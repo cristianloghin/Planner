@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useApp } from '../state'
-import type { CalendarEvent, Person, PersonId } from '../types'
+import type { Attendee, CalendarEvent, Person } from '../types'
 import { addDays, dayLabel, minutesToTime, timeToMinutes, toISODate } from '../lib/dates'
+import { attendeeBackground } from '../lib/people'
 
 // Layout scale. HOUR_H must match the gridline spacing in index.css.
 const HOUR_H = 56
@@ -11,7 +12,7 @@ const SNAP = 15
 
 /** A draft passed to the editor: either a new event (no id) or an existing one. */
 type Draft =
-  | { mode: 'new'; personId: PersonId; start: number; end: number }
+  | { mode: 'new'; personId: Attendee; start: number; end: number }
   | { mode: 'edit'; event: CalendarEvent }
 
 export function DayView() {
@@ -35,10 +36,13 @@ export function DayView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day, dateISO])
 
-  function addAt(personId: PersonId, minute: number) {
+  function addAt(personId: Attendee, minute: number) {
     const start = Math.min(Math.max(0, Math.round(minute / SNAP) * SNAP), DAY_MIN - SNAP)
     setDraft({ mode: 'new', personId, start, end: Math.min(start + 60, DAY_MIN) })
   }
+
+  const shared = state.events.filter((e) => e.day === day && e.personId === 'both')
+  const fullHeight = DAY_MIN * PX_PER_MIN
 
   return (
     <section className="planner">
@@ -54,26 +58,57 @@ export function DayView() {
 
       <div className="planner-head">
         <div className="gutter-spacer" />
-        {people.map((p) => (
-          <div key={p.id} className="lane-head" style={{ color: p.color }}>
-            <span className="dot" style={{ background: p.color }} />
-            {p.name}
-          </div>
-        ))}
+        <div className="lane-heads">
+          {people.map((p) => (
+            <div key={p.id} className="lane-head" style={{ color: p.color }}>
+              <span className="dot" style={{ background: p.color }} />
+              {p.name}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="planner-body" ref={scrollRef}>
         <TimeGutter />
-        {people.map((p) => (
-          <Lane
-            key={p.id}
-            person={p}
-            day={day}
-            nowMin={nowMin}
-            onAddAt={(min) => addAt(p.id, min)}
-            onEdit={(event) => setDraft({ mode: 'edit', event })}
-          />
-        ))}
+        <div className="lanes" style={{ height: fullHeight }}>
+          {people.map((p) => (
+            <Lane
+              key={p.id}
+              person={p}
+              day={day}
+              nowMin={nowMin}
+              onAddAt={(min) => addAt(p.id, min)}
+              onEdit={(event) => setDraft({ mode: 'edit', event })}
+            />
+          ))}
+
+          {/* Shared blocks span both columns, layered on top. */}
+          <div className="shared-layer" style={{ height: fullHeight }}>
+            {layout(shared).map(({ ev, col, cols }) => {
+              const top = ev.start * PX_PER_MIN
+              const height = Math.max((ev.end - ev.start) * PX_PER_MIN, 16)
+              return (
+                <button
+                  key={ev.id}
+                  className="tl-event shared"
+                  style={{
+                    top,
+                    height,
+                    left: `calc(${(100 / cols) * col}% + 2px)`,
+                    width: `calc(${100 / cols}% - 4px)`,
+                    background: attendeeBackground(state, 'both'),
+                  }}
+                  onClick={() => setDraft({ mode: 'edit', event: ev })}
+                >
+                  <span className="tl-time">
+                    {minutesToTime(ev.start)}–{minutesToTime(ev.end)} · Both
+                  </span>
+                  <span className="tl-title">{ev.title}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
       </div>
 
       {draft && <EventEditor draft={draft} day={day} onClose={() => setDraft(null)} />}
@@ -160,7 +195,7 @@ function Lane({
   }
 
   return (
-    <div className="lane" style={{ height: DAY_MIN * PX_PER_MIN }} onClick={handleClick}>
+    <div className="lane" onClick={handleClick}>
       {nowMin != null && (
         <div className="now-line" style={{ top: nowMin * PX_PER_MIN }}>
           <span className="now-dot" />
@@ -198,7 +233,7 @@ function EventEditor({ draft, day, onClose }: { draft: Draft; day: number; onClo
   const [title, setTitle] = useState(base?.title ?? '')
   const [start, setStart] = useState(minutesToTime(isEdit ? base!.start : draft.start))
   const [end, setEnd] = useState(minutesToTime(isEdit ? base!.end : draft.end))
-  const [personId, setPersonId] = useState<PersonId>(isEdit ? base!.personId : draft.personId)
+  const [personId, setPersonId] = useState<Attendee>(isEdit ? base!.personId : draft.personId)
 
   const titleRef = useRef<HTMLInputElement>(null)
   useEffect(() => titleRef.current?.focus(), [])
@@ -236,12 +271,13 @@ function EventEditor({ draft, day, onClose }: { draft: Draft; day: number; onClo
             <input type="time" step={SNAP * 60} value={end} onChange={(e) => setEnd(e.target.value)} />
           </label>
         </div>
-        <select value={personId} onChange={(e) => setPersonId(e.target.value as PersonId)}>
+        <select value={personId} onChange={(e) => setPersonId(e.target.value as Attendee)}>
           {Object.values(state.people).map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>
           ))}
+          <option value="both">Both (shared)</option>
         </select>
         <div className="modal-actions">
           {isEdit && (

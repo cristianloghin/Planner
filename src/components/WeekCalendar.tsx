@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useApp } from '../state'
-import type { CalendarEvent, PersonId } from '../types'
+import type { Attendee, CalendarEvent } from '../types'
 import { DAY_NAMES, dayLabel, minutesToTime, timeToMinutes, weekRangeLabel } from '../lib/dates'
+import { attendeeColor, attendeeName } from '../lib/people'
 
 export function WeekCalendar() {
   const { state, dispatch } = useApp()
@@ -31,19 +32,19 @@ export function WeekCalendar() {
               <div className="event-list">
                 {events.length === 0 && <p className="empty">No plans</p>}
                 {events.map((e) => {
-                  const person = state.people[e.personId]
+                  const color = attendeeColor(state, e.personId)
                   return (
                     <div
                       key={e.id}
                       className="event"
-                      style={{ borderLeftColor: person.color }}
+                      style={{ borderLeftColor: color }}
                     >
                       <div className="event-time">
                         {minutesToTime(e.start)}–{minutesToTime(e.end)}
                       </div>
                       <div className="event-title">{e.title}</div>
-                      <div className="event-meta" style={{ color: person.color }}>
-                        {person.name}
+                      <div className="event-meta" style={{ color }}>
+                        {attendeeName(state, e.personId)}
                       </div>
                       <button
                         className="event-del"
@@ -77,7 +78,7 @@ function EventForm({ day, onDone }: { day: number; onDone: () => void }) {
   const [title, setTitle] = useState('')
   const [start, setStart] = useState('09:00')
   const [end, setEnd] = useState('10:00')
-  const [personId, setPersonId] = useState<PersonId>('me')
+  const [personId, setPersonId] = useState<Attendee>('me')
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -105,12 +106,13 @@ function EventForm({ day, onDone }: { day: number; onDone: () => void }) {
         <input type="time" value={start} onChange={(e) => setStart(e.target.value)} />
         <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
       </div>
-      <select value={personId} onChange={(e) => setPersonId(e.target.value as PersonId)}>
+      <select value={personId} onChange={(e) => setPersonId(e.target.value as Attendee)}>
         {Object.values(state.people).map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
           </option>
         ))}
+        <option value="both">Both (shared)</option>
       </select>
       <div className="row">
         <button type="submit" className="primary">

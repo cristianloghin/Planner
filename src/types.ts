@@ -1,5 +1,8 @@
 export type PersonId = 'me' | 'partner'
 
+/** Who an event belongs to: one person, or 'both' (a shared block). */
+export type Attendee = PersonId | 'both'
+
 export interface Person {
   id: PersonId
   name: string
@@ -24,7 +27,8 @@ export interface CalendarEvent {
   /** Minutes from midnight. */
   start: number
   end: number
-  personId: PersonId
+  /** One person, or 'both' for a shared block spanning both columns. */
+  personId: Attendee
   notes?: string
 }
 

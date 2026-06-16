@@ -226,7 +226,17 @@ input[type='color'] {
 .planner-head,
 .planner-body {
   display: grid;
-  grid-template-columns: var(--gutter-w) repeat(2, minmax(0, 1fr));
+  grid-template-columns: var(--gutter-w) 1fr;
+}
+
+.lane-heads,
+.lanes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.lanes {
+  position: relative;
 }
 
 .planner-head {
@@ -336,6 +346,25 @@ input[type='color'] {
   height: 8px;
   border-radius: 50%;
   background: #ef4444;
+}
+
+/* Shared ('both') events: span both lanes, layered on top. */
+.shared-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.shared-layer .tl-event {
+  pointer-events: auto;
+}
+
+.tl-event.shared {
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
 }
 
 /* ---- Modal editor ---- */
