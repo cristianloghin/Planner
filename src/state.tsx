@@ -15,6 +15,8 @@ type Action =
   | { type: 'recolorPerson'; id: PersonId; color: string }
   | { type: 'shiftWeek'; delta: number }
   | { type: 'setWeek'; weekStart: string }
+  | { type: 'shiftDay'; delta: number }
+  | { type: 'setDay'; day: number }
 
 const id = () => Math.random().toString(36).slice(2, 10)
 
@@ -55,6 +57,20 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, weekStart: addDays(state.weekStart, action.delta * 7) }
     case 'setWeek':
       return { ...state, weekStart: action.weekStart }
+    case 'shiftDay': {
+      let day = state.selectedDay + action.delta
+      let weekStart = state.weekStart
+      if (day < 0) {
+        day = 6
+        weekStart = addDays(weekStart, -7)
+      } else if (day > 6) {
+        day = 0
+        weekStart = addDays(weekStart, 7)
+      }
+      return { ...state, selectedDay: day, weekStart }
+    }
+    case 'setDay':
+      return { ...state, selectedDay: action.day }
     default:
       return state
   }

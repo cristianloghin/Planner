@@ -34,4 +34,6 @@ export interface AppState {
   events: CalendarEvent[]
   /** ISO date (yyyy-mm-dd) of the Monday of the week being viewed. */
   weekStart: string
+  /** 0 = Monday ... 6 = Sunday — the day shown in the Day view. */
+  selectedDay: number
 }

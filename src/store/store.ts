@@ -13,6 +13,7 @@ export interface ScheduleStore {
 }
 
 export function defaultState(): AppState {
+  const today = new Date()
   return {
     people: {
       me: { id: 'me', name: 'Me', color: '#4f46e5' },
@@ -20,7 +21,8 @@ export function defaultState(): AppState {
     },
     tasks: [],
     events: [],
-    weekStart: mondayOf(new Date()),
+    weekStart: mondayOf(today),
+    selectedDay: (today.getDay() + 6) % 7, // 0 = Monday
   }
 }
 

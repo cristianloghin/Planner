@@ -1,19 +1,21 @@
 import { useState } from 'react'
 import { WeekCalendar } from './components/WeekCalendar'
+import { DayView } from './components/DayView'
 import { TaskList } from './components/TaskList'
 import { Settings } from './components/Settings'
 import { useApp } from './state'
 
-type Tab = 'calendar' | 'tasks' | 'settings'
+type Tab = 'day' | 'calendar' | 'tasks' | 'settings'
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: 'day', label: 'Day' },
   { id: 'calendar', label: 'Week' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'settings', label: 'People' },
 ]
 
 export function App() {
-  const [tab, setTab] = useState<Tab>('calendar')
+  const [tab, setTab] = useState<Tab>('day')
   const { state } = useApp()
 
   return (
@@ -31,6 +33,7 @@ export function App() {
       </header>
 
       <main className="app-main">
+        {tab === 'day' && <DayView />}
         {tab === 'calendar' && <WeekCalendar />}
         {tab === 'tasks' && <TaskList />}
         {tab === 'settings' && <Settings />}
