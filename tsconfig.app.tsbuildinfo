@@ -1,1 +1,0 @@
-{"root":["./src/App.tsx","./src/main.tsx","./src/state.tsx","./src/types.ts","./src/components/DayView.tsx","./src/components/Settings.tsx","./src/components/TaskList.tsx","./src/components/WeekCalendar.tsx","./src/lib/dates.ts","./src/store/store.ts"],"version":"5.9.3"}
