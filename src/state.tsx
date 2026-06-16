@@ -10,6 +10,7 @@ type Action =
   | { type: 'toggleTask'; id: string }
   | { type: 'removeTask'; id: string }
   | { type: 'addEvent'; event: Omit<CalendarEvent, 'id'> }
+  | { type: 'updateEvent'; event: CalendarEvent }
   | { type: 'removeEvent'; id: string }
   | { type: 'renamePerson'; id: PersonId; name: string }
   | { type: 'recolorPerson'; id: PersonId; color: string }
@@ -41,6 +42,11 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, tasks: state.tasks.filter((t) => t.id !== action.id) }
     case 'addEvent':
       return { ...state, events: [...state.events, { ...action.event, id: id() }] }
+    case 'updateEvent':
+      return {
+        ...state,
+        events: state.events.map((e) => (e.id === action.event.id ? action.event : e)),
+      }
     case 'removeEvent':
       return { ...state, events: state.events.filter((e) => e.id !== action.id) }
     case 'renamePerson':
