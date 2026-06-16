@@ -1,5 +1,22 @@
-import type { AppState } from '../types'
+import type { AppState, CalendarEvent, PersonId } from '../types'
 import { mondayOf } from '../lib/dates'
+
+/** Old events stored a single `personId` ('me' | 'partner' | 'kid' | 'both'). */
+type LegacyEvent = Omit<CalendarEvent, 'attendees'> & {
+  attendees?: PersonId[]
+  personId?: PersonId | 'both'
+}
+
+function migrateEvent(e: LegacyEvent): CalendarEvent {
+  if (Array.isArray(e.attendees) && e.attendees.length) {
+    const { personId: _drop, ...rest } = e
+    return rest as CalendarEvent
+  }
+  const attendees: PersonId[] =
+    e.personId === 'both' ? ['me', 'partner'] : [(e.personId as PersonId) ?? 'me']
+  const { personId: _drop, ...rest } = e
+  return { ...rest, attendees }
+}
 
 /**
  * Storage abstraction. Phase 1 is backed by localStorage (single device).
@@ -39,10 +56,12 @@ export class LocalStorageStore implements ScheduleStore {
       // Shallow-merge over defaults so missing/added fields stay valid, but
       // deep-merge people so newly-added members (e.g. Nora) appear for users
       // whose saved state predates them, while keeping their custom names/colours.
+      const events = (parsed.events ?? base.events).map((e) => migrateEvent(e as LegacyEvent))
       return {
         ...base,
         ...parsed,
         people: { ...base.people, ...(parsed.people ?? {}) },
+        events,
       } as AppState
     } catch {
       return defaultState()

@@ -1,8 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useApp } from '../state'
-import type { Attendee, CalendarEvent, Person } from '../types'
+import type { CalendarEvent, Person, PersonId } from '../types'
 import { addDays, dayLabel, minutesToTime, timeToMinutes, toISODate } from '../lib/dates'
-import { attendeeBackground } from '../lib/people'
+import { attendeeLabel, eventColor, isParentsPair, parentsGradient } from '../lib/people'
+import { kidStatuses, type KidStatus } from '../lib/conflicts'
+import { AttendeeChips } from './AttendeeChips'
 
 // Layout scale. HOUR_H must match the gridline spacing in index.css.
 const HOUR_H = 56
@@ -14,9 +16,8 @@ const SNAP = 15
 const KID_WEIGHT = 0.66
 const laneWeight = (p: Person) => (p.id === 'kid' ? KID_WEIGHT : 1)
 
-/** A draft passed to the editor: either a new event (no id) or an existing one. */
 type Draft =
-  | { mode: 'new'; personId: Attendee; start: number; end: number }
+  | { mode: 'new'; attendees: PersonId[]; start: number; end: number }
   | { mode: 'edit'; event: CalendarEvent }
 
 export function DayView() {
@@ -31,7 +32,6 @@ export function DayView() {
   const isToday = dateISO === toISODate(new Date())
   const nowMin = isToday ? new Date().getHours() * 60 + new Date().getMinutes() : null
 
-  // On day change, scroll to "now" if today, else to 07:00.
   useLayoutEffect(() => {
     const el = scrollRef.current
     if (!el) return
@@ -40,19 +40,20 @@ export function DayView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day, dateISO])
 
-  function addAt(personId: Attendee, minute: number) {
+  function addAt(attendees: PersonId[], minute: number) {
     const start = Math.min(Math.max(0, Math.round(minute / SNAP) * SNAP), DAY_MIN - SNAP)
-    setDraft({ mode: 'new', personId, start, end: Math.min(start + 60, DAY_MIN) })
+    setDraft({ mode: 'new', attendees, start, end: Math.min(start + 60, DAY_MIN) })
   }
 
-  const shared = state.events.filter((e) => e.day === day && e.personId === 'both')
-  const fullHeight = DAY_MIN * PX_PER_MIN
+  const dayEvents = state.events.filter((e) => e.day === day)
+  const spanning = dayEvents.filter((e) => isParentsPair(e.attendees))
+  const statuses = kidStatuses(dayEvents)
+  const hasWarnings = [...statuses.values()].some((s) => s !== 'covered')
 
-  // Column track sizing — Nora's lane is slimmer than the parents'.
+  const fullHeight = DAY_MIN * PX_PER_MIN
   const laneCols = people.map((p) => `${laneWeight(p)}fr`).join(' ')
   const totalWeight = people.reduce((s, p) => s + laneWeight(p), 0)
   const adultWeight = people.filter((p) => p.id !== 'kid').reduce((s, p) => s + laneWeight(p), 0)
-  // A 'both' block spans only the parent columns (which sit first).
   const adultPct = (adultWeight / totalWeight) * 100
 
   return (
@@ -66,6 +67,13 @@ export function DayView() {
           ›
         </button>
       </div>
+
+      {hasWarnings && (
+        <div className="conflict-legend">
+          <span className="warn-key clash">⚠ No one free for Nora</span>
+          <span className="warn-key needs">◌ Needs a grown-up</span>
+        </div>
+      )}
 
       <div className="planner-head">
         <div className="gutter-spacer" />
@@ -86,38 +94,35 @@ export function DayView() {
             <Lane
               key={p.id}
               person={p}
-              day={day}
+              dayEvents={dayEvents}
+              statuses={statuses}
               nowMin={nowMin}
-              onAddAt={(min) => addAt(p.id, min)}
+              onAddAt={(min) => addAt([p.id], min)}
               onEdit={(event) => setDraft({ mode: 'edit', event })}
             />
           ))}
 
-          {/* Shared blocks span the two parent columns, layered on top. */}
+          {/* 'Both' (two-parent) blocks span the two parent columns, layered on top. */}
           <div className="shared-layer" style={{ height: fullHeight, width: `${adultPct}%` }}>
-            {layout(shared).map(({ ev, col, cols }) => {
-              const top = ev.start * PX_PER_MIN
-              const height = Math.max((ev.end - ev.start) * PX_PER_MIN, 16)
-              return (
-                <button
-                  key={ev.id}
-                  className="tl-event shared"
-                  style={{
-                    top,
-                    height,
-                    left: `calc(${(100 / cols) * col}% + 2px)`,
-                    width: `calc(${100 / cols}% - 4px)`,
-                    background: attendeeBackground(state, 'both'),
-                  }}
-                  onClick={() => setDraft({ mode: 'edit', event: ev })}
-                >
-                  <span className="tl-time">
-                    {minutesToTime(ev.start)}–{minutesToTime(ev.end)} · Both
-                  </span>
-                  <span className="tl-title">{ev.title}</span>
-                </button>
-              )
-            })}
+            {layout(spanning).map(({ ev, col, cols }) => (
+              <button
+                key={ev.id}
+                className="tl-event shared"
+                style={{
+                  top: ev.start * PX_PER_MIN,
+                  height: Math.max((ev.end - ev.start) * PX_PER_MIN, 16),
+                  left: `calc(${(100 / cols) * col}% + 2px)`,
+                  width: `calc(${100 / cols}% - 4px)`,
+                  background: parentsGradient(state),
+                }}
+                onClick={() => setDraft({ mode: 'edit', event: ev })}
+              >
+                <span className="tl-time">
+                  {minutesToTime(ev.start)}–{minutesToTime(ev.end)} · Both
+                </span>
+                <span className="tl-title">{ev.title}</span>
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -184,22 +189,25 @@ function layout(events: CalendarEvent[]): Laid[] {
 
 function Lane({
   person,
-  day,
+  dayEvents,
+  statuses,
   nowMin,
   onAddAt,
   onEdit,
 }: {
   person: Person
-  day: number
+  dayEvents: CalendarEvent[]
+  statuses: Map<string, KidStatus>
   nowMin: number | null
   onAddAt: (minute: number) => void
   onEdit: (event: CalendarEvent) => void
 }) {
   const { state } = useApp()
-  const laid = layout(state.events.filter((e) => e.day === day && e.personId === person.id))
+  // This person's events, excluding two-parent 'Both' blocks (those span instead).
+  const mine = dayEvents.filter((e) => e.attendees.includes(person.id) && !isParentsPair(e.attendees))
+  const laid = layout(mine)
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
-    // Ignore clicks that landed on an event block.
     if ((e.target as HTMLElement).closest('.tl-event')) return
     const rect = e.currentTarget.getBoundingClientRect()
     onAddAt((e.clientY - rect.top) / PX_PER_MIN)
@@ -214,21 +222,29 @@ function Lane({
       )}
 
       {laid.map(({ ev, col, cols }) => {
-        const top = ev.start * PX_PER_MIN
-        const height = Math.max((ev.end - ev.start) * PX_PER_MIN, 16)
-        const width = `calc(${100 / cols}% - 4px)`
-        const left = `calc(${(100 / cols) * col}% + 2px)`
+        const status = statuses.get(ev.id)
+        const warnClass = status === 'clash' ? ' warn-clash' : status === 'needs' ? ' warn-needs' : ''
+        const joint = ev.attendees.length > 1
         return (
           <button
             key={ev.id}
-            className="tl-event"
-            style={{ top, height, left, width, background: person.color }}
+            className={`tl-event${warnClass}`}
+            style={{
+              top: ev.start * PX_PER_MIN,
+              height: Math.max((ev.end - ev.start) * PX_PER_MIN, 16),
+              left: `calc(${(100 / cols) * col}% + 2px)`,
+              width: `calc(${100 / cols}% - 4px)`,
+              background: eventColor(state, ev.attendees),
+            }}
             onClick={() => onEdit(ev)}
           >
             <span className="tl-time">
               {minutesToTime(ev.start)}–{minutesToTime(ev.end)}
+              {status === 'clash' && ' ⚠'}
+              {status === 'needs' && ' ◌'}
             </span>
             <span className="tl-title">{ev.title}</span>
+            {joint && <span className="tl-tag">{attendeeLabel(state, ev.attendees)}</span>}
           </button>
         )
       })}
@@ -237,14 +253,14 @@ function Lane({
 }
 
 function EventEditor({ draft, day, onClose }: { draft: Draft; day: number; onClose: () => void }) {
-  const { state, dispatch } = useApp()
+  const { dispatch } = useApp()
   const isEdit = draft.mode === 'edit'
   const base = isEdit ? draft.event : null
 
   const [title, setTitle] = useState(base?.title ?? '')
   const [start, setStart] = useState(minutesToTime(isEdit ? base!.start : draft.start))
   const [end, setEnd] = useState(minutesToTime(isEdit ? base!.end : draft.end))
-  const [personId, setPersonId] = useState<Attendee>(isEdit ? base!.personId : draft.personId)
+  const [attendees, setAttendees] = useState<PersonId[]>(isEdit ? base!.attendees : draft.attendees)
 
   const titleRef = useRef<HTMLInputElement>(null)
   useEffect(() => titleRef.current?.focus(), [])
@@ -255,9 +271,9 @@ function EventEditor({ draft, day, onClose }: { draft: Draft; day: number; onClo
     const s = timeToMinutes(start)
     const en = Math.max(timeToMinutes(end), s + SNAP)
     if (isEdit) {
-      dispatch({ type: 'updateEvent', event: { ...base!, title: title.trim(), start: s, end: en, personId } })
+      dispatch({ type: 'updateEvent', event: { ...base!, title: title.trim(), start: s, end: en, attendees } })
     } else {
-      dispatch({ type: 'addEvent', event: { title: title.trim(), day, start: s, end: en, personId } })
+      dispatch({ type: 'addEvent', event: { title: title.trim(), day, start: s, end: en, attendees } })
     }
     onClose()
   }
@@ -282,14 +298,8 @@ function EventEditor({ draft, day, onClose }: { draft: Draft; day: number; onClo
             <input type="time" step={SNAP * 60} value={end} onChange={(e) => setEnd(e.target.value)} />
           </label>
         </div>
-        <select value={personId} onChange={(e) => setPersonId(e.target.value as Attendee)}>
-          {Object.values(state.people).map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-          <option value="both">Both (shared)</option>
-        </select>
+        <label className="field">Who's involved?</label>
+        <AttendeeChips value={attendees} onChange={setAttendees} />
         <div className="modal-actions">
           {isEdit && (
             <button

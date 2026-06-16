@@ -367,6 +367,66 @@ input[type='color'] {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
 }
 
+.tl-tag {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Conflict markers on Nora's blocks. */
+.tl-event.warn-needs {
+  outline: 2px dashed #f59e0b;
+  outline-offset: -2px;
+}
+
+.tl-event.warn-clash {
+  outline: 2px solid #ef4444;
+  outline-offset: -2px;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
+}
+
+.conflict-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  justify-content: center;
+  margin: -4px 0 12px;
+  font-size: 12px;
+}
+
+.warn-key.clash {
+  color: #f87171;
+}
+
+.warn-key.needs {
+  color: #fbbf24;
+}
+
+/* Attendee chips (event editors). */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  background: transparent;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.chip.on {
+  color: #fff;
+}
+
 /* ---- Modal editor ---- */
 .modal-backdrop {
   position: fixed;
