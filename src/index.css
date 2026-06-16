@@ -1,13 +1,6 @@
+/* Design tokens live in styles/tokens.css. */
 :root {
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --surface-2: #273449;
-  --border: #334155;
-  --text: #e2e8f0;
-  --muted: #94a3b8;
-  --accent: #4f46e5;
-  --radius: 12px;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font);
 }
 
 * {
@@ -58,7 +51,7 @@ input[type='color'] {
   padding: 16px 20px;
   position: sticky;
   top: 0;
-  background: linear-gradient(var(--bg), rgba(15, 23, 42, 0.85));
+  background: var(--bg);
   backdrop-filter: blur(8px);
   z-index: 5;
 }
@@ -217,12 +210,6 @@ input[type='color'] {
 }
 
 /* ---- Day view: vertical planner timeline ---- */
-:root {
-  --gutter-w: 52px;
-  --hour-h: 56px; /* must match HOUR_H in DayView.tsx */
-  --quarter-h: 14px; /* hour / 4 */
-}
-
 .planner-head,
 .planner-body {
   display: grid;
@@ -286,15 +273,15 @@ input[type='color'] {
   /* Faint 15-min lines + stronger hour lines. */
   background-image: repeating-linear-gradient(
       to bottom,
-      rgba(148, 163, 184, 0.09) 0,
-      rgba(148, 163, 184, 0.09) 1px,
+      var(--grid-line) 0,
+      var(--grid-line) 1px,
       transparent 1px,
       transparent var(--quarter-h)
     ),
     repeating-linear-gradient(
       to bottom,
-      rgba(148, 163, 184, 0.22) 0,
-      rgba(148, 163, 184, 0.22) 1px,
+      var(--grid-line-strong) 0,
+      var(--grid-line-strong) 1px,
       transparent 1px,
       transparent var(--hour-h)
     );
@@ -305,13 +292,13 @@ input[type='color'] {
   border: none;
   border-radius: 7px;
   padding: 3px 6px;
-  color: #fff;
+  color: var(--on-accent);
   text-align: left;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 1px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 3px var(--shadow);
   line-height: 1.15;
 }
 
@@ -333,7 +320,7 @@ input[type='color'] {
   left: 0;
   right: 0;
   height: 0;
-  border-top: 2px solid #ef4444;
+  border-top: 2px solid var(--now);
   z-index: 2;
   pointer-events: none;
 }
@@ -345,7 +332,7 @@ input[type='color'] {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #ef4444;
+  background: var(--now);
 }
 
 /* Shared ('both') events: span both lanes, layered on top. */
@@ -363,8 +350,8 @@ input[type='color'] {
 }
 
 .tl-event.shared {
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--block-ring);
+  box-shadow: 0 2px 8px var(--shadow);
 }
 
 .tl-tag {
@@ -380,14 +367,14 @@ input[type='color'] {
 
 /* Conflict markers on Nora's blocks. */
 .tl-event.warn-needs {
-  outline: 2px dashed #f59e0b;
+  outline: 2px dashed var(--warning);
   outline-offset: -2px;
 }
 
 .tl-event.warn-clash {
-  outline: 2px solid #ef4444;
+  outline: 2px solid var(--danger);
   outline-offset: -2px;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25);
+  box-shadow: 0 0 0 3px var(--danger-glow);
 }
 
 .conflict-legend {
@@ -400,11 +387,11 @@ input[type='color'] {
 }
 
 .warn-key.clash {
-  color: #f87171;
+  color: var(--danger);
 }
 
 .warn-key.needs {
-  color: #fbbf24;
+  color: var(--warning);
 }
 
 /* Attendee chips (event editors). */
@@ -424,14 +411,14 @@ input[type='color'] {
 }
 
 .chip.on {
-  color: #fff;
+  color: var(--on-accent);
 }
 
 /* ---- Modal editor ---- */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(2, 6, 23, 0.6);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -487,8 +474,8 @@ input[type='color'] {
 
 .danger {
   background: transparent;
-  color: #f87171;
-  border: 1px solid #7f1d1d;
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
   border-radius: 8px;
   padding: 8px 12px;
 }
@@ -540,7 +527,7 @@ input[type='color'] {
 .badge {
   font-size: 11px;
   font-weight: 600;
-  color: #fff;
+  color: var(--on-accent);
   padding: 3px 8px;
   border-radius: 999px;
   white-space: nowrap;
@@ -587,7 +574,7 @@ input[type='color'] {
 /* ---- Buttons ---- */
 .primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   border: none;
   border-radius: 8px;
   padding: 8px 14px;
@@ -625,7 +612,7 @@ button:not(.primary):not(.tab):not(.add-link):not(.event-del):not(.task-del):not
 }
 
 .tab.active {
-  color: #fff;
+  color: var(--on-accent);
   background: var(--accent);
 }
 

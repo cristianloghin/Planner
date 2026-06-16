@@ -1,7 +1,7 @@
 import type { AppState, PersonId } from '../types'
 
-/** Colour used for shared parent ('Both') events where a single colour is needed. */
-export const SHARED_COLOR = '#a855f7'
+/** Colour for shared parent ('Both') events — the `--shared` design token. */
+export const SHARED_COLOR = 'var(--shared)'
 
 export const PARENT_IDS: PersonId[] = ['me', 'partner']
 

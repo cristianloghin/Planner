@@ -1,0 +1,63 @@
+/*
+ * Design tokens — the single place to adjust the look of the app.
+ *
+ * Colours are split into two groups:
+ *   1. Brand / status      — the same in both themes (accent, danger, ...).
+ *   2. Theme surfaces       — swapped automatically for light vs dark below.
+ * Layout tokens (sizes/spacing) live at the bottom.
+ *
+ * Light/dark follows the OS setting via `prefers-color-scheme`. To force one
+ * theme, delete the media query and keep only the values you want.
+ */
+:root {
+  /* Let native controls (time pickers, scrollbars) match the theme. */
+  color-scheme: light dark;
+
+  /* ---- Brand & status (theme-independent) ---- */
+  --accent: #4f46e5;
+  --on-accent: #ffffff; /* text/icons on a coloured block or accent button */
+  --danger: #ef4444;
+  --danger-glow: rgba(239, 68, 68, 0.25);
+  --warning: #f59e0b;
+  --shared: #a855f7; /* two-parent "Both" accent */
+  --now: #ef4444; /* current-time line */
+  --block-ring: rgba(255, 255, 255, 0.45);
+
+  /* ---- Typography ---- */
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* ---- Surfaces: dark theme (default) ---- */
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-2: #273449;
+  --border: #334155;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --grid-line: rgba(148, 163, 184, 0.09);
+  --grid-line-strong: rgba(148, 163, 184, 0.22);
+  --overlay: rgba(2, 6, 23, 0.6);
+  --shadow: rgba(0, 0, 0, 0.45);
+  --danger-border: #7f1d1d;
+
+  /* ---- Layout ---- */
+  --radius: 12px;
+  --gutter-w: 52px;
+  --hour-h: 56px; /* must match HOUR_H in DayView.tsx */
+  --quarter-h: 14px; /* hour / 4 */
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f1f5f9;
+    --surface: #ffffff;
+    --surface-2: #eef2f7;
+    --border: #d4dbe5;
+    --text: #0f172a;
+    --muted: #64748b;
+    --grid-line: rgba(71, 85, 105, 0.1);
+    --grid-line-strong: rgba(71, 85, 105, 0.22);
+    --overlay: rgba(15, 23, 42, 0.4);
+    --shadow: rgba(15, 23, 42, 0.18);
+    --danger-border: #fca5a5;
+  }
+}
