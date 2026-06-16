@@ -10,6 +10,10 @@ const PX_PER_MIN = HOUR_H / 60
 const DAY_MIN = 24 * 60
 const SNAP = 15
 
+// The kid's lane is narrower than an adult's (she shares a parent's time).
+const KID_WEIGHT = 0.66
+const laneWeight = (p: Person) => (p.id === 'kid' ? KID_WEIGHT : 1)
+
 /** A draft passed to the editor: either a new event (no id) or an existing one. */
 type Draft =
   | { mode: 'new'; personId: Attendee; start: number; end: number }
@@ -44,6 +48,13 @@ export function DayView() {
   const shared = state.events.filter((e) => e.day === day && e.personId === 'both')
   const fullHeight = DAY_MIN * PX_PER_MIN
 
+  // Column track sizing — Nora's lane is slimmer than the parents'.
+  const laneCols = people.map((p) => `${laneWeight(p)}fr`).join(' ')
+  const totalWeight = people.reduce((s, p) => s + laneWeight(p), 0)
+  const adultWeight = people.filter((p) => p.id !== 'kid').reduce((s, p) => s + laneWeight(p), 0)
+  // A 'both' block spans only the parent columns (which sit first).
+  const adultPct = (adultWeight / totalWeight) * 100
+
   return (
     <section className="planner">
       <div className="week-nav">
@@ -58,7 +69,7 @@ export function DayView() {
 
       <div className="planner-head">
         <div className="gutter-spacer" />
-        <div className="lane-heads">
+        <div className="lane-heads" style={{ gridTemplateColumns: laneCols }}>
           {people.map((p) => (
             <div key={p.id} className="lane-head" style={{ color: p.color }}>
               <span className="dot" style={{ background: p.color }} />
@@ -70,7 +81,7 @@ export function DayView() {
 
       <div className="planner-body" ref={scrollRef}>
         <TimeGutter />
-        <div className="lanes" style={{ height: fullHeight }}>
+        <div className="lanes" style={{ height: fullHeight, gridTemplateColumns: laneCols }}>
           {people.map((p) => (
             <Lane
               key={p.id}
@@ -82,8 +93,8 @@ export function DayView() {
             />
           ))}
 
-          {/* Shared blocks span both columns, layered on top. */}
-          <div className="shared-layer" style={{ height: fullHeight }}>
+          {/* Shared blocks span the two parent columns, layered on top. */}
+          <div className="shared-layer" style={{ height: fullHeight, width: `${adultPct}%` }}>
             {layout(shared).map(({ ev, col, cols }) => {
               const top = ev.start * PX_PER_MIN
               const height = Math.max((ev.end - ev.start) * PX_PER_MIN, 16)

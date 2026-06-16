@@ -18,6 +18,7 @@ export function defaultState(): AppState {
     people: {
       me: { id: 'me', name: 'Me', color: '#4f46e5' },
       partner: { id: 'partner', name: 'Partner', color: '#ec4899' },
+      kid: { id: 'kid', name: 'Nora', color: '#14b8a6' },
     },
     tasks: [],
     events: [],
@@ -34,8 +35,15 @@ export class LocalStorageStore implements ScheduleStore {
       const raw = localStorage.getItem(STORAGE_KEY)
       if (!raw) return defaultState()
       const parsed = JSON.parse(raw) as Partial<AppState>
-      // Shallow-merge over defaults so missing/added fields stay valid.
-      return { ...defaultState(), ...parsed } as AppState
+      const base = defaultState()
+      // Shallow-merge over defaults so missing/added fields stay valid, but
+      // deep-merge people so newly-added members (e.g. Nora) appear for users
+      // whose saved state predates them, while keeping their custom names/colours.
+      return {
+        ...base,
+        ...parsed,
+        people: { ...base.people, ...(parsed.people ?? {}) },
+      } as AppState
     } catch {
       return defaultState()
     }

@@ -232,7 +232,7 @@ input[type='color'] {
 .lane-heads,
 .lanes {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* grid-template-columns is set inline (data-driven, Nora's lane is narrower). */
 }
 
 .lanes {
@@ -353,7 +353,7 @@ input[type='color'] {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
+  /* width is set inline so the block spans only the parent columns. */
   pointer-events: none;
   z-index: 3;
 }

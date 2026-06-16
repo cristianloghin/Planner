@@ -1,6 +1,6 @@
-export type PersonId = 'me' | 'partner'
+export type PersonId = 'me' | 'partner' | 'kid'
 
-/** Who an event belongs to: one person, or 'both' (a shared block). */
+/** Who an event belongs to: one person, or 'both' (a shared parents block). */
 export type Attendee = PersonId | 'both'
 
 export interface Person {
