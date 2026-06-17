@@ -4,6 +4,7 @@ import { DayView } from './components/DayView'
 import { MonthView } from './components/MonthView'
 import { TaskList } from './components/TaskList'
 import { Settings } from './components/Settings'
+import { AlertHost } from './components/AlertHost'
 import { mondayOf, weekdayIndex } from './lib/dates'
 import { useApp } from './state'
 
@@ -29,6 +30,8 @@ export function App() {
 
   return (
     <div className="app">
+      <AlertHost />
+
       <main className="app-main">
         {tab === 'day' && <DayView />}
         {tab === 'calendar' && <WeekCalendar />}

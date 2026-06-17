@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../state'
 import type { CalendarEvent, PersonId, RecurrenceFreq } from '../types'
 import { minutesToTime, timeToMinutes } from '../lib/dates'
+import { REMINDER_OFFSETS, offsetLabel } from '../lib/notifications'
 import { AttendeeChips } from './AttendeeChips'
 
 const SNAP = 15
@@ -32,9 +33,16 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
   )
   const [repeat, setRepeat] = useState<RepeatChoice>(base?.recurrence?.freq ?? 'none')
   const [interval, setInterval] = useState(base?.recurrence?.interval ?? 1)
+  const [reminders, setReminders] = useState<number[]>(base?.reminders ?? [])
 
   const titleRef = useRef<HTMLInputElement>(null)
   useEffect(() => titleRef.current?.focus(), [])
+
+  function toggleReminder(offset: number) {
+    setReminders((prev) =>
+      prev.includes(offset) ? prev.filter((o) => o !== offset) : [...prev, offset],
+    )
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -50,6 +58,7 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
       days: allDay ? Math.max(1, days) : 1,
       recurrence: repeat === 'none' ? undefined : { freq: repeat, interval: Math.max(1, interval) },
       attendees,
+      reminders: reminders.length ? [...reminders].sort((a, b) => a - b) : undefined,
     }
     if (isEdit) {
       dispatch({ type: 'updateEvent', event: { ...event, id: base!.id } })
@@ -142,6 +151,24 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
 
         <label className="field">Who's involved?</label>
         <AttendeeChips value={attendees} onChange={setAttendees} />
+
+        <label className="field">Remind me</label>
+        <div className="chips">
+          {REMINDER_OFFSETS.map((o) => {
+            const on = reminders.includes(o)
+            return (
+              <button
+                type="button"
+                key={o}
+                className={on ? 'chip on' : 'chip'}
+                style={on ? { background: 'var(--accent)', borderColor: 'var(--accent)' } : undefined}
+                onClick={() => toggleReminder(o)}
+              >
+                {offsetLabel(o)}
+              </button>
+            )
+          })}
+        </div>
 
         {isEdit && (
           <button

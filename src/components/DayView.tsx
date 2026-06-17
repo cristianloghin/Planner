@@ -5,7 +5,9 @@ import { addDays, isoLabel, minutesToTime, toISODate } from '../lib/dates'
 import { occurrencesOnDate, type DayOccurrence } from '../lib/recurrence'
 import { attendeeLabel, eventColor, isParentsPair, parentsGradient } from '../lib/people'
 import { kidStatuses, type KidStatus } from '../lib/conflicts'
+import { remindersOnDate } from '../lib/notifications'
 import { EventEditor, type EditorTarget } from './EventEditor'
+import { ReminderEditor, type ReminderTarget } from './ReminderEditor'
 
 // Layout scale. HOUR_H must match the gridline spacing in index.css.
 const HOUR_H = 56
@@ -22,6 +24,7 @@ export function DayView() {
   const day = state.selectedDay
   const people = Object.values(state.people)
   const [target, setTarget] = useState<EditorTarget | null>(null)
+  const [reminderTarget, setReminderTarget] = useState<ReminderTarget | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -53,6 +56,8 @@ export function DayView() {
   )
   const statuses = kidStatuses(coverage)
   const hasWarnings = [...statuses.values()].some((s) => s !== 'covered')
+
+  const dayReminders = remindersOnDate(state.reminders, dateISO)
 
   const fullHeight = DAY_MIN * PX_PER_MIN
   const laneCols = people.map((p) => `${laneWeight(p)}fr`).join(' ')
@@ -94,6 +99,26 @@ export function DayView() {
             onClick={() => setTarget({ mode: 'new', date: dateISO, attendees: ['me'] })}
           >
             + All-day
+          </button>
+        </div>
+
+        <div className="reminder-bar">
+          {dayReminders.map((r) => (
+            <button
+              key={r.id}
+              className="reminder-chip"
+              onClick={() => setReminderTarget({ mode: 'edit', reminder: r })}
+            >
+              <span className="reminder-icon">🔔</span>
+              {minutesToTime(r.time)} {r.title}
+              {r.repeat === 'daily' && <span className="reminder-repeat">daily</span>}
+            </button>
+          ))}
+          <button
+            className="allday-add"
+            onClick={() => setReminderTarget({ mode: 'new', date: dateISO })}
+          >
+            + Reminder
           </button>
         </div>
       </div>
@@ -153,6 +178,9 @@ export function DayView() {
       </div>
 
       {target && <EventEditor target={target} onClose={() => setTarget(null)} />}
+      {reminderTarget && (
+        <ReminderEditor target={reminderTarget} onClose={() => setReminderTarget(null)} />
+      )}
     </section>
   )
 }
@@ -175,6 +203,7 @@ function AllDayChip({
       <span className="allday-meta">
         {attendeeLabel(state, event.attendees)}
         {occ.span > 1 && ` · day ${occ.offset + 1}/${occ.span}`}
+        {event.reminders?.length ? ' 🔔' : ''}
         {status === 'clash' && ' ⚠'}
         {status === 'needs' && ' ◌'}
       </span>
@@ -290,6 +319,7 @@ function Lane({
           >
             <span className="tl-time">
               {minutesToTime(ev.start)}–{minutesToTime(ev.end)}
+              {ev.reminders?.length ? ' 🔔' : ''}
               {status === 'clash' && ' ⚠'}
               {status === 'needs' && ' ◌'}
             </span>

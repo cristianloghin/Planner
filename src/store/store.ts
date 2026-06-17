@@ -17,6 +17,7 @@ interface LegacyEvent {
   days?: number
   recurrence?: Recurrence
   attendees?: PersonId[]
+  reminders?: number[]
   personId?: PersonId | 'both'
   notes?: string
 }
@@ -42,6 +43,7 @@ function migrateEvent(e: LegacyEvent, weekStart: string): CalendarEvent {
     days: e.days ?? 1,
     recurrence: e.recurrence,
     attendees,
+    reminders: e.reminders,
     notes: e.notes,
   }
 }
@@ -67,6 +69,7 @@ export function defaultState(): AppState {
     },
     tasks: [],
     events: [],
+    reminders: [],
     weekStart: mondayOf(today),
     selectedDay: (today.getDay() + 6) % 7, // 0 = Monday
   }
@@ -91,6 +94,7 @@ export class LocalStorageStore implements ScheduleStore {
         ...parsed,
         people: { ...base.people, ...(parsed.people ?? {}) },
         events,
+        reminders: parsed.reminders ?? base.reminders,
       } as AppState
     } catch {
       return defaultState()

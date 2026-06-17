@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react'
-import type { AppState, CalendarEvent, PersonId, Task } from './types'
+import type { AppState, CalendarEvent, PersonId, Reminder, Task } from './types'
 import { createStore } from './store/store'
 import { addDays } from './lib/dates'
 
@@ -12,6 +12,9 @@ type Action =
   | { type: 'addEvent'; event: Omit<CalendarEvent, 'id'> }
   | { type: 'updateEvent'; event: CalendarEvent }
   | { type: 'removeEvent'; id: string }
+  | { type: 'addReminder'; reminder: Omit<Reminder, 'id'> }
+  | { type: 'updateReminder'; reminder: Reminder }
+  | { type: 'removeReminder'; id: string }
   | { type: 'renamePerson'; id: PersonId; name: string }
   | { type: 'recolorPerson'; id: PersonId; color: string }
   | { type: 'shiftWeek'; delta: number }
@@ -49,6 +52,15 @@ function reducer(state: AppState, action: Action): AppState {
       }
     case 'removeEvent':
       return { ...state, events: state.events.filter((e) => e.id !== action.id) }
+    case 'addReminder':
+      return { ...state, reminders: [...state.reminders, { ...action.reminder, id: id() }] }
+    case 'updateReminder':
+      return {
+        ...state,
+        reminders: state.reminders.map((r) => (r.id === action.reminder.id ? action.reminder : r)),
+      }
+    case 'removeReminder':
+      return { ...state, reminders: state.reminders.filter((r) => r.id !== action.id) }
     case 'renamePerson':
       return {
         ...state,
