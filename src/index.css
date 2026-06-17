@@ -43,33 +43,9 @@ input[type='color'] {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.app-header {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  background: var(--bg);
-}
-
-.app-header h1 {
-  font-size: 20px;
-  margin: 0;
-}
-
-.people-legend {
-  display: flex;
-  gap: 14px;
-}
-
-.legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--muted);
+  /* Reserve the iPhone status bar area (time/battery) under black-translucent;
+     fall back to a small inset where none is reported. */
+  padding-top: max(env(safe-area-inset-top), 16px);
 }
 
 .dot {
@@ -800,10 +776,5 @@ button:not(.primary):not(.tab):not(.add-link):not(.event-del):not(.task-del):not
   }
   .day-col {
     min-height: auto;
-  }
-  .app-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
   }
 }

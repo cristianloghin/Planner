@@ -19,7 +19,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function App() {
   const [tab, setTab] = useState<Tab>('day')
-  const { state, dispatch } = useApp()
+  const { dispatch } = useApp()
 
   function openDay(iso: string) {
     dispatch({ type: 'setWeek', weekStart: mondayOf(new Date(iso + 'T00:00:00')) })
@@ -29,18 +29,6 @@ export function App() {
 
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>Planner</h1>
-        <div className="people-legend">
-          {Object.values(state.people).map((p) => (
-            <span key={p.id} className="legend-item">
-              <span className="dot" style={{ background: p.color }} />
-              {p.name}
-            </span>
-          ))}
-        </div>
-      </header>
-
       <main className="app-main">
         {tab === 'day' && <DayView />}
         {tab === 'calendar' && <WeekCalendar />}
