@@ -202,24 +202,6 @@ input[type='color'] {
   font-size: 13px;
 }
 
-.event-form {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.event-form .row {
-  display: flex;
-  gap: 6px;
-}
-
-.event-form input,
-.event-form select {
-  width: 100%;
-  font-size: 13px;
-}
-
 /* ---- Month view ---- */
 .month-grid {
   display: grid;
@@ -570,41 +552,56 @@ input[type='color'] {
   color: var(--on-accent);
 }
 
-/* ---- Modal editor ---- */
-.modal-backdrop {
+/* ---- Full-page event editor ---- */
+.editor-page {
   position: fixed;
   inset: 0;
-  background: var(--overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  z-index: 20;
-}
-
-.modal {
-  width: 100%;
-  max-width: 360px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px;
+  z-index: 30;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  background: var(--bg);
 }
 
-.modal h3 {
-  margin: 0;
+.editor-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: max(env(safe-area-inset-top), 16px) 16px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.editor-head strong {
   font-size: 16px;
 }
 
-.modal input,
-.modal select {
+.editor-cancel {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 15px;
+  padding: 6px 2px;
+}
+
+.editor-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  padding-bottom: calc(28px + env(safe-area-inset-bottom));
+}
+
+.editor-body input,
+.editor-body select {
   width: 100%;
 }
 
-.modal .row {
+.editor-body .row {
   display: flex;
   gap: 10px;
 }
@@ -618,14 +615,9 @@ input[type='color'] {
   color: var(--muted);
 }
 
-.modal-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.modal-actions .spacer {
-  flex: 1;
+.editor-delete {
+  margin-top: 6px;
+  width: 100%;
 }
 
 .danger {
@@ -633,7 +625,7 @@ input[type='color'] {
   color: var(--danger);
   border: 1px solid var(--danger-border);
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 10px 12px;
 }
 
 /* ---- Tasks ---- */
@@ -736,7 +728,7 @@ input[type='color'] {
   padding: 8px 14px;
 }
 
-button:not(.primary):not(.tab):not(.add-link):not(.event-del):not(.task-del):not(.week-nav button):not(.month-cell):not(.allday-chip):not(.allday-add):not(.event-body) {
+button:not(.primary):not(.tab):not(.add-link):not(.event-del):not(.task-del):not(.week-nav button):not(.month-cell):not(.allday-chip):not(.allday-add):not(.event-body):not(.editor-cancel):not(.danger) {
   background: var(--surface-2);
   color: var(--text);
   border: 1px solid var(--border);
