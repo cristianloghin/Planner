@@ -34,8 +34,8 @@ export function TaskList() {
   }
 
   return (
-    <section className="tasks">
-      <form className="task-add" onSubmit={addTask}>
+    <section className="tasks view">
+      <form className="task-add view-head" onSubmit={addTask}>
         <input
           placeholder="Add a task…"
           value={title}
@@ -54,6 +54,7 @@ export function TaskList() {
         </button>
       </form>
 
+      <div className="view-body">
       <ul className="task-list">
         {open.map((t) => (
           <li key={t.id} className="task">
@@ -105,6 +106,7 @@ export function TaskList() {
           </ul>
         </>
       )}
+      </div>
     </section>
   )
 }

@@ -38,22 +38,20 @@ input[type='color'] {
 .app {
   max-width: 1100px;
   margin: 0 auto;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding-bottom: 72px;
+  overflow: hidden;
 }
 
 .app-header {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  position: sticky;
-  top: 0;
   background: var(--bg);
-  backdrop-filter: blur(8px);
-  z-index: 5;
 }
 
 .app-header h1 {
@@ -83,7 +81,32 @@ input[type='color'] {
 
 .app-main {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: 12px 16px;
+}
+
+/*
+ * Layout contract for every view: the view fills the main area, its head (nav,
+ * lane names) stays put, and only `.view-body` scrolls — one scrollbar per view.
+ */
+.view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.view-head {
+  flex: none;
+}
+
+.view-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* ---- Week calendar ---- */
@@ -367,7 +390,7 @@ input[type='color'] {
 
 /* ---- Day view: vertical planner timeline ---- */
 .planner-head,
-.planner-body {
+.planner-grid {
   display: grid;
   grid-template-columns: var(--gutter-w) 1fr;
 }
@@ -402,7 +425,8 @@ input[type='color'] {
 }
 
 .planner-body {
-  max-height: calc(100vh - 230px);
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -746,10 +770,7 @@ button:not(.primary):not(.tab):not(.add-link):not(.event-del):not(.task-del):not
 
 /* ---- Tab bar ---- */
 .tabbar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  flex: none;
   display: flex;
   background: var(--surface);
   border-top: 1px solid var(--border);
