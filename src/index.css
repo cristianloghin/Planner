@@ -1,0 +1,632 @@
+/* Design tokens live in styles/tokens.css. */
+:root {
+  font-family: var(--font);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+input,
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+input[type='color'] {
+  padding: 2px;
+  width: 44px;
+  height: 38px;
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 72px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  backdrop-filter: blur(8px);
+  z-index: 5;
+}
+
+.app-header h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.people-legend {
+  display: flex;
+  gap: 14px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.app-main {
+  flex: 1;
+  padding: 12px 16px;
+}
+
+/* ---- Week calendar ---- */
+.week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.week-nav button {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+}
+
+.days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.day-col {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 140px;
+}
+
+.day-head {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.event-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.event {
+  position: relative;
+  background: var(--surface-2);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.event-time {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.event-title {
+  font-size: 13px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.event-meta {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.event-del,
+.task-del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  margin: 8px 0;
+}
+
+.add-link {
+  margin-top: 8px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 6px;
+  font-size: 13px;
+}
+
+.event-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.event-form .row {
+  display: flex;
+  gap: 6px;
+}
+
+.event-form input,
+.event-form select {
+  width: 100%;
+  font-size: 13px;
+}
+
+/* ---- Day view: vertical planner timeline ---- */
+.planner-head,
+.planner-body {
+  display: grid;
+  grid-template-columns: var(--gutter-w) 1fr;
+}
+
+.lane-heads,
+.lanes {
+  display: grid;
+  /* grid-template-columns is set inline (data-driven, Nora's lane is narrower). */
+}
+
+.lanes {
+  position: relative;
+}
+
+.planner-head {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.lane-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 10px 4px;
+  border-left: 1px solid var(--border);
+}
+
+.planner-body {
+  max-height: calc(100vh - 230px);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.time-gutter {
+  position: relative;
+}
+
+.gutter-label {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.lane {
+  position: relative;
+  border-left: 1px solid var(--border);
+  cursor: copy;
+  /* Faint 15-min lines + stronger hour lines. */
+  background-image: repeating-linear-gradient(
+      to bottom,
+      var(--grid-line) 0,
+      var(--grid-line) 1px,
+      transparent 1px,
+      transparent var(--quarter-h)
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--grid-line-strong) 0,
+      var(--grid-line-strong) 1px,
+      transparent 1px,
+      transparent var(--hour-h)
+    );
+}
+
+.tl-event {
+  position: absolute;
+  border: none;
+  border-radius: 7px;
+  padding: 3px 6px;
+  color: var(--on-accent);
+  text-align: left;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  box-shadow: 0 1px 3px var(--shadow);
+  line-height: 1.15;
+}
+
+.tl-time {
+  font-size: 10px;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.tl-title {
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px solid var(--now);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.now-dot {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--now);
+}
+
+/* Shared ('both') events: span both lanes, layered on top. */
+.shared-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* width is set inline so the block spans only the parent columns. */
+  pointer-events: none;
+  z-index: 3;
+}
+
+.shared-layer .tl-event {
+  pointer-events: auto;
+}
+
+.tl-event.shared {
+  border: 1px solid var(--block-ring);
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+.tl-tag {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Conflict markers on Nora's blocks. */
+.tl-event.warn-needs {
+  outline: 2px dashed var(--warning);
+  outline-offset: -2px;
+}
+
+.tl-event.warn-clash {
+  outline: 2px solid var(--danger);
+  outline-offset: -2px;
+  box-shadow: 0 0 0 3px var(--danger-glow);
+}
+
+.conflict-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  justify-content: center;
+  margin: -4px 0 12px;
+  font-size: 12px;
+}
+
+.warn-key.clash {
+  color: var(--danger);
+}
+
+.warn-key.needs {
+  color: var(--warning);
+}
+
+/* Attendee chips (event editors). */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  background: transparent;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.chip.on {
+  color: var(--on-accent);
+}
+
+/* ---- Modal editor ---- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 20;
+}
+
+.modal {
+  width: 100%;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.modal input,
+.modal select {
+  width: 100%;
+}
+
+.modal .row {
+  display: flex;
+  gap: 10px;
+}
+
+.field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-actions .spacer {
+  flex: 1;
+}
+
+.danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+/* ---- Tasks ---- */
+.task-add {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.task-add input {
+  flex: 1;
+}
+
+.task-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.task {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 36px 10px 12px;
+}
+
+.task label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  cursor: pointer;
+}
+
+.task.done .task-title {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--on-accent);
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.badge.shared {
+  background: var(--surface-2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.done-head {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 8px 0;
+}
+
+/* ---- Settings ---- */
+.settings {
+  max-width: 420px;
+}
+
+.person-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.person-row input[type='text'] {
+  flex: 1;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.hint.small {
+  font-size: 12px;
+  margin-top: 20px;
+}
+
+/* ---- Buttons ---- */
+.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+}
+
+button:not(.primary):not(.tab):not(.add-link):not(.event-del):not(.task-del):not(.week-nav button) {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+}
+
+/* ---- Tab bar ---- */
+.tabbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 8px max(16px, env(safe-area-inset-left)) calc(8px + env(safe-area-inset-bottom));
+}
+
+.tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.tab.active {
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 720px) {
+  .days {
+    grid-template-columns: 1fr;
+  }
+  .day-col {
+    min-height: auto;
+  }
+  .app-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
