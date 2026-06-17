@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../state'
+import { active } from '../lib/sync'
 import { dueAlerts, type FiredAlert } from '../lib/notifications'
 
 const SEEN_KEY = 'planner.alertsSeen'
@@ -19,18 +20,18 @@ function loadSeen(): number {
  */
 export function AlertHost() {
   const { state } = useApp()
-  const [active, setActive] = useState<FiredAlert[]>([])
+  const [banners, setBanners] = useState<FiredAlert[]>([])
   const seenRef = useRef(loadSeen())
 
   useEffect(() => {
     function check() {
       const now = Date.now()
       const from = Math.max(seenRef.current, now - MAX_LOOKBACK_MS)
-      const due = dueAlerts(state.events, state.reminders, from, now)
+      const due = dueAlerts(active(state.events), active(state.reminders), from, now)
       seenRef.current = now
       localStorage.setItem(SEEN_KEY, String(now))
       if (due.length) {
-        setActive((prev) => {
+        setBanners((prev) => {
           const seen = new Set(prev.map((a) => a.id))
           return [...prev, ...due.filter((a) => !seen.has(a.id))]
         })
@@ -47,13 +48,13 @@ export function AlertHost() {
   }, [state.events, state.reminders])
 
   function dismiss(id: string) {
-    setActive((prev) => prev.filter((a) => a.id !== id))
+    setBanners((prev) => prev.filter((a) => a.id !== id))
   }
 
-  if (!active.length) return null
+  if (!banners.length) return null
   return (
     <div className="alert-host">
-      {active.map((a) => (
+      {banners.map((a) => (
         <AlertCard key={a.id} alert={a} onDismiss={() => dismiss(a.id)} />
       ))}
     </div>

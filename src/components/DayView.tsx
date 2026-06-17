@@ -1,10 +1,11 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { useApp } from '../state'
-import type { CalendarEvent, Person, PersonId } from '../types'
+import type { CalendarEvent, Member, MemberId } from '../types'
 import { addDays, isoLabel, minutesToTime, toISODate } from '../lib/dates'
+import { active } from '../lib/sync'
 import { occurrencesOnDate, type DayOccurrence } from '../lib/recurrence'
-import { attendeeLabel, eventColor, isParentsPair, parentsGradient } from '../lib/people'
-import { kidStatuses, type KidStatus } from '../lib/conflicts'
+import { adultsGradient, attendeeLabel, eventColor, isAdultGroup } from '../lib/people'
+import { childStatuses, type CoverageStatus } from '../lib/conflicts'
 import { remindersOnDate } from '../lib/notifications'
 import { EventEditor, type EditorTarget } from './EventEditor'
 import { ReminderEditor, type ReminderTarget } from './ReminderEditor'
@@ -15,14 +16,18 @@ const PX_PER_MIN = HOUR_H / 60
 const DAY_MIN = 24 * 60
 const SNAP = 15
 
-// The kid's lane is narrower than an adult's (she shares a parent's time).
-const KID_WEIGHT = 0.66
-const laneWeight = (p: Person) => (p.id === 'kid' ? KID_WEIGHT : 1)
+// A child's lane is narrower than an adult's (they share an adult's time).
+const CHILD_WEIGHT = 0.66
+const laneWeight = (m: Member) => (m.role === 'child' ? CHILD_WEIGHT : 1)
 
 export function DayView() {
   const { state, dispatch } = useApp()
   const day = state.selectedDay
-  const people = Object.values(state.people)
+  // Adults first so the shared-event layer can span the leftmost columns.
+  const members = [...active(state.members)].sort(
+    (a, b) => (a.role === 'child' ? 1 : 0) - (b.role === 'child' ? 1 : 0),
+  )
+  const defaultAttendees = members[0] ? [members[0].id] : []
   const [target, setTarget] = useState<EditorTarget | null>(null)
   const [reminderTarget, setReminderTarget] = useState<ReminderTarget | null>(null)
 
@@ -40,30 +45,30 @@ export function DayView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day, dateISO])
 
-  function addAt(attendees: PersonId[], minute: number) {
+  function addAt(attendees: MemberId[], minute: number) {
     const start = Math.min(Math.max(0, Math.round(minute / SNAP) * SNAP), DAY_MIN - SNAP)
     setTarget({ mode: 'new', date: dateISO, attendees, start, end: Math.min(start + 60, DAY_MIN) })
   }
 
-  const occs = occurrencesOnDate(state.events, dateISO)
+  const occs = occurrencesOnDate(active(state.events), dateISO)
   const timed = occs.filter((o) => !o.event.allDay).map((o) => o.event)
   const allDayOccs = occs.filter((o) => o.event.allDay)
-  const spanning = timed.filter((e) => isParentsPair(e.attendees))
+  const spanning = timed.filter((e) => isAdultGroup(members, e.attendees))
 
   // Coverage looks at the whole day: all-day events count as busy from 00:00–24:00.
   const coverage = occs.map((o) =>
     o.event.allDay ? { ...o.event, start: 0, end: DAY_MIN } : o.event,
   )
-  const statuses = kidStatuses(coverage)
+  const statuses = childStatuses(members, coverage)
   const hasWarnings = [...statuses.values()].some((s) => s !== 'covered')
 
-  const dayReminders = remindersOnDate(state.reminders, dateISO)
+  const dayReminders = remindersOnDate(active(state.reminders), dateISO)
 
   const fullHeight = DAY_MIN * PX_PER_MIN
-  const laneCols = people.map((p) => `${laneWeight(p)}fr`).join(' ')
-  const totalWeight = people.reduce((s, p) => s + laneWeight(p), 0)
-  const adultWeight = people.filter((p) => p.id !== 'kid').reduce((s, p) => s + laneWeight(p), 0)
-  const adultPct = (adultWeight / totalWeight) * 100
+  const laneCols = members.map((m) => `${laneWeight(m)}fr`).join(' ')
+  const totalWeight = members.reduce((s, m) => s + laneWeight(m), 0)
+  const adultWeight = members.filter((m) => m.role !== 'child').reduce((s, m) => s + laneWeight(m), 0)
+  const adultPct = totalWeight ? (adultWeight / totalWeight) * 100 : 100
 
   return (
     <section className="planner view">
@@ -80,7 +85,7 @@ export function DayView() {
 
         {hasWarnings && (
           <div className="conflict-legend">
-            <span className="warn-key clash">⚠ No one free for Nora</span>
+            <span className="warn-key clash">⚠ No adult free</span>
             <span className="warn-key needs">◌ Needs a grown-up</span>
           </div>
         )}
@@ -90,13 +95,14 @@ export function DayView() {
             <AllDayChip
               key={o.event.id}
               occ={o}
+              members={members}
               status={statuses.get(o.event.id)}
               onClick={() => setTarget({ mode: 'edit', event: o.event })}
             />
           ))}
           <button
             className="allday-add"
-            onClick={() => setTarget({ mode: 'new', date: dateISO, attendees: ['me'] })}
+            onClick={() => setTarget({ mode: 'new', date: dateISO, attendees: defaultAttendees })}
           >
             + All-day
           </button>
@@ -127,10 +133,10 @@ export function DayView() {
         <div className="planner-head">
           <div className="gutter-spacer" />
           <div className="lane-heads" style={{ gridTemplateColumns: laneCols }}>
-            {people.map((p) => (
-              <div key={p.id} className="lane-head" style={{ color: p.color }}>
-                <span className="dot" style={{ background: p.color }} />
-                {p.name}
+            {members.map((m) => (
+              <div key={m.id} className="lane-head" style={{ color: m.color }}>
+                <span className="dot" style={{ background: m.color }} />
+                {m.name}
               </div>
             ))}
           </div>
@@ -139,19 +145,20 @@ export function DayView() {
         <div className="planner-grid">
           <TimeGutter />
           <div className="lanes" style={{ height: fullHeight, gridTemplateColumns: laneCols }}>
-            {people.map((p) => (
+            {members.map((m) => (
               <Lane
-                key={p.id}
-                person={p}
+                key={m.id}
+                member={m}
+                members={members}
                 dayEvents={timed}
                 statuses={statuses}
                 nowMin={nowMin}
-                onAddAt={(min) => addAt([p.id], min)}
+                onAddAt={(min) => addAt([m.id], min)}
                 onEdit={(event) => setTarget({ mode: 'edit', event })}
               />
             ))}
 
-            {/* 'Both' (two-parent) blocks span the two parent columns, layered on top. */}
+            {/* Shared adult ('Both') blocks span the adult columns, layered on top. */}
             <div className="shared-layer" style={{ height: fullHeight, width: `${adultPct}%` }}>
               {layout(spanning).map(({ ev, col, cols }) => (
                 <button
@@ -162,12 +169,12 @@ export function DayView() {
                     height: Math.max((ev.end - ev.start) * PX_PER_MIN, 16),
                     left: `calc(${(100 / cols) * col}% + 2px)`,
                     width: `calc(${100 / cols}% - 4px)`,
-                    background: parentsGradient(state),
+                    background: adultsGradient(members, ev.attendees),
                   }}
                   onClick={() => setTarget({ mode: 'edit', event: ev })}
                 >
                   <span className="tl-time">
-                    {minutesToTime(ev.start)}–{minutesToTime(ev.end)} · Both
+                    {minutesToTime(ev.start)}–{minutesToTime(ev.end)} · {attendeeLabel(members, ev.attendees)}
                   </span>
                   <span className="tl-title">{ev.title}</span>
                 </button>
@@ -187,21 +194,26 @@ export function DayView() {
 
 function AllDayChip({
   occ,
+  members,
   status,
   onClick,
 }: {
   occ: DayOccurrence
-  status: KidStatus | undefined
+  members: Member[]
+  status: CoverageStatus | undefined
   onClick: () => void
 }) {
-  const { state } = useApp()
   const { event } = occ
   const warnClass = status === 'clash' ? ' warn-clash' : status === 'needs' ? ' warn-needs' : ''
   return (
-    <button className={`allday-chip${warnClass}`} style={{ background: eventColor(state, event.attendees) }} onClick={onClick}>
+    <button
+      className={`allday-chip${warnClass}`}
+      style={{ background: eventColor(members, event.attendees) }}
+      onClick={onClick}
+    >
       <span className="allday-title">{event.title}</span>
       <span className="allday-meta">
-        {attendeeLabel(state, event.attendees)}
+        {attendeeLabel(members, event.attendees)}
         {occ.span > 1 && ` · day ${occ.offset + 1}/${occ.span}`}
         {event.reminders?.length ? ' 🔔' : ''}
         {status === 'clash' && ' ⚠'}
@@ -267,23 +279,26 @@ function layout(events: CalendarEvent[]): Laid[] {
 }
 
 function Lane({
-  person,
+  member,
+  members,
   dayEvents,
   statuses,
   nowMin,
   onAddAt,
   onEdit,
 }: {
-  person: Person
+  member: Member
+  members: Member[]
   dayEvents: CalendarEvent[]
-  statuses: Map<string, KidStatus>
+  statuses: Map<string, CoverageStatus>
   nowMin: number | null
   onAddAt: (minute: number) => void
   onEdit: (event: CalendarEvent) => void
 }) {
-  const { state } = useApp()
-  // This person's events, excluding two-parent 'Both' blocks (those span instead).
-  const mine = dayEvents.filter((e) => e.attendees.includes(person.id) && !isParentsPair(e.attendees))
+  // This member's events, excluding shared adult 'Both' blocks (those span instead).
+  const mine = dayEvents.filter(
+    (e) => e.attendees.includes(member.id) && !isAdultGroup(members, e.attendees),
+  )
   const laid = layout(mine)
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
@@ -313,7 +328,7 @@ function Lane({
               height: Math.max((ev.end - ev.start) * PX_PER_MIN, 16),
               left: `calc(${(100 / cols) * col}% + 2px)`,
               width: `calc(${100 / cols}% - 4px)`,
-              background: eventColor(state, ev.attendees),
+              background: eventColor(members, ev.attendees),
             }}
             onClick={() => onEdit(ev)}
           >
@@ -324,7 +339,7 @@ function Lane({
               {status === 'needs' && ' ◌'}
             </span>
             <span className="tl-title">{ev.title}</span>
-            {joint && <span className="tl-tag">{attendeeLabel(state, ev.attendees)}</span>}
+            {joint && <span className="tl-tag">{attendeeLabel(members, ev.attendees)}</span>}
           </button>
         )
       })}

@@ -791,12 +791,28 @@ input[type='color'] {
 
 .person-row {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 12px;
 }
 
 .person-row input[type='text'] {
   flex: 1;
+  min-width: 0;
+}
+
+.person-del {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.person-del:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 .hint {
@@ -819,7 +835,7 @@ input[type='color'] {
   padding: 8px 14px;
 }
 
-button:not(.primary):not(.tab):not(.add-link):not(.event-del):not(.task-del):not(.week-nav button):not(.month-cell):not(.allday-chip):not(.allday-add):not(.event-body):not(.editor-cancel):not(.danger):not(.reminder-chip):not(.alert-dismiss) {
+button:not(.primary):not(.tab):not(.add-link):not(.event-del):not(.task-del):not(.week-nav button):not(.month-cell):not(.allday-chip):not(.allday-add):not(.event-body):not(.editor-cancel):not(.danger):not(.reminder-chip):not(.alert-dismiss):not(.person-del) {
   background: var(--surface-2);
   color: var(--text);
   border: 1px solid var(--border);

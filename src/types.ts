@@ -1,18 +1,40 @@
-export type PersonId = 'me' | 'partner' | 'kid'
+/** A member id is just a string (UUID once on Supabase). */
+export type MemberId = string
 
-export interface Person {
-  id: PersonId
-  name: string
-  color: string
+/**
+ * Sync bookkeeping carried by every persisted entity, mirroring the columns a
+ * Supabase table will have. `deletedAt` is a soft delete — rows stay around so
+ * the change can sync; the UI filters them out (see lib/sync `active`).
+ */
+export interface SyncMeta {
+  id: string
+  /** ISO timestamps. */
+  createdAt: string
+  updatedAt: string
+  deletedAt: string | null
 }
 
-/** A to-do item, optionally assigned to one person or shared (personId === null). */
-export interface Task {
-  id: string
+/** The shared family/group everything belongs to. */
+export interface Household extends SyncMeta {
+  name: string
+}
+
+export type MemberRole = 'adult' | 'child'
+
+/** A person in the household. Role drives the child-coverage logic. */
+export interface Member extends SyncMeta {
+  householdId: string
+  name: string
+  color: string
+  role: MemberRole
+}
+
+/** A to-do item, optionally assigned to one member (memberId === null = shared). */
+export interface Task extends SyncMeta {
+  householdId: string
   title: string
   done: boolean
-  personId: PersonId | null
-  createdAt: number
+  memberId: MemberId | null
 }
 
 /** How often an event repeats. Omit on an event for a one-off. */
@@ -34,8 +56,8 @@ export interface Recurrence {
  * `recurrence` repeats the whole event from `date` onward; edits/deletes apply
  * to the entire series.
  */
-export interface CalendarEvent {
-  id: string
+export interface CalendarEvent extends SyncMeta {
+  householdId: string
   title: string
   /** ISO date (yyyy-mm-dd) of the first occurrence. */
   date: string
@@ -48,8 +70,8 @@ export interface CalendarEvent {
   days: number
   /** Repeat rule; omitted for a one-off. */
   recurrence?: Recurrence
-  /** Everyone involved — one or more people. A parent + Nora is a joint event. */
-  attendees: PersonId[]
+  /** Member ids involved — one or more. An adult + child is a joint event. */
+  attendees: MemberId[]
   /** In-app reminder offsets, in minutes before the event start (e.g. 15, 1440). */
   reminders?: number[]
   notes?: string
@@ -59,8 +81,8 @@ export interface CalendarEvent {
  * A standalone in-app notification at a date + time, optionally repeating daily.
  * (Not tied to an event — e.g. "notify at 18:30".)
  */
-export interface Reminder {
-  id: string
+export interface Reminder extends SyncMeta {
+  householdId: string
   title: string
   /** ISO date it's anchored to (the only day when repeat is 'none'). */
   date: string
@@ -70,12 +92,13 @@ export interface Reminder {
 }
 
 export interface AppState {
-  people: Record<PersonId, Person>
+  household: Household
+  members: Member[]
   tasks: Task[]
   events: CalendarEvent[]
   reminders: Reminder[]
-  /** ISO date (yyyy-mm-dd) of the Monday of the week being viewed. */
+  /** ISO date (yyyy-mm-dd) of the Monday of the week being viewed. Local-only UI. */
   weekStart: string
-  /** 0 = Monday ... 6 = Sunday — the day shown in the Day view. */
+  /** 0 = Monday ... 6 = Sunday — the day shown in the Day view. Local-only UI. */
   selectedDay: number
 }

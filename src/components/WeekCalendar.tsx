@@ -3,11 +3,15 @@ import { useApp } from '../state'
 import { DAY_NAMES, addDays, dayLabel, minutesToTime, weekRangeLabel } from '../lib/dates'
 import { occurrencesOnDate, recurrenceLabel } from '../lib/recurrence'
 import { attendeeLabel, eventColor } from '../lib/people'
+import { active } from '../lib/sync'
 import { EventEditor, type EditorTarget } from './EventEditor'
 
 export function WeekCalendar() {
   const { state, dispatch } = useApp()
   const [target, setTarget] = useState<EditorTarget | null>(null)
+  const members = active(state.members)
+  const events = active(state.events)
+  const defaultAttendees = members[0] ? [members[0].id] : []
 
   return (
     <section className="view">
@@ -28,7 +32,7 @@ export function WeekCalendar() {
         {DAY_NAMES.map((_, dayIdx) => {
           const dateISO = addDays(state.weekStart, dayIdx)
           // All-day items first, then timed by start.
-          const occs = occurrencesOnDate(state.events, dateISO).sort((a, b) => {
+          const occs = occurrencesOnDate(events, dateISO).sort((a, b) => {
             if (a.event.allDay !== b.event.allDay) return a.event.allDay ? -1 : 1
             return a.event.start - b.event.start
           })
@@ -40,7 +44,7 @@ export function WeekCalendar() {
                 {occs.length === 0 && <p className="empty">No plans</p>}
                 {occs.map((o) => {
                   const e = o.event
-                  const color = eventColor(state, e.attendees)
+                  const color = eventColor(members, e.attendees)
                   return (
                     <div key={e.id} className="event" style={{ borderLeftColor: color }}>
                       <div className="event-time">
@@ -56,7 +60,7 @@ export function WeekCalendar() {
                       >
                         <span className="event-title">{e.title}</span>
                         <span className="event-meta" style={{ color }}>
-                          {attendeeLabel(state, e.attendees)}
+                          {attendeeLabel(members, e.attendees)}
                           {e.recurrence && ` · ${recurrenceLabel(e.recurrence).toLowerCase()}`}
                         </span>
                       </button>
@@ -67,7 +71,7 @@ export function WeekCalendar() {
 
               <button
                 className="add-link"
-                onClick={() => setTarget({ mode: 'new', date: dateISO, attendees: ['me'] })}
+                onClick={() => setTarget({ mode: 'new', date: dateISO, attendees: defaultAttendees })}
               >
                 + Add
               </button>

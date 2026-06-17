@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../state'
-import type { CalendarEvent, PersonId, RecurrenceFreq } from '../types'
+import type { CalendarEvent, MemberId, RecurrenceFreq } from '../types'
 import { minutesToTime, timeToMinutes } from '../lib/dates'
 import { REMINDER_OFFSETS, offsetLabel } from '../lib/notifications'
 import { AttendeeChips } from './AttendeeChips'
@@ -9,7 +9,7 @@ const SNAP = 15
 
 /** What the editor opens onto: a brand-new event or an existing one. */
 export type EditorTarget =
-  | { mode: 'new'; date: string; attendees: PersonId[]; start?: number; end?: number }
+  | { mode: 'new'; date: string; attendees: MemberId[]; start?: number; end?: number }
   | { mode: 'edit'; event: CalendarEvent }
 
 type RepeatChoice = 'none' | RecurrenceFreq
@@ -28,7 +28,7 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
   )
   const [end, setEnd] = useState(minutesToTime(isEdit ? base!.end : (target.end ?? 10 * 60)))
   const [days, setDays] = useState(base?.days ?? 1)
-  const [attendees, setAttendees] = useState<PersonId[]>(
+  const [attendees, setAttendees] = useState<MemberId[]>(
     isEdit ? base!.attendees : target.attendees,
   )
   const [repeat, setRepeat] = useState<RepeatChoice>(base?.recurrence?.freq ?? 'none')
@@ -49,7 +49,7 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
     if (!title.trim()) return
     const s = timeToMinutes(start)
     const en = Math.max(timeToMinutes(end), s + SNAP)
-    const event: Omit<CalendarEvent, 'id'> = {
+    const fields = {
       title: title.trim(),
       date,
       allDay,
@@ -61,9 +61,9 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
       reminders: reminders.length ? [...reminders].sort((a, b) => a - b) : undefined,
     }
     if (isEdit) {
-      dispatch({ type: 'updateEvent', event: { ...event, id: base!.id } })
+      dispatch({ type: 'updateEvent', event: { ...base!, ...fields } })
     } else {
-      dispatch({ type: 'addEvent', event })
+      dispatch({ type: 'addEvent', event: fields })
     }
     onClose()
   }

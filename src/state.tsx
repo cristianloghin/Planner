@@ -1,76 +1,99 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react'
-import type { AppState, CalendarEvent, PersonId, Reminder, Task } from './types'
+import type {
+  AppState,
+  CalendarEvent,
+  Member,
+  MemberId,
+  Reminder,
+  SyncMeta,
+} from './types'
 import { createStore } from './store/store'
 import { addDays } from './lib/dates'
+import { softDelete, touch, withMeta } from './lib/sync'
 
 const store = createStore()
 
+/** New-entity payloads: the fields a caller supplies; the reducer adds id +
+ *  sync metadata + householdId. */
+type EventInput = Omit<CalendarEvent, keyof SyncMeta | 'householdId'>
+type ReminderInput = Omit<Reminder, keyof SyncMeta | 'householdId'>
+type MemberInput = Omit<Member, keyof SyncMeta | 'householdId'>
+
 type Action =
-  | { type: 'addTask'; title: string; personId: PersonId | null }
+  | { type: 'addTask'; title: string; memberId: MemberId | null }
   | { type: 'toggleTask'; id: string }
   | { type: 'removeTask'; id: string }
-  | { type: 'addEvent'; event: Omit<CalendarEvent, 'id'> }
+  | { type: 'addEvent'; event: EventInput }
   | { type: 'updateEvent'; event: CalendarEvent }
   | { type: 'removeEvent'; id: string }
-  | { type: 'addReminder'; reminder: Omit<Reminder, 'id'> }
+  | { type: 'addReminder'; reminder: ReminderInput }
   | { type: 'updateReminder'; reminder: Reminder }
   | { type: 'removeReminder'; id: string }
-  | { type: 'renamePerson'; id: PersonId; name: string }
-  | { type: 'recolorPerson'; id: PersonId; color: string }
+  | { type: 'addMember'; member: MemberInput }
+  | { type: 'updateMember'; member: Member }
+  | { type: 'removeMember'; id: string }
+  | { type: 'renameHousehold'; name: string }
   | { type: 'shiftWeek'; delta: number }
   | { type: 'setWeek'; weekStart: string }
   | { type: 'shiftDay'; delta: number }
   | { type: 'setDay'; day: number }
 
-const id = () => Math.random().toString(36).slice(2, 10)
+/** Replace the matching row, bumping updatedAt. */
+function replace<T extends SyncMeta>(xs: T[], next: T): T[] {
+  return xs.map((x) => (x.id === next.id ? touch(next) : x))
+}
+
+/** Soft-delete the matching row. */
+function remove<T extends SyncMeta>(xs: T[], id: string): T[] {
+  return xs.map((x) => (x.id === id ? softDelete(x) : x))
+}
 
 function reducer(state: AppState, action: Action): AppState {
+  const hid = state.household.id
   switch (action.type) {
-    case 'addTask': {
-      const task: Task = {
-        id: id(),
-        title: action.title,
-        done: false,
-        personId: action.personId,
-        createdAt: Date.now(),
+    case 'addTask':
+      return {
+        ...state,
+        tasks: [
+          withMeta({ householdId: hid, title: action.title, done: false, memberId: action.memberId }),
+          ...state.tasks,
+        ],
       }
-      return { ...state, tasks: [task, ...state.tasks] }
-    }
     case 'toggleTask':
       return {
         ...state,
-        tasks: state.tasks.map((t) => (t.id === action.id ? { ...t, done: !t.done } : t)),
+        tasks: state.tasks.map((t) => (t.id === action.id ? touch({ ...t, done: !t.done }) : t)),
       }
     case 'removeTask':
-      return { ...state, tasks: state.tasks.filter((t) => t.id !== action.id) }
+      return { ...state, tasks: remove(state.tasks, action.id) }
+
     case 'addEvent':
-      return { ...state, events: [...state.events, { ...action.event, id: id() }] }
+      return { ...state, events: [...state.events, withMeta({ ...action.event, householdId: hid })] }
     case 'updateEvent':
-      return {
-        ...state,
-        events: state.events.map((e) => (e.id === action.event.id ? action.event : e)),
-      }
+      return { ...state, events: replace(state.events, action.event) }
     case 'removeEvent':
-      return { ...state, events: state.events.filter((e) => e.id !== action.id) }
+      return { ...state, events: remove(state.events, action.id) }
+
     case 'addReminder':
-      return { ...state, reminders: [...state.reminders, { ...action.reminder, id: id() }] }
+      return {
+        ...state,
+        reminders: [...state.reminders, withMeta({ ...action.reminder, householdId: hid })],
+      }
     case 'updateReminder':
-      return {
-        ...state,
-        reminders: state.reminders.map((r) => (r.id === action.reminder.id ? action.reminder : r)),
-      }
+      return { ...state, reminders: replace(state.reminders, action.reminder) }
     case 'removeReminder':
-      return { ...state, reminders: state.reminders.filter((r) => r.id !== action.id) }
-    case 'renamePerson':
-      return {
-        ...state,
-        people: { ...state.people, [action.id]: { ...state.people[action.id], name: action.name } },
-      }
-    case 'recolorPerson':
-      return {
-        ...state,
-        people: { ...state.people, [action.id]: { ...state.people[action.id], color: action.color } },
-      }
+      return { ...state, reminders: remove(state.reminders, action.id) }
+
+    case 'addMember':
+      return { ...state, members: [...state.members, withMeta({ ...action.member, householdId: hid })] }
+    case 'updateMember':
+      return { ...state, members: replace(state.members, action.member) }
+    case 'removeMember':
+      return { ...state, members: remove(state.members, action.id) }
+
+    case 'renameHousehold':
+      return { ...state, household: touch({ ...state.household, name: action.name }) }
+
     case 'shiftWeek':
       return { ...state, weekStart: addDays(state.weekStart, action.delta * 7) }
     case 'setWeek':
