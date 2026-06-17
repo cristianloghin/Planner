@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../state'
 import { dueAlerts, type FiredAlert } from '../lib/notifications'
+import s from './AlertHost.module.css'
 
 const SEEN_KEY = 'planner.alertsSeen'
 const CHECK_MS = 30_000
@@ -52,7 +53,7 @@ export function AlertHost() {
 
   if (!active.length) return null
   return (
-    <div className="alert-host">
+    <div className={s.alertHost}>
       {active.map((a) => (
         <AlertCard key={a.id} alert={a} onDismiss={() => dismiss(a.id)} />
       ))}
@@ -67,13 +68,13 @@ function AlertCard({ alert, onDismiss }: { alert: FiredAlert; onDismiss: () => v
   }, [onDismiss])
 
   return (
-    <div className="alert-card" role="status">
-      <span className="alert-icon">🔔</span>
-      <div className="alert-text">
+    <div className={s.alertCard} role="status">
+      <span className={s.alertIcon}>🔔</span>
+      <div className={s.alertText}>
         <strong>{alert.title}</strong>
         {alert.sub && <span>{alert.sub}</span>}
       </div>
-      <button className="alert-dismiss" onClick={onDismiss} aria-label="Dismiss">
+      <button className={s.alertDismiss} onClick={onDismiss} aria-label="Dismiss">
         ×
       </button>
     </div>

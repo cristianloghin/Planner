@@ -12,6 +12,11 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Default Workbox glob omits fonts; add woff2 so the self-hosted
+      // Source Sans 3 files are precached and work offline.
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+      },
       // Generate PNG/apple-touch/favicon assets from the SVG source and
       // auto-inject the matching <link> tags (incl. apple-touch-icon, which
       // iOS requires since it ignores SVG manifest icons).

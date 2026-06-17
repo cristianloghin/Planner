@@ -1,0 +1,275 @@
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* ---- All-day bar ---- */
+.alldayBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.alldayChip {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 8px;
+  color: var(--on-accent);
+  text-align: left;
+  box-shadow: 0 1px 3px var(--shadow);
+}
+
+.alldayTitle {
+  font-size: var(--fs-base);
+  font-weight: 600;
+}
+
+.alldayMeta {
+  font-size: var(--fs-xs);
+  opacity: 0.9;
+}
+
+.alldayAdd {
+  align-self: center;
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: var(--fs-md);
+}
+
+.alldayChip.warnNeeds {
+  outline: 2px dashed var(--warning);
+  outline-offset: -2px;
+}
+
+.alldayChip.warnClash {
+  outline: 2px solid var(--danger);
+  outline-offset: -2px;
+}
+
+/* ---- Reminder bar ---- */
+.reminderBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.reminderChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: var(--fs-md);
+}
+
+.reminderIcon {
+  font-size: var(--fs-sm);
+}
+
+.reminderRepeat {
+  font-size: var(--fs-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+/* ---- Conflict legend ---- */
+.conflictLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  justify-content: center;
+  margin: -4px 0 12px;
+  font-size: var(--fs-md);
+}
+
+.warnKey.clash {
+  color: var(--danger);
+}
+
+.warnKey.needs {
+  color: var(--warning);
+}
+
+/* ---- Vertical planner timeline ---- */
+.plannerHead,
+.plannerGrid {
+  padding-top: 12px;
+  margin-right: 11px;
+  border-right: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: var(--gutter-w) 1fr;
+}
+
+.laneHeads,
+.lanes {
+  display: grid;
+  /* grid-template-columns is set inline (data-driven, Nora's lane is narrower). */
+}
+
+.lanes {
+  position: relative;
+}
+
+.plannerHead {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.laneHead {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  padding: 10px 4px;
+  border-left: 1px solid var(--border);
+}
+
+.plannerBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--surface);
+}
+
+.timeGutter {
+  position: relative;
+}
+
+.gutterLabel {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.lane {
+  position: relative;
+  border-left: 1px solid var(--border);
+  cursor: copy;
+  /* Faint 15-min lines + stronger hour lines. */
+  background-image: repeating-linear-gradient(
+      to bottom,
+      var(--grid-line) 0,
+      var(--grid-line) 1px,
+      transparent 1px,
+      transparent var(--quarter-h)
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--grid-line-strong) 0,
+      var(--grid-line-strong) 1px,
+      transparent 1px,
+      transparent var(--hour-h)
+    );
+}
+
+.tlEvent {
+  position: absolute;
+  border: none;
+  border-radius: 7px;
+  padding: 3px 6px;
+  color: var(--on-accent);
+  text-align: left;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  box-shadow: 0 1px 3px var(--shadow);
+  line-height: 1.15;
+}
+
+.tlTime {
+  font-size: var(--fs-xs);
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.tlTitle {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tlTag {
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nowLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px solid var(--now);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.nowDot {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--now);
+}
+
+/* Shared ('both') events: span both lanes, layered on top. */
+.sharedLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* width is set inline so the block spans only the parent columns. */
+  pointer-events: none;
+  z-index: 3;
+}
+
+.sharedLayer .tlEvent {
+  pointer-events: auto;
+}
+
+.tlEvent.shared {
+  border: 1px solid var(--block-ring);
+  box-shadow: 0 2px 8px var(--shadow);
+}
+
+/* Conflict markers on Nora's blocks. */
+.tlEvent.warnNeeds {
+  outline: 2px dashed var(--warning);
+  outline-offset: -2px;
+}
+
+.tlEvent.warnClash {
+  outline: 2px solid var(--danger);
+  outline-offset: -2px;
+  box-shadow: 0 0 0 3px var(--danger-glow);
+}

@@ -24,7 +24,23 @@
   --block-ring: rgba(255, 255, 255, 0.45);
 
   /* ---- Typography ---- */
-  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Source Sans 3 (self-hosted variable font, see main.tsx); system stack is
+     the fallback so text shows instantly while the font loads. */
+  --font: 'Source Sans 3 Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* Font-size scale — the single place to tune text sizing. Bumped +1px over
+     the original values since Source Sans 3 renders a touch smaller than the
+     system stack. (Original px noted in comments.) */
+  --fs-2xs: 10px; /* was 9 */
+  --fs-xs: 11px; /* was 10 */
+  --fs-sm: 12px; /* was 11 */
+  --fs-md: 13px; /* was 12 */
+  --fs-base: 14px; /* was 13 */
+  --fs-lg: 15px; /* was 14 */
+  --fs-xl: 16px; /* was 15 */
+  --fs-2xl: 17px; /* was 16 */
+  --fs-3xl: 19px; /* was 18 */
+  --fs-4xl: 21px; /* was 20 */
 
   /* ---- Surfaces: dark theme (default) ---- */
   --bg: #0f172a;
@@ -41,7 +57,7 @@
 
   /* ---- Layout ---- */
   --radius: 12px;
-  --gutter-w: 52px;
+  --gutter-w: 48px;
   --hour-h: 56px; /* must match HOUR_H in DayView.tsx */
   --quarter-h: 14px; /* hour / 4 */
 }

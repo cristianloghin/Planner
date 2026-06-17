@@ -11,6 +11,9 @@ import {
   startOfMonth,
   toISODate,
 } from '../lib/dates'
+import { cx } from '../lib/cx'
+import shared from '../styles/shared.module.css'
+import s from './MonthView.module.css'
 
 // Up to this many event dots before collapsing the rest into a "+N".
 const MAX_DOTS = 4
@@ -22,9 +25,9 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
   const days = monthGridDays(cursor)
 
   return (
-    <section className="view">
-      <div className="view-head">
-        <div className="week-nav">
+    <section className={shared.view}>
+      <div className={shared.viewHead}>
+        <div className={shared.weekNav}>
           <button onClick={() => setCursor(addMonths(cursor, -1))} aria-label="Previous month">
             ‹
           </button>
@@ -35,10 +38,10 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
         </div>
       </div>
 
-      <div className="view-body">
-        <div className="month-grid">
+      <div className={shared.viewBody}>
+        <div className={s.monthGrid}>
         {DAY_NAMES.map((name) => (
-          <div key={name} className="month-weekday">
+          <div key={name} className={s.monthWeekday}>
             {name}
           </div>
         ))}
@@ -48,33 +51,29 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
           const dayEvents = occurrencesOnDate(state.events, iso)
             .map((o) => o.event)
             .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start - b.start)
-          const classes = [
-            'month-cell',
-            isSameMonth(iso, cursor) ? '' : 'dim',
-            iso === today ? 'today' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')
-
           return (
             <button
               key={iso}
-              className={classes}
+              className={cx(
+                s.monthCell,
+                !isSameMonth(iso, cursor) && s.dim,
+                iso === today && s.today,
+              )}
               onClick={() => onOpenDay(iso)}
               aria-label={`${monthLabel(iso)} ${Number(iso.slice(8, 10))}, ${dayEvents.length} plans`}
             >
-              <span className="month-date">{Number(iso.slice(8, 10))}</span>
+              <span className={s.monthDate}>{Number(iso.slice(8, 10))}</span>
               {dayEvents.length > 0 && (
-                <span className="month-dots">
+                <span className={s.monthDots}>
                   {dayEvents.slice(0, MAX_DOTS).map((e) => (
                     <span
                       key={e.id}
-                      className="month-dot"
+                      className={s.monthDot}
                       style={{ background: eventColor(state, e.attendees) }}
                     />
                   ))}
                   {dayEvents.length > MAX_DOTS && (
-                    <span className="month-more">+{dayEvents.length - MAX_DOTS}</span>
+                    <span className={s.monthMore}>+{dayEvents.length - MAX_DOTS}</span>
                   )}
                 </span>
               )}
