@@ -1,17 +1,19 @@
 import { useApp } from '../state'
-import type { PersonId } from '../types'
+import type { MemberId } from '../types'
+import { active } from '../lib/sync'
 
 /** Toggle chips for choosing who's on an event. Always keeps at least one. */
 export function AttendeeChips({
   value,
   onChange,
 }: {
-  value: PersonId[]
-  onChange: (next: PersonId[]) => void
+  value: MemberId[]
+  onChange: (next: MemberId[]) => void
 }) {
   const { state } = useApp()
+  const members = active(state.members)
 
-  function toggle(id: PersonId) {
+  function toggle(id: MemberId) {
     const has = value.includes(id)
     let next = has ? value.filter((x) => x !== id) : [...value, id]
     if (next.length === 0) next = [id]
@@ -20,7 +22,7 @@ export function AttendeeChips({
 
   return (
     <div className="chips">
-      {Object.values(state.people).map((p) => {
+      {members.map((p) => {
         const on = value.includes(p.id)
         return (
           <button

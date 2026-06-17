@@ -25,16 +25,16 @@ export function ReminderEditor({ target, onClose }: { target: ReminderTarget; on
   function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
-    const reminder = {
+    const fields = {
       title: title.trim(),
       date,
       time: timeToMinutes(time),
       repeat: daily ? ('daily' as const) : ('none' as const),
     }
     if (isEdit) {
-      dispatch({ type: 'updateReminder', reminder: { ...reminder, id: base!.id } })
+      dispatch({ type: 'updateReminder', reminder: { ...base!, ...fields } })
     } else {
-      dispatch({ type: 'addReminder', reminder })
+      dispatch({ type: 'addReminder', reminder: fields })
     }
     onClose()
   }

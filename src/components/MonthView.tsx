@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useApp } from '../state'
 import { eventColor } from '../lib/people'
+import { active } from '../lib/sync'
 import { occurrencesOnDate } from '../lib/recurrence'
 import {
   DAY_NAMES,
@@ -17,6 +18,8 @@ const MAX_DOTS = 4
 
 export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
   const { state } = useApp()
+  const members = active(state.members)
+  const events = active(state.events)
   const [cursor, setCursor] = useState(() => startOfMonth(toISODate(new Date())))
   const today = toISODate(new Date())
   const days = monthGridDays(cursor)
@@ -45,7 +48,7 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
 
         {days.map((iso) => {
           // Expand recurring/multi-day events onto this concrete date.
-          const dayEvents = occurrencesOnDate(state.events, iso)
+          const dayEvents = occurrencesOnDate(events, iso)
             .map((o) => o.event)
             .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start - b.start)
           const classes = [
@@ -70,7 +73,7 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
                     <span
                       key={e.id}
                       className="month-dot"
-                      style={{ background: eventColor(state, e.attendees) }}
+                      style={{ background: eventColor(members, e.attendees) }}
                     />
                   ))}
                   {dayEvents.length > MAX_DOTS && (
