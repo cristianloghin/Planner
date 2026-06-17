@@ -62,10 +62,18 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
   const unitLabel = repeat === 'daily' ? 'days' : repeat === 'weekly' ? 'weeks' : 'months'
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
-        <h3>{isEdit ? 'Edit' : 'New'} event</h3>
+    <form className="editor-page" onSubmit={submit}>
+      <header className="editor-head">
+        <button type="button" className="editor-cancel" onClick={onClose}>
+          Cancel
+        </button>
+        <strong>{isEdit ? 'Edit event' : 'New event'}</strong>
+        <button type="submit" className="primary">
+          Save
+        </button>
+      </header>
 
+      <div className="editor-body">
         <input
           ref={titleRef}
           placeholder="What's the plan?"
@@ -135,28 +143,19 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
         <label className="field">Who's involved?</label>
         <AttendeeChips value={attendees} onChange={setAttendees} />
 
-        <div className="modal-actions">
-          {isEdit && (
-            <button
-              type="button"
-              className="danger"
-              onClick={() => {
-                dispatch({ type: 'removeEvent', id: base!.id })
-                onClose()
-              }}
-            >
-              Delete
-            </button>
-          )}
-          <div className="spacer" />
-          <button type="button" onClick={onClose}>
-            Cancel
+        {isEdit && (
+          <button
+            type="button"
+            className="danger editor-delete"
+            onClick={() => {
+              dispatch({ type: 'removeEvent', id: base!.id })
+              onClose()
+            }}
+          >
+            Delete event
           </button>
-          <button type="submit" className="primary">
-            Save
-          </button>
-        </div>
-      </form>
-    </div>
+        )}
+      </div>
+    </form>
   )
 }
