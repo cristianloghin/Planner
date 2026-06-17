@@ -12,7 +12,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg'],
+      // Generate PNG/apple-touch/favicon assets from the SVG source and
+      // auto-inject the matching <link> tags (incl. apple-touch-icon, which
+      // iOS requires since it ignores SVG manifest icons).
+      pwaAssets: {
+        image: 'public/icon.svg',
+        preset: 'minimal-2023',
+      },
       manifest: {
         name: 'Planner',
         short_name: 'Planner',
@@ -22,14 +28,7 @@ export default defineConfig({
         display: 'standalone',
         start_url: base,
         scope: base,
-        icons: [
-          {
-            src: 'icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
-            purpose: 'any maskable',
-          },
-        ],
+        // Icons are injected by pwaAssets (192/512 + maskable).
       },
     }),
   ],
