@@ -1,21 +1,49 @@
-import type { AppState, CalendarEvent, PersonId } from '../types'
-import { mondayOf } from '../lib/dates'
+import type { AppState, CalendarEvent, PersonId, Recurrence } from '../types'
+import { addDays, mondayOf } from '../lib/dates'
 
-/** Old events stored a single `personId` ('me' | 'partner' | 'kid' | 'both'). */
-type LegacyEvent = Omit<CalendarEvent, 'attendees'> & {
+/**
+ * Older saved shapes we still read:
+ *   - `personId` ('me' | 'partner' | 'kid' | 'both') before `attendees`.
+ *   - `day` (0-6 weekday) before events were anchored to an absolute `date`.
+ */
+interface LegacyEvent {
+  id: string
+  title: string
+  day?: number
+  date?: string
+  allDay?: boolean
+  start?: number
+  end?: number
+  days?: number
+  recurrence?: Recurrence
   attendees?: PersonId[]
   personId?: PersonId | 'both'
+  notes?: string
 }
 
-function migrateEvent(e: LegacyEvent): CalendarEvent {
-  if (Array.isArray(e.attendees) && e.attendees.length) {
-    const { personId: _drop, ...rest } = e
-    return rest as CalendarEvent
-  }
+function migrateEvent(e: LegacyEvent, weekStart: string): CalendarEvent {
   const attendees: PersonId[] =
-    e.personId === 'both' ? ['me', 'partner'] : [(e.personId as PersonId) ?? 'me']
-  const { personId: _drop, ...rest } = e
-  return { ...rest, attendees }
+    Array.isArray(e.attendees) && e.attendees.length
+      ? e.attendees
+      : e.personId === 'both'
+        ? ['me', 'partner']
+        : [(e.personId as PersonId) ?? 'me']
+
+  // Weekday-based events become one-offs on the matching day of their week.
+  const date = e.date ?? addDays(weekStart, e.day ?? 0)
+
+  return {
+    id: e.id,
+    title: e.title,
+    date,
+    allDay: e.allDay ?? false,
+    start: e.start ?? 9 * 60,
+    end: e.end ?? 10 * 60,
+    days: e.days ?? 1,
+    recurrence: e.recurrence,
+    attendees,
+    notes: e.notes,
+  }
 }
 
 /**
@@ -56,7 +84,8 @@ export class LocalStorageStore implements ScheduleStore {
       // Shallow-merge over defaults so missing/added fields stay valid, but
       // deep-merge people so newly-added members (e.g. Nora) appear for users
       // whose saved state predates them, while keeping their custom names/colours.
-      const events = (parsed.events ?? base.events).map((e) => migrateEvent(e as LegacyEvent))
+      const weekStart = parsed.weekStart ?? base.weekStart
+      const events = (parsed.events ?? base.events).map((e) => migrateEvent(e as LegacyEvent, weekStart))
       return {
         ...base,
         ...parsed,

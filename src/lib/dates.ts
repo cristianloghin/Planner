@@ -21,6 +21,22 @@ export function addDays(iso: string, days: number): string {
   return toISODate(d)
 }
 
+/** Whole days between two ISO dates (a - b); positive when `a` is later. */
+export function diffDays(a: string, b: string): number {
+  return Math.round(
+    (new Date(a + 'T00:00:00').getTime() - new Date(b + 'T00:00:00').getTime()) / 86_400_000,
+  )
+}
+
+/** Short date label like "Mon 16 Jun" for an ISO date. */
+export function isoLabel(iso: string): string {
+  return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
 /** Human label like "Mon 16 Jun" for a given week start + day offset. */
 export function dayLabel(weekStart: string, dayOffset: number): string {
   const d = new Date(weekStart + 'T00:00:00')

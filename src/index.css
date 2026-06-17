@@ -151,6 +151,18 @@ input[type='color'] {
   color: var(--muted);
 }
 
+.event-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: none;
+  text-align: left;
+  color: var(--text);
+}
+
 .event-title {
   font-size: 13px;
   font-weight: 600;
@@ -272,6 +284,84 @@ input[type='color'] {
 .month-more {
   font-size: 9px;
   line-height: 1;
+  color: var(--muted);
+}
+
+/* ---- All-day bar (Day view) ---- */
+.allday-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.allday-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 8px;
+  color: var(--on-accent);
+  text-align: left;
+  box-shadow: 0 1px 3px var(--shadow);
+}
+
+.allday-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.allday-meta {
+  font-size: 10px;
+  opacity: 0.9;
+}
+
+.allday-add {
+  align-self: center;
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.allday-chip.warn-needs {
+  outline: 2px dashed var(--warning);
+  outline-offset: -2px;
+}
+
+.allday-chip.warn-clash {
+  outline: 2px solid var(--danger);
+  outline-offset: -2px;
+}
+
+/* ---- Editor: all-day toggle & repeat interval ---- */
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.toggle input {
+  width: 18px;
+  height: 18px;
+}
+
+.interval {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.interval input {
+  width: 64px;
+}
+
+.interval span {
+  font-size: 13px;
   color: var(--muted);
 }
 
@@ -646,7 +736,7 @@ input[type='color'] {
   padding: 8px 14px;
 }
 
-button:not(.primary):not(.tab):not(.add-link):not(.event-del):not(.task-del):not(.week-nav button) {
+button:not(.primary):not(.tab):not(.add-link):not(.event-del):not(.task-del):not(.week-nav button):not(.month-cell):not(.allday-chip):not(.allday-add):not(.event-body) {
   background: var(--surface-2);
   color: var(--text);
   border: 1px solid var(--border);

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useApp } from '../state'
 import { eventColor } from '../lib/people'
+import { occurrencesOnDate } from '../lib/recurrence'
 import {
   DAY_NAMES,
   addMonths,
@@ -9,7 +10,6 @@ import {
   monthLabel,
   startOfMonth,
   toISODate,
-  weekdayIndex,
 } from '../lib/dates'
 
 // Up to this many event dots before collapsing the rest into a "+N".
@@ -41,11 +41,10 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
         ))}
 
         {days.map((iso) => {
-          // Events are keyed by weekday (matching the Day/Week views), so each
-          // cell shows the plans for its column's weekday.
-          const dayEvents = state.events
-            .filter((e) => e.day === weekdayIndex(iso))
-            .sort((a, b) => a.start - b.start)
+          // Expand recurring/multi-day events onto this concrete date.
+          const dayEvents = occurrencesOnDate(state.events, iso)
+            .map((o) => o.event)
+            .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start - b.start)
           const classes = [
             'month-cell',
             isSameMonth(iso, cursor) ? '' : 'dim',

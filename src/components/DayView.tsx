@@ -1,10 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useApp } from '../state'
 import type { CalendarEvent, Person, PersonId } from '../types'
-import { addDays, dayLabel, minutesToTime, timeToMinutes, toISODate } from '../lib/dates'
+import { addDays, isoLabel, minutesToTime, toISODate } from '../lib/dates'
+import { occurrencesOnDate, type DayOccurrence } from '../lib/recurrence'
 import { attendeeLabel, eventColor, isParentsPair, parentsGradient } from '../lib/people'
 import { kidStatuses, type KidStatus } from '../lib/conflicts'
-import { AttendeeChips } from './AttendeeChips'
+import { EventEditor, type EditorTarget } from './EventEditor'
 
 // Layout scale. HOUR_H must match the gridline spacing in index.css.
 const HOUR_H = 56
@@ -16,15 +17,11 @@ const SNAP = 15
 const KID_WEIGHT = 0.66
 const laneWeight = (p: Person) => (p.id === 'kid' ? KID_WEIGHT : 1)
 
-type Draft =
-  | { mode: 'new'; attendees: PersonId[]; start: number; end: number }
-  | { mode: 'edit'; event: CalendarEvent }
-
 export function DayView() {
   const { state, dispatch } = useApp()
   const day = state.selectedDay
   const people = Object.values(state.people)
-  const [draft, setDraft] = useState<Draft | null>(null)
+  const [target, setTarget] = useState<EditorTarget | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -42,12 +39,19 @@ export function DayView() {
 
   function addAt(attendees: PersonId[], minute: number) {
     const start = Math.min(Math.max(0, Math.round(minute / SNAP) * SNAP), DAY_MIN - SNAP)
-    setDraft({ mode: 'new', attendees, start, end: Math.min(start + 60, DAY_MIN) })
+    setTarget({ mode: 'new', date: dateISO, attendees, start, end: Math.min(start + 60, DAY_MIN) })
   }
 
-  const dayEvents = state.events.filter((e) => e.day === day)
-  const spanning = dayEvents.filter((e) => isParentsPair(e.attendees))
-  const statuses = kidStatuses(dayEvents)
+  const occs = occurrencesOnDate(state.events, dateISO)
+  const timed = occs.filter((o) => !o.event.allDay).map((o) => o.event)
+  const allDayOccs = occs.filter((o) => o.event.allDay)
+  const spanning = timed.filter((e) => isParentsPair(e.attendees))
+
+  // Coverage looks at the whole day: all-day events count as busy from 00:00–24:00.
+  const coverage = occs.map((o) =>
+    o.event.allDay ? { ...o.event, start: 0, end: DAY_MIN } : o.event,
+  )
+  const statuses = kidStatuses(coverage)
   const hasWarnings = [...statuses.values()].some((s) => s !== 'covered')
 
   const fullHeight = DAY_MIN * PX_PER_MIN
@@ -62,7 +66,7 @@ export function DayView() {
         <button onClick={() => dispatch({ type: 'shiftDay', delta: -1 })} aria-label="Previous day">
           ‹
         </button>
-        <strong>{dayLabel(state.weekStart, day)}</strong>
+        <strong>{isoLabel(dateISO)}</strong>
         <button onClick={() => dispatch({ type: 'shiftDay', delta: 1 })} aria-label="Next day">
           ›
         </button>
@@ -74,6 +78,23 @@ export function DayView() {
           <span className="warn-key needs">◌ Needs a grown-up</span>
         </div>
       )}
+
+      <div className="allday-bar">
+        {allDayOccs.map((o) => (
+          <AllDayChip
+            key={o.event.id}
+            occ={o}
+            status={statuses.get(o.event.id)}
+            onClick={() => setTarget({ mode: 'edit', event: o.event })}
+          />
+        ))}
+        <button
+          className="allday-add"
+          onClick={() => setTarget({ mode: 'new', date: dateISO, attendees: ['me'] })}
+        >
+          + All-day
+        </button>
+      </div>
 
       <div className="planner-head">
         <div className="gutter-spacer" />
@@ -94,11 +115,11 @@ export function DayView() {
             <Lane
               key={p.id}
               person={p}
-              dayEvents={dayEvents}
+              dayEvents={timed}
               statuses={statuses}
               nowMin={nowMin}
               onAddAt={(min) => addAt([p.id], min)}
-              onEdit={(event) => setDraft({ mode: 'edit', event })}
+              onEdit={(event) => setTarget({ mode: 'edit', event })}
             />
           ))}
 
@@ -115,7 +136,7 @@ export function DayView() {
                   width: `calc(${100 / cols}% - 4px)`,
                   background: parentsGradient(state),
                 }}
-                onClick={() => setDraft({ mode: 'edit', event: ev })}
+                onClick={() => setTarget({ mode: 'edit', event: ev })}
               >
                 <span className="tl-time">
                   {minutesToTime(ev.start)}–{minutesToTime(ev.end)} · Both
@@ -127,8 +148,33 @@ export function DayView() {
         </div>
       </div>
 
-      {draft && <EventEditor draft={draft} day={day} onClose={() => setDraft(null)} />}
+      {target && <EventEditor target={target} onClose={() => setTarget(null)} />}
     </section>
+  )
+}
+
+function AllDayChip({
+  occ,
+  status,
+  onClick,
+}: {
+  occ: DayOccurrence
+  status: KidStatus | undefined
+  onClick: () => void
+}) {
+  const { state } = useApp()
+  const { event } = occ
+  const warnClass = status === 'clash' ? ' warn-clash' : status === 'needs' ? ' warn-needs' : ''
+  return (
+    <button className={`allday-chip${warnClass}`} style={{ background: eventColor(state, event.attendees) }} onClick={onClick}>
+      <span className="allday-title">{event.title}</span>
+      <span className="allday-meta">
+        {attendeeLabel(state, event.attendees)}
+        {occ.span > 1 && ` · day ${occ.offset + 1}/${occ.span}`}
+        {status === 'clash' && ' ⚠'}
+        {status === 'needs' && ' ◌'}
+      </span>
+    </button>
   )
 }
 
@@ -248,80 +294,6 @@ function Lane({
           </button>
         )
       })}
-    </div>
-  )
-}
-
-function EventEditor({ draft, day, onClose }: { draft: Draft; day: number; onClose: () => void }) {
-  const { dispatch } = useApp()
-  const isEdit = draft.mode === 'edit'
-  const base = isEdit ? draft.event : null
-
-  const [title, setTitle] = useState(base?.title ?? '')
-  const [start, setStart] = useState(minutesToTime(isEdit ? base!.start : draft.start))
-  const [end, setEnd] = useState(minutesToTime(isEdit ? base!.end : draft.end))
-  const [attendees, setAttendees] = useState<PersonId[]>(isEdit ? base!.attendees : draft.attendees)
-
-  const titleRef = useRef<HTMLInputElement>(null)
-  useEffect(() => titleRef.current?.focus(), [])
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!title.trim()) return
-    const s = timeToMinutes(start)
-    const en = Math.max(timeToMinutes(end), s + SNAP)
-    if (isEdit) {
-      dispatch({ type: 'updateEvent', event: { ...base!, title: title.trim(), start: s, end: en, attendees } })
-    } else {
-      dispatch({ type: 'addEvent', event: { title: title.trim(), day, start: s, end: en, attendees } })
-    }
-    onClose()
-  }
-
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
-        <h3>{isEdit ? 'Edit' : 'New'} block</h3>
-        <input
-          ref={titleRef}
-          placeholder="What's the plan?"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <div className="row">
-          <label className="field">
-            From
-            <input type="time" step={SNAP * 60} value={start} onChange={(e) => setStart(e.target.value)} />
-          </label>
-          <label className="field">
-            To
-            <input type="time" step={SNAP * 60} value={end} onChange={(e) => setEnd(e.target.value)} />
-          </label>
-        </div>
-        <label className="field">Who's involved?</label>
-        <AttendeeChips value={attendees} onChange={setAttendees} />
-        <div className="modal-actions">
-          {isEdit && (
-            <button
-              type="button"
-              className="danger"
-              onClick={() => {
-                dispatch({ type: 'removeEvent', id: base!.id })
-                onClose()
-              }}
-            >
-              Delete
-            </button>
-          )}
-          <div className="spacer" />
-          <button type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="submit" className="primary">
-            Save
-          </button>
-        </div>
-      </form>
     </div>
   )
 }
