@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useApp } from '../state'
-import type { CalendarEvent, PersonId } from '../types'
-import { DAY_NAMES, dayLabel, minutesToTime, timeToMinutes, weekRangeLabel } from '../lib/dates'
+import { DAY_NAMES, addDays, dayLabel, minutesToTime, weekRangeLabel } from '../lib/dates'
+import { occurrencesOnDate, recurrenceLabel } from '../lib/recurrence'
 import { attendeeLabel, eventColor } from '../lib/people'
-import { AttendeeChips } from './AttendeeChips'
+import { EventEditor, type EditorTarget } from './EventEditor'
 
 export function WeekCalendar() {
   const { state, dispatch } = useApp()
-  const [adding, setAdding] = useState<number | null>(null)
+  const [target, setTarget] = useState<EditorTarget | null>(null)
 
   return (
     <section>
@@ -23,99 +23,57 @@ export function WeekCalendar() {
 
       <div className="days">
         {DAY_NAMES.map((_, dayIdx) => {
-          const events = state.events
-            .filter((e) => e.day === dayIdx)
-            .sort((a, b) => a.start - b.start)
+          const dateISO = addDays(state.weekStart, dayIdx)
+          // All-day items first, then timed by start.
+          const occs = occurrencesOnDate(state.events, dateISO).sort((a, b) => {
+            if (a.event.allDay !== b.event.allDay) return a.event.allDay ? -1 : 1
+            return a.event.start - b.event.start
+          })
           return (
             <div className="day-col" key={dayIdx}>
               <div className="day-head">{dayLabel(state.weekStart, dayIdx)}</div>
 
               <div className="event-list">
-                {events.length === 0 && <p className="empty">No plans</p>}
-                {events.map((e) => {
+                {occs.length === 0 && <p className="empty">No plans</p>}
+                {occs.map((o) => {
+                  const e = o.event
                   const color = eventColor(state, e.attendees)
                   return (
-                    <div
-                      key={e.id}
-                      className="event"
-                      style={{ borderLeftColor: color }}
-                    >
+                    <div key={e.id} className="event" style={{ borderLeftColor: color }}>
                       <div className="event-time">
-                        {minutesToTime(e.start)}–{minutesToTime(e.end)}
-                      </div>
-                      <div className="event-title">{e.title}</div>
-                      <div className="event-meta" style={{ color }}>
-                        {attendeeLabel(state, e.attendees)}
+                        {e.allDay
+                          ? o.span > 1
+                            ? `All day · ${o.offset + 1}/${o.span}`
+                            : 'All day'
+                          : `${minutesToTime(e.start)}–${minutesToTime(e.end)}`}
                       </div>
                       <button
-                        className="event-del"
-                        aria-label="Delete event"
-                        onClick={() => dispatch({ type: 'removeEvent', id: e.id })}
+                        className="event-body"
+                        onClick={() => setTarget({ mode: 'edit', event: e })}
                       >
-                        ×
+                        <span className="event-title">{e.title}</span>
+                        <span className="event-meta" style={{ color }}>
+                          {attendeeLabel(state, e.attendees)}
+                          {e.recurrence && ` · ${recurrenceLabel(e.recurrence).toLowerCase()}`}
+                        </span>
                       </button>
                     </div>
                   )
                 })}
               </div>
 
-              {adding === dayIdx ? (
-                <EventForm day={dayIdx} onDone={() => setAdding(null)} />
-              ) : (
-                <button className="add-link" onClick={() => setAdding(dayIdx)}>
-                  + Add
-                </button>
-              )}
+              <button
+                className="add-link"
+                onClick={() => setTarget({ mode: 'new', date: dateISO, attendees: ['me'] })}
+              >
+                + Add
+              </button>
             </div>
           )
         })}
       </div>
+
+      {target && <EventEditor target={target} onClose={() => setTarget(null)} />}
     </section>
-  )
-}
-
-function EventForm({ day, onDone }: { day: number; onDone: () => void }) {
-  const { dispatch } = useApp()
-  const [title, setTitle] = useState('')
-  const [start, setStart] = useState('09:00')
-  const [end, setEnd] = useState('10:00')
-  const [attendees, setAttendees] = useState<PersonId[]>(['me'])
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!title.trim()) return
-    const ev: Omit<CalendarEvent, 'id'> = {
-      title: title.trim(),
-      day,
-      start: timeToMinutes(start),
-      end: timeToMinutes(end),
-      attendees,
-    }
-    dispatch({ type: 'addEvent', event: ev })
-    onDone()
-  }
-
-  return (
-    <form className="event-form" onSubmit={submit}>
-      <input
-        autoFocus
-        placeholder="What's the plan?"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
-      <div className="row">
-        <input type="time" value={start} onChange={(e) => setStart(e.target.value)} />
-        <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
-      </div>
-      <AttendeeChips value={attendees} onChange={setAttendees} />
-      <div className="row">
-        <button type="submit" className="primary">
-          Add
-        </button>
-        <button type="button" onClick={onDone}>
-          Cancel
-        </button>
-      </div>
-    </form>
   )
 }

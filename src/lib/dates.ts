@@ -21,6 +21,22 @@ export function addDays(iso: string, days: number): string {
   return toISODate(d)
 }
 
+/** Whole days between two ISO dates (a - b); positive when `a` is later. */
+export function diffDays(a: string, b: string): number {
+  return Math.round(
+    (new Date(a + 'T00:00:00').getTime() - new Date(b + 'T00:00:00').getTime()) / 86_400_000,
+  )
+}
+
+/** Short date label like "Mon 16 Jun" for an ISO date. */
+export function isoLabel(iso: string): string {
+  return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
 /** Human label like "Mon 16 Jun" for a given week start + day offset. */
 export function dayLabel(weekStart: string, dayOffset: number): string {
   const d = new Date(weekStart + 'T00:00:00')
@@ -34,6 +50,45 @@ export function weekRangeLabel(weekStart: string): string {
   end.setDate(end.getDate() + 6)
   const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }
   return `${start.toLocaleDateString(undefined, opts)} – ${end.toLocaleDateString(undefined, opts)}`
+}
+
+/** 0 = Monday ... 6 = Sunday for an ISO date. */
+export function weekdayIndex(iso: string): number {
+  return (new Date(iso + 'T00:00:00').getDay() + 6) % 7
+}
+
+/** ISO date of the first day of the month containing `iso`. */
+export function startOfMonth(iso: string): string {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(1)
+  return toISODate(d)
+}
+
+/** Shift by whole months, pinned to the 1st so day-of-month never overflows. */
+export function addMonths(iso: string, delta: number): string {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(1)
+  d.setMonth(d.getMonth() + delta)
+  return toISODate(d)
+}
+
+/** Human label like "June 2026". */
+export function monthLabel(iso: string): string {
+  return new Date(iso + 'T00:00:00').toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+/** Whether an ISO date is in the same calendar month as `anchor`. */
+export function isSameMonth(iso: string, anchor: string): boolean {
+  return iso.slice(0, 7) === anchor.slice(0, 7)
+}
+
+/** The 42 days (six Monday-start weeks) covering the month that contains `iso`. */
+export function monthGridDays(iso: string): string[] {
+  const start = mondayOf(new Date(startOfMonth(iso) + 'T00:00:00'))
+  return Array.from({ length: 42 }, (_, i) => addDays(start, i))
 }
 
 /** "08:30" <-> minutes from midnight. */
