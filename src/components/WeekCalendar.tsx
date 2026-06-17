@@ -10,18 +10,21 @@ export function WeekCalendar() {
   const [target, setTarget] = useState<EditorTarget | null>(null)
 
   return (
-    <section>
-      <div className="week-nav">
-        <button onClick={() => dispatch({ type: 'shiftWeek', delta: -1 })} aria-label="Previous week">
-          ‹
-        </button>
-        <strong>{weekRangeLabel(state.weekStart)}</strong>
-        <button onClick={() => dispatch({ type: 'shiftWeek', delta: 1 })} aria-label="Next week">
-          ›
-        </button>
+    <section className="view">
+      <div className="view-head">
+        <div className="week-nav">
+          <button onClick={() => dispatch({ type: 'shiftWeek', delta: -1 })} aria-label="Previous week">
+            ‹
+          </button>
+          <strong>{weekRangeLabel(state.weekStart)}</strong>
+          <button onClick={() => dispatch({ type: 'shiftWeek', delta: 1 })} aria-label="Next week">
+            ›
+          </button>
+        </div>
       </div>
 
-      <div className="days">
+      <div className="view-body">
+        <div className="days">
         {DAY_NAMES.map((_, dayIdx) => {
           const dateISO = addDays(state.weekStart, dayIdx)
           // All-day items first, then timed by start.
@@ -71,6 +74,7 @@ export function WeekCalendar() {
             </div>
           )
         })}
+        </div>
       </div>
 
       {target && <EventEditor target={target} onClose={() => setTarget(null)} />}

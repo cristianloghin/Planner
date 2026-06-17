@@ -22,18 +22,21 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
   const days = monthGridDays(cursor)
 
   return (
-    <section>
-      <div className="week-nav">
-        <button onClick={() => setCursor(addMonths(cursor, -1))} aria-label="Previous month">
-          ‹
-        </button>
-        <strong>{monthLabel(cursor)}</strong>
-        <button onClick={() => setCursor(addMonths(cursor, 1))} aria-label="Next month">
-          ›
-        </button>
+    <section className="view">
+      <div className="view-head">
+        <div className="week-nav">
+          <button onClick={() => setCursor(addMonths(cursor, -1))} aria-label="Previous month">
+            ‹
+          </button>
+          <strong>{monthLabel(cursor)}</strong>
+          <button onClick={() => setCursor(addMonths(cursor, 1))} aria-label="Next month">
+            ›
+          </button>
+        </div>
       </div>
 
-      <div className="month-grid">
+      <div className="view-body">
+        <div className="month-grid">
         {DAY_NAMES.map((name) => (
           <div key={name} className="month-weekday">
             {name}
@@ -78,6 +81,7 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
             </button>
           )
         })}
+        </div>
       </div>
     </section>
   )

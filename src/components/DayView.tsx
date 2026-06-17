@@ -61,89 +61,93 @@ export function DayView() {
   const adultPct = (adultWeight / totalWeight) * 100
 
   return (
-    <section className="planner">
-      <div className="week-nav">
-        <button onClick={() => dispatch({ type: 'shiftDay', delta: -1 })} aria-label="Previous day">
-          ‹
-        </button>
-        <strong>{isoLabel(dateISO)}</strong>
-        <button onClick={() => dispatch({ type: 'shiftDay', delta: 1 })} aria-label="Next day">
-          ›
-        </button>
-      </div>
-
-      {hasWarnings && (
-        <div className="conflict-legend">
-          <span className="warn-key clash">⚠ No one free for Nora</span>
-          <span className="warn-key needs">◌ Needs a grown-up</span>
+    <section className="planner view">
+      <div className="view-head">
+        <div className="week-nav">
+          <button onClick={() => dispatch({ type: 'shiftDay', delta: -1 })} aria-label="Previous day">
+            ‹
+          </button>
+          <strong>{isoLabel(dateISO)}</strong>
+          <button onClick={() => dispatch({ type: 'shiftDay', delta: 1 })} aria-label="Next day">
+            ›
+          </button>
         </div>
-      )}
 
-      <div className="allday-bar">
-        {allDayOccs.map((o) => (
-          <AllDayChip
-            key={o.event.id}
-            occ={o}
-            status={statuses.get(o.event.id)}
-            onClick={() => setTarget({ mode: 'edit', event: o.event })}
-          />
-        ))}
-        <button
-          className="allday-add"
-          onClick={() => setTarget({ mode: 'new', date: dateISO, attendees: ['me'] })}
-        >
-          + All-day
-        </button>
-      </div>
+        {hasWarnings && (
+          <div className="conflict-legend">
+            <span className="warn-key clash">⚠ No one free for Nora</span>
+            <span className="warn-key needs">◌ Needs a grown-up</span>
+          </div>
+        )}
 
-      <div className="planner-head">
-        <div className="gutter-spacer" />
-        <div className="lane-heads" style={{ gridTemplateColumns: laneCols }}>
-          {people.map((p) => (
-            <div key={p.id} className="lane-head" style={{ color: p.color }}>
-              <span className="dot" style={{ background: p.color }} />
-              {p.name}
-            </div>
+        <div className="allday-bar">
+          {allDayOccs.map((o) => (
+            <AllDayChip
+              key={o.event.id}
+              occ={o}
+              status={statuses.get(o.event.id)}
+              onClick={() => setTarget({ mode: 'edit', event: o.event })}
+            />
           ))}
+          <button
+            className="allday-add"
+            onClick={() => setTarget({ mode: 'new', date: dateISO, attendees: ['me'] })}
+          >
+            + All-day
+          </button>
         </div>
       </div>
 
       <div className="planner-body" ref={scrollRef}>
-        <TimeGutter />
-        <div className="lanes" style={{ height: fullHeight, gridTemplateColumns: laneCols }}>
-          {people.map((p) => (
-            <Lane
-              key={p.id}
-              person={p}
-              dayEvents={timed}
-              statuses={statuses}
-              nowMin={nowMin}
-              onAddAt={(min) => addAt([p.id], min)}
-              onEdit={(event) => setTarget({ mode: 'edit', event })}
-            />
-          ))}
-
-          {/* 'Both' (two-parent) blocks span the two parent columns, layered on top. */}
-          <div className="shared-layer" style={{ height: fullHeight, width: `${adultPct}%` }}>
-            {layout(spanning).map(({ ev, col, cols }) => (
-              <button
-                key={ev.id}
-                className="tl-event shared"
-                style={{
-                  top: ev.start * PX_PER_MIN,
-                  height: Math.max((ev.end - ev.start) * PX_PER_MIN, 16),
-                  left: `calc(${(100 / cols) * col}% + 2px)`,
-                  width: `calc(${100 / cols}% - 4px)`,
-                  background: parentsGradient(state),
-                }}
-                onClick={() => setTarget({ mode: 'edit', event: ev })}
-              >
-                <span className="tl-time">
-                  {minutesToTime(ev.start)}–{minutesToTime(ev.end)} · Both
-                </span>
-                <span className="tl-title">{ev.title}</span>
-              </button>
+        <div className="planner-head">
+          <div className="gutter-spacer" />
+          <div className="lane-heads" style={{ gridTemplateColumns: laneCols }}>
+            {people.map((p) => (
+              <div key={p.id} className="lane-head" style={{ color: p.color }}>
+                <span className="dot" style={{ background: p.color }} />
+                {p.name}
+              </div>
             ))}
+          </div>
+        </div>
+
+        <div className="planner-grid">
+          <TimeGutter />
+          <div className="lanes" style={{ height: fullHeight, gridTemplateColumns: laneCols }}>
+            {people.map((p) => (
+              <Lane
+                key={p.id}
+                person={p}
+                dayEvents={timed}
+                statuses={statuses}
+                nowMin={nowMin}
+                onAddAt={(min) => addAt([p.id], min)}
+                onEdit={(event) => setTarget({ mode: 'edit', event })}
+              />
+            ))}
+
+            {/* 'Both' (two-parent) blocks span the two parent columns, layered on top. */}
+            <div className="shared-layer" style={{ height: fullHeight, width: `${adultPct}%` }}>
+              {layout(spanning).map(({ ev, col, cols }) => (
+                <button
+                  key={ev.id}
+                  className="tl-event shared"
+                  style={{
+                    top: ev.start * PX_PER_MIN,
+                    height: Math.max((ev.end - ev.start) * PX_PER_MIN, 16),
+                    left: `calc(${(100 / cols) * col}% + 2px)`,
+                    width: `calc(${100 / cols}% - 4px)`,
+                    background: parentsGradient(state),
+                  }}
+                  onClick={() => setTarget({ mode: 'edit', event: ev })}
+                >
+                  <span className="tl-time">
+                    {minutesToTime(ev.start)}–{minutesToTime(ev.end)} · Both
+                  </span>
+                  <span className="tl-title">{ev.title}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>

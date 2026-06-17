@@ -4,7 +4,8 @@ export function Settings() {
   const { state, dispatch } = useApp()
 
   return (
-    <section className="settings">
+    <section className="settings view">
+      <div className="view-body">
       <p className="hint">
         Set up who's who. Names and colours show up across the calendar and tasks.
       </p>
@@ -29,6 +30,7 @@ export function Settings() {
         Everything is stored on this device only for now. Cross-device sync between the two of you
         comes in a later phase.
       </p>
+      </div>
     </section>
   )
 }
