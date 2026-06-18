@@ -32,7 +32,7 @@ export function WeekCalendar() {
           // All-day items first, then timed by start.
           const occs = occurrencesOnDate(state.events, dateISO).sort((a, b) => {
             if (a.event.allDay !== b.event.allDay) return a.event.allDay ? -1 : 1
-            return a.event.start - b.event.start
+            return a.segment.start - b.segment.start
           })
           return (
             <div className={s.dayCol} key={dayIdx}>
@@ -50,7 +50,7 @@ export function WeekCalendar() {
                           ? o.span > 1
                             ? `All day · ${o.offset + 1}/${o.span}`
                             : 'All day'
-                          : `${minutesToTime(e.start)}–${minutesToTime(e.end)}`}
+                          : `${minutesToTime(o.segment.start)}–${minutesToTime(o.segment.end)}`}
                       </div>
                       <button
                         className={s.eventBody}

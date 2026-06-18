@@ -55,37 +55,6 @@
   outline-offset: -2px;
 }
 
-/* ---- Reminder bar ---- */
-.reminderBar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
-.reminderChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--text);
-  font-size: var(--fs-md);
-}
-
-.reminderIcon {
-  font-size: var(--fs-sm);
-}
-
-.reminderRepeat {
-  font-size: var(--fs-2xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-}
-
 /* ---- Conflict legend ---- */
 .conflictLegend {
   display: flex;
@@ -260,6 +229,23 @@
 .tlEvent.shared {
   border: 1px solid var(--block-ring);
   box-shadow: 0 2px 8px var(--shadow);
+}
+
+/* Completed occurrences fade and strike through. */
+.tlEvent.done,
+.alldayChip.done {
+  opacity: 0.5;
+}
+
+.tlEvent.done .tlTitle,
+.alldayChip.done .alldayTitle {
+  text-decoration: line-through;
+}
+
+/* Advisory: this occurrence is waiting on an unfinished prerequisite. */
+.tlEvent.blocked {
+  outline: 2px dotted var(--muted);
+  outline-offset: -2px;
 }
 
 /* Conflict markers on Nora's blocks. */

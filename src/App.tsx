@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { WeekCalendar } from './components/WeekCalendar'
 import { DayView } from './components/DayView'
 import { MonthView } from './components/MonthView'
-import { TaskList } from './components/TaskList'
+import { Lists } from './components/Lists'
 import { Settings } from './components/Settings'
 import { AlertHost } from './components/AlertHost'
 import { mondayOf, weekdayIndex } from './lib/dates'
@@ -10,13 +10,13 @@ import { cx } from './lib/cx'
 import { useApp } from './state'
 import s from './App.module.css'
 
-type Tab = 'day' | 'calendar' | 'month' | 'tasks' | 'settings'
+type Tab = 'day' | 'calendar' | 'month' | 'lists' | 'settings'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'day', label: 'Day' },
   { id: 'calendar', label: 'Week' },
   { id: 'month', label: 'Month' },
-  { id: 'tasks', label: 'Tasks' },
+  { id: 'lists', label: 'Lists' },
   { id: 'settings', label: 'People' },
 ]
 
@@ -38,7 +38,7 @@ export function App() {
         {tab === 'day' && <DayView />}
         {tab === 'calendar' && <WeekCalendar />}
         {tab === 'month' && <MonthView onOpenDay={openDay} />}
-        {tab === 'tasks' && <TaskList />}
+        {tab === 'lists' && <Lists />}
         {tab === 'settings' && <Settings />}
       </main>
 

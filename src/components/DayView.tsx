@@ -4,12 +4,13 @@ import type { CalendarEvent, Person, PersonId } from '../types'
 import { addDays, isoLabel, minutesToTime, toISODate } from '../lib/dates'
 import { occurrencesOnDate, type DayOccurrence } from '../lib/recurrence'
 import { attendeeLabel, eventColor, isParentsPair, parentsGradient } from '../lib/people'
-import { kidStatuses, type KidStatus } from '../lib/conflicts'
-import { remindersOnDate } from '../lib/notifications'
+import { kidStatuses, type Busy, type KidStatus } from '../lib/conflicts'
+import { hasReminders, checklistEntries } from '../lib/attachments'
+import { isOccurrenceDone, occurrenceStatus, occKey } from '../lib/occurrences'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cx } from '../lib/cx'
 import { EventEditor, type EditorTarget } from './EventEditor'
-import { ReminderEditor, type ReminderTarget } from './ReminderEditor'
+import { OccurrenceSheet } from './OccurrenceSheet'
 import shared from '../styles/shared.module.css'
 import s from './DayView.module.css'
 
@@ -23,12 +24,19 @@ const SNAP = 15
 const KID_WEIGHT = 0.66
 const laneWeight = (p: Person) => (p.id === 'kid' ? KID_WEIGHT : 1)
 
+/** A timed occurrence clamped to the current day, ready to lay out. */
+interface DayBlock {
+  occ: DayOccurrence
+  start: number
+  end: number
+}
+
 export function DayView() {
   const { state, dispatch } = useApp()
   const day = state.selectedDay
   const people = Object.values(state.people)
-  const [target, setTarget] = useState<EditorTarget | null>(null)
-  const [reminderTarget, setReminderTarget] = useState<ReminderTarget | null>(null)
+  const [editor, setEditor] = useState<EditorTarget | null>(null)
+  const [sheet, setSheet] = useState<{ event: CalendarEvent; date: string } | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -46,22 +54,29 @@ export function DayView() {
 
   function addAt(attendees: PersonId[], minute: number) {
     const start = Math.min(Math.max(0, Math.round(minute / SNAP) * SNAP), DAY_MIN - SNAP)
-    setTarget({ mode: 'new', date: dateISO, attendees, start, end: Math.min(start + 60, DAY_MIN) })
+    setEditor({ mode: 'new', date: dateISO, attendees, startMin: start, endMin: Math.min(start + 60, DAY_MIN) })
+  }
+
+  function openSheet(occ: DayOccurrence) {
+    setSheet({ event: occ.event, date: occ.start })
   }
 
   const occs = occurrencesOnDate(state.events, dateISO)
-  const timed = occs.filter((o) => !o.event.allDay).map((o) => o.event)
+  const timedBlocks: DayBlock[] = occs
+    .filter((o) => !o.event.allDay)
+    .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end }))
   const allDayOccs = occs.filter((o) => o.event.allDay)
-  const spanning = timed.filter((e) => isParentsPair(e.attendees))
+  const spanning = timedBlocks.filter((b) => isParentsPair(b.occ.event.attendees))
 
-  // Coverage looks at the whole day: all-day events count as busy from 00:00–24:00.
-  const coverage = occs.map((o) =>
-    o.event.allDay ? { ...o.event, start: 0, end: DAY_MIN } : o.event,
-  )
+  // Coverage looks at the whole day: all-day events count as busy 00:00–24:00.
+  const coverage: Busy[] = occs.map((o) => ({
+    id: o.event.id,
+    attendees: o.event.attendees,
+    start: o.event.allDay ? 0 : o.segment.start,
+    end: o.event.allDay ? DAY_MIN : o.segment.end,
+  }))
   const statuses = kidStatuses(coverage)
   const hasWarnings = [...statuses.values()].some((s) => s !== 'covered')
-
-  const dayReminders = remindersOnDate(state.reminders, dateISO)
 
   const fullHeight = DAY_MIN * PX_PER_MIN
   const laneCols = people.map((p) => `${laneWeight(p)}fr`).join(' ')
@@ -95,34 +110,14 @@ export function DayView() {
               key={o.event.id}
               occ={o}
               status={statuses.get(o.event.id)}
-              onClick={() => setTarget({ mode: 'edit', event: o.event })}
+              onClick={() => openSheet(o)}
             />
           ))}
           <button
             className={s.alldayAdd}
-            onClick={() => setTarget({ mode: 'new', date: dateISO, attendees: ['me'] })}
+            onClick={() => setEditor({ mode: 'new', date: dateISO, attendees: ['me'], allDay: true })}
           >
             + All-day
-          </button>
-        </div>
-
-        <div className={s.reminderBar}>
-          {dayReminders.map((r) => (
-            <button
-              key={r.id}
-              className={s.reminderChip}
-              onClick={() => setReminderTarget({ mode: 'edit', reminder: r })}
-            >
-              <span className={s.reminderIcon}>🔔</span>
-              {minutesToTime(r.time)} {r.title}
-              {r.repeat === 'daily' && <span className={s.reminderRepeat}>daily</span>}
-            </button>
-          ))}
-          <button
-            className={s.alldayAdd}
-            onClick={() => setReminderTarget({ mode: 'new', date: dateISO })}
-          >
-            + Reminder
           </button>
         </div>
       </div>
@@ -147,46 +142,78 @@ export function DayView() {
               <Lane
                 key={p.id}
                 person={p}
-                dayEvents={timed}
+                blocks={timedBlocks}
                 statuses={statuses}
                 nowMin={nowMin}
                 onAddAt={(min) => addAt([p.id], min)}
-                onEdit={(event) => setTarget({ mode: 'edit', event })}
+                onOpen={openSheet}
               />
             ))}
 
             {/* 'Both' (two-parent) blocks span the two parent columns, layered on top. */}
             <div className={s.sharedLayer} style={{ height: fullHeight, width: `${adultPct}%` }}>
-              {layout(spanning).map(({ ev, col, cols }) => (
-                <button
-                  key={ev.id}
-                  className={cx(s.tlEvent, s.shared)}
-                  style={{
-                    top: ev.start * PX_PER_MIN,
-                    height: Math.max((ev.end - ev.start) * PX_PER_MIN, 16),
-                    left: `calc(${(100 / cols) * col}% + 2px)`,
-                    width: `calc(${100 / cols}% - 4px)`,
-                    background: parentsGradient(state),
-                  }}
-                  onClick={() => setTarget({ mode: 'edit', event: ev })}
-                >
-                  <span className={s.tlTime}>
-                    {minutesToTime(ev.start)}–{minutesToTime(ev.end)} · Both
-                  </span>
-                  <span className={s.tlTitle}>{ev.title}</span>
-                </button>
-              ))}
+              {layout(spanning).map(({ block, col, cols }) => {
+                const ev = block.occ.event
+                const done = isOccurrenceDone(state, ev, block.occ.start)
+                return (
+                  <button
+                    key={ev.id}
+                    className={cx(s.tlEvent, s.shared, done && s.done)}
+                    style={{
+                      top: block.start * PX_PER_MIN,
+                      height: Math.max((block.end - block.start) * PX_PER_MIN, 16),
+                      left: `calc(${(100 / cols) * col}% + 2px)`,
+                      width: `calc(${100 / cols}% - 4px)`,
+                      background: parentsGradient(state),
+                    }}
+                    onClick={() => openSheet(block.occ)}
+                  >
+                    <span className={s.tlTime}>
+                      {minutesToTime(block.start)}–{minutesToTime(block.end)} · Both
+                    </span>
+                    <span className={s.tlTitle}>{ev.title}</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         </div>
       </div>
 
-      {target && <EventEditor target={target} onClose={() => setTarget(null)} />}
-      {reminderTarget && (
-        <ReminderEditor target={reminderTarget} onClose={() => setReminderTarget(null)} />
+      {editor && <EventEditor target={editor} onClose={() => setEditor(null)} />}
+      {sheet && (
+        <OccurrenceSheet
+          event={sheet.event}
+          date={sheet.date}
+          onEdit={() => {
+            setEditor({ mode: 'edit', event: sheet.event })
+            setSheet(null)
+          }}
+          onClose={() => setSheet(null)}
+        />
       )}
     </section>
   )
+}
+
+/** Compact badges shown on a block / chip: reminders, checklist progress, done, kid status. */
+function badges(
+  state: ReturnType<typeof useApp>['state'],
+  event: CalendarEvent,
+  date: string,
+  status: KidStatus | undefined,
+): string {
+  const entries = checklistEntries(event)
+  let out = ''
+  if (hasReminders(event)) out += ' 🔔'
+  if (entries.length) {
+    const checked = state.completions[occKey(event.id, date)]?.checked ?? {}
+    const n = entries.filter((e) => checked[e.id]).length
+    out += ` ☑${n}/${entries.length}`
+  }
+  if (status === 'clash') out += ' ⚠'
+  if (status === 'needs') out += ' ◌'
+  return out
 }
 
 function AllDayChip({
@@ -200,9 +227,15 @@ function AllDayChip({
 }) {
   const { state } = useApp()
   const { event } = occ
+  const done = isOccurrenceDone(state, event, occ.start)
   return (
     <button
-      className={cx(s.alldayChip, status === 'clash' && s.warnClash, status === 'needs' && s.warnNeeds)}
+      className={cx(
+        s.alldayChip,
+        done && s.done,
+        status === 'clash' && s.warnClash,
+        status === 'needs' && s.warnNeeds,
+      )}
       style={{ background: eventColor(state, event.attendees) }}
       onClick={onClick}
     >
@@ -210,9 +243,7 @@ function AllDayChip({
       <span className={s.alldayMeta}>
         {attendeeLabel(state, event.attendees)}
         {occ.span > 1 && ` · day ${occ.offset + 1}/${occ.span}`}
-        {event.reminders?.length ? ' 🔔' : ''}
-        {status === 'clash' && ' ⚠'}
-        {status === 'needs' && ' ◌'}
+        {badges(state, event, occ.start, status)}
       </span>
     </button>
   )
@@ -231,43 +262,43 @@ function TimeGutter() {
 }
 
 interface Laid {
-  ev: CalendarEvent
+  block: DayBlock
   col: number
   cols: number
 }
 
-/** Greedy column layout so overlapping events in one lane sit side by side. */
-function layout(events: CalendarEvent[]): Laid[] {
-  const sorted = [...events].sort((a, b) => a.start - b.start || a.end - b.end)
+/** Greedy column layout so overlapping blocks in one lane sit side by side. */
+function layout(blocks: DayBlock[]): Laid[] {
+  const sorted = [...blocks].sort((a, b) => a.start - b.start || a.end - b.end)
   const result: Laid[] = []
-  let cluster: CalendarEvent[] = []
+  let cluster: DayBlock[] = []
   let clusterEnd = -1
 
   const flush = () => {
-    const columns: CalendarEvent[][] = []
-    for (const ev of cluster) {
+    const columns: DayBlock[][] = []
+    for (const b of cluster) {
       let placed = false
       for (const c of columns) {
-        if (c[c.length - 1].end <= ev.start) {
-          c.push(ev)
+        if (c[c.length - 1].end <= b.start) {
+          c.push(b)
           placed = true
           break
         }
       }
-      if (!placed) columns.push([ev])
+      if (!placed) columns.push([b])
     }
     const n = columns.length
-    columns.forEach((c, ci) => c.forEach((ev) => result.push({ ev, col: ci, cols: n })))
+    columns.forEach((c, ci) => c.forEach((block) => result.push({ block, col: ci, cols: n })))
   }
 
-  for (const ev of sorted) {
-    if (cluster.length && ev.start >= clusterEnd) {
+  for (const b of sorted) {
+    if (cluster.length && b.start >= clusterEnd) {
       flush()
       cluster = []
       clusterEnd = -1
     }
-    cluster.push(ev)
-    clusterEnd = Math.max(clusterEnd, ev.end)
+    cluster.push(b)
+    clusterEnd = Math.max(clusterEnd, b.end)
   }
   if (cluster.length) flush()
   return result
@@ -275,22 +306,24 @@ function layout(events: CalendarEvent[]): Laid[] {
 
 function Lane({
   person,
-  dayEvents,
+  blocks,
   statuses,
   nowMin,
   onAddAt,
-  onEdit,
+  onOpen,
 }: {
   person: Person
-  dayEvents: CalendarEvent[]
+  blocks: DayBlock[]
   statuses: Map<string, KidStatus>
   nowMin: number | null
   onAddAt: (minute: number) => void
-  onEdit: (event: CalendarEvent) => void
+  onOpen: (occ: DayOccurrence) => void
 }) {
   const { state } = useApp()
-  // This person's events, excluding two-parent 'Both' blocks (those span instead).
-  const mine = dayEvents.filter((e) => e.attendees.includes(person.id) && !isParentsPair(e.attendees))
+  // This person's blocks, excluding two-parent 'Both' ones (those span instead).
+  const mine = blocks.filter(
+    (b) => b.occ.event.attendees.includes(person.id) && !isParentsPair(b.occ.event.attendees),
+  )
   const laid = layout(mine)
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
@@ -307,27 +340,34 @@ function Lane({
         </div>
       )}
 
-      {laid.map(({ ev, col, cols }) => {
+      {laid.map(({ block, col, cols }) => {
+        const ev = block.occ.event
         const status = statuses.get(ev.id)
         const joint = ev.attendees.length > 1
+        const done = isOccurrenceDone(state, ev, block.occ.start)
+        const blocked = occurrenceStatus(state, ev, block.occ.start) === 'blocked'
         return (
           <button
             key={ev.id}
-            className={cx(s.tlEvent, status === 'clash' && s.warnClash, status === 'needs' && s.warnNeeds)}
+            className={cx(
+              s.tlEvent,
+              done && s.done,
+              blocked && s.blocked,
+              status === 'clash' && s.warnClash,
+              status === 'needs' && s.warnNeeds,
+            )}
             style={{
-              top: ev.start * PX_PER_MIN,
-              height: Math.max((ev.end - ev.start) * PX_PER_MIN, 16),
+              top: block.start * PX_PER_MIN,
+              height: Math.max((block.end - block.start) * PX_PER_MIN, 16),
               left: `calc(${(100 / cols) * col}% + 2px)`,
               width: `calc(${100 / cols}% - 4px)`,
               background: eventColor(state, ev.attendees),
             }}
-            onClick={() => onEdit(ev)}
+            onClick={() => onOpen(block.occ)}
           >
             <span className={s.tlTime}>
-              {minutesToTime(ev.start)}–{minutesToTime(ev.end)}
-              {ev.reminders?.length ? ' 🔔' : ''}
-              {status === 'clash' && ' ⚠'}
-              {status === 'needs' && ' ◌'}
+              {minutesToTime(block.start)}–{minutesToTime(block.end)}
+              {badges(state, ev, block.occ.start, status)}
             </span>
             <span className={s.tlTitle}>{ev.title}</span>
             {joint && <span className={s.tlTag}>{attendeeLabel(state, ev.attendees)}</span>}
