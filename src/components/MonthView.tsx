@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useApp } from '../state'
 import { eventColor } from '../lib/people'
 import { occurrencesOnDate } from '../lib/recurrence'
+import { eventStartMinutes } from '../lib/timing'
 import {
   DAY_NAMES,
   addMonths,
@@ -50,7 +51,10 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
           // Expand recurring/multi-day events onto this concrete date.
           const dayEvents = occurrencesOnDate(state.events, iso)
             .map((o) => o.event)
-            .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start - b.start)
+            .sort(
+              (a, b) =>
+                Number(b.allDay) - Number(a.allDay) || eventStartMinutes(a) - eventStartMinutes(b),
+            )
           return (
             <button
               key={iso}

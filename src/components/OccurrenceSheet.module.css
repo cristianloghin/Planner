@@ -1,0 +1,82 @@
+.meta {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  margin: 0;
+}
+
+.doneTitle {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.waiting {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: var(--fs-md);
+}
+
+.checklist {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+}
+
+.checklistTitle {
+  margin: 0 0 6px;
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
+.checklistItems {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checklistItems label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-lg);
+}
+
+.doneToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-lg);
+  padding: 10px 0;
+}
+
+.doneToggle input {
+  width: 20px;
+  height: 20px;
+}
+
+.note {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: var(--fs-md);
+}
+
+.reminders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reminderChip {
+  padding: 5px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: var(--fs-md);
+}

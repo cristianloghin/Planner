@@ -1,52 +1,5 @@
-import type { AppState, CalendarEvent, PersonId, Recurrence } from '../types'
-import { addDays, mondayOf } from '../lib/dates'
-
-/**
- * Older saved shapes we still read:
- *   - `personId` ('me' | 'partner' | 'kid' | 'both') before `attendees`.
- *   - `day` (0-6 weekday) before events were anchored to an absolute `date`.
- */
-interface LegacyEvent {
-  id: string
-  title: string
-  day?: number
-  date?: string
-  allDay?: boolean
-  start?: number
-  end?: number
-  days?: number
-  recurrence?: Recurrence
-  attendees?: PersonId[]
-  reminders?: number[]
-  personId?: PersonId | 'both'
-  notes?: string
-}
-
-function migrateEvent(e: LegacyEvent, weekStart: string): CalendarEvent {
-  const attendees: PersonId[] =
-    Array.isArray(e.attendees) && e.attendees.length
-      ? e.attendees
-      : e.personId === 'both'
-        ? ['me', 'partner']
-        : [(e.personId as PersonId) ?? 'me']
-
-  // Weekday-based events become one-offs on the matching day of their week.
-  const date = e.date ?? addDays(weekStart, e.day ?? 0)
-
-  return {
-    id: e.id,
-    title: e.title,
-    date,
-    allDay: e.allDay ?? false,
-    start: e.start ?? 9 * 60,
-    end: e.end ?? 10 * 60,
-    days: e.days ?? 1,
-    recurrence: e.recurrence,
-    attendees,
-    reminders: e.reminders,
-    notes: e.notes,
-  }
-}
+import type { AppState } from '../types'
+import { mondayOf } from '../lib/dates'
 
 /**
  * Storage abstraction. Phase 1 is backed by localStorage (single device).
@@ -67,15 +20,18 @@ export function defaultState(): AppState {
       partner: { id: 'partner', name: 'Partner', color: '#ec4899' },
       kid: { id: 'kid', name: 'Nora', color: '#14b8a6' },
     },
-    tasks: [],
+    lists: [],
     events: [],
-    reminders: [],
+    completions: {},
     weekStart: mondayOf(today),
     selectedDay: (today.getDay() + 6) % 7, // 0 = Monday
   }
 }
 
-const STORAGE_KEY = 'planner.state.v1'
+// v2: the start/duration + attachments + completions model. The v1 key (a
+// different event shape) is intentionally not read — we're still iterating on
+// shapes, so stale data is simply ignored rather than migrated.
+const STORAGE_KEY = 'planner.state.v2'
 
 export class LocalStorageStore implements ScheduleStore {
   load(): AppState {
@@ -85,16 +41,15 @@ export class LocalStorageStore implements ScheduleStore {
       const parsed = JSON.parse(raw) as Partial<AppState>
       const base = defaultState()
       // Shallow-merge over defaults so missing/added fields stay valid, but
-      // deep-merge people so newly-added members (e.g. Nora) appear for users
-      // whose saved state predates them, while keeping their custom names/colours.
-      const weekStart = parsed.weekStart ?? base.weekStart
-      const events = (parsed.events ?? base.events).map((e) => migrateEvent(e as LegacyEvent, weekStart))
+      // deep-merge people so newly-added members appear for users whose saved
+      // state predates them, while keeping their custom names/colours.
       return {
         ...base,
         ...parsed,
         people: { ...base.people, ...(parsed.people ?? {}) },
-        events,
-        reminders: parsed.reminders ?? base.reminders,
+        lists: parsed.lists ?? base.lists,
+        events: parsed.events ?? base.events,
+        completions: parsed.completions ?? base.completions,
       } as AppState
     } catch {
       return defaultState()

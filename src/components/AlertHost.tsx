@@ -27,7 +27,7 @@ export function AlertHost() {
     function check() {
       const now = Date.now()
       const from = Math.max(seenRef.current, now - MAX_LOOKBACK_MS)
-      const due = dueAlerts(state.events, state.reminders, from, now)
+      const due = dueAlerts(state.events, from, now)
       seenRef.current = now
       localStorage.setItem(SEEN_KEY, String(now))
       if (due.length) {
@@ -45,7 +45,7 @@ export function AlertHost() {
       window.clearInterval(iv)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [state.events, state.reminders])
+  }, [state.events])
 
   function dismiss(id: string) {
     setActive((prev) => prev.filter((a) => a.id !== id))

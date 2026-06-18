@@ -1,9 +1,14 @@
-import type { CalendarEvent, Reminder } from '../types'
+import type { CalendarEvent } from '../types'
 import { addDays, diffDays, toISODate } from './dates'
 import { startsOn } from './recurrence'
+import { eventStartMinutes } from './timing'
+import { reminderOffsets } from './attachments'
 
 /** Reminder offsets (minutes before start) offered in the event editor. */
 export const REMINDER_OFFSETS = [0, 15, 30, 60, 120, 1440]
+
+/** All-day reminders have no clock time, so they anchor to this time of day. */
+const ALLDAY_REMINDER_MIN = 9 * 60
 
 export function offsetLabel(min: number): string {
   if (min === 0) return 'At start'
@@ -14,13 +19,6 @@ export function offsetLabel(min: number): string {
   }
   const d = min / 1440
   return `${d} day${d > 1 ? 's' : ''} before`
-}
-
-/** Standalone reminders that apply to ISO `date` (for the Day view list). */
-export function remindersOnDate(reminders: Reminder[], date: string): Reminder[] {
-  return reminders
-    .filter((r) => (r.repeat === 'daily' ? date >= r.date : r.date === date))
-    .sort((a, b) => a.time - b.time)
 }
 
 /** Local epoch ms for ISO `date` at `minutes` past midnight. */
@@ -47,39 +45,26 @@ export interface FiredAlert {
 }
 
 /**
- * Notifications whose fire time falls in the window (fromMs, toMs]: standalone
- * reminders plus event-attached offsets, expanded across recurrences.
+ * Event-attached reminders whose fire time falls in the window (fromMs, toMs],
+ * expanded across recurrences. Standalone reminders no longer exist — every
+ * reminder is an attachment on an event (a point-in-time event for a bare ping).
  */
-export function dueAlerts(
-  events: CalendarEvent[],
-  reminders: Reminder[],
-  fromMs: number,
-  toMs: number,
-): FiredAlert[] {
+export function dueAlerts(events: CalendarEvent[], fromMs: number, toMs: number): FiredAlert[] {
   const out: FiredAlert[] = []
   const inWindow = (w: number) => w > fromMs && w <= toMs
 
-  for (const r of reminders) {
-    const days = r.repeat === 'daily' ? datesBetween(fromMs, toMs) : [r.date]
-    for (const d of days) {
-      if (d < r.date) continue
-      const w = atMs(d, r.time)
-      if (inWindow(w)) out.push({ id: `r:${r.id}:${w}`, title: r.title, whenMs: w })
-    }
-  }
-
-  // Event offsets fire before the start, so look ahead by the largest offset.
-  const maxOffset = events.reduce(
-    (m, e) => Math.max(m, ...(e.reminders ?? [0])),
-    0,
-  )
+  // Reminders fire before the start, so look ahead by the largest offset.
+  const maxOffset = events.reduce((m, e) => Math.max(m, ...reminderOffsets(e), 0), 0)
   const dates = datesBetween(fromMs, toMs + maxOffset * 60_000)
+
   for (const e of events) {
-    if (!e.reminders?.length) continue
+    const offsets = reminderOffsets(e)
+    if (!offsets.length) continue
+    const baseMin = e.allDay ? ALLDAY_REMINDER_MIN : eventStartMinutes(e)
     for (const d of dates) {
       if (!startsOn(e, d)) continue
-      const startMs = atMs(d, e.allDay ? 0 : e.start)
-      for (const offset of e.reminders) {
+      const startMs = atMs(d, baseMin)
+      for (const offset of offsets) {
         const w = startMs - offset * 60_000
         if (inWindow(w)) {
           out.push({

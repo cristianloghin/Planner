@@ -6,8 +6,12 @@ export interface Person {
   color: string
 }
 
-/** A to-do item, optionally assigned to one person or shared (personId === null). */
-export interface Task {
+/**
+ * A standalone to-do in the Lists view: undated, flat, optionally assigned to one
+ * person or shared (personId === null). Distinct from an event's checklist — they
+ * share no data, only the spirit of "things to tick off".
+ */
+export interface ListItem {
   id: string
   title: string
   done: boolean
@@ -25,55 +29,68 @@ export interface Recurrence {
 }
 
 /**
- * A calendar event anchored to an absolute date.
+ * One line of a checklist attachment. Template only — whether it's *checked* is
+ * per-occurrence state and lives in `AppState.completions`, never here.
+ */
+export interface ChecklistEntry {
+  id: string
+  title: string
+}
+
+/**
+ * Polymorphic content attached to an event, kept in display order:
+ *   - note:      free text (repeatable — an event can have several).
+ *   - checklist: a titled list of entries; the event is "done" when all are checked.
+ *   - reminder:  an in-app notification offset, in minutes before the event start.
+ */
+export type Attachment =
+  | { id: string; kind: 'note'; text: string }
+  | { id: string; kind: 'checklist'; title?: string; items: ChecklistEntry[] }
+  | { id: string; kind: 'reminder'; offset: number }
+
+/**
+ * A calendar event — a pure *template*. Timing is `start` + `duration`:
+ *   - timed   (allDay === false): `start` is an ISO datetime `yyyy-mm-ddThh:mm`,
+ *     `duration` is minutes. A large duration spans midnight / several days.
+ *   - all-day (allDay === true):  `start` is an ISO date `yyyy-mm-dd`, `duration`
+ *     is whole days (>= 1).
+ * `duration === 0` is a point in time.
  *
- * Timing comes in two flavours:
- *   - timed   (allDay === false): a block from `start` to `end` minutes on `date`.
- *   - all-day (allDay === true):  covers whole days; `days` > 1 spans a trip.
- *
- * `recurrence` repeats the whole event from `date` onward; edits/deletes apply
- * to the entire series.
+ * No mutable "tick" state lives here — completion is per-occurrence (see
+ * `AppState.completions`). `recurrence` repeats the whole template from `start`.
  */
 export interface CalendarEvent {
   id: string
   title: string
-  /** ISO date (yyyy-mm-dd) of the first occurrence. */
-  date: string
-  /** All-day (covers whole days) vs a timed block. */
+  start: string
   allDay: boolean
-  /** Timed block: minutes from midnight. Ignored when `allDay`. */
-  start: number
-  end: number
-  /** Days an all-day event spans (>= 1). 1 unless it's a multi-day trip. */
-  days: number
-  /** Repeat rule; omitted for a one-off. */
+  duration: number
   recurrence?: Recurrence
-  /** Everyone involved — one or more people. A parent + Nora is a joint event. */
+  /** Everyone involved — one or more people. */
   attendees: PersonId[]
-  /** In-app reminder offsets, in minutes before the event start (e.g. 15, 1440). */
-  reminders?: number[]
-  notes?: string
+  /** Notes, checklists and reminders, in display order. */
+  attachments: Attachment[]
+  /** Prerequisite event ids — advisory "waiting on…" links (a DAG). */
+  dependsOn?: string[]
 }
 
 /**
- * A standalone in-app notification at a date + time, optionally repeating daily.
- * (Not tied to an event — e.g. "notify at 18:30".)
+ * Mutable per-occurrence state, keyed `${eventId}:${date}` in `completions`,
+ * where `date` is the occurrence's start date. This is where everything you
+ * *tick* lives, so a recurring event tracks completion per day.
  */
-export interface Reminder {
-  id: string
-  title: string
-  /** ISO date it's anchored to (the only day when repeat is 'none'). */
-  date: string
-  /** Minutes from midnight it fires at. */
-  time: number
-  repeat: 'none' | 'daily'
+export interface OccurrenceState {
+  /** Manual completion, for events without a checklist. */
+  done?: boolean
+  /** checklistEntryId → checked. */
+  checked?: Record<string, boolean>
 }
 
 export interface AppState {
   people: Record<PersonId, Person>
-  tasks: Task[]
+  lists: ListItem[]
   events: CalendarEvent[]
-  reminders: Reminder[]
+  completions: Record<string, OccurrenceState>
   /** ISO date (yyyy-mm-dd) of the Monday of the week being viewed. */
   weekStart: string
   /** 0 = Monday ... 6 = Sunday — the day shown in the Day view. */

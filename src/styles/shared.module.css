@@ -1,7 +1,7 @@
 /*
  * Cross-cutting classes used by more than one component: the per-view layout
  * contract, the week/month nav header, and the editor/form/chip kit shared by
- * EventEditor, ReminderEditor and AttendeeChips.
+ * EventEditor, OccurrenceSheet and AttendeeChips.
  */
 
 /*

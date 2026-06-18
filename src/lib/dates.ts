@@ -102,3 +102,8 @@ export function timeToMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number)
   return h * 60 + m
 }
+
+/** A Date as a `yyyy-mm-ddThh:mm` local string for <input type="datetime-local">. */
+export function toDateTimeLocal(d: Date): string {
+  return `${toISODate(d)}T${minutesToTime(d.getHours() * 60 + d.getMinutes())}`
+}

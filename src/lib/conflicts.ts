@@ -1,4 +1,4 @@
-import type { CalendarEvent } from '../types'
+import type { PersonId } from '../types'
 import { PARENT_IDS } from './people'
 
 /**
@@ -8,12 +8,20 @@ import { PARENT_IDS } from './people'
  */
 export type KidStatus = 'covered' | 'needs' | 'clash'
 
-function overlaps(a: CalendarEvent, b: CalendarEvent): boolean {
+/** A time block on a single day: minutes from midnight, who's on it. */
+export interface Busy {
+  id: string
+  attendees: PersonId[]
+  start: number
+  end: number
+}
+
+function overlaps(a: Busy, b: Busy): boolean {
   return a.start < b.end && b.start < a.end
 }
 
-/** Coverage status for every Nora event on a given day, keyed by event id. */
-export function kidStatuses(dayEvents: CalendarEvent[]): Map<string, KidStatus> {
+/** Coverage status for every Nora block on a given day, keyed by block id. */
+export function kidStatuses(dayEvents: Busy[]): Map<string, KidStatus> {
   const result = new Map<string, KidStatus>()
   const kidEvents = dayEvents.filter((e) => e.attendees.includes('kid'))
 

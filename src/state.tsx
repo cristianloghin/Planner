@@ -1,20 +1,21 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react'
-import type { AppState, CalendarEvent, PersonId, Reminder, Task } from './types'
+import type { AppState, CalendarEvent, ListItem, PersonId } from './types'
 import { createStore } from './store/store'
 import { addDays } from './lib/dates'
+import { occKey } from './lib/occurrences'
+import { uid } from './lib/id'
 
 const store = createStore()
 
 type Action =
-  | { type: 'addTask'; title: string; personId: PersonId | null }
-  | { type: 'toggleTask'; id: string }
-  | { type: 'removeTask'; id: string }
+  | { type: 'addListItem'; title: string; personId: PersonId | null }
+  | { type: 'toggleListItem'; id: string }
+  | { type: 'removeListItem'; id: string }
   | { type: 'addEvent'; event: Omit<CalendarEvent, 'id'> }
   | { type: 'updateEvent'; event: CalendarEvent }
   | { type: 'removeEvent'; id: string }
-  | { type: 'addReminder'; reminder: Omit<Reminder, 'id'> }
-  | { type: 'updateReminder'; reminder: Reminder }
-  | { type: 'removeReminder'; id: string }
+  | { type: 'setOccurrenceDone'; eventId: string; date: string; done: boolean }
+  | { type: 'toggleChecklistEntry'; eventId: string; date: string; entryId: string }
   | { type: 'renamePerson'; id: PersonId; name: string }
   | { type: 'recolorPerson'; id: PersonId; color: string }
   | { type: 'shiftWeek'; delta: number }
@@ -22,45 +23,60 @@ type Action =
   | { type: 'shiftDay'; delta: number }
   | { type: 'setDay'; day: number }
 
-const id = () => Math.random().toString(36).slice(2, 10)
-
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
-    case 'addTask': {
-      const task: Task = {
-        id: id(),
+    case 'addListItem': {
+      const item: ListItem = {
+        id: uid(),
         title: action.title,
         done: false,
         personId: action.personId,
         createdAt: Date.now(),
       }
-      return { ...state, tasks: [task, ...state.tasks] }
+      return { ...state, lists: [item, ...state.lists] }
     }
-    case 'toggleTask':
+    case 'toggleListItem':
       return {
         ...state,
-        tasks: state.tasks.map((t) => (t.id === action.id ? { ...t, done: !t.done } : t)),
+        lists: state.lists.map((t) => (t.id === action.id ? { ...t, done: !t.done } : t)),
       }
-    case 'removeTask':
-      return { ...state, tasks: state.tasks.filter((t) => t.id !== action.id) }
+    case 'removeListItem':
+      return { ...state, lists: state.lists.filter((t) => t.id !== action.id) }
     case 'addEvent':
-      return { ...state, events: [...state.events, { ...action.event, id: id() }] }
+      return { ...state, events: [...state.events, { ...action.event, id: uid() }] }
     case 'updateEvent':
       return {
         ...state,
         events: state.events.map((e) => (e.id === action.event.id ? action.event : e)),
       }
-    case 'removeEvent':
-      return { ...state, events: state.events.filter((e) => e.id !== action.id) }
-    case 'addReminder':
-      return { ...state, reminders: [...state.reminders, { ...action.reminder, id: id() }] }
-    case 'updateReminder':
-      return {
-        ...state,
-        reminders: state.reminders.map((r) => (r.id === action.reminder.id ? action.reminder : r)),
-      }
-    case 'removeReminder':
-      return { ...state, reminders: state.reminders.filter((r) => r.id !== action.id) }
+    case 'removeEvent': {
+      // Drop the event, any dangling dependsOn edges pointing at it, and all of
+      // its per-occurrence state.
+      const events = state.events
+        .filter((e) => e.id !== action.id)
+        .map((e) =>
+          e.dependsOn?.includes(action.id)
+            ? { ...e, dependsOn: e.dependsOn.filter((d) => d !== action.id) }
+            : e,
+        )
+      const prefix = action.id + ':'
+      const completions = Object.fromEntries(
+        Object.entries(state.completions).filter(([k]) => !k.startsWith(prefix)),
+      )
+      return { ...state, events, completions }
+    }
+    case 'setOccurrenceDone': {
+      const key = occKey(action.eventId, action.date)
+      const prev = state.completions[key] ?? {}
+      return { ...state, completions: { ...state.completions, [key]: { ...prev, done: action.done } } }
+    }
+    case 'toggleChecklistEntry': {
+      const key = occKey(action.eventId, action.date)
+      const prev = state.completions[key] ?? {}
+      const checked = { ...(prev.checked ?? {}) }
+      checked[action.entryId] = !checked[action.entryId]
+      return { ...state, completions: { ...state.completions, [key]: { ...prev, checked } } }
+    }
     case 'renamePerson':
       return {
         ...state,
