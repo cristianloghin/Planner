@@ -1,5 +1,7 @@
 import { useApp } from '../state'
 import type { PersonId } from '../types'
+import { cx } from '../lib/cx'
+import shared from '../styles/shared.module.css'
 
 /** Toggle chips for choosing who's on an event. Always keeps at least one. */
 export function AttendeeChips({
@@ -19,14 +21,14 @@ export function AttendeeChips({
   }
 
   return (
-    <div className="chips">
+    <div className={shared.chips}>
       {Object.values(state.people).map((p) => {
         const on = value.includes(p.id)
         return (
           <button
             type="button"
             key={p.id}
-            className={on ? 'chip on' : 'chip'}
+            className={cx(shared.chip, on && shared.on)}
             style={on ? { background: p.color, borderColor: p.color } : { borderColor: p.color, color: p.color }}
             onClick={() => toggle(p.id)}
           >

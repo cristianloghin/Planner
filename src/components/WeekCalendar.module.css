@@ -1,0 +1,88 @@
+.days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dayCol {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 140px;
+}
+
+.dayHead {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.eventList {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.event {
+  position: relative;
+  background: var(--surface-2);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+.eventTime {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.eventBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: none;
+  text-align: left;
+  color: var(--text);
+}
+
+.eventTitle {
+  font-size: var(--fs-base);
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.eventMeta {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.addLink {
+  margin-top: 8px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 6px;
+  font-size: var(--fs-base);
+}
+
+/* ---- Responsive: stack the week into one column on narrow screens ---- */
+@media (max-width: 720px) {
+  .days {
+    grid-template-columns: 1fr;
+  }
+  .dayCol {
+    min-height: auto;
+  }
+}

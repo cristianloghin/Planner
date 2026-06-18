@@ -1,16 +1,19 @@
 import { useApp } from '../state'
+import { cx } from '../lib/cx'
+import shared from '../styles/shared.module.css'
+import s from './Settings.module.css'
 
 export function Settings() {
   const { state, dispatch } = useApp()
 
   return (
-    <section className="settings view">
-      <div className="view-body">
-      <p className="hint">
+    <section className={cx(shared.view, s.settings)}>
+      <div className={shared.viewBody}>
+      <p className={s.hint}>
         Set up who's who. Names and colours show up across the calendar and tasks.
       </p>
       {Object.values(state.people).map((p) => (
-        <div className="person-row" key={p.id}>
+        <div className={s.personRow} key={p.id}>
           <input
             type="color"
             value={p.color}
@@ -26,7 +29,7 @@ export function Settings() {
         </div>
       ))}
 
-      <p className="hint small">
+      <p className={cx(s.hint, s.small)}>
         Everything is stored on this device only for now. Cross-device sync between the two of you
         comes in a later phase.
       </p>

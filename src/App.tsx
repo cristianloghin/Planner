@@ -6,7 +6,9 @@ import { TaskList } from './components/TaskList'
 import { Settings } from './components/Settings'
 import { AlertHost } from './components/AlertHost'
 import { mondayOf, weekdayIndex } from './lib/dates'
+import { cx } from './lib/cx'
 import { useApp } from './state'
+import s from './App.module.css'
 
 type Tab = 'day' | 'calendar' | 'month' | 'tasks' | 'settings'
 
@@ -29,10 +31,10 @@ export function App() {
   }
 
   return (
-    <div className="app">
+    <div className={s.app}>
       <AlertHost />
 
-      <main className="app-main">
+      <main className={s.appMain}>
         {tab === 'day' && <DayView />}
         {tab === 'calendar' && <WeekCalendar />}
         {tab === 'month' && <MonthView onOpenDay={openDay} />}
@@ -40,11 +42,11 @@ export function App() {
         {tab === 'settings' && <Settings />}
       </main>
 
-      <nav className="tabbar">
+      <nav className={s.tabbar}>
         {TABS.map((t) => (
           <button
             key={t.id}
-            className={t.id === tab ? 'tab active' : 'tab'}
+            className={cx(s.tab, t.id === tab && s.active)}
             onClick={() => setTab(t.id)}
           >
             {t.label}

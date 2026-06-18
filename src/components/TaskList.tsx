@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { useApp } from '../state'
 import type { PersonId } from '../types'
+import { cx } from '../lib/cx'
+import shared from '../styles/shared.module.css'
+import s from './TaskList.module.css'
 
 type Assignee = PersonId | 'shared'
 
@@ -24,18 +27,18 @@ export function TaskList() {
   const done = state.tasks.filter((t) => t.done)
 
   function badge(personId: PersonId | null) {
-    if (!personId) return <span className="badge shared">Shared</span>
+    if (!personId) return <span className={cx(s.badge, s.shared)}>Shared</span>
     const p = state.people[personId]
     return (
-      <span className="badge" style={{ background: p.color }}>
+      <span className={s.badge} style={{ background: p.color }}>
         {p.name}
       </span>
     )
   }
 
   return (
-    <section className="tasks view">
-      <form className="task-add view-head" onSubmit={addTask}>
+    <section className={shared.view}>
+      <form className={cx(s.taskAdd, shared.viewHead)} onSubmit={addTask}>
         <input
           placeholder="Add a task…"
           value={title}
@@ -49,26 +52,26 @@ export function TaskList() {
             </option>
           ))}
         </select>
-        <button type="submit" className="primary">
+        <button type="submit" className={shared.primary}>
           Add
         </button>
       </form>
 
-      <div className="view-body">
-      <ul className="task-list">
+      <div className={shared.viewBody}>
+      <ul className={s.taskList}>
         {open.map((t) => (
-          <li key={t.id} className="task">
+          <li key={t.id} className={s.task}>
             <label>
               <input
                 type="checkbox"
                 checked={t.done}
                 onChange={() => dispatch({ type: 'toggleTask', id: t.id })}
               />
-              <span className="task-title">{t.title}</span>
+              <span className={s.taskTitle}>{t.title}</span>
             </label>
             {badge(t.personId)}
             <button
-              className="task-del"
+              className={s.taskDel}
               aria-label="Delete task"
               onClick={() => dispatch({ type: 'removeTask', id: t.id })}
             >
@@ -76,26 +79,26 @@ export function TaskList() {
             </button>
           </li>
         ))}
-        {open.length === 0 && <p className="empty">Nothing to do. Nice.</p>}
+        {open.length === 0 && <p className={shared.empty}>Nothing to do. Nice.</p>}
       </ul>
 
       {done.length > 0 && (
         <>
-          <h3 className="done-head">Done ({done.length})</h3>
-          <ul className="task-list">
+          <h3 className={s.doneHead}>Done ({done.length})</h3>
+          <ul className={s.taskList}>
             {done.map((t) => (
-              <li key={t.id} className="task done">
+              <li key={t.id} className={cx(s.task, s.done)}>
                 <label>
                   <input
                     type="checkbox"
                     checked={t.done}
                     onChange={() => dispatch({ type: 'toggleTask', id: t.id })}
                   />
-                  <span className="task-title">{t.title}</span>
+                  <span className={s.taskTitle}>{t.title}</span>
                 </label>
                 {badge(t.personId)}
                 <button
-                  className="task-del"
+                  className={s.taskDel}
                   aria-label="Delete task"
                   onClick={() => dispatch({ type: 'removeTask', id: t.id })}
                 >

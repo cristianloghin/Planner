@@ -1,0 +1,193 @@
+/*
+ * Cross-cutting classes used by more than one component: the per-view layout
+ * contract, the week/month nav header, and the editor/form/chip kit shared by
+ * EventEditor, ReminderEditor and AttendeeChips.
+ */
+
+/*
+ * Layout contract for every view: the view fills the main area, its head (nav,
+ * lane names) stays put, and only `.viewBody` scrolls — one scrollbar per view.
+ */
+.view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.viewHead {
+  flex: none;
+  padding: 0 max(16px, env(safe-area-inset-left));
+}
+
+.viewBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ---- Prev / next header (Day, Week, Month) ---- */
+.weekNav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.weekNav button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  text-align: center;
+  margin: 8px 0;
+}
+
+/* ---- Buttons ---- */
+.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+}
+
+.danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+/* ---- Full-page editor shell (events + reminders) ---- */
+.editorPage {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.editorHead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: max(env(safe-area-inset-top), 16px) 16px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.editorHead strong {
+  font-size: var(--fs-2xl);
+}
+
+.editorCancel {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: var(--fs-xl);
+  padding: 6px 2px;
+}
+
+.editorBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  padding-bottom: calc(28px + env(safe-area-inset-bottom));
+}
+
+.editorBody input,
+.editorBody select {
+  width: 100%;
+}
+
+.editorBody .row {
+  display: flex;
+  gap: 10px;
+}
+
+.editorDelete {
+  margin-top: 6px;
+  width: 100%;
+}
+
+/* ---- Editor form primitives ---- */
+.field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-lg);
+}
+
+.toggle input {
+  width: 18px;
+  height: 18px;
+}
+
+.interval {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.interval input {
+  width: 64px;
+}
+
+.interval span {
+  font-size: var(--fs-base);
+  color: var(--muted);
+}
+
+/* ---- Attendee / reminder-offset chips ---- */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  background: transparent;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: var(--fs-base);
+  font-weight: 600;
+}
+
+.chip.on {
+  color: var(--on-accent);
+}

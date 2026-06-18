@@ -3,7 +3,9 @@ import { useApp } from '../state'
 import type { CalendarEvent, PersonId, RecurrenceFreq } from '../types'
 import { minutesToTime, timeToMinutes } from '../lib/dates'
 import { REMINDER_OFFSETS, offsetLabel } from '../lib/notifications'
+import { cx } from '../lib/cx'
 import { AttendeeChips } from './AttendeeChips'
+import shared from '../styles/shared.module.css'
 
 const SNAP = 15
 
@@ -71,18 +73,18 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
   const unitLabel = repeat === 'daily' ? 'days' : repeat === 'weekly' ? 'weeks' : 'months'
 
   return (
-    <form className="editor-page" onSubmit={submit}>
-      <header className="editor-head">
-        <button type="button" className="editor-cancel" onClick={onClose}>
+    <form className={shared.editorPage} onSubmit={submit}>
+      <header className={shared.editorHead}>
+        <button type="button" className={shared.editorCancel} onClick={onClose}>
           Cancel
         </button>
         <strong>{isEdit ? 'Edit event' : 'New event'}</strong>
-        <button type="submit" className="primary">
+        <button type="submit" className={shared.primary}>
           Save
         </button>
       </header>
 
-      <div className="editor-body">
+      <div className={shared.editorBody}>
         <input
           ref={titleRef}
           placeholder="What's the plan?"
@@ -90,18 +92,18 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
           onChange={(e) => setTitle(e.target.value)}
         />
 
-        <label className="field">
+        <label className={shared.field}>
           Date
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
 
-        <label className="toggle">
+        <label className={shared.toggle}>
           <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />
           All-day
         </label>
 
         {allDay ? (
-          <label className="field">
+          <label className={shared.field}>
             Spans (days)
             <input
               type="number"
@@ -111,20 +113,20 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
             />
           </label>
         ) : (
-          <div className="row">
-            <label className="field">
+          <div className={shared.row}>
+            <label className={shared.field}>
               From
               <input type="time" step={SNAP * 60} value={start} onChange={(e) => setStart(e.target.value)} />
             </label>
-            <label className="field">
+            <label className={shared.field}>
               To
               <input type="time" step={SNAP * 60} value={end} onChange={(e) => setEnd(e.target.value)} />
             </label>
           </div>
         )}
 
-        <div className="row">
-          <label className="field">
+        <div className={shared.row}>
+          <label className={shared.field}>
             Repeats
             <select value={repeat} onChange={(e) => setRepeat(e.target.value as RepeatChoice)}>
               <option value="none">Does not repeat</option>
@@ -134,9 +136,9 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
             </select>
           </label>
           {repeat !== 'none' && (
-            <label className="field">
+            <label className={shared.field}>
               Every
-              <div className="interval">
+              <div className={shared.interval}>
                 <input
                   type="number"
                   min={1}
@@ -149,18 +151,18 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
           )}
         </div>
 
-        <label className="field">Who's involved?</label>
+        <label className={shared.field}>Who's involved?</label>
         <AttendeeChips value={attendees} onChange={setAttendees} />
 
-        <label className="field">Remind me</label>
-        <div className="chips">
+        <label className={shared.field}>Remind me</label>
+        <div className={shared.chips}>
           {REMINDER_OFFSETS.map((o) => {
             const on = reminders.includes(o)
             return (
               <button
                 type="button"
                 key={o}
-                className={on ? 'chip on' : 'chip'}
+                className={cx(shared.chip, on && shared.on)}
                 style={on ? { background: 'var(--accent)', borderColor: 'var(--accent)' } : undefined}
                 onClick={() => toggleReminder(o)}
               >
@@ -173,7 +175,7 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
         {isEdit && (
           <button
             type="button"
-            className="danger editor-delete"
+            className={cx(shared.danger, shared.editorDelete)}
             onClick={() => {
               dispatch({ type: 'removeEvent', id: base!.id })
               onClose()

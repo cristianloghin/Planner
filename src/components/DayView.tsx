@@ -6,8 +6,12 @@ import { occurrencesOnDate, type DayOccurrence } from '../lib/recurrence'
 import { attendeeLabel, eventColor, isParentsPair, parentsGradient } from '../lib/people'
 import { kidStatuses, type KidStatus } from '../lib/conflicts'
 import { remindersOnDate } from '../lib/notifications'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { cx } from '../lib/cx'
 import { EventEditor, type EditorTarget } from './EventEditor'
 import { ReminderEditor, type ReminderTarget } from './ReminderEditor'
+import shared from '../styles/shared.module.css'
+import s from './DayView.module.css'
 
 // Layout scale. HOUR_H must match the gridline spacing in index.css.
 const HOUR_H = 56
@@ -66,26 +70,26 @@ export function DayView() {
   const adultPct = (adultWeight / totalWeight) * 100
 
   return (
-    <section className="planner view">
-      <div className="view-head">
-        <div className="week-nav">
+    <section className={shared.view}>
+      <div className={shared.viewHead}>
+        <div className={shared.weekNav}>
           <button onClick={() => dispatch({ type: 'shiftDay', delta: -1 })} aria-label="Previous day">
-            ‹
+            <ChevronLeft size={20} />
           </button>
           <strong>{isoLabel(dateISO)}</strong>
           <button onClick={() => dispatch({ type: 'shiftDay', delta: 1 })} aria-label="Next day">
-            ›
+            <ChevronRight size={20} />
           </button>
         </div>
 
         {hasWarnings && (
-          <div className="conflict-legend">
-            <span className="warn-key clash">⚠ No one free for Nora</span>
-            <span className="warn-key needs">◌ Needs a grown-up</span>
+          <div className={s.conflictLegend}>
+            <span className={cx(s.warnKey, s.clash)}>⚠ No one free for Nora</span>
+            <span className={cx(s.warnKey, s.needs)}>◌ Needs a grown-up</span>
           </div>
         )}
 
-        <div className="allday-bar">
+        <div className={s.alldayBar}>
           {allDayOccs.map((o) => (
             <AllDayChip
               key={o.event.id}
@@ -95,27 +99,27 @@ export function DayView() {
             />
           ))}
           <button
-            className="allday-add"
+            className={s.alldayAdd}
             onClick={() => setTarget({ mode: 'new', date: dateISO, attendees: ['me'] })}
           >
             + All-day
           </button>
         </div>
 
-        <div className="reminder-bar">
+        <div className={s.reminderBar}>
           {dayReminders.map((r) => (
             <button
               key={r.id}
-              className="reminder-chip"
+              className={s.reminderChip}
               onClick={() => setReminderTarget({ mode: 'edit', reminder: r })}
             >
-              <span className="reminder-icon">🔔</span>
+              <span className={s.reminderIcon}>🔔</span>
               {minutesToTime(r.time)} {r.title}
-              {r.repeat === 'daily' && <span className="reminder-repeat">daily</span>}
+              {r.repeat === 'daily' && <span className={s.reminderRepeat}>daily</span>}
             </button>
           ))}
           <button
-            className="allday-add"
+            className={s.alldayAdd}
             onClick={() => setReminderTarget({ mode: 'new', date: dateISO })}
           >
             + Reminder
@@ -123,22 +127,22 @@ export function DayView() {
         </div>
       </div>
 
-      <div className="planner-body" ref={scrollRef}>
-        <div className="planner-head">
-          <div className="gutter-spacer" />
-          <div className="lane-heads" style={{ gridTemplateColumns: laneCols }}>
+      <div className={s.plannerBody} ref={scrollRef}>
+        <div className={s.plannerHead}>
+          <div />
+          <div className={s.laneHeads} style={{ gridTemplateColumns: laneCols }}>
             {people.map((p) => (
-              <div key={p.id} className="lane-head" style={{ color: p.color }}>
-                <span className="dot" style={{ background: p.color }} />
+              <div key={p.id} className={s.laneHead} style={{ color: p.color }}>
+                <span className={s.dot} style={{ background: p.color }} />
                 {p.name}
               </div>
             ))}
           </div>
         </div>
 
-        <div className="planner-grid">
+        <div className={s.plannerGrid}>
           <TimeGutter />
-          <div className="lanes" style={{ height: fullHeight, gridTemplateColumns: laneCols }}>
+          <div className={s.lanes} style={{ height: fullHeight, gridTemplateColumns: laneCols }}>
             {people.map((p) => (
               <Lane
                 key={p.id}
@@ -152,11 +156,11 @@ export function DayView() {
             ))}
 
             {/* 'Both' (two-parent) blocks span the two parent columns, layered on top. */}
-            <div className="shared-layer" style={{ height: fullHeight, width: `${adultPct}%` }}>
+            <div className={s.sharedLayer} style={{ height: fullHeight, width: `${adultPct}%` }}>
               {layout(spanning).map(({ ev, col, cols }) => (
                 <button
                   key={ev.id}
-                  className="tl-event shared"
+                  className={cx(s.tlEvent, s.shared)}
                   style={{
                     top: ev.start * PX_PER_MIN,
                     height: Math.max((ev.end - ev.start) * PX_PER_MIN, 16),
@@ -166,10 +170,10 @@ export function DayView() {
                   }}
                   onClick={() => setTarget({ mode: 'edit', event: ev })}
                 >
-                  <span className="tl-time">
+                  <span className={s.tlTime}>
                     {minutesToTime(ev.start)}–{minutesToTime(ev.end)} · Both
                   </span>
-                  <span className="tl-title">{ev.title}</span>
+                  <span className={s.tlTitle}>{ev.title}</span>
                 </button>
               ))}
             </div>
@@ -196,11 +200,14 @@ function AllDayChip({
 }) {
   const { state } = useApp()
   const { event } = occ
-  const warnClass = status === 'clash' ? ' warn-clash' : status === 'needs' ? ' warn-needs' : ''
   return (
-    <button className={`allday-chip${warnClass}`} style={{ background: eventColor(state, event.attendees) }} onClick={onClick}>
-      <span className="allday-title">{event.title}</span>
-      <span className="allday-meta">
+    <button
+      className={cx(s.alldayChip, status === 'clash' && s.warnClash, status === 'needs' && s.warnNeeds)}
+      style={{ background: eventColor(state, event.attendees) }}
+      onClick={onClick}
+    >
+      <span className={s.alldayTitle}>{event.title}</span>
+      <span className={s.alldayMeta}>
         {attendeeLabel(state, event.attendees)}
         {occ.span > 1 && ` · day ${occ.offset + 1}/${occ.span}`}
         {event.reminders?.length ? ' 🔔' : ''}
@@ -213,9 +220,9 @@ function AllDayChip({
 
 function TimeGutter() {
   return (
-    <div className="time-gutter" style={{ height: DAY_MIN * PX_PER_MIN }}>
+    <div className={s.timeGutter} style={{ height: DAY_MIN * PX_PER_MIN }}>
       {Array.from({ length: 25 }, (_, h) => (
-        <div key={h} className="gutter-label" style={{ top: h * HOUR_H }}>
+        <div key={h} className={s.gutterLabel} style={{ top: h * HOUR_H }}>
           {String(h).padStart(2, '0')}:00
         </div>
       ))}
@@ -287,27 +294,26 @@ function Lane({
   const laid = layout(mine)
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
-    if ((e.target as HTMLElement).closest('.tl-event')) return
+    if ((e.target as HTMLElement).closest(`.${s.tlEvent}`)) return
     const rect = e.currentTarget.getBoundingClientRect()
     onAddAt((e.clientY - rect.top) / PX_PER_MIN)
   }
 
   return (
-    <div className="lane" onClick={handleClick}>
+    <div className={s.lane} onClick={handleClick}>
       {nowMin != null && (
-        <div className="now-line" style={{ top: nowMin * PX_PER_MIN }}>
-          <span className="now-dot" />
+        <div className={s.nowLine} style={{ top: nowMin * PX_PER_MIN }}>
+          <span className={s.nowDot} />
         </div>
       )}
 
       {laid.map(({ ev, col, cols }) => {
         const status = statuses.get(ev.id)
-        const warnClass = status === 'clash' ? ' warn-clash' : status === 'needs' ? ' warn-needs' : ''
         const joint = ev.attendees.length > 1
         return (
           <button
             key={ev.id}
-            className={`tl-event${warnClass}`}
+            className={cx(s.tlEvent, status === 'clash' && s.warnClash, status === 'needs' && s.warnNeeds)}
             style={{
               top: ev.start * PX_PER_MIN,
               height: Math.max((ev.end - ev.start) * PX_PER_MIN, 16),
@@ -317,14 +323,14 @@ function Lane({
             }}
             onClick={() => onEdit(ev)}
           >
-            <span className="tl-time">
+            <span className={s.tlTime}>
               {minutesToTime(ev.start)}–{minutesToTime(ev.end)}
               {ev.reminders?.length ? ' 🔔' : ''}
               {status === 'clash' && ' ⚠'}
               {status === 'needs' && ' ◌'}
             </span>
-            <span className="tl-title">{ev.title}</span>
-            {joint && <span className="tl-tag">{attendeeLabel(state, ev.attendees)}</span>}
+            <span className={s.tlTitle}>{ev.title}</span>
+            {joint && <span className={s.tlTag}>{attendeeLabel(state, ev.attendees)}</span>}
           </button>
         )
       })}

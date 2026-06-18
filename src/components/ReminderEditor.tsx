@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../state'
 import type { Reminder } from '../types'
 import { minutesToTime, timeToMinutes } from '../lib/dates'
+import { cx } from '../lib/cx'
+import shared from '../styles/shared.module.css'
 
 /** Opens onto a new standalone reminder or an existing one. */
 export type ReminderTarget =
@@ -40,18 +42,18 @@ export function ReminderEditor({ target, onClose }: { target: ReminderTarget; on
   }
 
   return (
-    <form className="editor-page" onSubmit={submit}>
-      <header className="editor-head">
-        <button type="button" className="editor-cancel" onClick={onClose}>
+    <form className={shared.editorPage} onSubmit={submit}>
+      <header className={shared.editorHead}>
+        <button type="button" className={shared.editorCancel} onClick={onClose}>
           Cancel
         </button>
         <strong>{isEdit ? 'Edit reminder' : 'New reminder'}</strong>
-        <button type="submit" className="primary">
+        <button type="submit" className={shared.primary}>
           Save
         </button>
       </header>
 
-      <div className="editor-body">
+      <div className={shared.editorBody}>
         <input
           ref={titleRef}
           placeholder="Remind me to…"
@@ -59,18 +61,18 @@ export function ReminderEditor({ target, onClose }: { target: ReminderTarget; on
           onChange={(e) => setTitle(e.target.value)}
         />
 
-        <div className="row">
-          <label className="field">
+        <div className={shared.row}>
+          <label className={shared.field}>
             Date
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </label>
-          <label className="field">
+          <label className={shared.field}>
             Time
             <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
           </label>
         </div>
 
-        <label className="toggle">
+        <label className={shared.toggle}>
           <input type="checkbox" checked={daily} onChange={(e) => setDaily(e.target.checked)} />
           Repeat daily
         </label>
@@ -78,7 +80,7 @@ export function ReminderEditor({ target, onClose }: { target: ReminderTarget; on
         {isEdit && (
           <button
             type="button"
-            className="danger editor-delete"
+            className={cx(shared.danger, shared.editorDelete)}
             onClick={() => {
               dispatch({ type: 'removeReminder', id: base!.id })
               onClose()

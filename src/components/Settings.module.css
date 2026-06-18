@@ -1,0 +1,24 @@
+.settings {
+  max-width: 420px;
+}
+
+.personRow {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.personRow input[type='text'] {
+  flex: 1;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: var(--fs-lg);
+  margin-bottom: 16px;
+}
+
+.hint.small {
+  font-size: var(--fs-md);
+  margin-top: 20px;
+}
