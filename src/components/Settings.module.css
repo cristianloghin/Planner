@@ -36,3 +36,39 @@
 .account .hint.small {
   margin-top: 0;
 }
+
+.changePw {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.changePw input {
+  flex: 1;
+  min-width: 160px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: var(--fs-base);
+  padding: 10px 12px;
+}
+
+.changePw button:disabled {
+  opacity: 0.6;
+}
+
+.pwStatus {
+  flex-basis: 100%;
+  font-size: var(--fs-md);
+}
+
+.pwOk {
+  color: var(--text);
+}
+
+.pwErr {
+  color: var(--danger);
+}
