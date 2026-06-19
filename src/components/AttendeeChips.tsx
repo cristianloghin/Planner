@@ -1,5 +1,6 @@
 import { useApp } from '../state'
 import type { PersonId } from '../types'
+import { peopleList } from '../lib/people'
 import { cx } from '../lib/cx'
 import shared from '../styles/shared.module.css'
 
@@ -22,7 +23,7 @@ export function AttendeeChips({
 
   return (
     <div className={shared.chips}>
-      {Object.values(state.people).map((p) => {
+      {peopleList(state).map((p) => {
         const on = value.includes(p.id)
         return (
           <button

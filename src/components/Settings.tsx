@@ -1,10 +1,12 @@
 import { useApp } from '../state'
+import { useAuth } from '../auth'
 import { cx } from '../lib/cx'
 import shared from '../styles/shared.module.css'
 import s from './Settings.module.css'
 
 export function Settings() {
   const { state, dispatch } = useApp()
+  const { session, signOut } = useAuth()
 
   return (
     <section className={cx(shared.view, s.settings)}>
@@ -30,9 +32,18 @@ export function Settings() {
       ))}
 
       <p className={cx(s.hint, s.small)}>
-        Everything is stored on this device only for now. Cross-device sync between the two of you
-        comes in a later phase.
+        Calendar data is still stored on this device for now. Cross-device sync between the two of
+        you is being wired up.
       </p>
+
+      {session && (
+        <div className={s.account}>
+          <span className={cx(s.hint, s.small)}>Signed in as {session.user.email}</span>
+          <button type="button" className={shared.danger} onClick={() => void signOut()}>
+            Sign out
+          </button>
+        </div>
+      )}
       </div>
     </section>
   )

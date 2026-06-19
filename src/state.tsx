@@ -1,30 +1,25 @@
-import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react'
-import type { AppState, CalendarEvent, ListItem, PersonId } from './types'
-import { createStore } from './store/store'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
+import type { AppState, ListItem } from './types'
+import { createStore, type ScheduleStore } from './store/store'
+import type { Action } from './store/actions'
+import { useAuth } from './auth'
 import { addDays } from './lib/dates'
 import { occKey } from './lib/occurrences'
 import { uid } from './lib/id'
 
-const store = createStore()
-
-type Action =
-  | { type: 'addListItem'; title: string; personId: PersonId | null }
-  | { type: 'toggleListItem'; id: string }
-  | { type: 'removeListItem'; id: string }
-  | { type: 'addEvent'; event: Omit<CalendarEvent, 'id'> }
-  | { type: 'updateEvent'; event: CalendarEvent }
-  | { type: 'removeEvent'; id: string }
-  | { type: 'setOccurrenceDone'; eventId: string; date: string; done: boolean }
-  | { type: 'toggleChecklistEntry'; eventId: string; date: string; entryId: string }
-  | { type: 'renamePerson'; id: PersonId; name: string }
-  | { type: 'recolorPerson'; id: PersonId; color: string }
-  | { type: 'shiftWeek'; delta: number }
-  | { type: 'setWeek'; weekStart: string }
-  | { type: 'shiftDay'; delta: number }
-  | { type: 'setDay'; day: number }
-
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
+    case 'hydrate':
+      return action.state
     case 'addListItem': {
       const item: ListItem = {
         id: uid(),
@@ -112,19 +107,54 @@ function reducer(state: AppState, action: Action): AppState {
 
 interface Ctx {
   state: AppState
-  dispatch: React.Dispatch<Action>
+  dispatch: (action: Action) => void
 }
 
 const AppContext = createContext<Ctx | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, () => store.load())
+  const { accountId, session } = useAuth()
+
+  // The store is created once. Mounted only when authed with an account (the
+  // Root gate guarantees this), so it's the Supabase-backed store.
+  const storeRef = useRef<ScheduleStore>()
+  if (!storeRef.current) {
+    storeRef.current =
+      accountId && session
+        ? createStore({ accountId, userId: session.user.id })
+        : createStore()
+  }
+
+  // State lives in useState; a ref mirrors it so the custom dispatch can compute
+  // the next state synchronously (and pass it to the store) without a stale read.
+  const [state, setState] = useState<AppState | null>(null)
+  const stateRef = useRef<AppState | null>(null)
 
   useEffect(() => {
-    store.save(state)
-  }, [state])
+    let cancelled = false
+    storeRef.current!.load().then((loaded) => {
+      if (cancelled) return
+      stateRef.current = loaded
+      setState(loaded)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
-  const value = useMemo(() => ({ state, dispatch }), [state])
+  const dispatch = useCallback((action: Action) => {
+    const prev = stateRef.current
+    if (!prev) return
+    const next = reducer(prev, action)
+    stateRef.current = next
+    setState(next)
+    void storeRef.current!.apply(action, next).catch((e) =>
+      console.error('Failed to persist change:', e),
+    )
+  }, [])
+
+  const value = useMemo(() => (state ? { state, dispatch } : null), [state, dispatch])
+  if (!value) return null
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }
 

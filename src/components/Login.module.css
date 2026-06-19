@@ -1,0 +1,85 @@
+.page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(env(safe-area-inset-top), 24px) 20px 24px;
+}
+
+.card {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+.title {
+  font-size: var(--fs-3xl);
+  margin: 0;
+  text-align: center;
+}
+
+.sub {
+  margin: 0 0 4px;
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--fs-md);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
+.field input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: var(--fs-base);
+  padding: 10px 12px;
+}
+
+.submit {
+  margin-top: 4px;
+  background: var(--accent);
+  color: var(--on-accent);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: var(--fs-base);
+  font-weight: 600;
+}
+
+.submit:disabled {
+  opacity: 0.6;
+}
+
+.switch {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: var(--fs-md);
+  padding: 4px;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--fs-md);
+}
+
+.notice {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-md);
+}

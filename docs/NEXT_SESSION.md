@@ -4,15 +4,30 @@ The data model is frozen and the migrations are written. This is the runbook to
 stand the backend up and start wiring the app to it. Read
 [`DATA_MODEL.md`](./DATA_MODEL.md) first for the *why*; this file is the *how*.
 
-## What's already done (in this branch)
+## What's already done
 
+**Design + migrations:**
 - `docs/DATA_MODEL.md` — frozen design + every decision with its rejected alternative.
 - `supabase/migrations/0001_schema.sql` — tables, lookup seeds, indexes, constraints.
 - `supabase/migrations/0002_rls.sql` — account-scoped RLS + `is_account_member` / `can_access_series` helpers.
 - `supabase/migrations/0003_functions.sql` — `split_series`, `create_account`, new-user mirror trigger.
+- `supabase/migrations/0004_grants.sql` — **base-table `GRANT`s to `authenticated`.** `0001`–`0003`
+  enabled RLS but never granted table privileges; without this every authenticated query fails
+  `42501 permission denied` (RLS filters rows, but Postgres still needs a table-level grant). Any
+  fresh DB must apply this.
 
-Nothing in the running app has been changed yet — the Phase‑1 localStorage store
-is untouched. The seam to swap is `ScheduleStore` in
+**Backend stood up + Phase‑2 slice 1 (auth + async seam) DONE & verified** (2026‑06‑19):
+- Project linked (`eefdddvbekwywleooioq`), migrations `0001`–`0004` pushed. Email confirmation OFF.
+- `src/lib/supabase.ts` — typed client (uses the new-style **publishable key**, not legacy `anon`).
+- `src/lib/database.types.ts` — generated from the live schema.
+- `src/auth.tsx` — `AuthProvider`: session + idempotent account bootstrap (in-flight dedupe so
+  concurrent callers don't create duplicate accounts).
+- `src/components/Login.tsx` — email/password sign-in/up; sign-out lives in Settings.
+- `src/store/store.ts` — `ScheduleStore` widened to **async** (`Promise`-based).
+- `src/state.tsx` — async hydration; `src/App.tsx` `Root` gate (spinner → login → app).
+
+**Data still flows through `LocalStorageStore`.** The remaining work is the `SupabaseStore`
+read/write mapping. The seam to swap is `ScheduleStore` in
 [`src/store/store.ts`](../src/store/store.ts).
 
 ## 1. Link the Supabase project and apply migrations
@@ -32,20 +47,39 @@ Verify in the dashboard: 20 tables, RLS enabled on all, `split_series` /
 trigger on `auth.users`.
 
 > If you'd rather not use the CLI, paste each migration into the SQL editor **in
-> numeric order** (0001, 0002, 0003).
+> numeric order** (0001 → 0004).
 
 ## 2. App wiring (Phase 2)
 
-1. `npm i @supabase/supabase-js`. Add `VITE_SUPABASE_URL` and
-   `VITE_SUPABASE_ANON_KEY` to `.env.local` (already gitignored — confirm).
-2. Generate types: `supabase gen types typescript --linked > src/lib/database.types.ts`.
-3. Implement `SupabaseStore implements ScheduleStore` and return it from
-   `createStore()`. Note the interface is currently **synchronous**
-   (`load(): AppState`) — Phase 2 needs async/subscription, so expect to widen
-   `ScheduleStore` to `Promise`-based (or add `subscribe`) rather than fit
-   Supabase into the sync shape.
-4. Auth: a signed-in user with no account calls the `create_account` RPC once;
-   store the active `account_id` client-side.
+1. ~~`npm i @supabase/supabase-js`; env vars in `.env.local`~~ **DONE.** Vars are
+   `VITE_SUPABASE_URL` + `VITE_SUPABASE_PUBLISHABLE_KEY` (new-style key, not `anon`).
+2. ~~Generate types~~ **DONE** → `src/lib/database.types.ts`.
+3. ~~Widen `ScheduleStore` to async~~ / ~~implement `SupabaseStore`~~ **DONE.**
+   `ScheduleStore` is now `load()` + `apply(action, next)` (granular writes).
+   `createStore({accountId, userId})` returns `SupabaseStore` (`src/store/supabaseStore.ts`);
+   `createStore()` with no ctx still returns `LocalStorageStore`. Realtime
+   `subscribe` is NOT yet added (load-once) — a good next addition.
+4. ~~Auth + account bootstrap~~ **DONE** — `src/auth.tsx`; the active `account_id`
+   is threaded into `SupabaseStore` via `createStore` from `state.tsx`.
+
+### People are now DATA (migration 0005) — overrides DATA_MODEL Decision 1's roster
+The app draws one lane per `person` row (account-scoped, `kind` adult|child, optional
+`user_id` login link); `event_person` is the roster. `event_participant`/`app_user`
+(RSVP) is untouched for a future real-invitee feature. Frontend is generic over N people.
+
+### SupabaseStore mapping gotchas (already handled — read before editing it)
+- PostgREST embeds need FK hints `table!fk_col` or you get `PGRST201` (ambiguous —
+  e.g. `checklist_item` also links m2m via `occurrence_item_removed`).
+- Occurrence rows stay sparse: done→upsert, undone→delete.
+- Children sync = upsert + delete-missing (NOT delete-all), else the cascade wipes
+  `occurrence_item_state` ticks on every edit.
+- Attachment display order is lossy on round-trip (DB has no polymorphic order).
+
+### Still deferred after slice 2
+- **Standalone Lists** are device-local (`localStorage` key `planner.lists.v1`) — still no table.
+- **`dependsOn`** (occurrence-level edges) not mapped — `load()` returns `[]`.
+- Recurrence + checklist/note round-trip + removeEvent + person rename/recolor are
+  coded but not yet click-tested.
 
 ## 3. Calendar library — the load-bearing contract
 
