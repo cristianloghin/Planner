@@ -14,10 +14,15 @@ import { SupabaseStore } from './supabaseStore'
  *  - `apply(action, next)` persists a single change. The localStorage store
  *    ignores the action and saves the whole `next` state; the Supabase store
  *    translates the action into targeted row writes.
+ *  - `subscribe(onChange)` fires when the backing data changes elsewhere (a
+ *    partner's edit) and returns an unsubscribe fn. localStorage has no remote
+ *    changes, so it's a no-op. (This is the seam a future TanStack Query layer
+ *    would hook for cache invalidation.)
  */
 export interface ScheduleStore {
   load(): Promise<AppState>
   apply(action: Action, next: AppState): Promise<void>
+  subscribe(onChange: () => void): () => void
 }
 
 export function defaultState(): AppState {
@@ -71,6 +76,11 @@ export class LocalStorageStore implements ScheduleStore {
     } catch {
       // Ignore quota / private-mode write failures for now.
     }
+  }
+
+  // Single-device store: nothing changes it remotely.
+  subscribe(): () => void {
+    return () => {}
   }
 }
 

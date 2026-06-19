@@ -55,12 +55,18 @@ trigger on `auth.users`.
    `VITE_SUPABASE_URL` + `VITE_SUPABASE_PUBLISHABLE_KEY` (new-style key, not `anon`).
 2. ~~Generate types~~ **DONE** → `src/lib/database.types.ts`.
 3. ~~Widen `ScheduleStore` to async~~ / ~~implement `SupabaseStore`~~ **DONE.**
-   `ScheduleStore` is now `load()` + `apply(action, next)` (granular writes).
+   `ScheduleStore` is now `load()` + `apply(action, next)` + `subscribe(onChange)`.
    `createStore({accountId, userId})` returns `SupabaseStore` (`src/store/supabaseStore.ts`);
-   `createStore()` with no ctx still returns `LocalStorageStore`. Realtime
-   `subscribe` is NOT yet added (load-once) — a good next addition.
+   `createStore()` with no ctx still returns `LocalStorageStore`.
 4. ~~Auth + account bootstrap~~ **DONE** — `src/auth.tsx`; the active `account_id`
    is threaded into `SupabaseStore` via `createStore` from `state.tsx`.
+5. ~~Realtime sync~~ **DONE (slice 3).** `0006_realtime.sql` adds the calendar
+   tables to the `supabase_realtime` publication; `SupabaseStore.subscribe` opens
+   a `postgres_changes` channel; `state.tsx` does a debounced reload on change,
+   **preserving the selected week/day** (UI nav isn't server data) and **deferring
+   while an editor is open** (flushes on close) so a partner's edit can't disturb
+   an unsaved draft. Verified live: a DB insert appeared in the open app with no
+   refresh; the edit-guard deferred then flushed correctly.
 
 ### People are now DATA (migration 0005) — overrides DATA_MODEL Decision 1's roster
 The app draws one lane per `person` row (account-scoped, `kind` adult|child, optional
@@ -75,11 +81,17 @@ The app draws one lane per `person` row (account-scoped, `kind` adult|child, opt
   `occurrence_item_state` ticks on every edit.
 - Attachment display order is lossy on round-trip (DB has no polymorphic order).
 
-### Still deferred after slice 2
+### Still deferred (after slice 3)
 - **Standalone Lists** are device-local (`localStorage` key `planner.lists.v1`) — still no table.
 - **`dependsOn`** (occurrence-level edges) not mapped — `load()` returns `[]`.
 - Recurrence + checklist/note round-trip + removeEvent + person rename/recolor are
   coded but not yet click-tested.
+- **Realtime is reload-on-change** (refetch all on any change). Fine at household
+  scale; revisit fine-grained delta apply / optimistic-write rollback if needed.
+  This is the seam where TanStack Query (cache invalidation) + Zustand would slot
+  in when the data layer outgrows the current store.
+- **Site URL** still defaults to `localhost:3000` (affects auth emails). Set it to
+  the deployed URL in Supabase → Authentication → URL Configuration.
 
 ## 3. Calendar library — the load-bearing contract
 

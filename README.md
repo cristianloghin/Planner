@@ -17,8 +17,9 @@ People are **data**: one calendar lane per `person` row (`adult`/`child`,
 optional login link), so the app works for any number of people.
 
 Done so far: backend stood up, auth + account bootstrap, `SupabaseStore` for
-people/events/completions. Not yet: realtime live updates (loads once on
-sign-in), standalone Lists sync (still device-local), and `dependsOn` edges.
+people/events/completions, and **realtime sync** (a partner's change appears
+live, deferred while you're mid-edit). Not yet: standalone Lists sync (still
+device-local) and `dependsOn` edges.
 
 - [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) — the schema and the reasoning behind every decision.
 - [`docs/NEXT_SESSION.md`](docs/NEXT_SESSION.md) — runbook + current status and remaining work.

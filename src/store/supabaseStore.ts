@@ -210,6 +210,24 @@ export class SupabaseStore implements ScheduleStore {
     }
   }
 
+  // ---- SUBSCRIBE ---------------------------------------------------------
+
+  /**
+   * Fire `onChange` whenever any calendar table changes (including our own
+   * writes — the caller debounces and reloads idempotently). RLS scopes the
+   * stream to this user's account, so no per-account filter is needed. Returns
+   * an unsubscribe fn.
+   */
+  subscribe(onChange: () => void): () => void {
+    const channel = supabase
+      .channel('account-data')
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => onChange())
+      .subscribe()
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }
+
   // ---- WRITE -------------------------------------------------------------
 
   async apply(action: Action, next: AppState): Promise<void> {
