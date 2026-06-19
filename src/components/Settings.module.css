@@ -22,3 +22,17 @@
   font-size: var(--fs-md);
   margin-top: 20px;
 }
+
+.account {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.account .hint.small {
+  margin-top: 0;
+}

@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
 import type { AppState, CalendarEvent, ListItem, PersonId } from './types'
-import { createStore } from './store/store'
+import { createStore, defaultState } from './store/store'
 import { addDays } from './lib/dates'
 import { occKey } from './lib/occurrences'
 import { uid } from './lib/id'
@@ -22,9 +22,12 @@ type Action =
   | { type: 'setWeek'; weekStart: string }
   | { type: 'shiftDay'; delta: number }
   | { type: 'setDay'; day: number }
+  | { type: 'hydrate'; state: AppState }
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
+    case 'hydrate':
+      return action.state
     case 'addListItem': {
       const item: ListItem = {
         id: uid(),
@@ -118,13 +121,31 @@ interface Ctx {
 const AppContext = createContext<Ctx | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, () => store.load())
+  // Start from the in-memory default, then hydrate asynchronously from the
+  // store. The store is async so a network backend (Supabase) fits the seam.
+  const [state, dispatch] = useReducer(reducer, undefined, defaultState)
+  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
-    store.save(state)
-  }, [state])
+    let cancelled = false
+    store.load().then((loaded) => {
+      if (cancelled) return
+      dispatch({ type: 'hydrate', state: loaded })
+      setHydrated(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    // Don't write the pre-hydration default back over stored data.
+    if (!hydrated) return
+    void store.save(state)
+  }, [state, hydrated])
 
   const value = useMemo(() => ({ state, dispatch }), [state])
+  if (!hydrated) return null
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }
 

@@ -6,10 +6,13 @@ import { mondayOf } from '../lib/dates'
  * To add real cross-device sync later (Supabase/Firebase/custom API), implement
  * this same interface and swap which one `createStore()` returns — nothing else
  * in the app needs to change.
+ *
+ * The interface is **async** so a network-backed store fits without reshaping
+ * the app. The localStorage store resolves synchronously-fast under the hood.
  */
 export interface ScheduleStore {
-  load(): AppState
-  save(state: AppState): void
+  load(): Promise<AppState>
+  save(state: AppState): Promise<void>
 }
 
 export function defaultState(): AppState {
@@ -34,7 +37,7 @@ export function defaultState(): AppState {
 const STORAGE_KEY = 'planner.state.v2'
 
 export class LocalStorageStore implements ScheduleStore {
-  load(): AppState {
+  async load(): Promise<AppState> {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
       if (!raw) return defaultState()
@@ -56,7 +59,7 @@ export class LocalStorageStore implements ScheduleStore {
     }
   }
 
-  save(state: AppState): void {
+  async save(state: AppState): Promise<void> {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
     } catch {
