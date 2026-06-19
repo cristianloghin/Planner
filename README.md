@@ -7,10 +7,15 @@ calendar, to-do lists, and per-person colours. Installable, works offline.
 persisted to `localStorage`, so it survives refreshes but lives on a single
 device. No accounts, no backend.
 
-**Phase 2 (later):** swap the storage layer for a real backend (e.g. Supabase /
-Firebase) to sync schedules across devices and between both partners. The whole
-app talks to storage through the `ScheduleStore` interface in
+**Phase 2 (later):** swap the storage layer for a real backend (Supabase) to
+sync schedules across devices and between both partners. The whole app talks to
+storage through the `ScheduleStore` interface in
 [`src/store/store.ts`](src/store/store.ts), so adding sync is a localized change.
+
+The backend is designed and ready to stand up:
+- [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) — the frozen schema and the reasoning behind every decision.
+- [`docs/NEXT_SESSION.md`](docs/NEXT_SESSION.md) — runbook to link Supabase, apply migrations, and wire the app.
+- [`supabase/migrations/`](supabase/migrations) — the schema, RLS, and functions, ready to `supabase db push`.
 
 ## Tech
 
