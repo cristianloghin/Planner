@@ -35,6 +35,7 @@ button {
 input,
 select {
   font: inherit;
+  font-size: var(--fs-base);
   color: var(--text);
   background: var(--surface-2);
   border: 1px solid var(--border);

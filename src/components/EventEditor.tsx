@@ -1,146 +1,187 @@
-import { useEffect, useRef, useState } from 'react'
-import { useApp } from '../state'
-import type { Attachment, CalendarEvent, ChecklistEntry, PersonId, RecurrenceFreq } from '../types'
-import { minutesToTime, toDateTimeLocal } from '../lib/dates'
-import { eventDate, eventStartMinutes } from '../lib/timing'
-import { REMINDER_OFFSETS, offsetLabel } from '../lib/notifications'
-import { isoLabel } from '../lib/dates'
-import { uid } from '../lib/id'
-import { cx } from '../lib/cx'
-import { AttendeeChips } from './AttendeeChips'
-import shared from '../styles/shared.module.css'
-import s from './EventEditor.module.css'
+import { useEffect, useRef, useState } from "react";
+import { cx } from "../lib/cx";
+import { isoLabel, minutesToTime, toDateTimeLocal } from "../lib/dates";
+import { uid } from "../lib/id";
+import { REMINDER_OFFSETS, offsetLabel } from "../lib/notifications";
+import { eventDate, eventStartMinutes } from "../lib/timing";
+import { useApp } from "../state";
+import shared from "../styles/shared.module.css";
+import type {
+  Attachment,
+  CalendarEvent,
+  ChecklistEntry,
+  PersonId,
+  RecurrenceFreq,
+} from "../types";
+import { AttendeeChips } from "./AttendeeChips";
+import s from "./EventEditor.module.css";
 
-const SNAP = 15
+const SNAP = 15;
 
 /** What the editor opens onto: a brand-new event or an existing one. */
 export type EditorTarget =
   | {
-      mode: 'new'
-      date: string
-      attendees: PersonId[]
-      allDay?: boolean
-      startMin?: number
-      endMin?: number
+      mode: "new";
+      date: string;
+      attendees: PersonId[];
+      allDay?: boolean;
+      startMin?: number;
+      endMin?: number;
     }
-  | { mode: 'edit'; event: CalendarEvent }
+  | { mode: "edit"; event: CalendarEvent };
 
-type RepeatChoice = 'none' | RecurrenceFreq
+type RepeatChoice = "none" | RecurrenceFreq;
 
 /** datetime-local value for a date + minutes-from-midnight. */
 function dtLocal(date: string, minute: number): string {
-  return `${date}T${minutesToTime(minute)}`
+  return `${date}T${minutesToTime(minute)}`;
 }
 
 /** Whole minutes between two datetime-local strings (b - a). */
 function minutesBetween(a: string, b: string): number {
-  return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60_000)
+  return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60_000);
 }
 
 /** Shared full-page editor for the event *template* (timing, attendees, attachments, deps). */
-export function EventEditor({ target, onClose }: { target: EditorTarget; onClose: () => void }) {
-  const { state, dispatch } = useApp()
-  const isEdit = target.mode === 'edit'
-  const base = isEdit ? target.event : null
+export function EventEditor({
+  target,
+  onClose,
+}: {
+  target: EditorTarget;
+  onClose: () => void;
+}) {
+  const { state, dispatch } = useApp();
+  const isEdit = target.mode === "edit";
+  const base = isEdit ? target.event : null;
 
-  const [title, setTitle] = useState(base?.title ?? '')
-  const [allDay, setAllDay] = useState(base?.allDay ?? (isEdit ? false : target.allDay ?? false))
+  const [title, setTitle] = useState(base?.title ?? "");
+  const [allDay, setAllDay] = useState(
+    base?.allDay ?? (isEdit ? false : (target.allDay ?? false)),
+  );
 
-  const initialDate = isEdit ? eventDate(base!) : target.date
-  const initialStartMin = isEdit ? eventStartMinutes(base!) : (target.mode === 'new' ? target.startMin : undefined) ?? 9 * 60
-  const initialEndMin = (target.mode === 'new' ? target.endMin : undefined) ?? Math.min(initialStartMin + 60, 24 * 60)
+  const initialDate = isEdit ? eventDate(base!) : target.date;
+  const initialStartMin = isEdit
+    ? eventStartMinutes(base!)
+    : ((target.mode === "new" ? target.startMin : undefined) ?? 9 * 60);
+  const initialEndMin =
+    (target.mode === "new" ? target.endMin : undefined) ??
+    Math.min(initialStartMin + 60, 24 * 60);
 
-  const [date, setDate] = useState(initialDate)
-  const [days, setDays] = useState(isEdit && base!.allDay ? Math.max(1, base!.duration) : 1)
+  const [date, setDate] = useState(initialDate);
+  const [days, setDays] = useState(
+    isEdit && base!.allDay ? Math.max(1, base!.duration) : 1,
+  );
   const [startDT, setStartDT] = useState(
-    isEdit && !base!.allDay ? base!.start : dtLocal(initialDate, initialStartMin),
-  )
+    isEdit && !base!.allDay
+      ? base!.start
+      : dtLocal(initialDate, initialStartMin),
+  );
   const [endDT, setEndDT] = useState(() => {
     if (isEdit && !base!.allDay) {
-      const d = new Date(base!.start)
-      d.setMinutes(d.getMinutes() + base!.duration)
-      return toDateTimeLocal(d)
+      const d = new Date(base!.start);
+      d.setMinutes(d.getMinutes() + base!.duration);
+      return toDateTimeLocal(d);
     }
-    return dtLocal(initialDate, initialEndMin)
-  })
+    return dtLocal(initialDate, initialEndMin);
+  });
 
-  const [attendees, setAttendees] = useState<PersonId[]>(isEdit ? base!.attendees : target.attendees)
-  const [repeat, setRepeat] = useState<RepeatChoice>(base?.recurrence?.freq ?? 'none')
-  const [interval, setInterval] = useState(base?.recurrence?.interval ?? 1)
-  const [attachments, setAttachments] = useState<Attachment[]>(base?.attachments ?? [])
-  const [dependsOn, setDependsOn] = useState<string[]>(base?.dependsOn ?? [])
+  const [attendees, setAttendees] = useState<PersonId[]>(
+    isEdit ? base!.attendees : target.attendees,
+  );
+  const [repeat, setRepeat] = useState<RepeatChoice>(
+    base?.recurrence?.freq ?? "none",
+  );
+  const [interval, setInterval] = useState(base?.recurrence?.interval ?? 1);
+  const [attachments, setAttachments] = useState<Attachment[]>(
+    base?.attachments ?? [],
+  );
+  const [dependsOn, setDependsOn] = useState<string[]>(base?.dependsOn ?? []);
 
-  const titleRef = useRef<HTMLInputElement>(null)
-  useEffect(() => titleRef.current?.focus(), [])
+  const titleRef = useRef<HTMLInputElement>(null);
+  useEffect(() => titleRef.current?.focus(), []);
 
   const reminderSet = new Set(
-    attachments.filter((a) => a.kind === 'reminder').map((a) => (a as { offset: number }).offset),
-  )
+    attachments
+      .filter((a) => a.kind === "reminder")
+      .map((a) => (a as { offset: number }).offset),
+  );
 
   function toggleReminder(offset: number) {
     setAttachments((prev) =>
       reminderSet.has(offset)
-        ? prev.filter((a) => !(a.kind === 'reminder' && a.offset === offset))
-        : [...prev, { id: uid(), kind: 'reminder', offset }],
-    )
+        ? prev.filter((a) => !(a.kind === "reminder" && a.offset === offset))
+        : [...prev, { id: uid(), kind: "reminder", offset }],
+    );
   }
 
   function addNote() {
-    setAttachments((prev) => [...prev, { id: uid(), kind: 'note', text: '' }])
+    setAttachments((prev) => [...prev, { id: uid(), kind: "note", text: "" }]);
   }
   function addChecklist() {
-    setAttachments((prev) => [...prev, { id: uid(), kind: 'checklist', items: [] }])
+    setAttachments((prev) => [
+      ...prev,
+      { id: uid(), kind: "checklist", items: [] },
+    ]);
   }
   function updateAttachment(id: string, patch: Partial<Attachment>) {
-    setAttachments((prev) => prev.map((a) => (a.id === id ? ({ ...a, ...patch } as Attachment) : a)))
+    setAttachments((prev) =>
+      prev.map((a) => (a.id === id ? ({ ...a, ...patch } as Attachment) : a)),
+    );
   }
   function removeAttachment(id: string) {
-    setAttachments((prev) => prev.filter((a) => a.id !== id))
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
   }
 
   function toggleDependency(id: string) {
-    setDependsOn((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]))
+    setDependsOn((prev) =>
+      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id],
+    );
   }
 
   function submit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!title.trim()) return
+    e.preventDefault();
+    if (!title.trim()) return;
 
-    let start: string
-    let duration: number
+    let start: string;
+    let duration: number;
     if (allDay) {
-      start = date
-      duration = Math.max(1, days)
+      start = date;
+      duration = Math.max(1, days);
     } else {
-      start = startDT
-      duration = Math.max(SNAP, minutesBetween(startDT, endDT))
+      start = startDT;
+      duration = Math.max(SNAP, minutesBetween(startDT, endDT));
     }
 
     // Drop empty notes / empty checklists so saving doesn't keep stubs around.
     const cleaned = attachments.filter((a) => {
-      if (a.kind === 'note') return a.text.trim().length > 0
-      if (a.kind === 'checklist') return a.items.length > 0
-      return true
-    })
+      if (a.kind === "note") return a.text.trim().length > 0;
+      if (a.kind === "checklist") return a.items.length > 0;
+      return true;
+    });
 
-    const event: Omit<CalendarEvent, 'id'> = {
+    const event: Omit<CalendarEvent, "id"> = {
       title: title.trim(),
       start,
       allDay,
       duration,
-      recurrence: repeat === 'none' ? undefined : { freq: repeat, interval: Math.max(1, interval) },
+      recurrence:
+        repeat === "none"
+          ? undefined
+          : { freq: repeat, interval: Math.max(1, interval) },
       attendees,
       attachments: cleaned,
       dependsOn: dependsOn.length ? dependsOn : undefined,
-    }
+    };
 
-    if (isEdit) dispatch({ type: 'updateEvent', event: { ...event, id: base!.id } })
-    else dispatch({ type: 'addEvent', event })
-    onClose()
+    if (isEdit)
+      dispatch({ type: "updateEvent", event: { ...event, id: base!.id } });
+    else dispatch({ type: "addEvent", event });
+    onClose();
   }
 
-  const unitLabel = repeat === 'daily' ? 'days' : repeat === 'weekly' ? 'weeks' : 'months'
-  const otherEvents = state.events.filter((e) => e.id !== base?.id)
+  const unitLabel =
+    repeat === "daily" ? "days" : repeat === "weekly" ? "weeks" : "months";
+  const otherEvents = state.events.filter((e) => e.id !== base?.id);
 
   return (
     <form className={shared.editorPage} onSubmit={submit}>
@@ -148,7 +189,7 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
         <button type="button" className={shared.editorCancel} onClick={onClose}>
           Cancel
         </button>
-        <strong>{isEdit ? 'Edit event' : 'New event'}</strong>
+        <strong>{isEdit ? "Edit event" : "New event"}</strong>
         <button type="submit" className={shared.primary}>
           Save
         </button>
@@ -163,7 +204,11 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
         />
 
         <label className={shared.toggle}>
-          <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={allDay}
+            onChange={(e) => setAllDay(e.target.checked)}
+          />
           All-day
         </label>
 
@@ -171,7 +216,11 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
           <div className={shared.row}>
             <label className={shared.field}>
               Date
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
             </label>
             <label className={shared.field}>
               Spans (days)
@@ -179,7 +228,9 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
                 type="number"
                 min={1}
                 value={days}
-                onChange={(e) => setDays(Math.max(1, Number(e.target.value) || 1))}
+                onChange={(e) =>
+                  setDays(Math.max(1, Number(e.target.value) || 1))
+                }
               />
             </label>
           </div>
@@ -192,13 +243,13 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
                 step={SNAP * 60}
                 value={startDT}
                 onChange={(e) => {
-                  const next = e.target.value
+                  const next = e.target.value;
                   // Keep the same duration when the start moves.
-                  const dur = Math.max(SNAP, minutesBetween(startDT, endDT))
-                  const ne = new Date(next)
-                  ne.setMinutes(ne.getMinutes() + dur)
-                  setStartDT(next)
-                  setEndDT(toDateTimeLocal(ne))
+                  const dur = Math.max(SNAP, minutesBetween(startDT, endDT));
+                  const ne = new Date(next);
+                  ne.setMinutes(ne.getMinutes() + dur);
+                  setStartDT(next);
+                  setEndDT(toDateTimeLocal(ne));
                 }}
               />
             </label>
@@ -217,14 +268,17 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
         <div className={shared.row}>
           <label className={shared.field}>
             Repeats
-            <select value={repeat} onChange={(e) => setRepeat(e.target.value as RepeatChoice)}>
+            <select
+              value={repeat}
+              onChange={(e) => setRepeat(e.target.value as RepeatChoice)}
+            >
               <option value="none">Does not repeat</option>
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
             </select>
           </label>
-          {repeat !== 'none' && (
+          {repeat !== "none" && (
             <label className={shared.field}>
               Every
               <div className={shared.interval}>
@@ -232,7 +286,9 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
                   type="number"
                   min={1}
                   value={interval}
-                  onChange={(e) => setInterval(Math.max(1, Number(e.target.value) || 1))}
+                  onChange={(e) =>
+                    setInterval(Math.max(1, Number(e.target.value) || 1))
+                  }
                 />
                 <span>{unitLabel}</span>
               </div>
@@ -240,32 +296,39 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
           )}
         </div>
 
-        <label className={shared.field}>Who's involved?</label>
+        <label className={shared.label}>Who's involved?</label>
         <AttendeeChips value={attendees} onChange={setAttendees} />
 
-        <label className={shared.field}>Remind me</label>
+        <label className={shared.label}>Remind me</label>
         <div className={shared.chips}>
           {REMINDER_OFFSETS.map((o) => {
-            const on = reminderSet.has(o)
+            const on = reminderSet.has(o);
             return (
               <button
                 type="button"
                 key={o}
                 className={cx(shared.chip, on && shared.on)}
-                style={on ? { background: 'var(--accent)', borderColor: 'var(--accent)' } : undefined}
+                style={
+                  on
+                    ? {
+                        background: "var(--accent)",
+                        borderColor: "var(--accent)",
+                      }
+                    : undefined
+                }
                 onClick={() => toggleReminder(o)}
               >
                 {offsetLabel(o)}
               </button>
-            )
+            );
           })}
         </div>
 
         <div className={s.attachments}>
           {attachments
-            .filter((a) => a.kind !== 'reminder')
+            .filter((a) => a.kind !== "reminder")
             .map((a) =>
-              a.kind === 'note' ? (
+              a.kind === "note" ? (
                 <NoteEditor
                   key={a.id}
                   text={a.text}
@@ -275,7 +338,7 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
               ) : (
                 <ChecklistEditor
                   key={a.id}
-                  title={a.title ?? ''}
+                  title={a.title ?? ""}
                   items={a.items}
                   onChange={(patch) => updateAttachment(a.id, patch)}
                   onRemove={() => removeAttachment(a.id)}
@@ -286,7 +349,11 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
             <button type="button" className={s.addAttachment} onClick={addNote}>
               + Note
             </button>
-            <button type="button" className={s.addAttachment} onClick={addChecklist}>
+            <button
+              type="button"
+              className={s.addAttachment}
+              onClick={addChecklist}
+            >
               + Checklist
             </button>
           </div>
@@ -297,18 +364,25 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
             <label className={shared.field}>Waits on</label>
             <div className={shared.chips}>
               {otherEvents.map((e) => {
-                const on = dependsOn.includes(e.id)
+                const on = dependsOn.includes(e.id);
                 return (
                   <button
                     type="button"
                     key={e.id}
                     className={cx(shared.chip, on && shared.on)}
-                    style={on ? { background: 'var(--accent)', borderColor: 'var(--accent)' } : undefined}
+                    style={
+                      on
+                        ? {
+                            background: "var(--accent)",
+                            borderColor: "var(--accent)",
+                          }
+                        : undefined
+                    }
                     onClick={() => toggleDependency(e.id)}
                   >
-                    {e.title || 'Untitled'} · {isoLabel(eventDate(e))}
+                    {e.title || "Untitled"} · {isoLabel(eventDate(e))}
                   </button>
-                )
+                );
               })}
             </div>
           </>
@@ -319,8 +393,8 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
             type="button"
             className={cx(shared.danger, shared.editorDelete)}
             onClick={() => {
-              dispatch({ type: 'removeEvent', id: base!.id })
-              onClose()
+              dispatch({ type: "removeEvent", id: base!.id });
+              onClose();
             }}
           >
             Delete event
@@ -328,7 +402,7 @@ export function EventEditor({ target, onClose }: { target: EditorTarget; onClose
         )}
       </div>
     </form>
-  )
+  );
 }
 
 function NoteEditor({
@@ -336,15 +410,20 @@ function NoteEditor({
   onChange,
   onRemove,
 }: {
-  text: string
-  onChange: (text: string) => void
-  onRemove: () => void
+  text: string;
+  onChange: (text: string) => void;
+  onRemove: () => void;
 }) {
   return (
     <div className={s.attachment}>
       <div className={s.attachmentHead}>
         <span className={s.attachmentKind}>Note</span>
-        <button type="button" className={s.attachmentDel} onClick={onRemove} aria-label="Remove note">
+        <button
+          type="button"
+          className={s.attachmentDel}
+          onClick={onRemove}
+          aria-label="Remove note"
+        >
           ×
         </button>
       </div>
@@ -356,7 +435,7 @@ function NoteEditor({
         onChange={(e) => onChange(e.target.value)}
       />
     </div>
-  )
+  );
 }
 
 function ChecklistEditor({
@@ -365,17 +444,17 @@ function ChecklistEditor({
   onChange,
   onRemove,
 }: {
-  title: string
-  items: ChecklistEntry[]
-  onChange: (patch: { title?: string; items?: ChecklistEntry[] }) => void
-  onRemove: () => void
+  title: string;
+  items: ChecklistEntry[];
+  onChange: (patch: { title?: string; items?: ChecklistEntry[] }) => void;
+  onRemove: () => void;
 }) {
-  const [draft, setDraft] = useState('')
+  const [draft, setDraft] = useState("");
 
   function addEntry() {
-    if (!draft.trim()) return
-    onChange({ items: [...items, { id: uid(), title: draft.trim() }] })
-    setDraft('')
+    if (!draft.trim()) return;
+    onChange({ items: [...items, { id: uid(), title: draft.trim() }] });
+    setDraft("");
   }
 
   return (
@@ -403,7 +482,9 @@ function ChecklistEditor({
             <button
               type="button"
               className={s.attachmentDel}
-              onClick={() => onChange({ items: items.filter((x) => x.id !== it.id) })}
+              onClick={() =>
+                onChange({ items: items.filter((x) => x.id !== it.id) })
+              }
               aria-label="Remove item"
             >
               ×
@@ -417,9 +498,9 @@ function ChecklistEditor({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              addEntry()
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addEntry();
             }
           }}
         />
@@ -428,5 +509,5 @@ function ChecklistEditor({
         </button>
       </div>
     </div>
-  )
+  );
 }

@@ -75,7 +75,7 @@
 .editorPage {
   position: fixed;
   inset: 0;
-  z-index: 30;
+  z-index: 2000;
   display: flex;
   flex-direction: column;
   background: var(--bg);
@@ -108,16 +108,12 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 14px;
   padding: 16px;
   padding-bottom: calc(28px + env(safe-area-inset-bottom));
-}
-
-.editorBody input,
-.editorBody select {
-  width: 100%;
 }
 
 .editorBody .row {
@@ -131,13 +127,18 @@
 }
 
 /* ---- Editor form primitives ---- */
+.label,
+.field {
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
 .field {
   flex: 1;
   display: flex;
+  overflow: hidden;
   flex-direction: column;
   gap: 4px;
-  font-size: var(--fs-md);
-  color: var(--muted);
 }
 
 .row {
