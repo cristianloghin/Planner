@@ -29,9 +29,11 @@ const TABS: { id: Tab; label: string }[] = [
  * loads for a signed-out user.
  */
 export function Root() {
-  const { session, loading } = useAuth()
+  const { session, accountId, loading } = useAuth()
 
-  if (loading) {
+  // Spinner while the session resolves, or while the account bootstraps (the
+  // store is built from accountId, so wait for it before mounting the data layer).
+  if (loading || (session && !accountId)) {
     return <div className={s.app} />
   }
 

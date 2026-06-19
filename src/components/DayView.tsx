@@ -3,8 +3,15 @@ import { useApp } from '../state'
 import type { CalendarEvent, Person, PersonId } from '../types'
 import { addDays, isoLabel, minutesToTime, toISODate } from '../lib/dates'
 import { occurrencesOnDate, type DayOccurrence } from '../lib/recurrence'
-import { attendeeLabel, eventColor, isParentsPair, parentsGradient } from '../lib/people'
-import { kidStatuses, type Busy, type KidStatus } from '../lib/conflicts'
+import {
+  attendeeLabel,
+  eventColor,
+  isAllAdults,
+  adultsGradient,
+  defaultAttendees,
+  peopleList,
+} from '../lib/people'
+import { childStatuses, type Busy, type ChildStatus } from '../lib/conflicts'
 import { hasReminders, checklistEntries } from '../lib/attachments'
 import { isOccurrenceDone, occurrenceStatus, occKey } from '../lib/occurrences'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
@@ -20,9 +27,9 @@ const PX_PER_MIN = HOUR_H / 60
 const DAY_MIN = 24 * 60
 const SNAP = 15
 
-// The kid's lane is narrower than an adult's (she shares a parent's time).
-const KID_WEIGHT = 0.66
-const laneWeight = (p: Person) => (p.id === 'kid' ? KID_WEIGHT : 1)
+// A child's lane is narrower than an adult's (they share an adult's time).
+const CHILD_WEIGHT = 0.66
+const laneWeight = (p: Person) => (p.kind === 'child' ? CHILD_WEIGHT : 1)
 
 /** A timed occurrence clamped to the current day, ready to lay out. */
 interface DayBlock {
@@ -34,7 +41,7 @@ interface DayBlock {
 export function DayView() {
   const { state, dispatch } = useApp()
   const day = state.selectedDay
-  const people = Object.values(state.people)
+  const people = peopleList(state)
   const [editor, setEditor] = useState<EditorTarget | null>(null)
   const [sheet, setSheet] = useState<{ event: CalendarEvent; date: string } | null>(null)
 
@@ -66,7 +73,7 @@ export function DayView() {
     .filter((o) => !o.event.allDay)
     .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end }))
   const allDayOccs = occs.filter((o) => o.event.allDay)
-  const spanning = timedBlocks.filter((b) => isParentsPair(b.occ.event.attendees))
+  const spanning = timedBlocks.filter((b) => isAllAdults(state, b.occ.event.attendees))
 
   // Coverage looks at the whole day: all-day events count as busy 00:00–24:00.
   const coverage: Busy[] = occs.map((o) => ({
@@ -75,13 +82,17 @@ export function DayView() {
     start: o.event.allDay ? 0 : o.segment.start,
     end: o.event.allDay ? DAY_MIN : o.segment.end,
   }))
-  const statuses = kidStatuses(coverage)
+  const statuses = childStatuses(coverage, state.people)
   const hasWarnings = [...statuses.values()].some((s) => s !== 'covered')
 
   const fullHeight = DAY_MIN * PX_PER_MIN
   const laneCols = people.map((p) => `${laneWeight(p)}fr`).join(' ')
   const totalWeight = people.reduce((s, p) => s + laneWeight(p), 0)
-  const adultWeight = people.filter((p) => p.id !== 'kid').reduce((s, p) => s + laneWeight(p), 0)
+  // The all-adults block spans only the leading adult lanes; size it to their
+  // share of the total. Assumes adults sort ahead of children (sortOrder).
+  const adultWeight = people
+    .filter((p) => p.kind === 'adult')
+    .reduce((s, p) => s + laneWeight(p), 0)
   const adultPct = (adultWeight / totalWeight) * 100
 
   return (
@@ -99,7 +110,7 @@ export function DayView() {
 
         {hasWarnings && (
           <div className={s.conflictLegend}>
-            <span className={cx(s.warnKey, s.clash)}>⚠ No one free for Nora</span>
+            <span className={cx(s.warnKey, s.clash)}>⚠ No adult free</span>
             <span className={cx(s.warnKey, s.needs)}>◌ Needs a grown-up</span>
           </div>
         )}
@@ -115,7 +126,9 @@ export function DayView() {
           ))}
           <button
             className={s.alldayAdd}
-            onClick={() => setEditor({ mode: 'new', date: dateISO, attendees: ['me'], allDay: true })}
+            onClick={() =>
+              setEditor({ mode: 'new', date: dateISO, attendees: defaultAttendees(state), allDay: true })
+            }
           >
             + All-day
           </button>
@@ -164,12 +177,13 @@ export function DayView() {
                       height: Math.max((block.end - block.start) * PX_PER_MIN, 16),
                       left: `calc(${(100 / cols) * col}% + 2px)`,
                       width: `calc(${100 / cols}% - 4px)`,
-                      background: parentsGradient(state),
+                      background: adultsGradient(state),
                     }}
                     onClick={() => openSheet(block.occ)}
                   >
                     <span className={s.tlTime}>
-                      {minutesToTime(block.start)}–{minutesToTime(block.end)} · Both
+                      {minutesToTime(block.start)}–{minutesToTime(block.end)} ·{' '}
+                      {attendeeLabel(state, ev.attendees)}
                     </span>
                     <span className={s.tlTitle}>{ev.title}</span>
                   </button>
@@ -201,7 +215,7 @@ function badges(
   state: ReturnType<typeof useApp>['state'],
   event: CalendarEvent,
   date: string,
-  status: KidStatus | undefined,
+  status: ChildStatus | undefined,
 ): string {
   const entries = checklistEntries(event)
   let out = ''
@@ -222,7 +236,7 @@ function AllDayChip({
   onClick,
 }: {
   occ: DayOccurrence
-  status: KidStatus | undefined
+  status: ChildStatus | undefined
   onClick: () => void
 }) {
   const { state } = useApp()
@@ -314,15 +328,15 @@ function Lane({
 }: {
   person: Person
   blocks: DayBlock[]
-  statuses: Map<string, KidStatus>
+  statuses: Map<string, ChildStatus>
   nowMin: number | null
   onAddAt: (minute: number) => void
   onOpen: (occ: DayOccurrence) => void
 }) {
   const { state } = useApp()
-  // This person's blocks, excluding two-parent 'Both' ones (those span instead).
+  // This person's blocks, excluding all-adults 'Both' ones (those span instead).
   const mine = blocks.filter(
-    (b) => b.occ.event.attendees.includes(person.id) && !isParentsPair(b.occ.event.attendees),
+    (b) => b.occ.event.attendees.includes(person.id) && !isAllAdults(state, b.occ.event.attendees),
   )
   const laid = layout(mine)
 

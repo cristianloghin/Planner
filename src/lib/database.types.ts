@@ -248,6 +248,36 @@ export type Database = {
           },
         ]
       }
+      event_person: {
+        Row: {
+          person_id: string
+          series_id: string
+        }
+        Insert: {
+          person_id: string
+          series_id: string
+        }
+        Update: {
+          person_id?: string
+          series_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_person_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "person"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_person_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "event_series"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_series: {
         Row: {
           account_id: string
@@ -674,6 +704,54 @@ export type Database = {
             columns: ["series_id"]
             isOneToOne: false
             referencedRelation: "event_series"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      person: {
+        Row: {
+          account_id: string
+          color: string
+          created_at: string
+          id: string
+          kind: string
+          name: string
+          sort_order: number
+          user_id: string | null
+        }
+        Insert: {
+          account_id: string
+          color?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          name: string
+          sort_order?: number
+          user_id?: string | null
+        }
+        Update: {
+          account_id?: string
+          color?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          name?: string
+          sort_order?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "app_user"
             referencedColumns: ["id"]
           },
         ]

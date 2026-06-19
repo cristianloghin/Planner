@@ -1,27 +1,32 @@
 import type { AppState } from '../types'
+import type { Action } from './actions'
 import { mondayOf } from '../lib/dates'
+import { SupabaseStore } from './supabaseStore'
 
 /**
- * Storage abstraction. Phase 1 is backed by localStorage (single device).
- * To add real cross-device sync later (Supabase/Firebase/custom API), implement
- * this same interface and swap which one `createStore()` returns — nothing else
- * in the app needs to change.
+ * Storage abstraction. Two backings exist: `LocalStorageStore` (single device,
+ * the Phase-1 fallback) and `SupabaseStore` (cross-device sync). The app talks
+ * only to this interface, so swapping which one `createStore()` returns is the
+ * whole switch.
  *
- * The interface is **async** so a network-backed store fits without reshaping
- * the app. The localStorage store resolves synchronously-fast under the hood.
+ *  - `load()` reads the full state once on startup (async — a network backend
+ *    fits without reshaping the app).
+ *  - `apply(action, next)` persists a single change. The localStorage store
+ *    ignores the action and saves the whole `next` state; the Supabase store
+ *    translates the action into targeted row writes.
  */
 export interface ScheduleStore {
   load(): Promise<AppState>
-  save(state: AppState): Promise<void>
+  apply(action: Action, next: AppState): Promise<void>
 }
 
 export function defaultState(): AppState {
   const today = new Date()
   return {
     people: {
-      me: { id: 'me', name: 'Me', color: '#4f46e5' },
-      partner: { id: 'partner', name: 'Partner', color: '#ec4899' },
-      kid: { id: 'kid', name: 'Nora', color: '#14b8a6' },
+      me: { id: 'me', name: 'Me', color: '#4f46e5', kind: 'adult', sortOrder: 0 },
+      partner: { id: 'partner', name: 'Partner', color: '#ec4899', kind: 'adult', sortOrder: 1 },
+      kid: { id: 'kid', name: 'Nora', color: '#14b8a6', kind: 'child', sortOrder: 2 },
     },
     lists: [],
     events: [],
@@ -59,15 +64,21 @@ export class LocalStorageStore implements ScheduleStore {
     }
   }
 
-  async save(state: AppState): Promise<void> {
+  // localStorage has no concept of granular writes — persist the whole state.
+  async apply(_action: Action, next: AppState): Promise<void> {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
     } catch {
       // Ignore quota / private-mode write failures for now.
     }
   }
 }
 
-export function createStore(): ScheduleStore {
+/**
+ * The active store. With an authenticated `account`/`user` it's Supabase-backed
+ * (cross-device sync); without, it falls back to localStorage (e.g. tests).
+ */
+export function createStore(ctx?: { accountId: string; userId: string }): ScheduleStore {
+  if (ctx) return new SupabaseStore(ctx.accountId, ctx.userId)
   return new LocalStorageStore()
 }

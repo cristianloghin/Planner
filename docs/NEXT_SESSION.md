@@ -54,13 +54,32 @@ trigger on `auth.users`.
 1. ~~`npm i @supabase/supabase-js`; env vars in `.env.local`~~ **DONE.** Vars are
    `VITE_SUPABASE_URL` + `VITE_SUPABASE_PUBLISHABLE_KEY` (new-style key, not `anon`).
 2. ~~Generate types~~ **DONE** → `src/lib/database.types.ts`.
-3. ~~Widen `ScheduleStore` to async~~ **DONE** — it's now `Promise`-based; `state.tsx`
-   hydrates asynchronously. **Still TODO:** implement `SupabaseStore implements
-   ScheduleStore` and return it from `createStore()` (currently still
-   `LocalStorageStore`). Consider adding `subscribe` for realtime at this point.
-4. ~~Auth + account bootstrap~~ **DONE** — `src/auth.tsx` gates the app and
-   bootstraps the account (`create_account` RPC, idempotent). The active
-   `account_id` is held in `AuthProvider`; thread it into `SupabaseStore`.
+3. ~~Widen `ScheduleStore` to async~~ / ~~implement `SupabaseStore`~~ **DONE.**
+   `ScheduleStore` is now `load()` + `apply(action, next)` (granular writes).
+   `createStore({accountId, userId})` returns `SupabaseStore` (`src/store/supabaseStore.ts`);
+   `createStore()` with no ctx still returns `LocalStorageStore`. Realtime
+   `subscribe` is NOT yet added (load-once) — a good next addition.
+4. ~~Auth + account bootstrap~~ **DONE** — `src/auth.tsx`; the active `account_id`
+   is threaded into `SupabaseStore` via `createStore` from `state.tsx`.
+
+### People are now DATA (migration 0005) — overrides DATA_MODEL Decision 1's roster
+The app draws one lane per `person` row (account-scoped, `kind` adult|child, optional
+`user_id` login link); `event_person` is the roster. `event_participant`/`app_user`
+(RSVP) is untouched for a future real-invitee feature. Frontend is generic over N people.
+
+### SupabaseStore mapping gotchas (already handled — read before editing it)
+- PostgREST embeds need FK hints `table!fk_col` or you get `PGRST201` (ambiguous —
+  e.g. `checklist_item` also links m2m via `occurrence_item_removed`).
+- Occurrence rows stay sparse: done→upsert, undone→delete.
+- Children sync = upsert + delete-missing (NOT delete-all), else the cascade wipes
+  `occurrence_item_state` ticks on every edit.
+- Attachment display order is lossy on round-trip (DB has no polymorphic order).
+
+### Still deferred after slice 2
+- **Standalone Lists** are device-local (`localStorage` key `planner.lists.v1`) — still no table.
+- **`dependsOn`** (occurrence-level edges) not mapped — `load()` returns `[]`.
+- Recurrence + checklist/note round-trip + removeEvent + person rename/recolor are
+  coded but not yet click-tested.
 
 ## 3. Calendar library — the load-bearing contract
 

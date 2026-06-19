@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useApp } from '../state'
 import { DAY_NAMES, addDays, dayLabel, minutesToTime, weekRangeLabel } from '../lib/dates'
 import { occurrencesOnDate, recurrenceLabel } from '../lib/recurrence'
-import { attendeeLabel, eventColor } from '../lib/people'
+import { attendeeLabel, eventColor, defaultAttendees } from '../lib/people'
 import { EventEditor, type EditorTarget } from './EventEditor'
 import shared from '../styles/shared.module.css'
 import s from './WeekCalendar.module.css'
@@ -69,7 +69,7 @@ export function WeekCalendar() {
 
               <button
                 className={s.addLink}
-                onClick={() => setTarget({ mode: 'new', date: dateISO, attendees: ['me'] })}
+                onClick={() => setTarget({ mode: 'new', date: dateISO, attendees: defaultAttendees(state) })}
               >
                 + Add
               </button>

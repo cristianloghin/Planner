@@ -1,9 +1,18 @@
-export type PersonId = 'me' | 'partner' | 'kid'
+/** A person's id. Now an opaque string (a backend uuid), not a fixed enum — the
+ *  app is generic over however many people exist. */
+export type PersonId = string
+
+/** Adults hold a full lane and can supervise; children get a narrow lane and
+ *  need a free adult on their events. Generalizes the old parent/kid roles. */
+export type PersonKind = 'adult' | 'child'
 
 export interface Person {
   id: PersonId
   name: string
   color: string
+  kind: PersonKind
+  /** Lane order, ascending. */
+  sortOrder: number
 }
 
 /**
