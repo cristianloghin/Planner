@@ -31,16 +31,15 @@
   /* Font-size scale — the single place to tune text sizing. Bumped +1px over
      the original values since Source Sans 3 renders a touch smaller than the
      system stack. (Original px noted in comments.) */
-  --fs-2xs: 10px; /* was 9 */
-  --fs-xs: 11px; /* was 10 */
-  --fs-sm: 12px; /* was 11 */
-  --fs-md: 13px; /* was 12 */
-  --fs-base: 14px; /* was 13 */
-  --fs-lg: 15px; /* was 14 */
-  --fs-xl: 16px; /* was 15 */
-  --fs-2xl: 17px; /* was 16 */
-  --fs-3xl: 19px; /* was 18 */
-  --fs-4xl: 21px; /* was 20 */
+  --fs-2xs: 0.6rem; 
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8rem;
+  --fs-md: 0.85rem;
+  --fs-base: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.25rem;
+  --fs-2xl: 2rem;
+  --fs-3xl: 2.5rem;
 
   /* ---- Surfaces: dark theme (default) ---- */
   --bg: #0f172a;
