@@ -14,6 +14,7 @@ export function Lists() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [assignee, setAssignee] = useState<Assignee>("shared");
+  const [group, setGroup] = useState("");
   const [newListName, setNewListName] = useState("");
   const [renaming, setRenaming] = useState(false);
 
@@ -48,8 +49,10 @@ export function Lists() {
       listId: selected.id,
       title: title.trim(),
       personId: assignee === "shared" ? null : assignee,
+      group: group.trim() || null,
     });
     setTitle("");
+    // Keep `group` so consecutive adds land in the same section.
   }
 
   function badge(personId: PersonId | null) {
@@ -95,6 +98,25 @@ export function Lists() {
 
   const open = selected ? selected.items.filter((t) => !t.done) : [];
   const done = selected ? selected.items.filter((t) => t.done) : [];
+
+  // Group open items by their header. Ungrouped (key "") renders first with no
+  // header; labelled groups follow in first-appearance order.
+  const openGroups: [string, ListItem[]][] = (() => {
+    const m = new Map<string, ListItem[]>();
+    for (const t of open) {
+      const key = t.groupLabel ?? "";
+      if (!m.has(key)) m.set(key, []);
+      m.get(key)!.push(t);
+    }
+    return [...m.entries()].sort((a, b) =>
+      a[0] === "" ? -1 : b[0] === "" ? 1 : 0,
+    );
+  })();
+
+  // Distinct existing headers in this list, for the add-form's suggestions.
+  const groupOptions = selected
+    ? [...new Set(selected.items.map((i) => i.groupLabel).filter((g): g is string => !!g))]
+    : [];
 
   return (
     <section className={shared.view}>
@@ -201,6 +223,18 @@ export function Lists() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
               />
+              <input
+                className={s.groupInput}
+                placeholder="Group (optional)"
+                list="list-group-options"
+                value={group}
+                onChange={(e) => setGroup(e.target.value)}
+              />
+              <datalist id="list-group-options">
+                {groupOptions.map((g) => (
+                  <option key={g} value={g} />
+                ))}
+              </datalist>
               <select
                 value={assignee}
                 onChange={(e) => setAssignee(e.target.value as Assignee)}
@@ -217,12 +251,15 @@ export function Lists() {
               </button>
             </form>
 
-            <ul className={s.taskList}>
-              {open.map(row)}
-              {open.length === 0 && (
-                <p className={shared.empty}>Nothing to do. Nice.</p>
-              )}
-            </ul>
+            {open.length === 0 && (
+              <p className={shared.empty}>Nothing to do. Nice.</p>
+            )}
+            {openGroups.map(([label, items]) => (
+              <div key={label || "__ungrouped"}>
+                {label && <h3 className={s.groupHead}>{label}</h3>}
+                <ul className={s.taskList}>{items.map(row)}</ul>
+              </div>
+            ))}
 
             {done.length > 0 && (
               <>
