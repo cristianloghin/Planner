@@ -42,7 +42,7 @@ function reducer(state: AppState, action: Action): AppState {
         title: action.title,
         done: false,
         personId: action.personId,
-        groupLabel: null,
+        groupLabel: action.group,
         dueOn: null,
         sortOrder: 0, // set below from the target list's length
         createdAt: Date.now(),
