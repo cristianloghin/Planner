@@ -15,24 +15,52 @@
 
 .alldayChip {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 5px 10px;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
   border: none;
   border-radius: 8px;
   color: var(--on-accent);
   text-align: left;
   box-shadow: 0 1px 3px var(--shadow);
-}
-
-.alldayTitle {
-  font-size: var(--fs-base);
-  font-weight: 600;
+  overflow: hidden;
 }
 
 .alldayMeta {
-  font-size: var(--fs-xs);
-  opacity: 0.9;
+  flex: 0;
+}
+
+.badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1em;
+}
+
+.badgeIcon {
+  width: 0.825rem;
+  height: 0.825rem;
+  flex-shrink: 0;
+}
+
+.alldayTitle {
+  flex: 1;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.allDayOffset {
+  flex: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
 }
 
 .alldayAdd {
@@ -55,14 +83,28 @@
   outline-offset: -2px;
 }
 
+/* ---- Today button ---- */
 /* ---- Conflict legend ---- */
+
+.today,
 .conflictLegend {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
+  align-items: center;
   justify-content: center;
-  margin: -4px 0 12px;
-  font-size: var(--fs-md);
+}
+
+.todayButton {
+  display: flex;
+  background-color: transparent;
+  border: none;
+  outline: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.alertBadge {
+  color: var(--danger);
 }
 
 .warnKey.clash {
@@ -73,19 +115,54 @@
   color: var(--warning);
 }
 
-/* ---- Vertical planner timeline ---- */
-.plannerHead,
-.plannerGrid {
-  padding-top: 12px;
-  margin-right: 11px;
-  border-right: 1px solid var(--border);
+.plannerHead {
   display: grid;
   grid-template-columns: var(--gutter-w) 1fr;
 }
 
-.laneHeads,
+.laneHeads {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-right: 1px solid var(--border);
+  /* grid-template-columns is set inline (data-driven, Nora's lane is narrower). */
+}
+
+.laneHead {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  
+  padding: 8px 4px 4px 4px;
+  border-left: 1px solid var(--border);
+
+  > div:first-child {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: var(--fs-lg);
+    font-weight: 700;
+  }
+
+  > div:last-child {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
+/* ---- Vertical planner timeline ---- */
+.plannerGrid {
+  padding-top: 16px;
+  display: grid;
+  grid-template-columns: var(--gutter-w) 1fr;
+}
+
 .lanes {
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-right: 1px solid var(--border);
   /* grid-template-columns is set inline (data-driven, Nora's lane is narrower). */
 }
 
@@ -93,30 +170,12 @@
   position: relative;
 }
 
-.plannerHead {
-  position: sticky;
-  top: 0;
-  z-index: 4;
-  background: var(--bg);
-  border-bottom: 1px solid var(--border);
-}
-
-.laneHead {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  font-size: var(--fs-xl);
-  font-weight: 700;
-  padding: 10px 4px;
-  border-left: 1px solid var(--border);
-}
-
 .plannerBody {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   background: var(--surface);
+  padding: 0 max(16px, env(safe-area-inset-left));
 }
 
 .timeGutter {

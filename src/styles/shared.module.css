@@ -18,12 +18,21 @@
 .viewHead {
   flex: none;
   padding: 0 max(16px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--border);
+}
+
+.viewHeadContainer {
+  display: grid;
+  grid-template-columns: 24px 1fr 24px;
+  align-items: center;
+  margin-bottom: 14px;
 }
 
 .viewBody {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  padding: 16px max(16px, env(safe-area-inset-left));
 }
 
 /* ---- Prev / next header (Day, Week, Month) ---- */
@@ -32,7 +41,7 @@
   align-items: center;
   justify-content: center;
   gap: 16px;
-  margin-bottom: 14px;
+  font-size: var(--fs-xl);
 }
 
 .weekNav button {
