@@ -1,7 +1,33 @@
-import type { AppState } from '../types'
+import type { AppState, ListItem, TodoList } from '../types'
 import type { Action } from './actions'
 import { mondayOf } from '../lib/dates'
+import { uid } from '../lib/id'
 import { SupabaseStore } from './supabaseStore'
+
+/**
+ * Tolerate saved state from before Lists became multi-list: the `lists` field
+ * used to be a flat `ListItem[]` (one implicit list). Wrap any such legacy array
+ * into a single default list so old localStorage data isn't dropped.
+ */
+function normalizeLists(raw: unknown): TodoList[] {
+  if (!Array.isArray(raw) || raw.length === 0) return []
+  // Already the new shape (a list carries an `items` array)?
+  if (raw.every((l) => l && typeof l === 'object' && 'items' in l)) {
+    return raw as TodoList[]
+  }
+  // Legacy flat items → one default list.
+  const items: ListItem[] = (raw as Record<string, unknown>[]).map((it, i) => ({
+    id: typeof it.id === 'string' ? it.id : uid(),
+    title: String(it.title ?? ''),
+    done: Boolean(it.done),
+    personId: (it.personId as string | null) ?? null,
+    groupLabel: null,
+    dueOn: null,
+    sortOrder: i,
+    createdAt: typeof it.createdAt === 'number' ? it.createdAt : 0,
+  }))
+  return [{ id: uid(), title: 'To-do', sortOrder: 0, items }]
+}
 
 /**
  * Storage abstraction. Two backings exist: `LocalStorageStore` (single device,
@@ -62,7 +88,7 @@ export class LocalStorageStore implements ScheduleStore {
         ...base,
         ...parsed,
         people: { ...base.people, ...(parsed.people ?? {}) },
-        lists: parsed.lists ?? base.lists,
+        lists: normalizeLists(parsed.lists),
         events: parsed.events ?? base.events,
         completions: parsed.completions ?? base.completions,
         dependencies: parsed.dependencies ?? base.dependencies,
