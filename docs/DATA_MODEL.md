@@ -75,6 +75,12 @@ erDiagram
 
     event_series ||--o{ occurrence_dependency : "dependent / prerequisite"
     occurrence_status ||--o{ occurrence_dependency : "required_status"
+
+    account ||--o{ list : "owns (RLS scope)"
+    list ||--o{ list_item : "owns items"
+    person ||--o{ list_item : "assignee (nullable)"
+    list_item ||--o{ list_item_event_link : "surfaced on"
+    event_series ||--o{ list_item_event_link : "at occurrence"
 ```
 
 The authoritative column list is the SQL in `supabase/migrations/0001_schema.sql`.
@@ -184,6 +190,57 @@ is an **app‑side deep copy** into a concrete series with a real `dtstart`, set
 (the function guards against it). `split_from_id` records this‑and‑following
 lineage, distinct from `template_id`.
 
+### 11. Standalone Lists = `list` + `list_item`, single-context `done`, linkable to occurrences
+The undated to‑do view (Phase‑1 `ListItem`) becomes two account‑scoped tables plus
+one occurrence‑grain link, landing in migration `0009_lists.sql`:
+- **`list`** — a named list (`title`, `sort_order`), scoped to `account_id`.
+- **`list_item`** — one to‑do: `group_label` (an in‑list **header**, exactly like
+  `checklist_item.group_label`), `title`, `done`, `person_id` (assignee;
+  `on delete set null` = becomes shared), `sort_order`, **`due_on date`** (optional
+  deadline; `null` = none), `created_at`.
+- **`list_item_event_link`** — ties a to‑do to a **concrete occurrence**:
+  `(list_item_id, series_id, occurrence_start)`, same grain and rules as
+  `occurrence_dependency`.
+
+Four sub‑decisions, each with its rejected alternative:
+
+**`done` lives on the item — the one divergence from `checklist_item`.** A standalone
+list is single‑context, so there is no per‑occurrence tick table
+(`occurrence_item_state`); the item is simply done or not, and a checked item **stays
+in place** (it can be unchecked). *Rejected:* per‑occurrence ticks. They exist for
+checklists only because a recurring event's list resets each occurrence — a standalone
+to‑do has exactly one context, so the extra grain is pure overhead.
+
+**Headers are a `group_label` string, not a table.** Verbatim copy of the
+`checklist_item` shape, so the grouping/sort logic transfers: `sort_order` is
+position‑derived on write, ordered + grouped on read — identical to checklists.
+*Rejected:* a `list_section` table. It buys stable header identity and empty headers at
+the cost of a third table and ordering bookkeeping; not worth it at household scale, and
+inconsistent with checklists.
+
+**Linking is occurrence‑grained with a single source of truth for the tick.** A to‑do
+("buy cat", added in July) is surfaced inside a concrete occurrence ("go to pet store"
+in November) via one `list_item_event_link` row. Ticking it **in the occurrence or in
+the Lists view both write the same `list_item.done`** — there is no
+`occurrence_item_state` row for a linked item. Realtime reload keeps both views in
+lockstep. The link is M:N‑capable (the same to‑do can hang off "pet store" *and*
+"shelter"; done anywhere = done everywhere, coherent because `done` is on the one item).
+`occurrence_start` is the **original slot** and, like every occurrence‑grain table, is
+**not** an FK (most occurrences are virtual — Decision 4). Both ends `on delete cascade`:
+deleting the event drops the link, never the to‑do. *Rejected:* linking to the whole
+series (loses "that November trip"); and duplicating the to‑do as a `checklist_item` on
+the event (two `done`s to reconcile — the bug this design avoids).
+
+**A linked to‑do does NOT gate the occurrence's completion.** It is a surfaced
+convenience line, not a `required` checklist item, so whether the cat is bought never
+blocks "go to pet store" from being marked done (Decision 7's math ignores it).
+*Rejected:* counting links toward occurrence completion — it couples list progress to
+event completion; add a per‑link `required` flag later if ever wanted.
+
+Grain note: `list`/`list_item` sit **outside** the series/occurrence model
+(account‑grained, single‑context); only `list_item_event_link` touches the occurrence
+grain, and it reuses Decision 4's identity rules.
+
 ---
 
 ## What this maps to from Phase 1
@@ -199,13 +256,14 @@ lineage, distinct from `template_id`.
 | `AppState.completions[ev:date].status` (`done`/`skipped`/`blocked`) | `event_occurrence.status` |
 | `AppState.dependencies[ev:date][]` (occurrence‑keyed) | `occurrence_dependency` (occurrence→occurrence) — **realized**; the app is occurrence‑keyed, not the old event‑level `dependsOn[]` |
 | `Person` / `PersonId` (`me`/`partner`/`kid`) | `app_user` + `event_participant` |
-| `ListItem` (standalone to‑dos) | **not yet mapped** — see open items |
+| `ListItem` (standalone to‑dos) | `list` + `list_item` (+ `list_item_event_link`) — see [Decision 11](#11-standalone-lists--list--list_item-single-context-done-linkable-to-occurrences) |
 
 ### Deferred (not blocking)
-- **Standalone Lists** (`ListItem`): the undated to‑do view has no backend table
-  yet. It's a single‑context list, so its `done` lives on the item (unlike
-  checklist entries). Likeliest shape: a `list` + `list_item` pair scoped to
-  `account_id`. Decide when building that view.
+- **Standalone Lists** (`ListItem`): **designed** (see [Decision 11](#11-standalone-lists--list--list_item-single-context-done-linkable-to-occurrences)),
+  not yet built. Two account‑scoped tables (`list` + `list_item`, `done` on the item)
+  plus an occurrence‑grain `list_item_event_link` so a to‑do can be ticked from a linked
+  event. Migration `0009_lists.sql` + the `SupabaseStore` mapping are the remaining work;
+  the app still persists lists to `localStorage` until then.
 - **Participant‑level RLS granularity** (owner vs member write rights): the
   baseline policies treat any account member as able to read/write the account's
   series. Tighten with an `account_member.role` check when it matters.
@@ -226,3 +284,4 @@ Apply in order. See [`NEXT_SESSION.md`](./NEXT_SESSION.md) for the full connect�
 | `0006_realtime.sql` | Calendar tables → `supabase_realtime` publication |
 | `0007_user_preferences.sql` | Per‑user `user_preference` JSON blob (personal colour overrides) |
 | `0008_realtime_dependencies.sql` | `occurrence_dependency` → `supabase_realtime` publication |
+| `0009_lists.sql` *(planned)* | Standalone Lists: `list` + `list_item` + `list_item_event_link`, RLS, grants, realtime ([Decision 11](#11-standalone-lists--list--list_item-single-context-done-linkable-to-occurrences)) |

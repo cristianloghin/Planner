@@ -86,7 +86,8 @@ The app draws one lane per `person` row (account-scoped, `kind` adult|child, opt
 - Attachment display order is lossy on round-trip (DB has no polymorphic order).
 
 ### Still deferred (after slice 3)
-- **Standalone Lists** are device-local (`localStorage` key `planner.lists.v1`) — still no table.
+- **Standalone Lists** are device-local (`localStorage` key `planner.lists.v1`) — table
+  not built yet, but the design is now **frozen** (DATA_MODEL Decision 11 + §5 below).
 - Recurrence + checklist/note round-trip + removeEvent + person rename/recolor are
   coded but not yet click-tested.
 - **Realtime is reload-on-change** (refetch all on any change). Fine at household
@@ -133,11 +134,35 @@ The DB does **no** RRULE math. Add [`rrule`](https://github.com/jkbrzt/rrule)
   `occurrence_item_state`. `event_occurrence.status = null` means "compute"; a set
   value overrides.
 
-## 5. Still unmapped (decide when you reach them)
+## 5. Standalone Lists — designed, ready to build (DATA_MODEL Decision 11)
 
-- **Standalone Lists** (`ListItem`) have no table yet — likely `list` +
-  `list_item` scoped to `account_id`. Its `done` lives on the item (single
-  context), unlike checklist ticks.
+Promoted from "unmapped" to a frozen design. Build it as migration `0009_lists.sql`
+plus a `SupabaseStore` mapping; it replaces the `localStorage` (`planner.lists.v1`) path.
+
+**Schema (all account-scoped, RLS + grants + realtime like `0005`/`0006`):**
+- `list` — named list (`title`, `sort_order`).
+- `list_item` — `group_label` (in-list **header**, like `checklist_item`), `title`,
+  `done` (on the item — single context, **stays checked in place**, can be unchecked),
+  `person_id` (`on delete set null` = becomes shared), `sort_order`, **`due_on date`**
+  (optional deadline, `null` = none), `created_at`.
+- `list_item_event_link` — `(list_item_id, series_id, occurrence_start)`, the **same
+  occurrence grain as `occurrence_dependency`** (`occurrence_start` is the original slot,
+  **not** an FK; both ends `on delete cascade`).
+
+**Behaviour to implement:**
+- **Sort = checklist parity:** `sort_order` position-derived on write, ordered + grouped
+  by `group_label` on read (copy the `checklist_item` path in `supabaseStore.ts`).
+- **Linking:** in `OccurrenceSheet` (where dependency-linking already lives), a "Link a
+  to-do" picker writes one `list_item_event_link` row to the concrete occurrence. The
+  linked to-do renders as a tickable line inside that occurrence; ticking it there **or**
+  in the Lists view writes the **same `list_item.done`** — no `occurrence_item_state` row
+  for linked items. Realtime reload keeps both views in sync.
+- **No completion coupling:** a linked to-do is NOT a `required` checklist item, so it
+  never gates the occurrence's "done" (§4 math ignores it).
+- **One-time import:** migrate any existing `planner.lists.v1` items into a default list.
+
+## 6. Still unmapped (decide when you reach them)
+
 - **RLS granularity:** the baseline lets any account member read/write the
   account's series. Add an `account_member.role` check if you need owner-only
   writes.
