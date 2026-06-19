@@ -4,9 +4,13 @@ import type {
   CalendarEvent,
   ChecklistEntry,
   ListItem,
+  OccurrenceDependency,
+  OccurrenceStatusCode,
   Person,
+  Preferences,
 } from '../types'
 import type { Action } from './actions'
+import type { Json } from '../lib/database.types'
 import type { ScheduleStore } from './store'
 import { defaultState } from './store'
 import { supabase } from '../lib/supabase'
@@ -105,10 +109,12 @@ export class SupabaseStore implements ScheduleStore {
   async load(): Promise<AppState> {
     const base = defaultState()
 
-    const [people, events, completions] = await Promise.all([
+    const [people, events, completions, dependencies, preferences] = await Promise.all([
       this.loadPeople(),
       this.loadEvents(),
       this.loadCompletions(),
+      this.loadDependencies(),
+      this.loadPreferences(),
     ])
 
     return {
@@ -116,8 +122,31 @@ export class SupabaseStore implements ScheduleStore {
       people,
       events,
       completions,
+      dependencies,
+      preferences,
       lists: this.loadLists(),
     }
+  }
+
+  /**
+   * This user's preference document for this account, defaulted if none yet.
+   * Preferences are non-critical: if the read fails (e.g. migration 0007 not yet
+   * applied) we fall back to defaults rather than breaking the whole hydration.
+   */
+  private async loadPreferences(): Promise<Preferences> {
+    const empty: Preferences = { personColors: {} }
+    const { data, error } = await supabase
+      .from('user_preference')
+      .select('prefs')
+      .eq('account_id', this.accountId)
+      .eq('user_id', this.userId)
+      .maybeSingle()
+    if (error) {
+      console.warn('Could not load preferences; using defaults.', error)
+      return empty
+    }
+    const prefs = (data?.prefs ?? {}) as Partial<Preferences>
+    return { ...empty, ...prefs, personColors: { ...empty.personColors, ...prefs.personColors } }
   }
 
   private async loadPeople(): Promise<Record<string, Person>> {
@@ -169,10 +198,30 @@ export class SupabaseStore implements ScheduleStore {
         recurrence: rruleToRecurrence(r.rrule),
         attendees: r.event_person.map((ep) => ep.person_id),
         attachments: rebuildAttachments(r),
-        // dependsOn (occurrence-level edges) not mapped yet — see store notes.
-        dependsOn: [],
       }
     })
+  }
+
+  /**
+   * Prerequisite edges, keyed by the dependent occurrence (`${seriesId}:${date}`)
+   * to match `AppState.dependencies`. Each `occurrence_dependency` row carries
+   * timestamptz slots on both ends; we key/store them as occurrence dates.
+   */
+  private async loadDependencies(): Promise<Record<string, OccurrenceDependency[]>> {
+    const { data, error } = await supabase
+      .from('occurrence_dependency')
+      .select('dependent_series, dependent_occurrence, prerequisite_series, prerequisite_occurrence, required_status')
+    if (error) throw error
+    const out: Record<string, OccurrenceDependency[]> = {}
+    for (const row of data ?? []) {
+      const k = `${row.dependent_series}:${tsToDateKey(row.dependent_occurrence)}`
+      ;(out[k] ??= []).push({
+        prerequisiteSeriesId: row.prerequisite_series,
+        prerequisiteDate: tsToDateKey(row.prerequisite_occurrence),
+        requiredStatus: row.required_status as OccurrenceDependency['requiredStatus'],
+      })
+    }
+    return out
   }
 
   private async loadCompletions(): Promise<Record<string, import('../types').OccurrenceState>> {
@@ -187,9 +236,9 @@ export class SupabaseStore implements ScheduleStore {
     if (items.error) throw items.error
 
     for (const o of occ.data ?? []) {
-      if (o.status === 'done') {
+      if (o.status) {
         const k = key(o.series_id, o.occurrence_start)
-        completions[k] = { ...completions[k], done: true }
+        completions[k] = { ...completions[k], status: o.status as OccurrenceStatusCode }
       }
     }
     for (const it of items.data ?? []) {
@@ -246,15 +295,15 @@ export class SupabaseStore implements ScheduleStore {
         if (error) throw error
         return
       }
-      case 'setOccurrenceDone': {
+      case 'setOccurrenceStatus': {
         const ev = next.events.find((e) => e.id === action.eventId)
         if (!ev) return
         const occurrence_start = occurrenceTs(ev, action.date)
-        if (action.done) {
+        if (action.status) {
           const { error } = await supabase
             .from('event_occurrence')
             .upsert(
-              { series_id: ev.id, occurrence_start, status: 'done' },
+              { series_id: ev.id, occurrence_start, status: action.status },
               { onConflict: 'series_id,occurrence_start' },
             )
           if (error) throw error
@@ -266,6 +315,37 @@ export class SupabaseStore implements ScheduleStore {
             .eq('occurrence_start', occurrence_start)
           if (error) throw error
         }
+        return
+      }
+      case 'addDependency': {
+        const dependent = next.events.find((e) => e.id === action.eventId)
+        const prerequisite = next.events.find((e) => e.id === action.prerequisiteSeriesId)
+        if (!dependent || !prerequisite) return
+        const { error } = await supabase.from('occurrence_dependency').upsert(
+          {
+            dependent_series: dependent.id,
+            dependent_occurrence: occurrenceTs(dependent, action.date),
+            prerequisite_series: prerequisite.id,
+            prerequisite_occurrence: occurrenceTs(prerequisite, action.prerequisiteDate),
+            required_status: action.requiredStatus,
+          },
+          { onConflict: 'dependent_series,dependent_occurrence,prerequisite_series,prerequisite_occurrence' },
+        )
+        if (error) throw error
+        return
+      }
+      case 'removeDependency': {
+        const dependent = next.events.find((e) => e.id === action.eventId)
+        const prerequisite = next.events.find((e) => e.id === action.prerequisiteSeriesId)
+        if (!dependent || !prerequisite) return
+        const { error } = await supabase
+          .from('occurrence_dependency')
+          .delete()
+          .eq('dependent_series', dependent.id)
+          .eq('dependent_occurrence', occurrenceTs(dependent, action.date))
+          .eq('prerequisite_series', prerequisite.id)
+          .eq('prerequisite_occurrence', occurrenceTs(prerequisite, action.prerequisiteDate))
+        if (error) throw error
         return
       }
       case 'toggleChecklistEntry': {
@@ -303,6 +383,23 @@ export class SupabaseStore implements ScheduleStore {
           .from('person')
           .update({ color: action.color })
           .eq('id', action.id)
+        if (error) throw error
+        return
+      }
+      // Preferences are a per-user JSON blob: any preference change writes the
+      // whole (already-updated) `next.preferences` document for this user.
+      case 'setColorPref':
+      case 'clearColorPref': {
+        const { error } = await supabase.from('user_preference').upsert(
+          {
+            account_id: this.accountId,
+            user_id: this.userId,
+            // Preferences is a structured interface; the column is free-form Json.
+            prefs: next.preferences as unknown as Json,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'account_id,user_id' },
+        )
         if (error) throw error
         return
       }

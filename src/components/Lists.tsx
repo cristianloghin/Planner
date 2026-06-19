@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useApp } from '../state'
 import type { PersonId } from '../types'
+import { personColor } from '../lib/people'
 import { cx } from '../lib/cx'
 import shared from '../styles/shared.module.css'
 import s from './Lists.module.css'
@@ -31,7 +32,7 @@ export function Lists() {
     if (!personId) return <span className={cx(s.badge, s.shared)}>Shared</span>
     const p = state.people[personId]
     return (
-      <span className={s.badge} style={{ background: p.color }}>
+      <span className={s.badge} style={{ background: personColor(state, personId) }}>
         {p.name}
       </span>
     )

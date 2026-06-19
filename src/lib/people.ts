@@ -8,6 +8,15 @@ export function peopleList(state: AppState): Person[] {
   return Object.values(state.people).sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
+/**
+ * The colour to draw a person's lane in — this user's personal override if set,
+ * otherwise the shared `Person.color`. Every colour read should go through here
+ * so overrides apply everywhere uniformly.
+ */
+export function personColor(state: AppState, id: PersonId): string {
+  return state.preferences.personColors[id] ?? state.people[id]?.color ?? SHARED_COLOR
+}
+
 export function adults(state: AppState): Person[] {
   return peopleList(state).filter((p) => p.kind === 'adult')
 }
@@ -40,14 +49,14 @@ export function isAllAdults(state: AppState, attendees: PersonId[]): boolean {
  */
 export function eventColor(state: AppState, attendees: PersonId[]): string {
   const childId = attendees.find((id) => state.people[id]?.kind === 'child')
-  if (childId) return state.people[childId].color
+  if (childId) return personColor(state, childId)
   if (isAllAdults(state, attendees)) return SHARED_COLOR
-  return state.people[attendees[0]]?.color ?? SHARED_COLOR
+  return attendees[0] ? personColor(state, attendees[0]) : SHARED_COLOR
 }
 
 /** Gradient blending the adult colours — used for the spanning all-adults block. */
 export function adultsGradient(state: AppState): string {
-  const cols = adults(state).map((p) => p.color)
+  const cols = adults(state).map((p) => personColor(state, p.id))
   if (cols.length === 0) return SHARED_COLOR
   if (cols.length === 1) return cols[0]
   return `linear-gradient(120deg, ${cols.join(', ')})`

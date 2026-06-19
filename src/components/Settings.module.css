@@ -12,6 +12,21 @@
   flex: 1;
 }
 
+.resetColor {
+  flex: none;
+  padding: 0 10px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.resetColor:hover {
+  color: var(--text);
+}
+
 .hint {
   color: var(--muted);
   font-size: var(--fs-lg);

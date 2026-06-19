@@ -63,6 +63,20 @@ export function latestStartOnOrBefore(e: CalendarEvent, date: string): string | 
   }
 }
 
+/**
+ * Occurrence start dates of `e` within the inclusive ISO range [from, to]. Used
+ * to populate the prerequisite-occurrence picker, so the user links to a real
+ * RRULE slot (never an arbitrary date). The range is walked day-by-day; callers
+ * keep it bounded (a recurring event has no natural end).
+ */
+export function seriesOccurrenceDatesInRange(e: CalendarEvent, from: string, to: string): string[] {
+  const out: string[] = []
+  for (let d = from; diffDays(to, d) >= 0; d = addDays(d, 1)) {
+    if (startsOn(e, d)) out.push(d)
+  }
+  return out
+}
+
 /** One materialised event instance covering a specific date. */
 export interface DayOccurrence {
   event: CalendarEvent

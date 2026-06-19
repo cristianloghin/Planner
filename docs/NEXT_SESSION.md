@@ -15,6 +15,10 @@ stand the backend up and start wiring the app to it. Read
   enabled RLS but never granted table privileges; without this every authenticated query fails
   `42501 permission denied` (RLS filters rows, but Postgres still needs a table-level grant). Any
   fresh DB must apply this.
+- `supabase/migrations/0005_person.sql` — people as DATA (`person` + `event_person`); see below.
+- `supabase/migrations/0006_realtime.sql` — calendar tables added to the `supabase_realtime` publication.
+- `supabase/migrations/0007_user_preferences.sql` — per-user `user_preference` JSON blob (colour overrides).
+- `supabase/migrations/0008_realtime_dependencies.sql` — `occurrence_dependency` added to the publication.
 
 **Backend stood up + Phase‑2 slice 1 (auth + async seam) DONE & verified** (2026‑06‑19):
 - Project linked (`eefdddvbekwywleooioq`), migrations `0001`–`0004` pushed. Email confirmation OFF.
@@ -83,15 +87,28 @@ The app draws one lane per `person` row (account-scoped, `kind` adult|child, opt
 
 ### Still deferred (after slice 3)
 - **Standalone Lists** are device-local (`localStorage` key `planner.lists.v1`) — still no table.
-- **`dependsOn`** (occurrence-level edges) not mapped — `load()` returns `[]`.
 - Recurrence + checklist/note round-trip + removeEvent + person rename/recolor are
   coded but not yet click-tested.
 - **Realtime is reload-on-change** (refetch all on any change). Fine at household
   scale; revisit fine-grained delta apply / optimistic-write rollback if needed.
   This is the seam where TanStack Query (cache invalidation) + Zustand would slot
   in when the data layer outgrows the current store.
-- **Site URL** still defaults to `localhost:3000` (affects auth emails). Set it to
-  the deployed URL in Supabase → Authentication → URL Configuration.
+
+### Done since slice 3
+- **Site URL** configured to the deployed URL in Supabase → Authentication → URL
+  Configuration (was defaulting to `localhost:3000`, which broke auth emails).
+- **User preferences** (per-user, per-account `user_preference` JSON blob, migration
+  `0007`): first preference is personal event-colour overrides — each user recolours
+  any person's lane for their own view; the shared `person.color` stays the default.
+  `personColor(state, id)` is the single effective-colour read.
+- **`dependsOn` → occurrence dependencies** (the DB's `occurrence_dependency`, not a
+  new table). The app is now occurrence-keyed: `AppState.dependencies[occKey]` mirrors
+  the table; `blockingPrerequisites` compares each prerequisite occurrence's effective
+  status to the edge's `required_status`. Linking lives in `OccurrenceSheet` (pick a
+  prerequisite event → a concrete occurrence → required status); the series-level
+  "Waits on" chips were removed from `EventEditor`. Occurrence status generalised to
+  `done | skipped | blocked` (`setOccurrenceStatus`). Migration `0008` adds
+  `occurrence_dependency` to the realtime publication.
 
 ## 3. Calendar library — the load-bearing contract
 

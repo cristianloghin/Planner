@@ -79,8 +79,26 @@ export interface CalendarEvent {
   attendees: PersonId[]
   /** Notes, checklists and reminders, in display order. */
   attachments: Attachment[]
-  /** Prerequisite event ids — advisory "waiting on…" links (a DAG). */
-  dependsOn?: string[]
+}
+
+/**
+ * An occurrence's status, matching the DB `occurrence_status` lookup. `done` can
+ * also be derived from a checklist (see `isOccurrenceDone`); `skipped`/`blocked`
+ * are only ever set explicitly.
+ */
+export type OccurrenceStatusCode = 'done' | 'skipped' | 'blocked'
+
+/**
+ * One prerequisite edge for an occurrence — a row of `occurrence_dependency`.
+ * Stored in `AppState.dependencies` keyed by the *dependent* occurrence, so it
+ * names only the prerequisite end: a concrete occurrence of another series and
+ * the status that occurrence must reach to clear the gate.
+ */
+export interface OccurrenceDependency {
+  prerequisiteSeriesId: string
+  /** ISO date (yyyy-mm-dd) of the specific prerequisite occurrence. */
+  prerequisiteDate: string
+  requiredStatus: OccurrenceStatusCode
 }
 
 /**
@@ -89,10 +107,25 @@ export interface CalendarEvent {
  * *tick* lives, so a recurring event tracks completion per day.
  */
 export interface OccurrenceState {
-  /** Manual completion, for events without a checklist. */
-  done?: boolean
+  /**
+   * Explicit occurrence status (`event_occurrence.status`). For a checklist-free
+   * event this is how "done" is set manually; it also carries `skipped`/`blocked`.
+   * Absent = compute (e.g. derive `done` from the checklist).
+   */
+  status?: OccurrenceStatusCode
   /** checklistEntryId → checked. */
   checked?: Record<string, boolean>
+}
+
+/**
+ * Per-user, per-account settings — personal, never shared with a partner. Stored
+ * as one JSON document (the `user_preference` table) so new settings are just new
+ * fields here, no schema change. The first one is `personColors`: an override for
+ * how THIS user sees each person's lane; an unset id falls back to the shared
+ * `Person.color`.
+ */
+export interface Preferences {
+  personColors: Record<PersonId, string>
 }
 
 export interface AppState {
@@ -100,6 +133,14 @@ export interface AppState {
   lists: ListItem[]
   events: CalendarEvent[]
   completions: Record<string, OccurrenceState>
+  /**
+   * Prerequisite edges keyed by the dependent occurrence (`${eventId}:${date}`),
+   * mirroring `occurrence_dependency`. Each value lists the concrete prerequisite
+   * occurrences that occurrence waits on.
+   */
+  dependencies: Record<string, OccurrenceDependency[]>
+  /** This user's personal preferences (colour overrides, …). */
+  preferences: Preferences
   /** ISO date (yyyy-mm-dd) of the Monday of the week being viewed. */
   weekStart: string
   /** 0 = Monday ... 6 = Sunday — the day shown in the Day view. */

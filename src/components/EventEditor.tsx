@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { cx } from "../lib/cx";
-import { isoLabel, minutesToTime, toDateTimeLocal } from "../lib/dates";
+import { minutesToTime, toDateTimeLocal } from "../lib/dates";
 import { uid } from "../lib/id";
 import { REMINDER_OFFSETS, offsetLabel } from "../lib/notifications";
 import { eventDate, eventStartMinutes } from "../lib/timing";
@@ -50,7 +50,7 @@ export function EventEditor({
   target: EditorTarget;
   onClose: () => void;
 }) {
-  const { state, dispatch, beginEdit, endEdit } = useApp();
+  const { dispatch, beginEdit, endEdit } = useApp();
   const isEdit = target.mode === "edit";
   const base = isEdit ? target.event : null;
 
@@ -102,7 +102,6 @@ export function EventEditor({
   const [attachments, setAttachments] = useState<Attachment[]>(
     base?.attachments ?? [],
   );
-  const [dependsOn, setDependsOn] = useState<string[]>(base?.dependsOn ?? []);
 
   const titleRef = useRef<HTMLInputElement>(null);
   useEffect(() => titleRef.current?.focus(), []);
@@ -139,12 +138,6 @@ export function EventEditor({
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   }
 
-  function toggleDependency(id: string) {
-    setDependsOn((prev) =>
-      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id],
-    );
-  }
-
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
@@ -177,7 +170,6 @@ export function EventEditor({
           : { freq: repeat, interval: Math.max(1, interval) },
       attendees,
       attachments: cleaned,
-      dependsOn: dependsOn.length ? dependsOn : undefined,
     };
 
     if (isEdit)
@@ -188,7 +180,6 @@ export function EventEditor({
 
   const unitLabel =
     repeat === "daily" ? "days" : repeat === "weekly" ? "weeks" : "months";
-  const otherEvents = state.events.filter((e) => e.id !== base?.id);
 
   return (
     <form className={shared.editorPage} onSubmit={submit}>
@@ -365,35 +356,6 @@ export function EventEditor({
             </button>
           </div>
         </div>
-
-        {otherEvents.length > 0 && (
-          <>
-            <label className={shared.field}>Waits on</label>
-            <div className={shared.chips}>
-              {otherEvents.map((e) => {
-                const on = dependsOn.includes(e.id);
-                return (
-                  <button
-                    type="button"
-                    key={e.id}
-                    className={cx(shared.chip, on && shared.on)}
-                    style={
-                      on
-                        ? {
-                            background: "var(--accent)",
-                            borderColor: "var(--accent)",
-                          }
-                        : undefined
-                    }
-                    onClick={() => toggleDependency(e.id)}
-                  >
-                    {e.title || "Untitled"} · {isoLabel(eventDate(e))}
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        )}
 
         {isEdit && (
           <button
