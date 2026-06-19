@@ -50,9 +50,16 @@ export function EventEditor({
   target: EditorTarget;
   onClose: () => void;
 }) {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, beginEdit, endEdit } = useApp();
   const isEdit = target.mode === "edit";
   const base = isEdit ? target.event : null;
+
+  // While this editor is open, defer realtime reloads so a partner's change
+  // can't pull data out from under the unsaved draft.
+  useEffect(() => {
+    beginEdit();
+    return endEdit;
+  }, [beginEdit, endEdit]);
 
   const [title, setTitle] = useState(base?.title ?? "");
   const [allDay, setAllDay] = useState(

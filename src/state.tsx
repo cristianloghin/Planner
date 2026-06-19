@@ -108,6 +108,12 @@ function reducer(state: AppState, action: Action): AppState {
 interface Ctx {
   state: AppState
   dispatch: (action: Action) => void
+  /**
+   * Bracket an in-progress edit (open editor) so a realtime reload doesn't pull
+   * data out from under it. A deferred reload runs when the last edit ends.
+   */
+  beginEdit: () => void
+  endEdit: () => void
 }
 
 const AppContext = createContext<Ctx | null>(null)
@@ -153,7 +159,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
     )
   }, [])
 
-  const value = useMemo(() => (state ? { state, dispatch } : null), [state, dispatch])
+  // ---- realtime: reload on a partner's change ----------------------------
+  // Edit guard: while an editor is open we defer reloads (the open form holds an
+  // unsaved draft) and flush once it closes.
+  const editCountRef = useRef(0)
+  const pendingReloadRef = useRef(false)
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  const reloadFromStore = useCallback(async () => {
+    const fresh = await storeRef.current!.load()
+    const prev = stateRef.current
+    // weekStart/selectedDay are local UI navigation, not server data — keep them
+    // so a remote change never yanks the user back to today's view.
+    const merged = prev
+      ? { ...fresh, weekStart: prev.weekStart, selectedDay: prev.selectedDay }
+      : fresh
+    stateRef.current = merged
+    setState(merged)
+  }, [])
+
+  const onRemoteChange = useCallback(() => {
+    if (editCountRef.current > 0) {
+      pendingReloadRef.current = true
+      return
+    }
+    clearTimeout(reloadTimerRef.current)
+    reloadTimerRef.current = setTimeout(() => void reloadFromStore(), 300)
+  }, [reloadFromStore])
+
+  const beginEdit = useCallback(() => {
+    editCountRef.current += 1
+  }, [])
+
+  const endEdit = useCallback(() => {
+    editCountRef.current = Math.max(0, editCountRef.current - 1)
+    if (editCountRef.current === 0 && pendingReloadRef.current) {
+      pendingReloadRef.current = false
+      void reloadFromStore()
+    }
+  }, [reloadFromStore])
+
+  useEffect(() => {
+    const unsubscribe = storeRef.current!.subscribe(onRemoteChange)
+    return () => {
+      unsubscribe()
+      clearTimeout(reloadTimerRef.current)
+    }
+  }, [onRemoteChange])
+
+  const value = useMemo(
+    () => (state ? { state, dispatch, beginEdit, endEdit } : null),
+    [state, dispatch, beginEdit, endEdit],
+  )
   if (!value) return null
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }
