@@ -11,6 +11,8 @@ interface AuthCtx {
   signIn(email: string, password: string): Promise<{ error?: string }>
   signUp(email: string, password: string): Promise<{ error?: string; needsConfirmation?: boolean }>
   signOut(): Promise<void>
+  /** Set a new password for the signed-in user. */
+  updatePassword(password: string): Promise<{ error?: string }>
 }
 
 const AuthContext = createContext<AuthCtx | null>(null)
@@ -111,6 +113,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       async signOut() {
         await supabase.auth.signOut()
+      },
+      async updatePassword(password) {
+        const { error } = await supabase.auth.updateUser({ password })
+        return error ? { error: error.message } : {}
       },
     }),
     [session, accountId, loading],

@@ -1,3 +1,4 @@
+import { useState, type FormEvent } from 'react'
 import { useApp } from '../state'
 import { useAuth } from '../auth'
 import { cx } from '../lib/cx'
@@ -39,6 +40,7 @@ export function Settings() {
       {session && (
         <div className={s.account}>
           <span className={cx(s.hint, s.small)}>Signed in as {session.user.email}</span>
+          <ChangePassword />
           <button type="button" className={shared.danger} onClick={() => void signOut()}>
             Sign out
           </button>
@@ -46,5 +48,46 @@ export function Settings() {
       )}
       </div>
     </section>
+  )
+}
+
+/** Set a new password for the signed-in user (no email round-trip needed). */
+function ChangePassword() {
+  const { updatePassword } = useAuth()
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setStatus(null)
+    const { error } = await updatePassword(password)
+    setBusy(false)
+    if (error) setStatus({ ok: false, text: error })
+    else {
+      setStatus({ ok: true, text: 'Password updated.' })
+      setPassword('')
+    }
+  }
+
+  return (
+    <form className={s.changePw} onSubmit={onSubmit}>
+      <input
+        type="password"
+        autoComplete="new-password"
+        placeholder="New password"
+        minLength={6}
+        required
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <button type="submit" className={shared.primary} disabled={busy || password.length < 6}>
+        {busy ? '…' : 'Change'}
+      </button>
+      {status && (
+        <span className={cx(s.pwStatus, status.ok ? s.pwOk : s.pwErr)}>{status.text}</span>
+      )}
+    </form>
   )
 }
