@@ -45,25 +45,53 @@ function reducer(state: AppState, action: Action): AppState {
         events: state.events.map((e) => (e.id === action.event.id ? action.event : e)),
       }
     case 'removeEvent': {
-      // Drop the event, any dangling dependsOn edges pointing at it, and all of
-      // its per-occurrence state.
-      const events = state.events
-        .filter((e) => e.id !== action.id)
-        .map((e) =>
-          e.dependsOn?.includes(action.id)
-            ? { ...e, dependsOn: e.dependsOn.filter((d) => d !== action.id) }
-            : e,
-        )
+      // Drop the event, all of its per-occurrence state, and every dependency
+      // edge that touches it — whether it's the dependent occurrence (key prefix)
+      // or a prerequisite of someone else's occurrence (DB cascades both ends).
+      const events = state.events.filter((e) => e.id !== action.id)
       const prefix = action.id + ':'
       const completions = Object.fromEntries(
         Object.entries(state.completions).filter(([k]) => !k.startsWith(prefix)),
       )
-      return { ...state, events, completions }
+      const dependencies: typeof state.dependencies = {}
+      for (const [k, edges] of Object.entries(state.dependencies)) {
+        if (k.startsWith(prefix)) continue
+        const kept = edges.filter((e) => e.prerequisiteSeriesId !== action.id)
+        if (kept.length) dependencies[k] = kept
+      }
+      return { ...state, events, completions, dependencies }
     }
-    case 'setOccurrenceDone': {
+    case 'setOccurrenceStatus': {
       const key = occKey(action.eventId, action.date)
-      const prev = state.completions[key] ?? {}
-      return { ...state, completions: { ...state.completions, [key]: { ...prev, done: action.done } } }
+      const { status: _drop, ...rest } = state.completions[key] ?? {}
+      const next = action.status === null ? rest : { ...rest, status: action.status }
+      return { ...state, completions: { ...state.completions, [key]: next } }
+    }
+    case 'addDependency': {
+      const key = occKey(action.eventId, action.date)
+      const edges = state.dependencies[key] ?? []
+      // Dedupe by prerequisite slot; a re-add updates the required status.
+      const without = edges.filter(
+        (e) =>
+          !(e.prerequisiteSeriesId === action.prerequisiteSeriesId && e.prerequisiteDate === action.prerequisiteDate),
+      )
+      const edge = {
+        prerequisiteSeriesId: action.prerequisiteSeriesId,
+        prerequisiteDate: action.prerequisiteDate,
+        requiredStatus: action.requiredStatus,
+      }
+      return { ...state, dependencies: { ...state.dependencies, [key]: [...without, edge] } }
+    }
+    case 'removeDependency': {
+      const key = occKey(action.eventId, action.date)
+      const edges = (state.dependencies[key] ?? []).filter(
+        (e) =>
+          !(e.prerequisiteSeriesId === action.prerequisiteSeriesId && e.prerequisiteDate === action.prerequisiteDate),
+      )
+      const dependencies = { ...state.dependencies }
+      if (edges.length) dependencies[key] = edges
+      else delete dependencies[key]
+      return { ...state, dependencies }
     }
     case 'toggleChecklistEntry': {
       const key = occKey(action.eventId, action.date)
@@ -82,6 +110,19 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         people: { ...state.people, [action.id]: { ...state.people[action.id], color: action.color } },
       }
+    case 'setColorPref':
+      return {
+        ...state,
+        preferences: {
+          ...state.preferences,
+          personColors: { ...state.preferences.personColors, [action.personId]: action.color },
+        },
+      }
+    case 'clearColorPref': {
+      const personColors = { ...state.preferences.personColors }
+      delete personColors[action.personId]
+      return { ...state, preferences: { ...state.preferences, personColors } }
+    }
     case 'shiftWeek':
       return { ...state, weekStart: addDays(state.weekStart, action.delta * 7) }
     case 'setWeek':

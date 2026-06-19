@@ -826,6 +826,35 @@ export type Database = {
         }
         Relationships: []
       }
+      user_preference: {
+        Row: {
+          account_id: string
+          prefs: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          prefs?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          prefs?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_preference_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

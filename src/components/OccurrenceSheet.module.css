@@ -80,3 +80,94 @@
   border-radius: 999px;
   font-size: var(--fs-md);
 }
+
+/* ---- status control ---- */
+.statusRow {
+  display: flex;
+  gap: 8px;
+  padding: 10px 0;
+}
+
+.statusBtn {
+  padding: 6px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  font-size: var(--fs-md);
+  cursor: pointer;
+}
+
+.statusOn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+/* ---- prerequisite links ---- */
+.deps {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.depsTitle {
+  margin: 0 0 8px;
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
+.depList {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.depRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-md);
+}
+
+.depDot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.depMet {
+  background: var(--accent);
+}
+
+.depUnmet {
+  border: 1.5px solid var(--muted);
+}
+
+.depText {
+  flex: 1;
+}
+
+.depRemove {
+  flex: none;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: var(--fs-md);
+}
+
+.depForm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.depForm select {
+  flex: 1;
+  min-width: 120px;
+}

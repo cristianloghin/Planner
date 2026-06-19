@@ -10,6 +10,7 @@ import {
   adultsGradient,
   defaultAttendees,
   peopleList,
+  personColor,
 } from '../lib/people'
 import { childStatuses, type Busy, type ChildStatus } from '../lib/conflicts'
 import { hasReminders, checklistEntries } from '../lib/attachments'
@@ -140,8 +141,8 @@ export function DayView() {
           <div />
           <div className={s.laneHeads} style={{ gridTemplateColumns: laneCols }}>
             {people.map((p) => (
-              <div key={p.id} className={s.laneHead} style={{ color: p.color }}>
-                <span className={s.dot} style={{ background: p.color }} />
+              <div key={p.id} className={s.laneHead} style={{ color: personColor(state, p.id) }}>
+                <span className={s.dot} style={{ background: personColor(state, p.id) }} />
                 {p.name}
               </div>
             ))}

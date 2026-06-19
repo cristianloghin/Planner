@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Settings as SettingsIcon, type LucideIcon } from 'lucide-react'
 import { WeekCalendar } from './components/WeekCalendar'
 import { DayView } from './components/DayView'
 import { MonthView } from './components/MonthView'
@@ -14,12 +15,12 @@ import s from './App.module.css'
 
 type Tab = 'day' | 'calendar' | 'month' | 'lists' | 'settings'
 
-const TABS: { id: Tab; label: string }[] = [
+const TABS: { id: Tab; label: string; icon?: LucideIcon }[] = [
   { id: 'day', label: 'Day' },
   { id: 'calendar', label: 'Week' },
   { id: 'month', label: 'Month' },
   { id: 'lists', label: 'Lists' },
-  { id: 'settings', label: 'People' },
+  { id: 'settings', label: 'Settings', icon: SettingsIcon },
 ]
 
 /**
@@ -80,8 +81,9 @@ export function App() {
             key={t.id}
             className={cx(s.tab, t.id === tab && s.active)}
             onClick={() => setTab(t.id)}
+            aria-label={t.label}
           >
-            {t.label}
+            {t.icon ? <t.icon size={20} /> : t.label}
           </button>
         ))}
       </nav>

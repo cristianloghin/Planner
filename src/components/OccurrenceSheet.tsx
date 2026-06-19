@@ -1,20 +1,28 @@
+import { useState } from 'react'
 import { useApp } from '../state'
-import type { CalendarEvent } from '../types'
-import { minutesToTime } from '../lib/dates'
+import type { CalendarEvent, OccurrenceStatusCode } from '../types'
+import { addDays, isoLabel, minutesToTime } from '../lib/dates'
 import { eventStartMinutes, eventSpanDays, MINS_PER_DAY } from '../lib/timing'
 import { attendeeLabel } from '../lib/people'
 import { checklists, notes, reminderOffsets } from '../lib/attachments'
-import { blockingPrerequisites, isOccurrenceDone, occKey } from '../lib/occurrences'
+import {
+  blockingPrerequisites,
+  isOccurrenceDone,
+  occKey,
+  occurrenceEffectiveStatus,
+} from '../lib/occurrences'
 import { offsetLabel } from '../lib/notifications'
-import { recurrenceLabel } from '../lib/recurrence'
+import { recurrenceLabel, seriesOccurrenceDatesInRange } from '../lib/recurrence'
 import { cx } from '../lib/cx'
 import shared from '../styles/shared.module.css'
 import s from './OccurrenceSheet.module.css'
 
+const STATUSES: OccurrenceStatusCode[] = ['done', 'skipped', 'blocked']
+
 /**
  * A single occurrence of an event on a date: the place to tick it off, work its
- * checklist, and see what it's waiting on. Editing the *template* hands off to
- * the EventEditor.
+ * checklist, set its status, and manage what it waits on. Editing the *template*
+ * hands off to the EventEditor.
  */
 export function OccurrenceSheet({
   event,
@@ -32,7 +40,12 @@ export function OccurrenceSheet({
   const hasChecklist = cls.length > 0
   const done = isOccurrenceDone(state, event, date)
   const checked = state.completions[occKey(event.id, date)]?.checked ?? {}
+  const status = state.completions[occKey(event.id, date)]?.status
   const blockers = blockingPrerequisites(state, event, date)
+
+  function setStatus(next: OccurrenceStatusCode | null) {
+    dispatch({ type: 'setOccurrenceStatus', eventId: event.id, date, status: next })
+  }
 
   const startMin = eventStartMinutes(event)
   const endMin = startMin + event.duration
@@ -42,6 +55,10 @@ export function OccurrenceSheet({
       ? `All day · ${span} days`
       : 'All day'
     : `${minutesToTime(startMin)}–${minutesToTime(endMin % MINS_PER_DAY)}${span > 1 ? ` (+${span - 1}d)` : ''}`
+
+  // For a checklist event, "done" is derived from ticks — only skipped/blocked
+  // are set explicitly. Otherwise all three statuses are selectable.
+  const statusOptions = hasChecklist ? STATUSES.filter((o) => o !== 'done') : STATUSES
 
   return (
     <div className={shared.editorPage}>
@@ -62,10 +79,15 @@ export function OccurrenceSheet({
         </p>
 
         {blockers.length > 0 && (
-          <p className={s.waiting}>⏳ Waiting on {blockers.map((b) => b.title).join(', ')}</p>
+          <p className={s.waiting}>
+            ⏳ Waiting on{' '}
+            {blockers
+              .map((b) => `${b.event.title} (${isoLabel(b.date)}) — needs ${b.requiredStatus}`)
+              .join(', ')}
+          </p>
         )}
 
-        {hasChecklist ? (
+        {hasChecklist &&
           cls.map((c) => (
             <div key={c.id} className={s.checklist}>
               {c.title && <h4 className={s.checklistTitle}>{c.title}</h4>}
@@ -86,19 +108,20 @@ export function OccurrenceSheet({
                 ))}
               </ul>
             </div>
-          ))
-        ) : (
-          <label className={s.doneToggle}>
-            <input
-              type="checkbox"
-              checked={done}
-              onChange={(e) =>
-                dispatch({ type: 'setOccurrenceDone', eventId: event.id, date, done: e.target.checked })
-              }
-            />
-            Mark done
-          </label>
-        )}
+          ))}
+
+        <div className={s.statusRow}>
+          {statusOptions.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              className={cx(s.statusBtn, status === opt && s.statusOn)}
+              onClick={() => setStatus(status === opt ? null : opt)}
+            >
+              {opt === 'done' ? 'Mark done' : opt[0].toUpperCase() + opt.slice(1)}
+            </button>
+          ))}
+        </div>
 
         {notes(event).map((n) => (
           <p key={n.id} className={s.note}>
@@ -115,7 +138,141 @@ export function OccurrenceSheet({
             ))}
           </div>
         )}
+
+        <DependencyEditor event={event} date={date} />
       </div>
+    </div>
+  )
+}
+
+/**
+ * Manage this occurrence's prerequisite links — concrete occurrence→occurrence
+ * edges. Each link names another event, one of its real occurrences, and the
+ * status that occurrence must reach.
+ */
+function DependencyEditor({ event, date }: { event: CalendarEvent; date: string }) {
+  const { state, dispatch } = useApp()
+  const edges = state.dependencies[occKey(event.id, date)] ?? []
+  const others = state.events.filter((e) => e.id !== event.id)
+
+  const [prereqId, setPrereqId] = useState('')
+  const [prereqDate, setPrereqDate] = useState('')
+  const [requiredStatus, setRequiredStatus] = useState<OccurrenceStatusCode>('done')
+
+  const prereq = others.find((e) => e.id === prereqId)
+  // Bound the occurrence search to a year either side of this occurrence so a
+  // recurring prerequisite yields a finite, relevant list of real slots.
+  const prereqDates = prereq
+    ? seriesOccurrenceDatesInRange(prereq, addDays(date, -365), addDays(date, 365))
+    : []
+
+  function add() {
+    if (!prereqId || !prereqDate) return
+    dispatch({
+      type: 'addDependency',
+      eventId: event.id,
+      date,
+      prerequisiteSeriesId: prereqId,
+      prerequisiteDate: prereqDate,
+      requiredStatus,
+    })
+    setPrereqId('')
+    setPrereqDate('')
+    setRequiredStatus('done')
+  }
+
+  return (
+    <div className={s.deps}>
+      <h4 className={s.depsTitle}>Waits on</h4>
+
+      {edges.length > 0 && (
+        <ul className={s.depList}>
+          {edges.map((edge) => {
+            const dep = state.events.find((e) => e.id === edge.prerequisiteSeriesId)
+            const actual = dep ? occurrenceEffectiveStatus(state, dep, edge.prerequisiteDate) : null
+            const met = actual === edge.requiredStatus
+            return (
+              <li key={`${edge.prerequisiteSeriesId}:${edge.prerequisiteDate}`} className={s.depRow}>
+                <span className={cx(s.depDot, met ? s.depMet : s.depUnmet)} />
+                <span className={s.depText}>
+                  {dep?.title ?? 'Unknown'} · {isoLabel(edge.prerequisiteDate)} · needs {edge.requiredStatus}
+                </span>
+                <button
+                  type="button"
+                  className={s.depRemove}
+                  onClick={() =>
+                    dispatch({
+                      type: 'removeDependency',
+                      eventId: event.id,
+                      date,
+                      prerequisiteSeriesId: edge.prerequisiteSeriesId,
+                      prerequisiteDate: edge.prerequisiteDate,
+                    })
+                  }
+                  aria-label="Remove link"
+                >
+                  ✕
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      {others.length > 0 ? (
+        <div className={s.depForm}>
+          <select
+            value={prereqId}
+            onChange={(e) => {
+              setPrereqId(e.target.value)
+              setPrereqDate('')
+            }}
+            aria-label="Prerequisite event"
+          >
+            <option value="">Add a prerequisite…</option>
+            {others.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.title || 'Untitled'}
+              </option>
+            ))}
+          </select>
+
+          {prereq && (
+            <>
+              <select
+                value={prereqDate}
+                onChange={(e) => setPrereqDate(e.target.value)}
+                aria-label="Prerequisite occurrence"
+              >
+                <option value="">Which occurrence…</option>
+                {prereqDates.map((d) => (
+                  <option key={d} value={d}>
+                    {isoLabel(d)}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={requiredStatus}
+                onChange={(e) => setRequiredStatus(e.target.value as OccurrenceStatusCode)}
+                aria-label="Required status"
+              >
+                {STATUSES.map((st) => (
+                  <option key={st} value={st}>
+                    needs {st}
+                  </option>
+                ))}
+              </select>
+
+              <button type="button" className={shared.primary} onClick={add} disabled={!prereqDate}>
+                Add
+              </button>
+            </>
+          )}
+        </div>
+      ) : (
+        <p className={s.meta}>No other events to wait on yet.</p>
+      )}
     </div>
   )
 }

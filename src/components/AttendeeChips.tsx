@@ -1,6 +1,6 @@
 import { useApp } from '../state'
 import type { PersonId } from '../types'
-import { peopleList } from '../lib/people'
+import { peopleList, personColor } from '../lib/people'
 import { cx } from '../lib/cx'
 import shared from '../styles/shared.module.css'
 
@@ -25,12 +25,13 @@ export function AttendeeChips({
     <div className={shared.chips}>
       {peopleList(state).map((p) => {
         const on = value.includes(p.id)
+        const c = personColor(state, p.id)
         return (
           <button
             type="button"
             key={p.id}
             className={cx(shared.chip, on && shared.on)}
-            style={on ? { background: p.color, borderColor: p.color } : { borderColor: p.color, color: p.color }}
+            style={on ? { background: c, borderColor: c } : { borderColor: c, color: c }}
             onClick={() => toggle(p.id)}
           >
             {p.name}

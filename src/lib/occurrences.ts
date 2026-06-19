@@ -1,6 +1,5 @@
-import type { AppState, CalendarEvent } from '../types'
+import type { AppState, CalendarEvent, OccurrenceStatusCode } from '../types'
 import { checklistEntries } from './attachments'
-import { latestStartOnOrBefore } from './recurrence'
 
 /** Key for an occurrence's per-occurrence state: a specific event on a specific start date. */
 export function occKey(eventId: string, date: string): string {
@@ -9,8 +8,9 @@ export function occKey(eventId: string, date: string): string {
 
 /**
  * Is the occurrence of `event` starting on `date` complete? Derived from its
- * checklist when it has one (all entries checked), else the manual `done` flag.
- * The non-empty-entries guard keeps an empty checklist from reading as "done".
+ * checklist when it has one (all entries checked), else the explicit `done`
+ * status. The non-empty-entries guard keeps an empty checklist from reading as
+ * "done".
  */
 export function isOccurrenceDone(state: AppState, event: CalendarEvent, date: string): boolean {
   const st = state.completions[occKey(event.id, date)]
@@ -19,25 +19,51 @@ export function isOccurrenceDone(state: AppState, event: CalendarEvent, date: st
     const checked = st?.checked ?? {}
     return entries.every((entry) => checked[entry.id])
   }
-  return !!st?.done
+  return st?.status === 'done'
 }
 
 /**
- * Prerequisites that aren't satisfied for this occurrence: each `dependsOn`
- * event whose relevant occurrence (the latest at or before `date`) isn't done,
- * or hasn't happened yet.
+ * The effective status of an occurrence for gating purposes: a checklist-complete
+ * occurrence counts as `done` even without an explicit status row; otherwise the
+ * explicitly-set status, or `null` if none.
+ */
+export function occurrenceEffectiveStatus(
+  state: AppState,
+  event: CalendarEvent,
+  date: string,
+): OccurrenceStatusCode | null {
+  if (isOccurrenceDone(state, event, date)) return 'done'
+  return state.completions[occKey(event.id, date)]?.status ?? null
+}
+
+/** A prerequisite edge that isn't satisfied for a given dependent occurrence. */
+export interface UnmetPrerequisite {
+  event: CalendarEvent
+  date: string
+  requiredStatus: OccurrenceStatusCode
+  actualStatus: OccurrenceStatusCode | null
+}
+
+/**
+ * Prerequisites that aren't satisfied for this occurrence: each enumerated
+ * `occurrence_dependency` edge whose prerequisite occurrence hasn't reached the
+ * edge's `required_status`. An edge whose prerequisite event no longer exists is
+ * dropped (the DB cascades it; in-memory we just skip it).
  */
 export function blockingPrerequisites(
   state: AppState,
   event: CalendarEvent,
   date: string,
-): CalendarEvent[] {
-  const out: CalendarEvent[] = []
-  for (const depId of event.dependsOn ?? []) {
-    const dep = state.events.find((e) => e.id === depId)
+): UnmetPrerequisite[] {
+  const edges = state.dependencies[occKey(event.id, date)] ?? []
+  const out: UnmetPrerequisite[] = []
+  for (const edge of edges) {
+    const dep = state.events.find((e) => e.id === edge.prerequisiteSeriesId)
     if (!dep) continue
-    const depDate = latestStartOnOrBefore(dep, date)
-    if (depDate == null || !isOccurrenceDone(state, dep, depDate)) out.push(dep)
+    const actualStatus = occurrenceEffectiveStatus(state, dep, edge.prerequisiteDate)
+    if (actualStatus !== edge.requiredStatus) {
+      out.push({ event: dep, date: edge.prerequisiteDate, requiredStatus: edge.requiredStatus, actualStatus })
+    }
   }
   return out
 }
