@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { AppState, ListItem } from './types'
+import type { AppState, ListItem, TodoList } from './types'
 import { createStore, type ScheduleStore } from './store/store'
 import type { Action } from './store/actions'
 import { useAuth } from './auth'
@@ -20,23 +20,65 @@ function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'hydrate':
       return action.state
+    case 'addList': {
+      const list: TodoList = {
+        id: uid(),
+        title: action.title,
+        sortOrder: state.lists.length,
+        items: [],
+      }
+      return { ...state, lists: [...state.lists, list] }
+    }
+    case 'renameList':
+      return {
+        ...state,
+        lists: state.lists.map((l) => (l.id === action.id ? { ...l, title: action.title } : l)),
+      }
+    case 'removeList':
+      return { ...state, lists: state.lists.filter((l) => l.id !== action.id) }
     case 'addListItem': {
       const item: ListItem = {
         id: uid(),
         title: action.title,
         done: false,
         personId: action.personId,
+        groupLabel: null,
+        dueOn: null,
+        sortOrder: 0, // set below from the target list's length
         createdAt: Date.now(),
       }
-      return { ...state, lists: [item, ...state.lists] }
+      return {
+        ...state,
+        lists: state.lists.map((l) =>
+          l.id === action.listId
+            ? { ...l, items: [...l.items, { ...item, sortOrder: l.items.length }] }
+            : l,
+        ),
+      }
     }
     case 'toggleListItem':
       return {
         ...state,
-        lists: state.lists.map((t) => (t.id === action.id ? { ...t, done: !t.done } : t)),
+        lists: state.lists.map((l) =>
+          l.id === action.listId
+            ? {
+                ...l,
+                items: l.items.map((t) =>
+                  t.id === action.itemId ? { ...t, done: !t.done } : t,
+                ),
+              }
+            : l,
+        ),
       }
     case 'removeListItem':
-      return { ...state, lists: state.lists.filter((t) => t.id !== action.id) }
+      return {
+        ...state,
+        lists: state.lists.map((l) =>
+          l.id === action.listId
+            ? { ...l, items: l.items.filter((t) => t.id !== action.itemId) }
+            : l,
+        ),
+      }
     case 'addEvent':
       return { ...state, events: [...state.events, { ...action.event, id: uid() }] }
     case 'updateEvent':

@@ -6,9 +6,13 @@ import type { CalendarEvent, OccurrenceStatusCode, PersonId } from '../types'
  * here so both sides agree without a circular import through `state.tsx`.
  */
 export type Action =
-  | { type: 'addListItem'; title: string; personId: PersonId | null }
-  | { type: 'toggleListItem'; id: string }
-  | { type: 'removeListItem'; id: string }
+  // Named lists (the `list` table). Items live nested under their list.
+  | { type: 'addList'; title: string }
+  | { type: 'renameList'; id: string; title: string }
+  | { type: 'removeList'; id: string }
+  | { type: 'addListItem'; listId: string; title: string; personId: PersonId | null }
+  | { type: 'toggleListItem'; listId: string; itemId: string }
+  | { type: 'removeListItem'; listId: string; itemId: string }
   | { type: 'addEvent'; event: Omit<CalendarEvent, 'id'> }
   | { type: 'updateEvent'; event: CalendarEvent }
   | { type: 'removeEvent'; id: string }

@@ -86,8 +86,8 @@ The app draws one lane per `person` row (account-scoped, `kind` adult|child, opt
 - Attachment display order is lossy on round-trip (DB has no polymorphic order).
 
 ### Still deferred (after slice 3)
-- **Standalone Lists** are device-local (`localStorage` key `planner.lists.v1`) — table
-  not built yet, but the design is now **frozen** (DATA_MODEL Decision 11 + §5 below).
+- ~~**Standalone Lists** are device-local~~ **DONE (pass 1)** — Lists now sync via the
+  backend (`list` + `list_item`, migration `0009`). See §5 for what's wired vs. deferred.
 - Recurrence + checklist/note round-trip + removeEvent + person rename/recolor are
   coded but not yet click-tested.
 - **Realtime is reload-on-change** (refetch all on any change). Fine at household
@@ -134,10 +134,24 @@ The DB does **no** RRULE math. Add [`rrule`](https://github.com/jkbrzt/rrule)
   `occurrence_item_state`. `event_occurrence.status = null` means "compute"; a set
   value overrides.
 
-## 5. Standalone Lists — designed, ready to build (DATA_MODEL Decision 11)
+## 5. Standalone Lists — backend sync wired (DATA_MODEL Decision 11)
 
-Promoted from "unmapped" to a frozen design. Build it as migration `0009_lists.sql`
-plus a `SupabaseStore` mapping; it replaces the `localStorage` (`planner.lists.v1`) path.
+**Pass 1 done (2026-06-19):** migration `0009_lists.sql` is live and the
+`SupabaseStore` mapping replaces the `localStorage` (`planner.lists.v1`) path.
+Implemented + verified against the live DB (create/rename/delete list, add/tick/
+remove item all round-trip through a reload):
+- `AppState.lists` is now `TodoList[]` (named lists, each with nested `ListItem[]`);
+  `ListItem` carries `groupLabel`/`dueOn`/`sortOrder` (persisted) — see `src/types.ts`.
+- `SupabaseStore.loadLists` reads `list` + `list_item` ordered by `sort_order`; the
+  `apply` cases write `addList`/`renameList`/`removeList`/`add`/`toggle`/`removeListItem`.
+- One-time legacy import: `planner.lists.v1` → a default "To-do" list, guarded by a
+  localStorage flag **and** an empty-account check so it can't double-import per device.
+- Multi-list UI in `src/components/Lists.tsx` (list-tab switcher + create/rename/delete).
+
+**Still deferred to pass 2** (columns/links exist in the DB, no UI yet):
+- `group_label` in-list headers and `due_on` deadlines (persisted as null for now).
+- **Occurrence linking** (`list_item_event_link`): the "Link a to-do" picker in
+  `OccurrenceSheet` and the tickable line inside an occurrence — see below.
 
 **Schema (all account-scoped, RLS + grants + realtime like `0005`/`0006`):**
 - `list` — named list (`title`, `sort_order`).

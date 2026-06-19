@@ -16,16 +16,39 @@ export interface Person {
 }
 
 /**
- * A standalone to-do in the Lists view: undated, flat, optionally assigned to one
- * person or shared (personId === null). Distinct from an event's checklist — they
- * share no data, only the spirit of "things to tick off".
+ * A standalone to-do, living inside a {@link TodoList}. Undated by default,
+ * optionally assigned to one person or shared (personId === null). Distinct from
+ * an event's checklist — they share no data, only the spirit of "things to tick
+ * off". `done` lives on the item itself (single context — it stays checked in
+ * place and can be unchecked); see DATA_MODEL Decision 11.
+ *
+ * `groupLabel` (in-list header) and `dueOn` (optional deadline) are persisted by
+ * the backend but have no UI yet — they land in a later pass.
  */
 export interface ListItem {
   id: string
   title: string
   done: boolean
   personId: PersonId | null
+  /** In-list section header; null = ungrouped. Persisted, no UI yet. */
+  groupLabel: string | null
+  /** Optional deadline as an ISO date ('yyyy-mm-dd'); null = none. No UI yet. */
+  dueOn: string | null
+  /** Position within the list, ascending (checklist-parity ordering). */
+  sortOrder: number
   createdAt: number
+}
+
+/**
+ * A named, account-scoped list of to-dos (DB table `list`). The Lists view shows
+ * one list at a time; users can create, rename, and delete lists.
+ */
+export interface TodoList {
+  id: string
+  title: string
+  /** List order, ascending. */
+  sortOrder: number
+  items: ListItem[]
 }
 
 /** How often an event repeats. Omit on an event for a one-off. */
@@ -130,7 +153,7 @@ export interface Preferences {
 
 export interface AppState {
   people: Record<PersonId, Person>
-  lists: ListItem[]
+  lists: TodoList[]
   events: CalendarEvent[]
   completions: Record<string, OccurrenceState>
   /**

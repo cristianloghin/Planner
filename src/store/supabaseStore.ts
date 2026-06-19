@@ -8,6 +8,7 @@ import type {
   OccurrenceStatusCode,
   Person,
   Preferences,
+  TodoList,
 } from '../types'
 import type { Action } from './actions'
 import type { Json } from '../lib/database.types'
@@ -21,9 +22,10 @@ import { recurrenceToRRule, rruleToRecurrence } from '../lib/rrule'
 
 const MINS_PER_DAY = 24 * 60
 
-// Standalone Lists have no backend table yet (deferred): they stay device-local
-// in localStorage so the Lists tab keeps working without syncing.
-const LISTS_KEY = 'planner.lists.v1'
+// Legacy device-local Lists store (pre-migration 0009). Read once to migrate any
+// existing items into the backend, then marked imported so it never runs again.
+const LEGACY_LISTS_KEY = 'planner.lists.v1'
+const LEGACY_LISTS_IMPORTED_KEY = 'planner.lists.v1.imported'
 
 // ---- Phase-1 <-> Postgres conversions ------------------------------------
 
@@ -109,12 +111,13 @@ export class SupabaseStore implements ScheduleStore {
   async load(): Promise<AppState> {
     const base = defaultState()
 
-    const [people, events, completions, dependencies, preferences] = await Promise.all([
+    const [people, events, completions, dependencies, preferences, lists] = await Promise.all([
       this.loadPeople(),
       this.loadEvents(),
       this.loadCompletions(),
       this.loadDependencies(),
       this.loadPreferences(),
+      this.loadLists(),
     ])
 
     return {
@@ -124,7 +127,7 @@ export class SupabaseStore implements ScheduleStore {
       completions,
       dependencies,
       preferences,
-      lists: this.loadLists(),
+      lists,
     }
   }
 
@@ -250,13 +253,108 @@ export class SupabaseStore implements ScheduleStore {
     return completions
   }
 
-  private loadLists(): ListItem[] {
-    try {
-      const raw = localStorage.getItem(LISTS_KEY)
-      return raw ? (JSON.parse(raw) as ListItem[]) : []
-    } catch {
-      return []
+  /**
+   * Named lists with their items, ordered + grouped like checklists (sort_order
+   * ascending). One-time migrates any pre-0009 device-local items first.
+   */
+  private async loadLists(): Promise<TodoList[]> {
+    await this.importLegacyLists()
+
+    const [lists, items] = await Promise.all([
+      supabase
+        .from('list')
+        .select('id, title, sort_order')
+        .eq('account_id', this.accountId)
+        .order('sort_order'),
+      supabase
+        .from('list_item')
+        .select('id, list_id, group_label, title, done, person_id, due_on, sort_order, created_at')
+        .order('sort_order'),
+    ])
+    if (lists.error) throw lists.error
+    if (items.error) throw items.error
+
+    const byList = new Map<string, ListItem[]>()
+    for (const it of items.data ?? []) {
+      const arr = byList.get(it.list_id) ?? []
+      arr.push({
+        id: it.id,
+        title: it.title,
+        done: it.done,
+        personId: it.person_id,
+        groupLabel: it.group_label,
+        dueOn: it.due_on,
+        sortOrder: it.sort_order,
+        createdAt: Date.parse(it.created_at),
+      })
+      byList.set(it.list_id, arr)
     }
+
+    return (lists.data ?? []).map((l) => ({
+      id: l.id,
+      title: l.title,
+      sortOrder: l.sort_order,
+      // The query already orders by sort_order; sort again defensively in case a
+      // list's items arrive interleaved across the result set.
+      items: (byList.get(l.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder),
+    }))
+  }
+
+  /**
+   * Migrate pre-0009 `planner.lists.v1` items (a flat, device-local array) into a
+   * single backend list, once. Guarded by a localStorage flag AND by the account
+   * already having lists, so it can't double-import or fight a partner's data.
+   */
+  private async importLegacyLists(): Promise<void> {
+    let legacy: { title?: string; done?: boolean; personId?: string | null }[]
+    try {
+      if (localStorage.getItem(LEGACY_LISTS_IMPORTED_KEY)) return
+      const raw = localStorage.getItem(LEGACY_LISTS_KEY)
+      legacy = raw ? JSON.parse(raw) : []
+    } catch {
+      return
+    }
+    if (!Array.isArray(legacy) || legacy.length === 0) {
+      try {
+        localStorage.setItem(LEGACY_LISTS_IMPORTED_KEY, '1')
+      } catch { /* ignore */ }
+      return
+    }
+
+    // Only import into an empty account, so we never duplicate on a second device.
+    const existing = await supabase
+      .from('list')
+      .select('id')
+      .eq('account_id', this.accountId)
+      .limit(1)
+    if (existing.error) throw existing.error
+    if ((existing.data ?? []).length > 0) {
+      try {
+        localStorage.setItem(LEGACY_LISTS_IMPORTED_KEY, '1')
+      } catch { /* ignore */ }
+      return
+    }
+
+    const listId = uid()
+    const insList = await supabase
+      .from('list')
+      .insert({ id: listId, account_id: this.accountId, title: 'To-do', sort_order: 0 })
+    if (insList.error) throw insList.error
+
+    const rows = legacy.map((it, i) => ({
+      id: uid(),
+      list_id: listId,
+      title: String(it.title ?? ''),
+      done: Boolean(it.done),
+      person_id: it.personId ?? null,
+      sort_order: i,
+    }))
+    const insItems = await supabase.from('list_item').insert(rows)
+    if (insItems.error) throw insItems.error
+
+    try {
+      localStorage.setItem(LEGACY_LISTS_IMPORTED_KEY, '1')
+    } catch { /* ignore */ }
   }
 
   // ---- SUBSCRIBE ---------------------------------------------------------
@@ -403,12 +501,63 @@ export class SupabaseStore implements ScheduleStore {
         if (error) throw error
         return
       }
-      // Standalone lists are device-local for now.
-      case 'addListItem':
-      case 'toggleListItem':
-      case 'removeListItem':
-        this.saveLists(next.lists)
+      case 'addList': {
+        // The reducer appended the new (id-stamped) list; persist that one.
+        const list = next.lists[next.lists.length - 1]
+        if (!list) return
+        const { error } = await supabase
+          .from('list')
+          .insert({ id: list.id, account_id: this.accountId, title: list.title, sort_order: list.sortOrder })
+        if (error) throw error
         return
+      }
+      case 'renameList': {
+        const { error } = await supabase.from('list').update({ title: action.title }).eq('id', action.id)
+        if (error) throw error
+        return
+      }
+      case 'removeList': {
+        // Cascade drops the list's items and any event links.
+        const { error } = await supabase.from('list').delete().eq('id', action.id)
+        if (error) throw error
+        return
+      }
+      case 'addListItem': {
+        // The reducer appended the new item to its list; persist that one.
+        const list = next.lists.find((l) => l.id === action.listId)
+        const item = list?.items[list.items.length - 1]
+        if (!item) return
+        const { error } = await supabase.from('list_item').insert({
+          id: item.id,
+          list_id: action.listId,
+          title: item.title,
+          done: item.done,
+          person_id: item.personId,
+          group_label: item.groupLabel,
+          due_on: item.dueOn,
+          sort_order: item.sortOrder,
+        })
+        if (error) throw error
+        return
+      }
+      case 'toggleListItem': {
+        // `done` lives on the item (single context); read the post-toggle value.
+        const item = next.lists
+          .find((l) => l.id === action.listId)
+          ?.items.find((t) => t.id === action.itemId)
+        if (!item) return
+        const { error } = await supabase
+          .from('list_item')
+          .update({ done: item.done })
+          .eq('id', action.itemId)
+        if (error) throw error
+        return
+      }
+      case 'removeListItem': {
+        const { error } = await supabase.from('list_item').delete().eq('id', action.itemId)
+        if (error) throw error
+        return
+      }
       // UI navigation + hydration: nothing to persist.
       case 'shiftWeek':
       case 'setWeek':
@@ -519,13 +668,6 @@ export class SupabaseStore implements ScheduleStore {
     if (res.error) throw res.error
   }
 
-  private saveLists(lists: ListItem[]): void {
-    try {
-      localStorage.setItem(LISTS_KEY, JSON.stringify(lists))
-    } catch {
-      // ignore quota / private-mode failures
-    }
-  }
 }
 
 /**

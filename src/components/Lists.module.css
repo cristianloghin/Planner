@@ -1,3 +1,75 @@
+.listTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.listTab {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.listTab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.newList {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.newList input {
+  flex: 1;
+}
+
+.smallBtn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.listHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.listTitle {
+  flex: 1;
+  margin: 0;
+  font-size: var(--fs-xl);
+}
+
+.renameForm {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+}
+
+.renameForm input {
+  flex: 1;
+}
+
+.deleteList {
+  color: var(--danger, #dc2626);
+  border-color: var(--danger, #dc2626);
+}
+
 .taskAdd {
   display: flex;
   gap: 8px;
