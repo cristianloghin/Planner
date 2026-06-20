@@ -62,7 +62,7 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
 
           {days.map((iso) => {
             // Expand recurring/multi-day events onto this concrete date.
-            const dayEvents = occurrencesOnDate(state.events, iso)
+            const dayEvents = occurrencesOnDate(state.events, iso, state.completions)
               .map((o) => o.event)
               .sort(
                 (a, b) =>
@@ -83,9 +83,9 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
                 <span className={s.monthDate}>{Number(iso.slice(8, 10))}</span>
                 {dayEvents.length > 0 && (
                   <span className={s.monthDots}>
-                    {dayEvents.slice(0, MAX_DOTS).map((e) => (
+                    {dayEvents.slice(0, MAX_DOTS).map((e, i) => (
                       <span
-                        key={e.id}
+                        key={`${e.id}:${i}`}
                         className={s.monthDot}
                         style={{ background: eventColor(state, e.attendees) }}
                       />

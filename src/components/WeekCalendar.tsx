@@ -47,7 +47,7 @@ export function WeekCalendar() {
           {DAY_NAMES.map((_, dayIdx) => {
             const dateISO = addDays(state.weekStart, dayIdx);
             // All-day items first, then timed by start.
-            const occs = occurrencesOnDate(state.events, dateISO).sort(
+            const occs = occurrencesOnDate(state.events, dateISO, state.completions).sort(
               (a, b) => {
                 if (a.event.allDay !== b.event.allDay)
                   return a.event.allDay ? -1 : 1;
@@ -69,7 +69,7 @@ export function WeekCalendar() {
                     const color = eventColor(state, e.attendees);
                     return (
                       <div
-                        key={e.id}
+                        key={`${e.id}:${o.start}`}
                         className={s.event}
                         style={{ borderLeftColor: color }}
                       >
@@ -79,10 +79,17 @@ export function WeekCalendar() {
                               ? `All day · ${o.offset + 1}/${o.span}`
                               : "All day"
                             : `${minutesToTime(o.segment.start)}–${minutesToTime(o.segment.end)}`}
+                          {o.moved && " · ↔ moved"}
                         </div>
                         <button
                           className={s.eventBody}
-                          onClick={() => setTarget({ mode: "edit", event: e })}
+                          onClick={() =>
+                            setTarget({
+                              mode: "edit",
+                              event: e,
+                              occurrenceDate: o.start,
+                            })
+                          }
                         >
                           <span className={s.eventTitle}>{e.title}</span>
                           <span className={s.eventMeta} style={{ color }}>

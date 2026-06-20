@@ -118,3 +118,59 @@
 .saveTemplate:disabled {
   opacity: 0.5;
 }
+
+/* ---- save-scope chooser (recurring-occurrence edits) ---- */
+.scopeOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.scopeCard {
+  width: 100%;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scopeTitle {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.scopeOption {
+  width: 100%;
+  text-align: left;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.scopeOption:hover {
+  border-color: var(--accent);
+}
+
+.scopeCancel {
+  align-self: center;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 8px;
+  margin-top: 4px;
+  font-size: var(--fs-md);
+}

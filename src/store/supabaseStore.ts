@@ -20,7 +20,7 @@ import { supabase } from '../lib/supabase'
 import { uid } from '../lib/id'
 import { toISODate, toDateTimeLocal } from '../lib/dates'
 import { notes as noteAttachments, checklists } from '../lib/attachments'
-import { recurrenceToRRule, rruleToRecurrence } from '../lib/rrule'
+import { recurrenceToRRule, rruleToRecurrence, truncatedRRule } from '../lib/rrule'
 
 const MINS_PER_DAY = 24 * 60
 
@@ -273,16 +273,27 @@ export class SupabaseStore implements ScheduleStore {
     const key = (seriesId: string, ts: string) => `${seriesId}:${tsToDateKey(ts)}`
 
     const [occ, items] = await Promise.all([
-      supabase.from('event_occurrence').select('series_id, occurrence_start, status'),
+      // Embed the parent's all_day so reschedule columns map back into the same
+      // unit convention as CalendarEvent (timed = minutes, all-day = days).
+      supabase
+        .from('event_occurrence')
+        .select('series_id, occurrence_start, status, rescheduled_to, rescheduled_duration, cancelled, event_series(all_day)'),
       supabase.from('occurrence_item_state').select('series_id, occurrence_start, item_id, status'),
     ])
     if (occ.error) throw occ.error
     if (items.error) throw items.error
 
     for (const o of occ.data ?? []) {
-      if (o.status) {
-        const k = key(o.series_id, o.occurrence_start)
-        completions[k] = { ...completions[k], status: o.status as OccurrenceStatusCode }
+      // PostgREST returns the to-one parent embed as an object.
+      const allDay = (o.event_series as { all_day: boolean } | null)?.all_day ?? false
+      const entry: import('../types').OccurrenceState = { ...completions[key(o.series_id, o.occurrence_start)] }
+      if (o.status) entry.status = o.status as OccurrenceStatusCode
+      if (o.cancelled) entry.cancelled = true
+      if (o.rescheduled_to) entry.start = tsToStart(o.rescheduled_to, allDay)
+      if (o.rescheduled_duration) entry.duration = intervalToDuration(o.rescheduled_duration, allDay)
+      // Skip rows that carry no app-visible state (e.g. a cleared override).
+      if (entry.status || entry.cancelled || entry.start != null || entry.duration != null) {
+        completions[key(o.series_id, o.occurrence_start)] = entry
       }
     }
     for (const it of items.data ?? []) {
@@ -488,6 +499,70 @@ export class SupabaseStore implements ScheduleStore {
             .eq('occurrence_start', occurrence_start)
           if (error) throw error
         }
+        return
+      }
+      case 'setOccurrenceOverride': {
+        const ev = next.events.find((e) => e.id === action.eventId)
+        if (!ev) return
+        // Identity stays the ORIGINAL slot; the new time/length go in the
+        // reschedule columns. Upsert touches only those, leaving any existing
+        // status/checklist ticks on the row intact.
+        const { error } = await supabase.from('event_occurrence').upsert(
+          {
+            series_id: ev.id,
+            occurrence_start: occurrenceTs(ev, action.date),
+            rescheduled_to: startToTs(action.start, ev.allDay),
+            rescheduled_duration: durationToInterval(action.duration, ev.allDay),
+          },
+          { onConflict: 'series_id,occurrence_start' },
+        )
+        if (error) throw error
+        return
+      }
+      case 'clearOccurrenceOverride': {
+        const ev = next.events.find((e) => e.id === action.eventId)
+        if (!ev) return
+        // Null the timing override but keep the row (it may still carry status).
+        const { error } = await supabase
+          .from('event_occurrence')
+          .update({ rescheduled_to: null, rescheduled_duration: null })
+          .eq('series_id', ev.id)
+          .eq('occurrence_start', occurrenceTs(ev, action.date))
+        if (error) throw error
+        return
+      }
+      case 'splitSeries': {
+        // The reducer already capped the old series and appended an optimistic
+        // clone; here we do the authoritative split. `next` still holds the old
+        // series' timing (only `recurrence.until` changed), so occurrenceTs and
+        // truncatedRRule read the right anchor/rule.
+        const old = next.events.find((e) => e.id === action.eventId)
+        if (!old || !old.recurrence) return
+        const cutover = occurrenceTs(old, action.fromDate)
+        const { data: newId, error: rpcErr } = await supabase.rpc('split_series', {
+          p_series: action.eventId,
+          p_cutover: cutover,
+          p_truncated_rrule: truncatedRRule(old.recurrence, action.fromDate),
+        })
+        if (rpcErr) throw rpcErr
+        // Apply the user's edits to the cloned series' own row + roster. Its
+        // checklist/notes/reminders were copied by the RPC (fresh ids, with
+        // future ticks migrated), so we deliberately don't re-sync those.
+        const e = action.event
+        const up = await supabase
+          .from('event_series')
+          .update({
+            title: e.title,
+            all_day: e.allDay,
+            dtstart: startToTs(e.start, e.allDay),
+            duration: durationToInterval(e.duration, e.allDay),
+            rrule: recurrenceToRRule(e.recurrence),
+          })
+          .eq('id', newId as string)
+        if (up.error) throw up.error
+        await this.syncAttendees({ id: newId as string, attendees: e.attendees, attachments: e.attachments })
+        // A full reload (driven by the realtime change + edit-guard flush) then
+        // replaces the optimistic clone with the real, migrated shape.
         return
       }
       case 'addDependency': {

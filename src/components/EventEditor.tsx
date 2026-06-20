@@ -4,6 +4,7 @@ import { minutesToTime, toDateTimeLocal } from "../lib/dates";
 import { uid } from "../lib/id";
 import { REMINDER_OFFSETS, offsetLabel } from "../lib/notifications";
 import { eventDate, eventStartMinutes } from "../lib/timing";
+import { effectiveOccurrence } from "../lib/recurrence";
 import { useApp } from "../state";
 import { cloneAttachments } from "../lib/attachments";
 import shared from "../styles/shared.module.css";
@@ -30,7 +31,16 @@ export type EditorTarget =
       startMin?: number;
       endMin?: number;
     }
-  | { mode: "edit"; event: CalendarEvent };
+  | {
+      mode: "edit";
+      event: CalendarEvent;
+      /**
+       * The ISO date of the specific occurrence the edit was opened from. Present
+       * only when entered via an occurrence (not a series-level chip); unlocks the
+       * "this occurrence / this & following / all" save-scope chooser.
+       */
+      occurrenceDate?: string;
+    };
 
 type RepeatChoice = "none" | RecurrenceFreq;
 
@@ -68,9 +78,29 @@ export function EventEditor({
     base?.allDay ?? (isEdit ? false : (target.allDay ?? false)),
   );
 
-  const initialDate = isEdit ? eventDate(base!) : target.date;
+  // When the editor is opened from a specific occurrence of a recurring series,
+  // seed the form from THAT occurrence (its date + any one-off override) rather
+  // than the series' first instance, and unlock the save-scope chooser.
+  const occurrenceDate = isEdit ? target.occurrenceDate : undefined;
+  const isRecurringOccurrence = isEdit && !!base!.recurrence && !!occurrenceDate;
+  // The occurrence as it currently stands (override applied), re-anchored onto its
+  // own date so the form shows the right day/time even for a far-future instance.
+  const seed: CalendarEvent | null =
+    isEdit && occurrenceDate
+      ? (() => {
+          const eff = effectiveOccurrence(base!, occurrenceDate, state.completions);
+          return {
+            ...eff,
+            start: eff.allDay
+              ? occurrenceDate
+              : dtLocal(occurrenceDate, eventStartMinutes(eff)),
+          };
+        })()
+      : base;
+
+  const initialDate = isEdit ? eventDate(seed!) : target.date;
   const initialStartMin = isEdit
-    ? eventStartMinutes(base!)
+    ? eventStartMinutes(seed!)
     : ((target.mode === "new" ? target.startMin : undefined) ?? 9 * 60);
   const initialEndMin =
     (target.mode === "new" ? target.endMin : undefined) ??
@@ -78,17 +108,15 @@ export function EventEditor({
 
   const [date, setDate] = useState(initialDate);
   const [days, setDays] = useState(
-    isEdit && base!.allDay ? Math.max(1, base!.duration) : 1,
+    isEdit && seed!.allDay ? Math.max(1, seed!.duration) : 1,
   );
   const [startDT, setStartDT] = useState(
-    isEdit && !base!.allDay
-      ? base!.start
-      : dtLocal(initialDate, initialStartMin),
+    isEdit && !seed!.allDay ? seed!.start : dtLocal(initialDate, initialStartMin),
   );
   const [endDT, setEndDT] = useState(() => {
-    if (isEdit && !base!.allDay) {
-      const d = new Date(base!.start);
-      d.setMinutes(d.getMinutes() + base!.duration);
+    if (isEdit && !seed!.allDay) {
+      const d = new Date(seed!.start);
+      d.setMinutes(d.getMinutes() + seed!.duration);
       return toDateTimeLocal(d);
     }
     return dtLocal(initialDate, initialEndMin);
@@ -109,6 +137,8 @@ export function EventEditor({
   const [templateId, setTemplateId] = useState<string | null>(null);
   // Transient "Saved to templates" confirmation.
   const [savedTemplate, setSavedTemplate] = useState(false);
+  // Save-scope chooser for editing one occurrence of a recurring series.
+  const [showScope, setShowScope] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(savedTimer.current), []);
 
@@ -197,15 +227,11 @@ export function EventEditor({
     savedTimer.current = setTimeout(() => setSavedTemplate(false), 2000);
   }
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!title.trim()) return;
-
-    const start = allDay ? date : startDT;
-
-    const event: Omit<CalendarEvent, "id"> = {
+  /** The event the form currently describes (no id). */
+  function buildEvent(): Omit<CalendarEvent, "id"> {
+    return {
       title: title.trim(),
-      start,
+      start: allDay ? date : startDT,
       allDay,
       duration: currentDuration(),
       recurrence:
@@ -215,10 +241,68 @@ export function EventEditor({
       attendees,
       attachments: cleanedAttachments(),
     };
+  }
 
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) return;
+    // Editing one occurrence of a recurring series: ask for the save scope first.
+    if (isRecurringOccurrence) {
+      setShowScope(true);
+      return;
+    }
     if (isEdit)
-      dispatch({ type: "updateEvent", event: { ...event, id: base!.id } });
-    else dispatch({ type: "addEvent", event, templateId: templateId ?? undefined });
+      dispatch({ type: "updateEvent", event: { ...buildEvent(), id: base!.id } });
+    else
+      dispatch({
+        type: "addEvent",
+        event: buildEvent(),
+        templateId: templateId ?? undefined,
+      });
+    onClose();
+  }
+
+  // ---- save-scope handlers (recurring-occurrence edits) -------------------
+  function saveThisOccurrence() {
+    // The override's identity stays the original slot (`occurrenceDate`); `start`
+    // carries the form's chosen day + time, so changing the day relocates just
+    // this occurrence (it stays part of the series, rendered on the new day).
+    dispatch({
+      type: "setOccurrenceOverride",
+      eventId: base!.id,
+      date: occurrenceDate!,
+      start: allDay ? date : startDT,
+      duration: currentDuration(),
+    });
+    onClose();
+  }
+  function saveThisAndFollowing() {
+    // Re-anchor to the occurrence's own day so the new series keeps the series'
+    // cadence — only the time/length (and other fields) carry the edit. A day
+    // move is a "this occurrence" operation, not a cadence change.
+    const start = allDay
+      ? occurrenceDate!
+      : `${occurrenceDate}T${startDT.slice(11)}`;
+    dispatch({
+      type: "splitSeries",
+      eventId: base!.id,
+      fromDate: occurrenceDate!,
+      event: { ...buildEvent(), start },
+    });
+    onClose();
+  }
+  function saveAllEvents() {
+    // Editing from an occurrence seeds the form on that occurrence's date, but
+    // "all events" must keep the series' original anchor date (moving the whole
+    // series to another day is out of scope) — apply only the new time/duration.
+    const ev = buildEvent();
+    const start = allDay
+      ? eventDate(base!)
+      : `${eventDate(base!)}T${startDT.slice(11)}`;
+    dispatch({
+      type: "updateEvent",
+      event: { ...ev, start, id: base!.id },
+    });
     onClose();
   }
 
@@ -448,6 +532,47 @@ export function EventEditor({
           </button>
         )}
       </div>
+
+      {showScope && (
+        <div
+          className={s.scopeOverlay}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowScope(false);
+          }}
+        >
+          <div className={s.scopeCard}>
+            <span className={s.scopeTitle}>Save changes to…</span>
+            <button
+              type="button"
+              className={s.scopeOption}
+              onClick={saveThisOccurrence}
+            >
+              This event only
+            </button>
+            <button
+              type="button"
+              className={s.scopeOption}
+              onClick={saveThisAndFollowing}
+            >
+              This and following events
+            </button>
+            <button
+              type="button"
+              className={s.scopeOption}
+              onClick={saveAllEvents}
+            >
+              All events
+            </button>
+            <button
+              type="button"
+              className={s.scopeCancel}
+              onClick={() => setShowScope(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

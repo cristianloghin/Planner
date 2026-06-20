@@ -57,6 +57,12 @@ export interface Recurrence {
   freq: RecurrenceFreq
   /** Repeat every N units (>= 1): every 2 days, every 3 weeks, ... */
   interval: number
+  /**
+   * Inclusive last day the series may produce an occurrence, as a local ISO date
+   * (`yyyy-mm-dd`). Omitted = repeats forever. Set when a series is capped by a
+   * "this and following" split; round-trips through the stored RRULE's `UNTIL`.
+   */
+  until?: string
 }
 
 /**
@@ -157,6 +163,18 @@ export interface OccurrenceState {
   status?: OccurrenceStatusCode
   /** checklistEntryId → checked. */
   checked?: Record<string, boolean>
+  /**
+   * One-off timing override for *this* occurrence only (`event_occurrence`'s
+   * `rescheduled_to` / `rescheduled_duration`). Same units as {@link CalendarEvent}:
+   * `start` is `yyyy-mm-ddThh:mm` (timed) or `yyyy-mm-dd` (all-day) on the
+   * occurrence's own date — the day is fixed, only the time of day and length
+   * move; `duration` is minutes (timed) or whole days (all-day). Absent fields
+   * fall back to the series timing.
+   */
+  start?: string
+  duration?: number
+  /** This occurrence has been removed from the series (`event_occurrence.cancelled`). */
+  cancelled?: boolean
 }
 
 /**
