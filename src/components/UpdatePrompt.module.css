@@ -1,0 +1,64 @@
+/* ---- "Update available" toast (sits above the tab bar) ---- */
+.host {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  z-index: 1100;
+  display: flex;
+  justify-content: center;
+  padding: 0 12px;
+  pointer-events: none;
+}
+
+.card {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 520px;
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 6px 20px var(--shadow);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.text strong {
+  font-size: var(--fs-lg);
+}
+
+.text span {
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
+.reload {
+  flex: none;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 8px 14px;
+  color: var(--on-accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.later {
+  flex: none;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 8px 6px;
+  cursor: pointer;
+}
