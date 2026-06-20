@@ -67,7 +67,22 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 2px;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.templateInfo strong {
+  font-size: var(--fs-base);
+}
+
+.templateInfo:hover strong {
+  text-decoration: underline;
 }
 
 .templateMeta {
