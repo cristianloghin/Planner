@@ -16,6 +16,24 @@ import { addDays } from './lib/dates'
 import { occKey } from './lib/occurrences'
 import { uid } from './lib/id'
 
+/**
+ * Remove the given to-do ids from every occurrence's link list, dropping keys
+ * that empty out. Used to mirror the DB's cascade when an item or list is gone.
+ */
+function dropLinkedItems(
+  listLinks: AppState['listLinks'],
+  removedIds: string[],
+): AppState['listLinks'] {
+  if (removedIds.length === 0) return listLinks
+  const drop = new Set(removedIds)
+  const out: AppState['listLinks'] = {}
+  for (const [k, ids] of Object.entries(listLinks)) {
+    const kept = ids.filter((id) => !drop.has(id))
+    if (kept.length) out[k] = kept
+  }
+  return out
+}
+
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'hydrate':
@@ -34,8 +52,17 @@ function reducer(state: AppState, action: Action): AppState {
         ...state,
         lists: state.lists.map((l) => (l.id === action.id ? { ...l, title: action.title } : l)),
       }
-    case 'removeList':
-      return { ...state, lists: state.lists.filter((l) => l.id !== action.id) }
+    case 'removeList': {
+      const removed = state.lists.find((l) => l.id === action.id)
+      return {
+        ...state,
+        lists: state.lists.filter((l) => l.id !== action.id),
+        // The DB cascades the list's items and their links; mirror it in memory.
+        listLinks: removed
+          ? dropLinkedItems(state.listLinks, removed.items.map((i) => i.id))
+          : state.listLinks,
+      }
+    }
     case 'addListItem': {
       const item: ListItem = {
         id: uid(),
@@ -43,7 +70,7 @@ function reducer(state: AppState, action: Action): AppState {
         done: false,
         personId: action.personId,
         groupLabel: action.group,
-        dueOn: null,
+        dueOn: action.dueOn,
         sortOrder: 0, // set below from the target list's length
         createdAt: Date.now(),
       }
@@ -70,6 +97,20 @@ function reducer(state: AppState, action: Action): AppState {
             : l,
         ),
       }
+    case 'setListItemDue':
+      return {
+        ...state,
+        lists: state.lists.map((l) =>
+          l.id === action.listId
+            ? {
+                ...l,
+                items: l.items.map((t) =>
+                  t.id === action.itemId ? { ...t, dueOn: action.dueOn } : t,
+                ),
+              }
+            : l,
+        ),
+      }
     case 'removeListItem':
       return {
         ...state,
@@ -78,6 +119,8 @@ function reducer(state: AppState, action: Action): AppState {
             ? { ...l, items: l.items.filter((t) => t.id !== action.itemId) }
             : l,
         ),
+        // The DB cascades the item's links; drop them in memory too.
+        listLinks: dropLinkedItems(state.listLinks, [action.itemId]),
       }
     case 'addEvent':
       return { ...state, events: [...state.events, { ...action.event, id: uid() }] }
@@ -101,7 +144,12 @@ function reducer(state: AppState, action: Action): AppState {
         const kept = edges.filter((e) => e.prerequisiteSeriesId !== action.id)
         if (kept.length) dependencies[k] = kept
       }
-      return { ...state, events, completions, dependencies }
+      // Drop every to-do link surfaced on this event's occurrences (the DB
+      // cascades them via series_id); the to-dos themselves are untouched.
+      const listLinks = Object.fromEntries(
+        Object.entries(state.listLinks).filter(([k]) => !k.startsWith(prefix)),
+      )
+      return { ...state, events, completions, dependencies, listLinks }
     }
     case 'setOccurrenceStatus': {
       const key = occKey(action.eventId, action.date)
@@ -134,6 +182,20 @@ function reducer(state: AppState, action: Action): AppState {
       if (edges.length) dependencies[key] = edges
       else delete dependencies[key]
       return { ...state, dependencies }
+    }
+    case 'linkListItem': {
+      const key = occKey(action.eventId, action.date)
+      const ids = state.listLinks[key] ?? []
+      if (ids.includes(action.itemId)) return state
+      return { ...state, listLinks: { ...state.listLinks, [key]: [...ids, action.itemId] } }
+    }
+    case 'unlinkListItem': {
+      const key = occKey(action.eventId, action.date)
+      const ids = (state.listLinks[key] ?? []).filter((id) => id !== action.itemId)
+      const listLinks = { ...state.listLinks }
+      if (ids.length) listLinks[key] = ids
+      else delete listLinks[key]
+      return { ...state, listLinks }
     }
     case 'toggleChecklistEntry': {
       const key = occKey(action.eventId, action.date)

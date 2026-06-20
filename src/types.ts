@@ -20,19 +20,18 @@ export interface Person {
  * optionally assigned to one person or shared (personId === null). Distinct from
  * an event's checklist — they share no data, only the spirit of "things to tick
  * off". `done` lives on the item itself (single context — it stays checked in
- * place and can be unchecked); see DATA_MODEL Decision 11.
- *
- * `groupLabel` (in-list header) and `dueOn` (optional deadline) are persisted by
- * the backend but have no UI yet — they land in a later pass.
+ * place and can be unchecked); see DATA_MODEL Decision 11. A to-do can also be
+ * surfaced inside a calendar occurrence via `AppState.listLinks` — the tick stays
+ * on this one `done`, so ticking it there or here is the same write.
  */
 export interface ListItem {
   id: string
   title: string
   done: boolean
   personId: PersonId | null
-  /** In-list section header; null = ungrouped. Persisted, no UI yet. */
+  /** In-list section header; null = ungrouped (grouped/sorted like a checklist). */
   groupLabel: string | null
-  /** Optional deadline as an ISO date ('yyyy-mm-dd'); null = none. No UI yet. */
+  /** Optional deadline as an ISO date ('yyyy-mm-dd'); null = none. */
   dueOn: string | null
   /** Position within the list, ascending (checklist-parity ordering). */
   sortOrder: number
@@ -162,6 +161,13 @@ export interface AppState {
    * occurrences that occurrence waits on.
    */
   dependencies: Record<string, OccurrenceDependency[]>
+  /**
+   * To-dos surfaced inside a concrete occurrence — `list_item_event_link` rows,
+   * keyed by the dependent occurrence (`${seriesId}:${date}`) like `dependencies`.
+   * Each value is the linked {@link ListItem} ids; the tick lives on the item's
+   * own `done`, so the same to-do may appear under several occurrences.
+   */
+  listLinks: Record<string, string[]>
   /** This user's personal preferences (colour overrides, …). */
   preferences: Preferences
   /** ISO date (yyyy-mm-dd) of the Monday of the week being viewed. */

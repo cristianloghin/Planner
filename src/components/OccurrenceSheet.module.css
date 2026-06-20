@@ -171,3 +171,43 @@
   flex: 1;
   min-width: 120px;
 }
+
+/* ---- linked to-dos ---- */
+.todoList {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.todoRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-md);
+}
+
+.todoLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  cursor: pointer;
+}
+
+.todoDue {
+  flex: none;
+  padding: 2px 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.todoOverdue {
+  color: var(--danger, #dc2626);
+  border-color: var(--danger, #dc2626);
+}
