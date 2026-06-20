@@ -234,7 +234,32 @@ yet: a Supabase **Edge Function** + a DB trigger/webhook on `occurrence_share` i
 supports web push for *installed* PWAs (16.4+). Design it once to also cover **reminders**
 — which today only fire while the app is open (`AlertHost.tsx`) — not just shares.
 
-## 7. Still unmapped (decide when you reach them)
+## 7. Private lists — designed, not built ([Decision 13](./DATA_MODEL.md#13-private-lists--per-list-visibility-scope))
+
+Opt-in per-list privacy on top of Decision 11's Lists. A list gains `owner_id` +
+`visibility` (`account`|`private`); items **inherit** the list's scope; a link still exposes
+a **single item** to event-viewers without exposing its list. The worked example: a private
+list stays invisible, but an item linked from it shows (and ticks) inside a shared event.
+
+Touch-points:
+1. Migration `0013_list_visibility.sql` — add `owner_id`/`visibility` to `list`; tighten
+   `can_access_list` to also require `(visibility='account' or owner_id = auth.uid())`;
+   replace the `list_item` SELECT policy with the OR (**list-derived** *or* **link-exposed**,
+   see Decision 13); decide the `list_item` UPDATE policy (mirror the OR, or a
+   `SECURITY DEFINER` done-only RPC).
+2. `SupabaseStore`: a `loadLinkedItems()` that fetches link-attached `list_item`s the viewer
+   can see but whose list they can't, into a `linkedItems` lookup; `OccurrenceSheet` reads
+   linked to-dos from that lookup, **not** `state.lists`. `loadLists` keeps grouping only
+   *visible* lists. New lists default to `owner_id = me`, `visibility = 'account'`.
+3. `state.tsx`: `AppState` gains `linkedItems`; an action to set a list's visibility.
+4. UI: a private/shared toggle (+ lock glyph) in `Lists.tsx`; the occurrence view renders
+   link-exposed items identically whether or not their list is visible.
+
+Watch-outs: assignment (`person_id`, a domain `person`) is **not** visibility (an
+`app_user`) — keep them separate; ticking a link-exposed private item must still write the
+one `list_item.done` (the UPDATE-policy question above).
+
+## 8. Still unmapped (decide when you reach them)
 
 - **RLS granularity:** the baseline lets any account member read/write the
   account's series. Add an `account_member.role` check if you need owner-only

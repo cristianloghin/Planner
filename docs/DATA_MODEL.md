@@ -323,7 +323,81 @@ to‑do‑linking already live.
 **Background push is out of scope here.** A notification when the recipient's app is
 *closed* needs the app's first backend component (a Supabase Edge Function +
 web‑push subscriptions) and would serve reminders too; the in‑app inbox/toast is free.
-See [`NEXT_SESSION.md`](./NEXT_SESSION.md) §7 for the build plan and the two layers.
+See [`NEXT_SESSION.md`](./NEXT_SESSION.md) §6 for the build plan and the two layers.
+
+### 13. Private lists — per-list visibility scope
+Decision 11 made every list account-wide. This adds an opt-in **private** scope so a user
+can keep a list to themselves, *without* changing how linked items surface on events.
+Lands in migration `0013_list_visibility.sql` (planned).
+
+Schema delta on `list`:
+- `owner_id uuid not null references app_user(id)` — the creator.
+- `visibility text not null default 'account' check (visibility in ('account','private'))`.
+  `account` = every member sees it (today's behaviour); `private` = only `owner_id`.
+
+`list_item` is unchanged: an item **inherits its list's scope** for direct visibility, and
+its `person_id` stays a pure **assignment** (a domain `person`, possibly not even a login) —
+orthogonal to *who can see the list*. Per-item visibility overrides (e.g. one private item
+inside a shared list) are deliberately **not** modelled; add an item-level `owner_id` later
+if ever wanted.
+
+Visibility has **two independent sources**, expressed as an OR in RLS:
+
+1. **List-derived** — you see an item because you can see its list. `can_access_list` is
+   tightened to respect privacy:
+   ```sql
+   -- was: is_account_member(l.account_id)
+   select exists (
+     select 1 from list l
+     where l.id = p_list
+       and is_account_member(l.account_id)
+       and (l.visibility = 'account' or l.owner_id = auth.uid())
+   );
+   ```
+2. **Link-exposed** — you see a *single item* because it's linked to an occurrence you can
+   access, regardless of its list's scope:
+   ```sql
+   create policy item_visible on list_item for select to authenticated using (
+     can_access_list(list_id)                       -- (1) list-derived
+     or exists (                                    -- (2) exposed via a link
+       select 1 from list_item_event_link k
+       join event_series s on s.id = k.series_id
+       where k.list_item_id = list_item.id
+         and is_account_member(s.account_id)
+     )
+   );
+   ```
+
+This is exactly the worked example: a partner's **private** list stays invisible (its `list`
+row fails RLS, so it never appears in the Lists view), yet any item she **links to a shared
+event** rides along — the other partner reads the *item* via branch (2) and the link via
+`can_access_series`, sees it tickable inside the occurrence, but **cannot reach the source
+list** (branch (1) denies the `list` row). Visibility of the item, not the list, travels
+with the link.
+
+Sub-decisions / things to settle at build:
+
+**Items inherit; assignment ≠ visibility.** `person_id` (assignee) and list scope are
+separate axes — assigning an item to a person doesn't reveal it, and a private item can be
+assigned to anyone. *Rejected:* using the assignee as the visibility key — conflates a
+domain concept (a `person`, maybe not a user) with an access concept (an `app_user`).
+
+**Linked-item writes.** Ticking a link-exposed item in the occurrence still writes the
+**same `list_item.done`** (Decision 11's single source of truth), so the `list_item` UPDATE
+policy needs the same OR as SELECT *or* the occurrence tick routes through a
+`SECURITY DEFINER` RPC that flips only `done`. Start with the OR (parity, household scale);
+tighten to the RPC if column-scoped writes ever matter. *Rejected:* read-only link exposure
+— breaks "done anywhere = done everywhere."
+
+**App load path.** A link-exposed item may belong to a list the viewer can't see, so it
+won't appear in `loadLists` (grouped by *visible* lists). Load such items by the **link
+set** instead — a `linkedItems` lookup (`item_id → {title, done, person_id, …}`) populated
+from a join on `list_item_event_link` — so `OccurrenceSheet` renders linked to-dos without
+depending on `state.lists`. *Rejected:* relying on the list grouping — silently drops items
+from invisible lists.
+
+Realtime: `owner_id`/`visibility` are ordinary columns on `list`, so no publication change;
+private lists simply never reach non-owners through RLS.
 
 ---
 
@@ -372,3 +446,4 @@ Apply in order. See [`NEXT_SESSION.md`](./NEXT_SESSION.md) for the full connect�
 | `0010_occurrence_overrides.sql` | Per‑occurrence `rescheduled_duration` on `event_occurrence`; `split_series` re‑created to copy `event_person` |
 | `0011_realtime_delete_replica_identity.sql` | `REPLICA IDENTITY FULL` on RLS‑gated tables so DELETEs reach the other client over realtime |
 | `0012_shares.sql` *(planned)* | Shares & pins: `occurrence_share` (one table for both), RLS, grants, realtime + `REPLICA IDENTITY FULL` ([Decision 12](#12-shares--pins--one-occurrence-grain-table-occurrence_share)) |
+| `0013_list_visibility.sql` *(planned)* | Per‑list `owner_id` + `visibility` (private/account); `can_access_list` respects privacy; `list_item` SELECT OR‑exposes link‑attached items ([Decision 13](#13-private-lists--per-list-visibility-scope)) |
