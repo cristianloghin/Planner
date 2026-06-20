@@ -11,7 +11,12 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // Prompt instead of autoUpdate: a silent auto-reload could land while an
+      // EventEditor holds an unsaved draft (the realtime edit-guard can't stop a
+      // service-worker reload). The UpdatePrompt toast lets the user apply the
+      // update when it's safe. Registration is handled by `useRegisterSW`, so the
+      // default `injectRegister: 'auto'` injects nothing.
+      registerType: 'prompt',
       // Default Workbox glob omits fonts; add woff2 so the self-hosted
       // Source Sans 3 files are precached and work offline.
       workbox: {
