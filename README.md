@@ -24,7 +24,10 @@ occurrence of another event via `occurrence_dependency`), and **standalone Lists
 (see [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) Decision 11): named, account-scoped
 lists that sync across devices — with in-list headers, optional per-item deadlines,
 and to-dos linkable to a calendar occurrence so ticking the to-do in the event or in
-the Lists view is one and the same write.
+the Lists view is one and the same write — and **event templates** (Decision 10):
+reusable event blueprints (`event_series` with `is_template = true`, no schedule) you
+save from the event editor and start a new event from, an app-side deep copy that
+stamps a real start and fresh attachment rows.
 
 - [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) — the schema and the reasoning behind every decision.
 - [`docs/NEXT_SESSION.md`](docs/NEXT_SESSION.md) — runbook + current status and remaining work.

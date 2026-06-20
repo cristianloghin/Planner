@@ -98,3 +98,23 @@
   padding: 8px;
   font-size: var(--fs-md);
 }
+
+.templateBar {
+  display: flex;
+  margin-top: 4px;
+}
+
+.saveTemplate {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.saveTemplate:disabled {
+  opacity: 0.5;
+}

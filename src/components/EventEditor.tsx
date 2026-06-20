@@ -5,11 +5,13 @@ import { uid } from "../lib/id";
 import { REMINDER_OFFSETS, offsetLabel } from "../lib/notifications";
 import { eventDate, eventStartMinutes } from "../lib/timing";
 import { useApp } from "../state";
+import { cloneAttachments } from "../lib/attachments";
 import shared from "../styles/shared.module.css";
 import type {
   Attachment,
   CalendarEvent,
   ChecklistEntry,
+  EventTemplate,
   PersonId,
   RecurrenceFreq,
 } from "../types";
@@ -50,7 +52,7 @@ export function EventEditor({
   target: EditorTarget;
   onClose: () => void;
 }) {
-  const { dispatch, beginEdit, endEdit } = useApp();
+  const { state, dispatch, beginEdit, endEdit } = useApp();
   const isEdit = target.mode === "edit";
   const base = isEdit ? target.event : null;
 
@@ -102,6 +104,13 @@ export function EventEditor({
   const [attachments, setAttachments] = useState<Attachment[]>(
     base?.attachments ?? [],
   );
+  // Provenance: the template a *new* event was started from (written to the
+  // series' `template_id`). Stays null for from-scratch events and edits.
+  const [templateId, setTemplateId] = useState<string | null>(null);
+  // Transient "Saved to templates" confirmation.
+  const [savedTemplate, setSavedTemplate] = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(savedTimer.current), []);
 
   const titleRef = useRef<HTMLInputElement>(null);
   useEffect(() => titleRef.current?.focus(), []);
@@ -138,43 +147,78 @@ export function EventEditor({
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   }
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!title.trim()) return;
-
-    let start: string;
-    let duration: number;
-    if (allDay) {
-      start = date;
-      duration = Math.max(1, days);
-    } else {
-      start = startDT;
-      duration = Math.max(SNAP, minutesBetween(startDT, endDT));
-    }
-
-    // Drop empty notes / empty checklists so saving doesn't keep stubs around.
-    const cleaned = attachments.filter((a) => {
+  // Drop empty notes / empty checklists so saving doesn't keep stubs around.
+  function cleanedAttachments(): Attachment[] {
+    return attachments.filter((a) => {
       if (a.kind === "note") return a.text.trim().length > 0;
       if (a.kind === "checklist") return a.items.length > 0;
       return true;
     });
+  }
+
+  // The duration the form currently describes (whole days all-day, else minutes).
+  function currentDuration(): number {
+    return allDay ? Math.max(1, days) : Math.max(SNAP, minutesBetween(startDT, endDT));
+  }
+
+  /** Pre-fill the form from a template (deep-copying its attachments). */
+  function applyTemplate(t: EventTemplate) {
+    setTemplateId(t.id);
+    setTitle(t.title);
+    setAttendees(t.attendees);
+    setAttachments(cloneAttachments(t.attachments));
+    setAllDay(t.allDay);
+    if (t.allDay) {
+      setDays(Math.max(1, t.duration));
+    } else {
+      // Keep the chosen start; stretch the end to the template's duration.
+      const end = new Date(startDT);
+      end.setMinutes(end.getMinutes() + Math.max(SNAP, t.duration));
+      setEndDT(toDateTimeLocal(end));
+    }
+  }
+
+  /** Save the current form as a reusable template (a separate row; the event,
+   *  if any, is untouched). Attachments are copied with fresh ids. */
+  function saveAsTemplate() {
+    if (!title.trim()) return;
+    dispatch({
+      type: "addTemplate",
+      template: {
+        title: title.trim(),
+        allDay,
+        duration: currentDuration(),
+        attendees,
+        attachments: cloneAttachments(cleanedAttachments()),
+      },
+    });
+    setSavedTemplate(true);
+    clearTimeout(savedTimer.current);
+    savedTimer.current = setTimeout(() => setSavedTemplate(false), 2000);
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!title.trim()) return;
+
+    const start = allDay ? date : startDT;
 
     const event: Omit<CalendarEvent, "id"> = {
       title: title.trim(),
       start,
       allDay,
-      duration,
+      duration: currentDuration(),
       recurrence:
         repeat === "none"
           ? undefined
           : { freq: repeat, interval: Math.max(1, interval) },
       attendees,
-      attachments: cleaned,
+      attachments: cleanedAttachments(),
     };
 
     if (isEdit)
       dispatch({ type: "updateEvent", event: { ...event, id: base!.id } });
-    else dispatch({ type: "addEvent", event });
+    else dispatch({ type: "addEvent", event, templateId: templateId ?? undefined });
     onClose();
   }
 
@@ -194,6 +238,27 @@ export function EventEditor({
       </header>
 
       <div className={shared.editorBody}>
+        {!isEdit && state.templates.length > 0 && (
+          <label className={shared.field}>
+            Start from a template
+            <select
+              value={templateId ?? ""}
+              onChange={(e) => {
+                const t = state.templates.find((x) => x.id === e.target.value);
+                if (t) applyTemplate(t);
+                else setTemplateId(null);
+              }}
+            >
+              <option value="">Blank event</option>
+              {state.templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title || "Untitled template"}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         <input
           ref={titleRef}
           placeholder="What's the plan?"
@@ -355,6 +420,17 @@ export function EventEditor({
               + Checklist
             </button>
           </div>
+        </div>
+
+        <div className={s.templateBar}>
+          <button
+            type="button"
+            className={s.saveTemplate}
+            onClick={saveAsTemplate}
+            disabled={!title.trim()}
+          >
+            {savedTemplate ? "Saved to templates ✓" : "Save as template"}
+          </button>
         </div>
 
         {isEdit && (

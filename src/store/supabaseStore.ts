@@ -3,10 +3,12 @@ import type {
   Attachment,
   CalendarEvent,
   ChecklistEntry,
+  EventTemplate,
   ListItem,
   OccurrenceDependency,
   OccurrenceStatusCode,
   Person,
+  PersonId,
   Preferences,
   TodoList,
 } from '../types'
@@ -100,6 +102,10 @@ interface SeriesRow {
   reminder: { id: string; offset_seconds: number }[]
 }
 
+/** The roster + attachments shared by a real event and a template, for the sync
+ *  helpers that reconcile those child rows (they never touch timing). */
+type SeriesAttachments = { id: string; attendees: PersonId[]; attachments: Attachment[] }
+
 export class SupabaseStore implements ScheduleStore {
   constructor(
     private readonly accountId: string,
@@ -111,10 +117,11 @@ export class SupabaseStore implements ScheduleStore {
   async load(): Promise<AppState> {
     const base = defaultState()
 
-    const [people, events, completions, dependencies, preferences, lists, listLinks] =
+    const [people, events, templates, completions, dependencies, preferences, lists, listLinks] =
       await Promise.all([
         this.loadPeople(),
         this.loadEvents(),
+        this.loadTemplates(),
         this.loadCompletions(),
         this.loadDependencies(),
         this.loadPreferences(),
@@ -126,6 +133,7 @@ export class SupabaseStore implements ScheduleStore {
       ...base,
       people,
       events,
+      templates,
       completions,
       dependencies,
       preferences,
@@ -206,6 +214,36 @@ export class SupabaseStore implements ScheduleStore {
         attachments: rebuildAttachments(r),
       }
     })
+  }
+
+  /**
+   * Templates (`is_template = true`): the same series shell as an event but with
+   * no `dtstart`/`rrule`, so we map only title / all-day / duration / roster /
+   * attachments. Same embed hints as {@link loadEvents}.
+   */
+  private async loadTemplates(): Promise<EventTemplate[]> {
+    const { data, error } = await supabase
+      .from('event_series')
+      .select(
+        `id, title, all_day, dtstart, duration, rrule,
+         event_person!series_id ( person_id ),
+         checklist_item!owner_series_id ( id, label, group_label, sort_order, occurrence_start ),
+         note!owner_series_id ( id, body ),
+         reminder!series_id ( id, offset_seconds )`,
+      )
+      .eq('account_id', this.accountId)
+      .eq('is_template', true)
+    if (error) throw error
+
+    const rows = (data ?? []) as unknown as SeriesRow[]
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      allDay: r.all_day,
+      duration: intervalToDuration(r.duration, r.all_day),
+      attendees: r.event_person.map((ep) => ep.person_id),
+      attachments: rebuildAttachments(r),
+    }))
   }
 
   /**
@@ -403,13 +441,29 @@ export class SupabaseStore implements ScheduleStore {
       case 'addEvent': {
         // The reducer appends the new (id-stamped) event; persist that one.
         const ev = next.events[next.events.length - 1]
-        if (ev) await this.writeEvent(ev)
+        if (ev) await this.writeEvent(ev, action.templateId)
         return
       }
       case 'updateEvent':
         await this.writeEvent(action.event)
         return
       case 'removeEvent': {
+        const { error } = await supabase.from('event_series').delete().eq('id', action.id)
+        if (error) throw error
+        return
+      }
+      case 'addTemplate': {
+        // The reducer appended the new (id-stamped) template; persist that one.
+        const tmpl = next.templates[next.templates.length - 1]
+        if (tmpl) await this.writeTemplate(tmpl)
+        return
+      }
+      case 'updateTemplate':
+        await this.writeTemplate(action.template)
+        return
+      case 'removeTemplate': {
+        // Cascade drops the template's roster/attachments; `template_id` on any
+        // events made from it is `on delete set null`, so they're untouched.
         const { error } = await supabase.from('event_series').delete().eq('id', action.id)
         if (error) throw error
         return
@@ -623,8 +677,9 @@ export class SupabaseStore implements ScheduleStore {
     }
   }
 
-  /** Upsert a series and reconcile its rosters/attachments. */
-  private async writeEvent(ev: CalendarEvent): Promise<void> {
+  /** Upsert a series and reconcile its rosters/attachments. `templateId` records
+   *  provenance when this event was created from a template (else left as-is). */
+  private async writeEvent(ev: CalendarEvent, templateId?: string): Promise<void> {
     const series = {
       id: ev.id,
       account_id: this.accountId,
@@ -634,6 +689,9 @@ export class SupabaseStore implements ScheduleStore {
       duration: durationToInterval(ev.duration, ev.allDay),
       rrule: recurrenceToRRule(ev.recurrence),
       is_template: false,
+      // Only stamp provenance on insert-from-template; updates omit it so an edit
+      // never clobbers an existing link.
+      ...(templateId ? { template_id: templateId } : {}),
       created_by: this.userId,
     }
     const up = await supabase.from('event_series').upsert(series, { onConflict: 'id' })
@@ -647,7 +705,34 @@ export class SupabaseStore implements ScheduleStore {
     ])
   }
 
-  private async syncAttendees(ev: CalendarEvent): Promise<void> {
+  /**
+   * Upsert a template series (`is_template = true`, no `dtstart`/`rrule`) and
+   * reconcile its roster/attachments through the same helpers as a real event.
+   */
+  private async writeTemplate(t: EventTemplate): Promise<void> {
+    const series = {
+      id: t.id,
+      account_id: this.accountId,
+      title: t.title,
+      all_day: t.allDay,
+      dtstart: null,
+      duration: durationToInterval(t.duration, t.allDay),
+      rrule: null,
+      is_template: true,
+      created_by: this.userId,
+    }
+    const up = await supabase.from('event_series').upsert(series, { onConflict: 'id' })
+    if (up.error) throw up.error
+
+    await Promise.all([
+      this.syncAttendees(t),
+      this.syncChecklist(t),
+      this.syncNotes(t),
+      this.syncReminders(t),
+    ])
+  }
+
+  private async syncAttendees(ev: SeriesAttachments): Promise<void> {
     // No per-row dependents — delete-all then insert is safe and simplest.
     const del = await supabase.from('event_person').delete().eq('series_id', ev.id)
     if (del.error) throw del.error
@@ -659,7 +744,7 @@ export class SupabaseStore implements ScheduleStore {
     }
   }
 
-  private async syncChecklist(ev: CalendarEvent): Promise<void> {
+  private async syncChecklist(ev: SeriesAttachments): Promise<void> {
     // Upsert present items (preserves rows so ticks in occurrence_item_state
     // survive an edit), then delete only the list items that were removed.
     const desired = checklists(ev).flatMap((c, ci) =>
@@ -684,7 +769,7 @@ export class SupabaseStore implements ScheduleStore {
     if (res.error) throw res.error
   }
 
-  private async syncNotes(ev: CalendarEvent): Promise<void> {
+  private async syncNotes(ev: SeriesAttachments): Promise<void> {
     const desired = noteAttachments(ev).map((n) => ({
       id: n.id,
       owner_series_id: ev.id,
@@ -702,7 +787,7 @@ export class SupabaseStore implements ScheduleStore {
     if (res.error) throw res.error
   }
 
-  private async syncReminders(ev: CalendarEvent): Promise<void> {
+  private async syncReminders(ev: SeriesAttachments): Promise<void> {
     const desired = ev.attachments
       .filter((a): a is Extract<Attachment, { kind: 'reminder' }> => a.kind === 'reminder')
       .map((r) => ({
