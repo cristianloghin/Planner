@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Dialog } from "radix-ui";
 import { cx } from "../lib/cx";
 import { minutesToTime, toDateTimeLocal } from "../lib/dates";
 import { eventDate, eventStartMinutes } from "../lib/timing";
@@ -442,15 +443,13 @@ export function EventEditor({
         )}
       </div>
 
-      {showScope && (
-        <div
-          className={s.scopeOverlay}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowScope(false);
-          }}
-        >
-          <div className={s.scopeCard}>
-            <span className={s.scopeTitle}>Save changes to…</span>
+      <Dialog.Root open={showScope} onOpenChange={setShowScope}>
+        <Dialog.Portal>
+          <Dialog.Overlay className={s.scopeOverlay} />
+          <Dialog.Content className={s.scopeCard} aria-describedby={undefined}>
+            <Dialog.Title className={s.scopeTitle}>
+              Save changes to…
+            </Dialog.Title>
             <button
               type="button"
               className={s.scopeOption}
@@ -472,16 +471,14 @@ export function EventEditor({
             >
               All events
             </button>
-            <button
-              type="button"
-              className={s.scopeCancel}
-              onClick={() => setShowScope(false)}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+            <Dialog.Close asChild>
+              <button type="button" className={s.scopeCancel}>
+                Cancel
+              </button>
+            </Dialog.Close>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </form>
   );
 }
