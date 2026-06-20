@@ -9,6 +9,8 @@ import {
 import { attendeeLabel, personColor } from "../lib/people";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
+import type { EventTemplate } from "../types";
+import { TemplateEditor } from "./TemplateEditor";
 import s from "./Settings.module.css";
 
 export function Settings() {
@@ -99,18 +101,20 @@ export function Settings() {
 
 /**
  * Manage saved event templates (DATA_MODEL Decision 10). Templates are *created*
- * from the event editor ("Save as template"); here you review and delete them.
+ * from the event editor ("Save as template"); here you review, edit and delete
+ * them. Clicking a row opens the full-page {@link TemplateEditor}.
  */
 function TemplatesSection() {
   const { state, dispatch } = useApp();
   const templates = state.templates;
+  const [editing, setEditing] = useState<EventTemplate | null>(null);
 
   return (
     <div className={s.templates}>
       <span className={cx(s.hint, s.small)}>
         Event templates — reusable blueprints. Pick one when creating an event to
         prefill its people, checklists, notes and reminders. Save a new one from
-        the event editor.
+        the event editor, or tap one here to edit it.
       </span>
       {templates.length === 0 ? (
         <p className={s.templatesEmpty}>No templates yet.</p>
@@ -127,12 +131,17 @@ function TemplatesSection() {
           if (reminders) bits.push(`${reminders} reminder${reminders > 1 ? "s" : ""}`);
           return (
             <div className={s.templateRow} key={t.id}>
-              <div className={s.templateInfo}>
+              <button
+                type="button"
+                className={s.templateInfo}
+                onClick={() => setEditing(t)}
+                aria-label={`Edit template ${t.title || "Untitled"}`}
+              >
                 <strong>{t.title || "Untitled template"}</strong>
                 {bits.length > 0 && (
                   <span className={s.templateMeta}>{bits.join(" · ")}</span>
                 )}
-              </div>
+              </button>
               <button
                 type="button"
                 className={s.resetColor}
@@ -144,6 +153,12 @@ function TemplatesSection() {
             </div>
           );
         })
+      )}
+      {editing && (
+        <TemplateEditor
+          template={editing}
+          onClose={() => setEditing(null)}
+        />
       )}
     </div>
   );
