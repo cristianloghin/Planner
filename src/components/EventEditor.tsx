@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "radix-ui";
 import { cx } from "../lib/cx";
-import { minutesToTime, toDateTimeLocal } from "../lib/dates";
+import { addDays, diffDays, minutesToTime, toDateTimeLocal } from "../lib/dates";
 import { eventDate, eventStartMinutes } from "../lib/timing";
 import { effectiveOccurrence } from "../lib/recurrence";
 import { useApp } from "../state";
@@ -354,8 +354,17 @@ export function EventEditor({
               />
             </label>
             <label className={shared.field}>
-              Spans (days)
-              <NumberField min={1} value={days} onChange={setDays} />
+              Ends
+              <input
+                type="date"
+                // All-day duration is whole days, so the picked end date is
+                // inclusive: ending on the start date is a one-day event.
+                value={addDays(date, Math.max(1, days) - 1)}
+                min={date}
+                onChange={(e) =>
+                  setDays(Math.max(1, diffDays(e.target.value, date) + 1))
+                }
+              />
             </label>
           </div>
         ) : (
