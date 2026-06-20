@@ -1,5 +1,6 @@
 import { RRule, Frequency } from 'rrule'
 import type { Recurrence, RecurrenceFreq } from '../types'
+import { addDays, toISODate } from './dates'
 
 /**
  * The bridge between the app's lightweight `Recurrence` ({freq, interval}) and
@@ -34,9 +35,24 @@ export function recurrenceToRRule(r: Recurrence | undefined): string | null {
   const rule = new RRule({
     freq: FREQ_TO_RRULE[r.freq],
     interval: Math.max(1, r.interval),
+    // UNTIL is an RFC-5545 UTC instant; the app's `until` is a local ISO date.
+    // Encode it as the local end of that day so a round-trip back through
+    // `toISODate` (also local) lands on the same date.
+    ...(r.until ? { until: new Date(`${r.until}T23:59:59`) } : {}),
   })
   // RRule.toString() yields "RRULE:FREQ=WEEKLY;INTERVAL=2"; store the bare rule.
   return rule.toString().replace(/^RRULE:/, '')
+}
+
+/**
+ * The bare RRULE for `r` capped so its last occurrence falls strictly *before*
+ * `splitDate` (i.e. `UNTIL = splitDate − 1 day`). Used to truncate the old series
+ * on a "this and following" split, so the split day belongs only to the new
+ * series. `splitDate` is a local ISO date.
+ */
+export function truncatedRRule(r: Recurrence, splitDate: string): string {
+  // recurrenceToRRule never returns null for a defined recurrence.
+  return recurrenceToRRule({ ...r, until: addDays(splitDate, -1) }) as string
 }
 
 /**
@@ -54,5 +70,9 @@ export function rruleToRecurrence(rrule: string | null | undefined): Recurrence 
   }
   const freq = options.freq != null ? RRULE_TO_FREQ[options.freq] : undefined
   if (!freq) return undefined
-  return { freq, interval: options.interval ?? 1 }
+  // UNTIL comes back as a Date (UTC instant); reduce it to the local ISO date the
+  // rest of the app compares against. Without this a capped (split) series would
+  // reload as infinite and re-render occurrences past its cap.
+  const until = options.until ? toISODate(new Date(options.until)) : undefined
+  return { freq, interval: options.interval ?? 1, ...(until ? { until } : {}) }
 }

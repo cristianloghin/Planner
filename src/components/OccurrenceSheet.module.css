@@ -9,6 +9,22 @@
   opacity: 0.7;
 }
 
+.moved {
+  margin: 0;
+  font-size: var(--fs-sm, var(--fs-md));
+  color: var(--accent);
+}
+
+.resetOverride {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .waiting {
   margin: 0;
   padding: 8px 12px;

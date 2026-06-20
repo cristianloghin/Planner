@@ -12,7 +12,7 @@ import {
   occurrenceEffectiveStatus,
 } from '../lib/occurrences'
 import { offsetLabel } from '../lib/notifications'
-import { recurrenceLabel, seriesOccurrenceDatesInRange } from '../lib/recurrence'
+import { effectiveOccurrence, recurrenceLabel, seriesOccurrenceDatesInRange } from '../lib/recurrence'
 import { findListItem, isOverdue } from '../lib/lists'
 import { cx } from '../lib/cx'
 import shared from '../styles/shared.module.css'
@@ -40,18 +40,27 @@ export function OccurrenceSheet({
   const cls = checklists(event).filter((c) => c.items.length > 0)
   const hasChecklist = cls.length > 0
   const done = isOccurrenceDone(state, event, date)
-  const checked = state.completions[occKey(event.id, date)]?.checked ?? {}
-  const status = state.completions[occKey(event.id, date)]?.status
+  const occState = state.completions[occKey(event.id, date)]
+  const checked = occState?.checked ?? {}
+  const status = occState?.status
   const blockers = blockingPrerequisites(state, event, date)
+  // A one-off override on this slot. `date` is the occurrence's identity (the day
+  // the series would normally place it); if the override's start lands on another
+  // day, it's been moved there.
+  const hasTimingOverride = occState?.start != null || occState?.duration != null
+  const movedFromOrigin = occState?.start != null && occState.start.slice(0, 10) !== date
 
   function setStatus(next: OccurrenceStatusCode | null) {
     dispatch({ type: 'setOccurrenceStatus', eventId: event.id, date, status: next })
   }
 
-  const startMin = eventStartMinutes(event)
-  const endMin = startMin + event.duration
-  const span = eventSpanDays(event)
-  const timeLabel = event.allDay
+  // Show this occurrence's *effective* timing — a one-off override moves the time
+  // and length for this date only, while `event` stays the series for editing.
+  const eff = effectiveOccurrence(event, date, state.completions)
+  const startMin = eventStartMinutes(eff)
+  const endMin = startMin + eff.duration
+  const span = eventSpanDays(eff)
+  const timeLabel = eff.allDay
     ? span > 1
       ? `All day · ${span} days`
       : 'All day'
@@ -78,6 +87,22 @@ export function OccurrenceSheet({
           {timeLabel} · {attendeeLabel(state, event.attendees)}
           {event.recurrence && ` · ${recurrenceLabel(event.recurrence).toLowerCase()}`}
         </p>
+
+        {hasTimingOverride && (
+          <p className={s.moved}>
+            {movedFromOrigin
+              ? `Moved from ${isoLabel(date)} — still part of this series`
+              : 'Rescheduled for this occurrence only'}
+            {' · '}
+            <button
+              type="button"
+              className={s.resetOverride}
+              onClick={() => dispatch({ type: 'clearOccurrenceOverride', eventId: event.id, date })}
+            >
+              Reset to series time
+            </button>
+          </p>
+        )}
 
         {blockers.length > 0 && (
           <p className={s.waiting}>

@@ -170,6 +170,37 @@ function reducer(state: AppState, action: Action): AppState {
       const next = action.status === null ? rest : { ...rest, status: action.status }
       return { ...state, completions: { ...state.completions, [key]: next } }
     }
+    case 'setOccurrenceOverride': {
+      const key = occKey(action.eventId, action.date)
+      const prev = state.completions[key] ?? {}
+      return {
+        ...state,
+        completions: {
+          ...state.completions,
+          [key]: { ...prev, start: action.start, duration: action.duration },
+        },
+      }
+    }
+    case 'clearOccurrenceOverride': {
+      const key = occKey(action.eventId, action.date)
+      // Drop only the timing override; keep any status/checklist ticks on this slot.
+      const { start: _s, duration: _d, ...rest } = state.completions[key] ?? {}
+      return { ...state, completions: { ...state.completions, [key]: rest } }
+    }
+    case 'splitSeries': {
+      // Optimistic only: cap the old series and append the edited clone. The
+      // store runs `split_series` + a full reload, which replaces this with the
+      // authoritative shape (real new id, migrated per-occurrence rows).
+      const old = state.events.find((e) => e.id === action.eventId)
+      if (!old || !old.recurrence) return state
+      const events = state.events.map((e) =>
+        e.id === action.eventId && e.recurrence
+          ? { ...e, recurrence: { ...e.recurrence, until: addDays(action.fromDate, -1) } }
+          : e,
+      )
+      events.push({ ...action.event, id: uid() })
+      return { ...state, events }
+    }
     case 'addDependency': {
       const key = occKey(action.eventId, action.date)
       const edges = state.dependencies[key] ?? []

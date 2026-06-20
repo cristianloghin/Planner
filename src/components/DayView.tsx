@@ -97,7 +97,7 @@ export function DayView() {
     setSheet({ event: occ.event, date: occ.start });
   }
 
-  const occs = occurrencesOnDate(state.events, dateISO);
+  const occs = occurrencesOnDate(state.events, dateISO, state.completions);
   const timedBlocks: DayBlock[] = occs
     .filter((o) => !o.event.allDay)
     .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end }));
@@ -186,7 +186,7 @@ export function DayView() {
                     .filter((o) => o.event.attendees.includes(p.id))
                     .map((o) => (
                       <AllDayChip
-                        key={o.event.id}
+                        key={`${o.event.id}:${o.start}`}
                         occ={o}
                         status={statuses.get(o.event.id)}
                         onClick={() => openSheet(o)}
@@ -224,7 +224,7 @@ export function DayView() {
                 const done = isOccurrenceDone(state, ev, block.occ.start);
                 return (
                   <button
-                    key={ev.id}
+                    key={`${ev.id}:${block.occ.start}`}
                     className={cx(s.tlEvent, s.shared, done && s.done)}
                     style={{
                       top: block.start * PX_PER_MIN,
@@ -259,7 +259,11 @@ export function DayView() {
           event={sheet.event}
           date={sheet.date}
           onEdit={() => {
-            setEditor({ mode: "edit", event: sheet.event });
+            setEditor({
+              mode: "edit",
+              event: sheet.event,
+              occurrenceDate: sheet.date,
+            });
             setSheet(null);
           }}
           onClose={() => setSheet(null)}
@@ -444,7 +448,7 @@ function Lane({
           occurrenceStatus(state, ev, block.occ.start) === "blocked";
         return (
           <button
-            key={ev.id}
+            key={`${ev.id}:${block.occ.start}`}
             className={cx(
               s.tlEvent,
               done && s.done,
@@ -463,6 +467,12 @@ function Lane({
           >
             <span className={s.tlTime}>
               {minutesToTime(block.start)}–{minutesToTime(block.end)}
+              {block.occ.moved && (
+                <span className={s.tlTag} aria-label="Moved from another day">
+                  {" "}
+                  ↔ moved
+                </span>
+              )}
               {badges(state, ev, block.occ.start, status)}
             </span>
             <span className={s.tlTitle}>{ev.title}</span>

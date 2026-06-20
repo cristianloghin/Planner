@@ -31,6 +31,14 @@ export type Action =
   | { type: 'addEvent'; event: Omit<CalendarEvent, 'id'>; templateId?: string }
   | { type: 'updateEvent'; event: CalendarEvent }
   | { type: 'removeEvent'; id: string }
+  // One-off timing override for a single occurrence (`event_occurrence`'s
+  // `rescheduled_to`/`rescheduled_duration`). `date` is the occurrence's fixed
+  // date; `start` is the new `yyyy-mm-ddThh:mm` on that date, `duration` minutes.
+  | { type: 'setOccurrenceOverride'; eventId: string; date: string; start: string; duration: number }
+  | { type: 'clearOccurrenceOverride'; eventId: string; date: string }
+  // "Edit this and all following": split the series at `fromDate` into a new
+  // series carrying `event`'s edits, capping the old one just before `fromDate`.
+  | { type: 'splitSeries'; eventId: string; fromDate: string; event: Omit<CalendarEvent, 'id'> }
   // Reusable event blueprints (`event_series` with `is_template = true`).
   | { type: 'addTemplate'; template: Omit<EventTemplate, 'id'> }
   | { type: 'updateTemplate'; template: EventTemplate }

@@ -128,6 +128,7 @@ export type Database = {
         Row: {
           cancelled: boolean
           occurrence_start: string
+          rescheduled_duration: string | null
           rescheduled_to: string | null
           series_id: string
           status: string | null
@@ -135,6 +136,7 @@ export type Database = {
         Insert: {
           cancelled?: boolean
           occurrence_start: string
+          rescheduled_duration?: string | null
           rescheduled_to?: string | null
           series_id: string
           status?: string | null
@@ -142,6 +144,7 @@ export type Database = {
         Update: {
           cancelled?: boolean
           occurrence_start?: string
+          rescheduled_duration?: string | null
           rescheduled_to?: string | null
           series_id?: string
           status?: string | null
