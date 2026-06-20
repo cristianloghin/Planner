@@ -239,24 +239,26 @@ export function EventEditor({
 
       <div className={shared.editorBody}>
         {!isEdit && state.templates.length > 0 && (
-          <label className={shared.field}>
-            Start from a template
-            <select
-              value={templateId ?? ""}
-              onChange={(e) => {
-                const t = state.templates.find((x) => x.id === e.target.value);
-                if (t) applyTemplate(t);
-                else setTemplateId(null);
-              }}
-            >
-              <option value="">Blank event</option>
-              {state.templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title || "Untitled template"}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className={shared.row}>
+            <label className={shared.field}>
+              Start from a template
+              <select
+                value={templateId ?? ""}
+                onChange={(e) => {
+                  const t = state.templates.find((x) => x.id === e.target.value);
+                  if (t) applyTemplate(t);
+                  else setTemplateId(null);
+                }}
+              >
+                <option value="">Blank event</option>
+                {state.templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.title || "Untitled template"}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         )}
 
         <input
