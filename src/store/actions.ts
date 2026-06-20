@@ -1,4 +1,4 @@
-import type { CalendarEvent, OccurrenceStatusCode, PersonId } from '../types'
+import type { CalendarEvent, EventTemplate, OccurrenceStatusCode, PersonId } from '../types'
 
 /**
  * Every state change flows through one of these. The reducer applies it to
@@ -26,9 +26,15 @@ export type Action =
   // occurrence is (eventId, date); the tick stays on the item's own `done`.
   | { type: 'linkListItem'; eventId: string; date: string; itemId: string }
   | { type: 'unlinkListItem'; eventId: string; date: string; itemId: string }
-  | { type: 'addEvent'; event: Omit<CalendarEvent, 'id'> }
+  // `templateId` is pure provenance — the source template, written to the new
+  // series' `template_id` column. Omitted for an event built from scratch.
+  | { type: 'addEvent'; event: Omit<CalendarEvent, 'id'>; templateId?: string }
   | { type: 'updateEvent'; event: CalendarEvent }
   | { type: 'removeEvent'; id: string }
+  // Reusable event blueprints (`event_series` with `is_template = true`).
+  | { type: 'addTemplate'; template: Omit<EventTemplate, 'id'> }
+  | { type: 'updateTemplate'; template: EventTemplate }
+  | { type: 'removeTemplate'; id: string }
   // Set (or clear, with status: null) an occurrence's explicit status.
   | { type: 'setOccurrenceStatus'; eventId: string; date: string; status: OccurrenceStatusCode | null }
   | { type: 'toggleChecklistEntry'; eventId: string; date: string; entryId: string }

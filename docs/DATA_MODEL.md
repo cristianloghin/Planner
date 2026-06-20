@@ -190,6 +190,16 @@ is an **app‑side deep copy** into a concrete series with a real `dtstart`, set
 (the function guards against it). `split_from_id` records this‑and‑following
 lineage, distinct from `template_id`.
 
+**Wired into the app (2026‑06‑20).** `AppState.templates: EventTemplate[]` (a series
+shell — title / all‑day / duration / roster / attachments, no timing). `SupabaseStore`
+loads them with `is_template = true` and writes them via `writeTemplate` (same
+roster/attachment sync as a real event, `dtstart`/`rrule` `null`). The event editor's
+**"Save as template"** copies the current form into a new template (fresh attachment
+ids); in *new* mode a **"Start from a template"** picker deep‑copies a template into
+the draft (fresh attachment ids) and the created event carries `template_id`
+provenance. Templates are reviewed/deleted in **Settings**. They never appear on the
+calendar (the event read filters `is_template = false`).
+
 ### 11. Standalone Lists = `list` + `list_item`, single-context `done`, linkable to occurrences
 The undated to‑do view (Phase‑1 `ListItem`) becomes two account‑scoped tables plus
 one occurrence‑grain link, landing in migration `0009_lists.sql`:

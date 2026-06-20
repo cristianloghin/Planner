@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { AppState, ListItem, TodoList } from './types'
+import type { AppState, EventTemplate, ListItem, TodoList } from './types'
 import { createStore, type ScheduleStore } from './store/store'
 import type { Action } from './store/actions'
 import { useAuth } from './auth'
@@ -151,6 +151,19 @@ function reducer(state: AppState, action: Action): AppState {
       )
       return { ...state, events, completions, dependencies, listLinks }
     }
+    case 'addTemplate': {
+      const template: EventTemplate = { ...action.template, id: uid() }
+      return { ...state, templates: [...state.templates, template] }
+    }
+    case 'updateTemplate':
+      return {
+        ...state,
+        templates: state.templates.map((t) =>
+          t.id === action.template.id ? action.template : t,
+        ),
+      }
+    case 'removeTemplate':
+      return { ...state, templates: state.templates.filter((t) => t.id !== action.id) }
     case 'setOccurrenceStatus': {
       const key = occKey(action.eventId, action.date)
       const { status: _drop, ...rest } = state.completions[key] ?? {}

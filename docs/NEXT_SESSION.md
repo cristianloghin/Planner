@@ -96,6 +96,17 @@ The app draws one lane per `person` row (account-scoped, `kind` adult|child, opt
   in when the data layer outgrows the current store.
 
 ### Done since slice 3
+- **Event templates wired** (DATA_MODEL Decision 10). The `is_template`/`template_id`
+  schema was already live (migration `0001`); now the app uses it. `AppState.templates`
+  (a series shell: title / all-day / duration / roster / attachments, no timing);
+  `SupabaseStore.loadTemplates` reads `is_template = true`, `writeTemplate` writes it
+  (shared roster/attachment sync, `dtstart`/`rrule` null). Actions `addTemplate` /
+  `updateTemplate` / `removeTemplate`; `addEvent` gained an optional `templateId` that
+  stamps `template_id` provenance on the new series. UI: **"Save as template"** in
+  `EventEditor` (both modes), a **"Start from a template"** picker in new-event mode
+  (deep-copies attachments with fresh ids via `cloneAttachments`), and a **Templates**
+  list in Settings (review/delete). The calendar read still filters `is_template = false`,
+  so templates never show as events.
 - **Site URL** configured to the deployed URL in Supabase → Authentication → URL
   Configuration (was defaulting to `localhost:3000`, which broke auth emails).
 - **User preferences** (per-user, per-account `user_preference` JSON blob, migration

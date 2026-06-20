@@ -1,7 +1,12 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../auth";
 import { cx } from "../lib/cx";
-import { personColor } from "../lib/people";
+import {
+  checklistEntries,
+  notes,
+  reminderOffsets,
+} from "../lib/attachments";
+import { attendeeLabel, personColor } from "../lib/people";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import s from "./Settings.module.css";
@@ -70,6 +75,8 @@ export function Settings() {
           );
         })}
 
+        <TemplatesSection />
+
         {session && (
           <div className={s.account}>
             <span className={cx(s.hint, s.small)}>
@@ -87,6 +94,58 @@ export function Settings() {
         )}
       </div>
     </section>
+  );
+}
+
+/**
+ * Manage saved event templates (DATA_MODEL Decision 10). Templates are *created*
+ * from the event editor ("Save as template"); here you review and delete them.
+ */
+function TemplatesSection() {
+  const { state, dispatch } = useApp();
+  const templates = state.templates;
+
+  return (
+    <div className={s.templates}>
+      <span className={cx(s.hint, s.small)}>
+        Event templates — reusable blueprints. Pick one when creating an event to
+        prefill its people, checklists, notes and reminders. Save a new one from
+        the event editor.
+      </span>
+      {templates.length === 0 ? (
+        <p className={s.templatesEmpty}>No templates yet.</p>
+      ) : (
+        templates.map((t) => {
+          const bits: string[] = [];
+          if (t.attendees.length)
+            bits.push(attendeeLabel(state, t.attendees));
+          const checks = checklistEntries(t).length;
+          if (checks) bits.push(`${checks} checklist item${checks > 1 ? "s" : ""}`);
+          const noteCount = notes(t).length;
+          if (noteCount) bits.push(`${noteCount} note${noteCount > 1 ? "s" : ""}`);
+          const reminders = reminderOffsets(t).length;
+          if (reminders) bits.push(`${reminders} reminder${reminders > 1 ? "s" : ""}`);
+          return (
+            <div className={s.templateRow} key={t.id}>
+              <div className={s.templateInfo}>
+                <strong>{t.title || "Untitled template"}</strong>
+                {bits.length > 0 && (
+                  <span className={s.templateMeta}>{bits.join(" · ")}</span>
+                )}
+              </div>
+              <button
+                type="button"
+                className={s.resetColor}
+                onClick={() => dispatch({ type: "removeTemplate", id: t.id })}
+                aria-label={`Delete template ${t.title || "Untitled"}`}
+              >
+                Delete
+              </button>
+            </div>
+          );
+        })
+      )}
+    </div>
   );
 }
 

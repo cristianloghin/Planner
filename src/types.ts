@@ -104,6 +104,26 @@ export interface CalendarEvent {
 }
 
 /**
+ * A reusable event *blueprint* — an `event_series` row with `is_template = true`
+ * and no `dtstart`/`rrule` (see DATA_MODEL Decision 10). It owns the same roster
+ * and attachments (notes / checklists / reminders) as a real series, but carries
+ * no point in time. "New from template" is an app-side **deep copy** into a
+ * concrete {@link CalendarEvent} with a real `start` (and fresh attachment ids),
+ * recording the source via the DB's `template_id` provenance column.
+ */
+export interface EventTemplate {
+  id: string
+  title: string
+  /** Default all-day flag the created event opens with. */
+  allDay: boolean
+  /** Default duration (minutes timed / whole days all-day) for the created event. */
+  duration: number
+  attendees: PersonId[]
+  /** Notes, checklists and reminders copied onto each event made from this. */
+  attachments: Attachment[]
+}
+
+/**
  * An occurrence's status, matching the DB `occurrence_status` lookup. `done` can
  * also be derived from a checklist (see `isOccurrenceDone`); `skipped`/`blocked`
  * are only ever set explicitly.
@@ -154,6 +174,8 @@ export interface AppState {
   people: Record<PersonId, Person>
   lists: TodoList[]
   events: CalendarEvent[]
+  /** Reusable event blueprints (DATA_MODEL Decision 10); never on the calendar. */
+  templates: EventTemplate[]
   completions: Record<string, OccurrenceState>
   /**
    * Prerequisite edges keyed by the dependent occurrence (`${eventId}:${date}`),

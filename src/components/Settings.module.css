@@ -38,6 +38,43 @@
   margin-top: 20px;
 }
 
+.templates {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.templates .hint.small {
+  margin-top: 0;
+}
+
+.templatesEmpty {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  margin: 0;
+}
+
+.templateRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.templateInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.templateMeta {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
 .account {
   display: flex;
   flex-direction: column;
