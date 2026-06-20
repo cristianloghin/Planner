@@ -1,0 +1,28 @@
+name: Test
+
+# Run the unit suite on every commit, from any branch, and on PRs. Also exposed
+# as a reusable workflow (workflow_call) so the deploy pipeline can gate on the
+# exact same job — see deploy.yml.
+#
+# Push to `main` is intentionally ignored here: deploy.yml calls this workflow as
+# its first job, so main is already covered and we don't run the suite twice.
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
