@@ -7,7 +7,7 @@ import {
   ChevronRight,
   CircleDashed,
 } from "lucide-react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { checklistEntries, hasReminders } from "../lib/attachments";
 import { childStatuses, type Busy, type ChildStatus } from "../lib/conflicts";
 import { cx } from "../lib/cx";
@@ -36,15 +36,32 @@ import s from "./DayView.module.css";
 import { EventEditor, type EditorTarget } from "./EventEditor";
 import { OccurrenceSheet } from "./OccurrenceSheet";
 
-// Layout scale. HOUR_H must match the gridline spacing in index.css.
-const HOUR_H = 56;
-const PX_PER_MIN = HOUR_H / 60;
+// Layout scale. The hour height is user-zoomable (pinch); the rest are fixed.
+// The default must match --hour-h in tokens.css for the very first paint.
+const DEFAULT_HOUR_H = 56;
+const MIN_HOUR_H = 28;
+const MAX_HOUR_H = 160;
 const DAY_MIN = 24 * 60;
 const SNAP = 15;
+const ZOOM_KEY = "planner:hourH";
+
+// Past this much horizontal travel a touch is a day swipe (not a tap/scroll);
+// the slide animation that commits the change runs for this many ms.
+const SWIPE_COMMIT = 60;
+const SWIPE_SLIDE_MS = 200;
 
 // A child's lane is narrower than an adult's (they share an adult's time).
 const CHILD_WEIGHT = 1;
 const laneWeight = (p: Person) => (p.kind === "child" ? CHILD_WEIGHT : 1);
+
+const clampZoom = (h: number) => Math.min(MAX_HOUR_H, Math.max(MIN_HOUR_H, h));
+
+/** Last zoom level the user pinched to, or the default. */
+function loadZoom(): number {
+  if (typeof localStorage === "undefined") return DEFAULT_HOUR_H;
+  const raw = Number(localStorage.getItem(ZOOM_KEY));
+  return raw ? clampZoom(raw) : DEFAULT_HOUR_H;
+}
 
 /** A timed occurrence clamped to the current day, ready to lay out. */
 interface DayBlock {
@@ -63,7 +80,16 @@ export function DayView() {
     date: string;
   } | null>(null);
 
+  // Pixels-per-hour for the timeline; pinch-to-zoom adjusts it (Y axis only).
+  const [hourH, setHourH] = useState(loadZoom);
+  const pxPerMin = hourH / 60;
+  // Mirror for the native touch listeners, which bind once and would otherwise
+  // close over a stale hour height mid-gesture.
+  const hourHRef = useRef(hourH);
+  hourHRef.current = hourH;
+
   const scrollRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const dateISO = addDays(state.weekStart, day);
   const isToday = dateISO === toISODate(new Date());
@@ -71,13 +97,155 @@ export function DayView() {
     ? new Date().getHours() * 60 + new Date().getMinutes()
     : null;
 
-  useLayoutEffect(() => {
+  // Scroll the timeline so `minute` sits a little below the top edge.
+  function scrollToMinute(minute: number) {
     const el = scrollRef.current;
-    if (!el) return;
-    const focusMin = nowMin ?? 7 * 60;
-    el.scrollTop = Math.max(0, focusMin * PX_PER_MIN - 80);
+    if (el) el.scrollTop = Math.max(0, minute * (hourHRef.current / 60) - 80);
+  }
+
+  // First mount only: focus now (or 7am). Day navigation deliberately keeps the
+  // user's scroll position — jumping the timeline on every day change is jarring.
+  useEffect(() => {
+    scrollToMinute(nowMin ?? 7 * 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [day, dateISO]);
+  }, []);
+
+  // ---- touch gestures: swipe to change day, pinch to zoom -----------------
+  const g = useRef({
+    mode: "none" as "none" | "decide" | "swipe" | "pinch",
+    x0: 0,
+    y0: 0,
+    dx: 0,
+    moved: false,
+    // pinch
+    dist0: 0,
+    hour0: DEFAULT_HOUR_H,
+    focalMin: 0,
+    focalOff: 0,
+  });
+  // Set after a real swipe/drag so the synthetic click doesn't add an event.
+  const suppressClick = useRef(false);
+  // Pinch focal point, consumed by the layout effect that re-pins scroll below.
+  const pinchAnchor = useRef<{ focalMin: number; focalOff: number } | null>(
+    null,
+  );
+
+  // Keep the focal point fixed while a pinch changes the timeline height. Runs
+  // after the DOM has the new heights, so the math uses the post-zoom scale.
+  useLayoutEffect(() => {
+    const a = pinchAnchor.current;
+    const el = scrollRef.current;
+    if (!a || !el) return;
+    el.scrollTop = a.focalMin * (hourH / 60) - a.focalOff;
+  }, [hourH]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    const grid = gridRef.current;
+    if (!el || !grid) return;
+
+    const dist = (t: TouchList) =>
+      Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+
+    const onStart = (e: TouchEvent) => {
+      const st = g.current;
+      if (e.touches.length === 2) {
+        const rect = el.getBoundingClientRect();
+        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        st.mode = "pinch";
+        st.dist0 = dist(e.touches);
+        st.hour0 = hourHRef.current;
+        st.focalOff = midY - rect.top;
+        st.focalMin = (el.scrollTop + st.focalOff) / (hourHRef.current / 60);
+        grid.style.transition = "none";
+        grid.style.transform = "";
+      } else if (e.touches.length === 1) {
+        st.mode = "decide";
+        st.x0 = e.touches[0].clientX;
+        st.y0 = e.touches[0].clientY;
+        st.dx = 0;
+        st.moved = false;
+      }
+    };
+
+    const onMove = (e: TouchEvent) => {
+      const st = g.current;
+      if (st.mode === "pinch" && e.touches.length === 2) {
+        e.preventDefault();
+        const next = clampZoom((st.hour0 * dist(e.touches)) / st.dist0);
+        pinchAnchor.current = { focalMin: st.focalMin, focalOff: st.focalOff };
+        setHourH(next);
+        return;
+      }
+      if (st.mode === "decide") {
+        const dx = e.touches[0].clientX - st.x0;
+        const dy = e.touches[0].clientY - st.y0;
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        // Horizontal intent → swipe; otherwise hand back to native scrolling.
+        st.mode = Math.abs(dx) > Math.abs(dy) ? "swipe" : "none";
+        if (st.mode === "none") return;
+      }
+      if (st.mode === "swipe") {
+        e.preventDefault();
+        st.dx = e.touches[0].clientX - st.x0;
+        st.moved = true;
+        grid.style.transition = "none";
+        grid.style.transform = `translateX(${st.dx}px)`;
+      }
+    };
+
+    const onEnd = () => {
+      const st = g.current;
+      if (st.mode === "pinch") {
+        pinchAnchor.current = null;
+        localStorage.setItem(ZOOM_KEY, String(hourHRef.current));
+        st.mode = "none";
+        return;
+      }
+      if (st.mode === "swipe") {
+        if (st.moved) suppressClick.current = true;
+        const w = el.clientWidth;
+        if (Math.abs(st.dx) > SWIPE_COMMIT) {
+          // Slide the current day out the way it was dragged, swap, then slide
+          // the new day in from the opposite edge — a one-rendered-day carousel.
+          const dir = st.dx < 0 ? -1 : 1;
+          grid.style.transition = `transform ${SWIPE_SLIDE_MS}ms ease`;
+          grid.style.transform = `translateX(${dir * w}px)`;
+          window.setTimeout(() => {
+            dispatch({ type: "shiftDay", delta: -dir });
+            grid.style.transition = "none";
+            grid.style.transform = `translateX(${-dir * w}px)`;
+            requestAnimationFrame(() => {
+              grid.style.transition = `transform ${SWIPE_SLIDE_MS}ms ease`;
+              grid.style.transform = "translateX(0)";
+            });
+          }, SWIPE_SLIDE_MS);
+        } else {
+          grid.style.transition = `transform ${SWIPE_SLIDE_MS}ms ease`;
+          grid.style.transform = "translateX(0)";
+        }
+      }
+      st.mode = "none";
+    };
+
+    const noGesture = (e: Event) => e.preventDefault();
+
+    // passive:false so the pinch/swipe handlers can preventDefault the browser's
+    // own pinch-zoom and horizontal overscroll.
+    el.addEventListener("touchstart", onStart, { passive: false });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd);
+    el.addEventListener("touchcancel", onEnd);
+    el.addEventListener("gesturestart", noGesture); // iOS Safari pinch-zoom
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+      el.removeEventListener("gesturestart", noGesture);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function addAt(attendees: PersonId[], minute: number) {
     const start = Math.min(
@@ -116,7 +284,7 @@ export function DayView() {
   const statuses = childStatuses(coverage, state.people);
   const hasWarnings = [...statuses.values()].some((s) => s !== "covered");
 
-  const fullHeight = DAY_MIN * PX_PER_MIN;
+  const fullHeight = DAY_MIN * pxPerMin;
   const totalWeight = people.reduce((s, p) => s + laneWeight(p), 0);
   // The all-adults block spans only the leading adult lanes; size it to their
   // share of the total. Assumes adults sort ahead of children (sortOrder).
@@ -129,6 +297,9 @@ export function DayView() {
     const todayISO = toISODate(new Date());
     dispatch({ type: "setWeek", weekStart: mondayOf(new Date()) });
     dispatch({ type: "setDay", day: weekdayIndex(todayISO) });
+    // Explicit "take me to now" intent, so re-focus the current time.
+    const now = new Date().getHours() * 60 + new Date().getMinutes();
+    requestAnimationFrame(() => scrollToMinute(now));
   }
 
   return (
@@ -198,9 +369,30 @@ export function DayView() {
           </div>
         </div>
       </div>
-      <div className={s.plannerBody} ref={scrollRef}>
-        <div className={s.plannerGrid}>
-          <TimeGutter />
+      <div
+        className={s.plannerBody}
+        ref={scrollRef}
+        // Browser owns vertical panning; we own horizontal swipe + pinch.
+        style={{ touchAction: "pan-y" }}
+        onClickCapture={(e) => {
+          if (suppressClick.current) {
+            suppressClick.current = false;
+            e.stopPropagation();
+            e.preventDefault();
+          }
+        }}
+      >
+        <div
+          className={s.plannerGrid}
+          ref={gridRef}
+          style={
+            {
+              "--hour-h": `${hourH}px`,
+              "--quarter-h": `${hourH / 4}px`,
+            } as React.CSSProperties
+          }
+        >
+          <TimeGutter hourH={hourH} />
           <div className={s.lanes} style={{ height: fullHeight }}>
             {people.map((p) => (
               <Lane
@@ -209,6 +401,7 @@ export function DayView() {
                 blocks={timedBlocks}
                 statuses={statuses}
                 nowMin={nowMin}
+                pxPerMin={pxPerMin}
                 onAddAt={(min) => addAt([p.id], min)}
                 onOpen={openSheet}
               />
@@ -227,9 +420,9 @@ export function DayView() {
                     key={`${ev.id}:${block.occ.start}`}
                     className={cx(s.tlEvent, s.shared, done && s.done)}
                     style={{
-                      top: block.start * PX_PER_MIN,
+                      top: block.start * pxPerMin,
                       height: Math.max(
-                        (block.end - block.start) * PX_PER_MIN,
+                        (block.end - block.start) * pxPerMin,
                         16,
                       ),
                       left: `calc(${(100 / cols) * col}% + 2px)`,
@@ -344,11 +537,11 @@ function AllDayChip({
   );
 }
 
-function TimeGutter() {
+function TimeGutter({ hourH }: { hourH: number }) {
   return (
-    <div className={s.timeGutter} style={{ height: DAY_MIN * PX_PER_MIN }}>
+    <div className={s.timeGutter} style={{ height: DAY_MIN * (hourH / 60) }}>
       {Array.from({ length: 25 }, (_, h) => (
-        <div key={h} className={s.gutterLabel} style={{ top: h * HOUR_H }}>
+        <div key={h} className={s.gutterLabel} style={{ top: h * hourH }}>
           {String(h).padStart(2, "0")}:00
         </div>
       ))}
@@ -406,6 +599,7 @@ function Lane({
   blocks,
   statuses,
   nowMin,
+  pxPerMin,
   onAddAt,
   onOpen,
 }: {
@@ -413,6 +607,7 @@ function Lane({
   blocks: DayBlock[];
   statuses: Map<string, ChildStatus>;
   nowMin: number | null;
+  pxPerMin: number;
   onAddAt: (minute: number) => void;
   onOpen: (occ: DayOccurrence) => void;
 }) {
@@ -428,13 +623,13 @@ function Lane({
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
     if ((e.target as HTMLElement).closest(`.${s.tlEvent}`)) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    onAddAt((e.clientY - rect.top) / PX_PER_MIN);
+    onAddAt((e.clientY - rect.top) / pxPerMin);
   }
 
   return (
     <div className={s.lane} onClick={handleClick}>
       {nowMin != null && (
-        <div className={s.nowLine} style={{ top: nowMin * PX_PER_MIN }}>
+        <div className={s.nowLine} style={{ top: nowMin * pxPerMin }}>
           <span className={s.nowDot} />
         </div>
       )}
@@ -457,8 +652,8 @@ function Lane({
               status === "needs" && s.warnNeeds,
             )}
             style={{
-              top: block.start * PX_PER_MIN,
-              height: Math.max((block.end - block.start) * PX_PER_MIN, 16),
+              top: block.start * pxPerMin,
+              height: Math.max((block.end - block.start) * pxPerMin, 16),
               left: `calc(${(100 / cols) * col}% + 2px)`,
               width: `calc(${100 / cols}% - 4px)`,
               background: eventColor(state, ev.attendees),

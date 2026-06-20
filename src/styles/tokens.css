@@ -57,7 +57,7 @@
   /* ---- Layout ---- */
   --radius: 12px;
   --gutter-w: 36px;
-  --hour-h: 56px; /* must match HOUR_H in DayView.tsx */
+  --hour-h: 56px; /* must match DEFAULT_HOUR_H in DayView.tsx */
   --quarter-h: 14px; /* hour / 4 */
 }
 
