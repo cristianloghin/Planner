@@ -13,6 +13,7 @@ import {
 } from '../lib/occurrences'
 import { offsetLabel } from '../lib/notifications'
 import { recurrenceLabel, seriesOccurrenceDatesInRange } from '../lib/recurrence'
+import { findListItem, isOverdue } from '../lib/lists'
 import { cx } from '../lib/cx'
 import shared from '../styles/shared.module.css'
 import s from './OccurrenceSheet.module.css'
@@ -139,8 +140,102 @@ export function OccurrenceSheet({
           </div>
         )}
 
+        <LinkedTodos event={event} date={date} />
+
         <DependencyEditor event={event} date={date} />
       </div>
+    </div>
+  )
+}
+
+/**
+ * To-dos surfaced inside this occurrence (`list_item_event_link`). Each linked
+ * to-do is a tickable line whose tick is the to-do's own `list_item.done` — so
+ * ticking it here is the same write as in the Lists view (no per-occurrence
+ * state). A linked to-do never gates the occurrence's completion.
+ */
+function LinkedTodos({ event, date }: { event: CalendarEvent; date: string }) {
+  const { state, dispatch } = useApp()
+  const linkedIds = state.listLinks[occKey(event.id, date)] ?? []
+  const linked = linkedIds
+    .map((id) => findListItem(state, id))
+    .filter((r): r is NonNullable<typeof r> => r !== null)
+
+  const [pick, setPick] = useState('')
+
+  // Items not already linked here, kept under their list as <optgroup>s.
+  const groups = state.lists
+    .map((list) => ({
+      list,
+      items: list.items.filter((i) => !linkedIds.includes(i.id)),
+    }))
+    .filter((g) => g.items.length > 0)
+
+  function add() {
+    if (!pick) return
+    dispatch({ type: 'linkListItem', eventId: event.id, date, itemId: pick })
+    setPick('')
+  }
+
+  return (
+    <div className={s.deps}>
+      <h4 className={s.depsTitle}>To-dos</h4>
+
+      {linked.length > 0 && (
+        <ul className={s.todoList}>
+          {linked.map(({ list, item }) => (
+            <li key={item.id} className={s.todoRow}>
+              <label className={s.todoLabel}>
+                <input
+                  type="checkbox"
+                  checked={item.done}
+                  onChange={() =>
+                    dispatch({ type: 'toggleListItem', listId: list.id, itemId: item.id })
+                  }
+                />
+                <span className={cx(item.done && s.doneTitle)}>{item.title}</span>
+              </label>
+              {item.dueOn && (
+                <span className={cx(s.todoDue, isOverdue(item) && s.todoOverdue)}>
+                  {isoLabel(item.dueOn)}
+                </span>
+              )}
+              <button
+                type="button"
+                className={s.depRemove}
+                onClick={() =>
+                  dispatch({ type: 'unlinkListItem', eventId: event.id, date, itemId: item.id })
+                }
+                aria-label="Unlink to-do"
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {groups.length > 0 ? (
+        <div className={s.depForm}>
+          <select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Link a to-do">
+            <option value="">Link a to-do…</option>
+            {groups.map(({ list, items }) => (
+              <optgroup key={list.id} label={list.title}>
+                {items.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.title}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <button type="button" className={shared.primary} onClick={add} disabled={!pick}>
+            Link
+          </button>
+        </div>
+      ) : (
+        linked.length === 0 && <p className={s.meta}>No to-dos to link yet.</p>
+      )}
     </div>
   )
 }

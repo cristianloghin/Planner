@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { cx } from "../lib/cx";
+import { isOverdue } from "../lib/lists";
 import { personColor } from "../lib/people";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
@@ -15,6 +16,7 @@ export function Lists() {
   const [title, setTitle] = useState("");
   const [assignee, setAssignee] = useState<Assignee>("shared");
   const [group, setGroup] = useState("");
+  const [due, setDue] = useState("");
   const [newListName, setNewListName] = useState("");
   const [renaming, setRenaming] = useState(false);
 
@@ -50,9 +52,12 @@ export function Lists() {
       title: title.trim(),
       personId: assignee === "shared" ? null : assignee,
       group: group.trim() || null,
+      dueOn: due || null,
     });
     setTitle("");
-    // Keep `group` so consecutive adds land in the same section.
+    setDue("");
+    // Keep `group` so consecutive adds land in the same section; a deadline,
+    // though, is per-item, so it resets.
   }
 
   function badge(personId: PersonId | null) {
@@ -82,6 +87,21 @@ export function Lists() {
           />
           <span className={s.taskTitle}>{t.title}</span>
         </label>
+        <input
+          type="date"
+          className={cx(s.due, isOverdue(t) && s.overdue)}
+          value={t.dueOn ?? ""}
+          onChange={(e) =>
+            dispatch({
+              type: "setListItemDue",
+              listId: selected.id,
+              itemId: t.id,
+              dueOn: e.target.value || null,
+            })
+          }
+          aria-label="Deadline"
+          title={t.dueOn ? `Due ${t.dueOn}` : "Set a deadline"}
+        />
         {badge(t.personId)}
         <button
           className={s.taskDel}
@@ -235,6 +255,14 @@ export function Lists() {
                   <option key={g} value={g} />
                 ))}
               </datalist>
+              <input
+                type="date"
+                className={s.dueInput}
+                value={due}
+                onChange={(e) => setDue(e.target.value)}
+                aria-label="Deadline (optional)"
+                title="Deadline (optional)"
+              />
               <select
                 value={assignee}
                 onChange={(e) => setAssignee(e.target.value as Assignee)}

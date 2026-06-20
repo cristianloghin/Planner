@@ -148,10 +148,20 @@ remove item all round-trip through a reload):
   localStorage flag **and** an empty-account check so it can't double-import per device.
 - Multi-list UI in `src/components/Lists.tsx` (list-tab switcher + create/rename/delete).
 
-**Still deferred to pass 2** (columns/links exist in the DB, no UI yet):
-- `group_label` in-list headers and `due_on` deadlines (persisted as null for now).
-- **Occurrence linking** (`list_item_event_link`): the "Link a to-do" picker in
-  `OccurrenceSheet` and the tickable line inside an occurrence — see below.
+**Pass 2 done (2026-06-20):** the deferred columns/links are now wired end to end.
+- `group_label` in-list headers (grouping pass, PR #21) — grouped + sorted like a
+  checklist on read; an add-form "Group" field with existing-header suggestions.
+- **`due_on` deadlines** — an optional per-item deadline. Add-form date input
+  (resets per item) + an inline date control on each row; the `setListItemDue` action
+  writes `due_on`. Open items past their deadline render red (`isOverdue`, `src/lib/lists.ts`).
+- **Occurrence linking** (`list_item_event_link`) — `AppState.listLinks` mirrors the
+  table (keyed by occurrence like `dependencies`). A `LinkedTodos` section in
+  `OccurrenceSheet` (a "Link a to-do" picker, items grouped by list via `<optgroup>`)
+  writes one link row to the concrete occurrence; the linked to-do renders as a
+  tickable line whose checkbox dispatches `toggleListItem` — i.e. the **same
+  `list_item.done`** as the Lists view, no `occurrence_item_state` row. The reducer
+  drops links in memory when an item/list/event is removed (the DB cascades them too).
+  A linked to-do never gates the occurrence's completion (§4 math ignores it).
 
 **Schema (all account-scoped, RLS + grants + realtime like `0005`/`0006`):**
 - `list` — named list (`title`, `sort_order`).
@@ -163,7 +173,7 @@ remove item all round-trip through a reload):
   occurrence grain as `occurrence_dependency`** (`occurrence_start` is the original slot,
   **not** an FK; both ends `on delete cascade`).
 
-**Behaviour to implement:**
+**Behaviour (implemented — kept as the spec of record):**
 - **Sort = checklist parity:** `sort_order` position-derived on write, ordered + grouped
   by `group_label` on read (copy the `checklist_item` path in `supabaseStore.ts`).
 - **Linking:** in `OccurrenceSheet` (where dependency-linking already lives), a "Link a

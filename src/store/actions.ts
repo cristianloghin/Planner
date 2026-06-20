@@ -10,9 +10,22 @@ export type Action =
   | { type: 'addList'; title: string }
   | { type: 'renameList'; id: string; title: string }
   | { type: 'removeList'; id: string }
-  | { type: 'addListItem'; listId: string; title: string; personId: PersonId | null; group: string | null }
+  | {
+      type: 'addListItem'
+      listId: string
+      title: string
+      personId: PersonId | null
+      group: string | null
+      dueOn: string | null
+    }
   | { type: 'toggleListItem'; listId: string; itemId: string }
   | { type: 'removeListItem'; listId: string; itemId: string }
+  // Set (or clear, with dueOn: null) a to-do's optional deadline.
+  | { type: 'setListItemDue'; listId: string; itemId: string; dueOn: string | null }
+  // Surface a to-do inside a concrete occurrence (`list_item_event_link`). The
+  // occurrence is (eventId, date); the tick stays on the item's own `done`.
+  | { type: 'linkListItem'; eventId: string; date: string; itemId: string }
+  | { type: 'unlinkListItem'; eventId: string; date: string; itemId: string }
   | { type: 'addEvent'; event: Omit<CalendarEvent, 'id'> }
   | { type: 'updateEvent'; event: CalendarEvent }
   | { type: 'removeEvent'; id: string }

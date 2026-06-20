@@ -19,12 +19,12 @@ optional login link), so the app works for any number of people.
 Done so far: backend stood up, auth + account bootstrap, `SupabaseStore` for
 people/events/completions, **realtime sync** (a partner's change appears live,
 deferred while you're mid-edit), **per-user preferences** (personal event-colour
-overrides), and **occurrence dependencies** (link an occurrence to a concrete
-occurrence of another event via `occurrence_dependency`). Not yet built (but
-**designed** — see [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) Decision 11):
-standalone Lists sync — named lists with headers, per-item deadlines, and to-dos
-linkable to a calendar occurrence so ticking the event ticks the to-do. Lists are
-still device-local until that lands.
+overrides), **occurrence dependencies** (link an occurrence to a concrete
+occurrence of another event via `occurrence_dependency`), and **standalone Lists**
+(see [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) Decision 11): named, account-scoped
+lists that sync across devices — with in-list headers, optional per-item deadlines,
+and to-dos linkable to a calendar occurrence so ticking the to-do in the event or in
+the Lists view is one and the same write.
 
 - [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) — the schema and the reasoning behind every decision.
 - [`docs/NEXT_SESSION.md`](docs/NEXT_SESSION.md) — runbook + current status and remaining work.

@@ -63,6 +63,7 @@ export function defaultState(): AppState {
     events: [],
     completions: {},
     dependencies: {},
+    listLinks: {},
     preferences: { personColors: {} },
     weekStart: mondayOf(today),
     selectedDay: (today.getDay() + 6) % 7, // 0 = Monday
@@ -92,6 +93,7 @@ export class LocalStorageStore implements ScheduleStore {
         events: parsed.events ?? base.events,
         completions: parsed.completions ?? base.completions,
         dependencies: parsed.dependencies ?? base.dependencies,
+        listLinks: parsed.listLinks ?? base.listLinks,
         preferences: { ...base.preferences, ...(parsed.preferences ?? {}) },
       } as AppState
     } catch {

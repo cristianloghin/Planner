@@ -111,14 +111,16 @@ export class SupabaseStore implements ScheduleStore {
   async load(): Promise<AppState> {
     const base = defaultState()
 
-    const [people, events, completions, dependencies, preferences, lists] = await Promise.all([
-      this.loadPeople(),
-      this.loadEvents(),
-      this.loadCompletions(),
-      this.loadDependencies(),
-      this.loadPreferences(),
-      this.loadLists(),
-    ])
+    const [people, events, completions, dependencies, preferences, lists, listLinks] =
+      await Promise.all([
+        this.loadPeople(),
+        this.loadEvents(),
+        this.loadCompletions(),
+        this.loadDependencies(),
+        this.loadPreferences(),
+        this.loadLists(),
+        this.loadListLinks(),
+      ])
 
     return {
       ...base,
@@ -128,6 +130,7 @@ export class SupabaseStore implements ScheduleStore {
       dependencies,
       preferences,
       lists,
+      listLinks,
     }
   }
 
@@ -357,6 +360,24 @@ export class SupabaseStore implements ScheduleStore {
     } catch { /* ignore */ }
   }
 
+  /**
+   * To-do→occurrence links (`list_item_event_link`), keyed by the occurrence
+   * (`${series_id}:${date}`) like `AppState.dependencies`. `occurrence_start` is
+   * the original slot; we store it as the occurrence date.
+   */
+  private async loadListLinks(): Promise<Record<string, string[]>> {
+    const { data, error } = await supabase
+      .from('list_item_event_link')
+      .select('list_item_id, series_id, occurrence_start')
+    if (error) throw error
+    const out: Record<string, string[]> = {}
+    for (const row of data ?? []) {
+      const k = `${row.series_id}:${tsToDateKey(row.occurrence_start)}`
+      ;(out[k] ??= []).push(row.list_item_id)
+    }
+    return out
+  }
+
   // ---- SUBSCRIBE ---------------------------------------------------------
 
   /**
@@ -555,6 +576,40 @@ export class SupabaseStore implements ScheduleStore {
       }
       case 'removeListItem': {
         const { error } = await supabase.from('list_item').delete().eq('id', action.itemId)
+        if (error) throw error
+        return
+      }
+      case 'setListItemDue': {
+        const { error } = await supabase
+          .from('list_item')
+          .update({ due_on: action.dueOn })
+          .eq('id', action.itemId)
+        if (error) throw error
+        return
+      }
+      case 'linkListItem': {
+        const ev = next.events.find((e) => e.id === action.eventId)
+        if (!ev) return
+        const { error } = await supabase.from('list_item_event_link').upsert(
+          {
+            list_item_id: action.itemId,
+            series_id: ev.id,
+            occurrence_start: occurrenceTs(ev, action.date),
+          },
+          { onConflict: 'list_item_id,series_id,occurrence_start' },
+        )
+        if (error) throw error
+        return
+      }
+      case 'unlinkListItem': {
+        const ev = next.events.find((e) => e.id === action.eventId)
+        if (!ev) return
+        const { error } = await supabase
+          .from('list_item_event_link')
+          .delete()
+          .eq('list_item_id', action.itemId)
+          .eq('series_id', ev.id)
+          .eq('occurrence_start', occurrenceTs(ev, action.date))
         if (error) throw error
         return
       }
