@@ -4,6 +4,7 @@ import shared from "../styles/shared.module.css";
 import type { Attachment, EventTemplate, PersonId } from "../types";
 import { AttachmentsEditor } from "./AttachmentsEditor";
 import { AttendeeChips } from "./AttendeeChips";
+import { NumberField } from "./NumberField";
 
 const SNAP = 15;
 
@@ -113,42 +114,23 @@ export function TemplateEditor({
           <div className={shared.row}>
             <label className={shared.field}>
               Spans (days)
-              <input
-                type="number"
-                min={1}
-                value={days}
-                onChange={(e) =>
-                  setDays(Math.max(1, Number(e.target.value) || 1))
-                }
-              />
+              <NumberField min={1} value={days} onChange={setDays} />
             </label>
           </div>
         ) : (
           <div className={shared.row}>
             <label className={shared.field}>
               Hours
-              <input
-                type="number"
-                min={0}
-                value={hours}
-                onChange={(e) =>
-                  setHours(Math.max(0, Number(e.target.value) || 0))
-                }
-              />
+              <NumberField min={0} value={hours} onChange={setHours} />
             </label>
             <label className={shared.field}>
               Minutes
-              <input
-                type="number"
+              <NumberField
                 min={0}
                 max={59}
                 step={SNAP}
                 value={minutes}
-                onChange={(e) =>
-                  setMinutes(
-                    Math.min(59, Math.max(0, Number(e.target.value) || 0)),
-                  )
-                }
+                onChange={setMinutes}
               />
             </label>
           </div>

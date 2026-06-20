@@ -15,6 +15,7 @@ import type {
 } from "../types";
 import { AttachmentsEditor } from "./AttachmentsEditor";
 import { AttendeeChips } from "./AttendeeChips";
+import { NumberField } from "./NumberField";
 import s from "./EventEditor.module.css";
 
 const SNAP = 15;
@@ -353,14 +354,7 @@ export function EventEditor({
             </label>
             <label className={shared.field}>
               Spans (days)
-              <input
-                type="number"
-                min={1}
-                value={days}
-                onChange={(e) =>
-                  setDays(Math.max(1, Number(e.target.value) || 1))
-                }
-              />
+              <NumberField min={1} value={days} onChange={setDays} />
             </label>
           </div>
         ) : (
@@ -411,14 +405,7 @@ export function EventEditor({
             <label className={shared.field}>
               Every
               <div className={shared.interval}>
-                <input
-                  type="number"
-                  min={1}
-                  value={interval}
-                  onChange={(e) =>
-                    setInterval(Math.max(1, Number(e.target.value) || 1))
-                  }
-                />
+                <NumberField min={1} value={interval} onChange={setInterval} />
                 <span>{unitLabel}</span>
               </div>
             </label>
