@@ -89,7 +89,9 @@ The app draws one lane per `person` row (account-scoped, `kind` adult|child, opt
 - ~~**Standalone Lists** are device-local~~ **DONE (pass 1)** — Lists now sync via the
   backend (`list` + `list_item`, migration `0009`). See §5 for what's wired vs. deferred.
 - Recurrence + checklist/note round-trip + removeEvent + person rename/recolor are
-  coded but not yet click-tested.
+  coded but not yet click-tested. (The **pure** recurrence/RRULE/occurrence/Lists
+  logic is now covered by a `vitest` unit suite — `npm test`; the remaining gap is
+  the `SupabaseStore` DB round-trip, which still needs a live click-test.)
 - **Realtime is reload-on-change** (refetch all on any change). Fine at household
   scale; revisit fine-grained delta apply / optimistic-write rollback if needed.
   This is the seam where TanStack Query (cache invalidation) + Zustand would slot

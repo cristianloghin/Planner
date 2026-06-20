@@ -5,6 +5,7 @@ import { personColor } from "../lib/people";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import type { ListItem, PersonId } from "../types";
+import { ConfirmDialog } from "./ConfirmDialog";
 import s from "./Lists.module.css";
 
 type Assignee = PersonId | "shared";
@@ -19,6 +20,7 @@ export function Lists() {
   const [due, setDue] = useState("");
   const [newListName, setNewListName] = useState("");
   const [renaming, setRenaming] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // After creating a list, jump to it (the reducer appends it last).
   const jumpToLast = useRef(false);
@@ -222,14 +224,7 @@ export function Lists() {
                   <button
                     className={cx(s.smallBtn, s.deleteList)}
                     aria-label="Delete list"
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          `Delete “${selected.title}” and its ${selected.items.length} item(s)?`,
-                        )
-                      )
-                        dispatch({ type: "removeList", id: selected.id });
-                    }}
+                    onClick={() => setConfirmDelete(true)}
                   >
                     Delete
                   </button>
@@ -298,6 +293,18 @@ export function Lists() {
           </>
         )}
       </div>
+
+      {selected && (
+        <ConfirmDialog
+          open={confirmDelete}
+          onOpenChange={setConfirmDelete}
+          title={`Delete “${selected.title}”?`}
+          message={`This removes the list and its ${selected.items.length} item(s).`}
+          confirmLabel="Delete"
+          destructive
+          onConfirm={() => dispatch({ type: "removeList", id: selected.id })}
+        />
+      )}
     </section>
   );
 }

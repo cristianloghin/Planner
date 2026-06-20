@@ -53,7 +53,15 @@ npm install
 npm run dev      # local dev server
 npm run build    # type-check + production build to dist/
 npm run preview  # preview the production build
+npm test         # run the unit suite (vitest, no backend needed)
+npm run test:watch
 ```
+
+`npm test` covers the pure, backend-free logic — recurrence expansion
+(`src/lib/recurrence.ts`), the RRULE round-trip (`src/lib/rrule.ts`),
+occurrence completion/dependency gating (`src/lib/occurrences.ts`), and the
+Lists helpers (`src/lib/lists.ts`). These run without Supabase, so they guard
+the trickiest hand-rolled date math on every change.
 
 ## Deploy
 
