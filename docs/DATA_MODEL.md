@@ -251,6 +251,80 @@ Grain note: `list`/`list_item` sit **outside** the series/occurrence model
 (account‑grained, single‑context); only `list_item_event_link` touches the occurrence
 grain, and it reuses Decision 4's identity rules.
 
+### 12. Shares & pins = one occurrence-grain table (`occurrence_share`)
+A way to draw attention to a **specific occurrence**. Two faces of one mechanism:
+- **Share** — user A flags an occurrence *for* user B; B gets an in‑app inbox entry
+  (and, later, a push). All events are already visible to every account member
+  (Decision 1), so a share is an *attention* signal, never an access grant.
+- **Pin / favorite** — a private bookmark a user makes for themselves to jump back to
+  an occurrence quickly; no notification, visible only to them.
+
+A pin is just a self‑share, so both live in one table, landing in migration
+`0012_shares.sql` (planned):
+
+```sql
+create table occurrence_share (
+  id               uuid primary key default gen_random_uuid(),
+  series_id        uuid not null references event_series(id) on delete cascade,
+  occurrence_start timestamptz not null,        -- original slot, NOT an FK (Decision 4)
+  from_user        uuid not null references app_user(id) on delete cascade,
+  to_user          uuid not null references app_user(id) on delete cascade,
+  kind             text not null,               -- 'share' | 'pin'
+  message          text,                        -- shares only; null for pins
+  created_at       timestamptz not null default now(),
+  read_at          timestamptz,                 -- inbox read/dismiss state (shares)
+  unique (from_user, to_user, series_id, occurrence_start)
+);
+```
+- **Share** = `from_user = A, to_user = B`, `kind = 'share'`.
+- **Pin** = `from_user = to_user = me`, `kind = 'pin'`.
+
+Sub‑decisions, each with its rejected alternative:
+
+**Pins and shares are one table, distinguished by sender vs recipient.** They share
+identical occurrence keying, RLS, realtime and load/apply paths; only *visibility* and
+*whether a toast fires* differ. *Rejected:* two tables (`event_favorite` +
+`event_share`) — duplicates all of that plumbing for a one‑column difference.
+
+**One RLS policy yields both visibilities:** `using (to_user = auth.uid() or from_user =
+auth.uid())` (within the account). A pin (`me,me`) is visible only to me; a share (`A→B`)
+is visible to both A (to manage/unshare) and B (to act). *Rejected:* a kind‑specific
+policy pair — unnecessary once the row carries both endpoints.
+
+**"No notification for a pin" is a client rule, not schema.** Pins and shares are
+structurally identical rows; the inbox/toast fires only for
+`kind = 'share' and to_user = me and from_user <> me`. Pins just populate the favorites
+list. *Rejected:* a `notified` boolean — derivable from `kind` + endpoints.
+
+**Explicit `kind`, rather than inferring a pin from `from_user = to_user`.** Leaves room
+for a genuine notify‑myself "note to self" share (a self‑row that *should* inbox)
+without colliding with a silent pin. Cheap insurance. *Rejected:* inferring pin‑ness —
+closes off self‑shares forever.
+
+**Occurrence grain reuses Decision 4 identity.** `occurrence_start` is the original
+computed slot, addressable whether or not an `event_occurrence` row exists, and is
+**not** an FK. It survives a reschedule (identity stays the original slot); an orphaned
+row (the series rule no longer yields that date) simply doesn't render — the same
+tolerance as `occurrence_dependency` / `list_item_event_link`. `split_series` should
+migrate future `occurrence_share` rows onto the new series id alongside the other
+occurrence‑grain tables (or deliberately leave them — decide at build).
+
+**Realtime + delete delivery.** Add `occurrence_share` to the `supabase_realtime`
+publication so a share reaches B's open app live, and set `REPLICA IDENTITY FULL` so an
+un‑pin / dismiss (DELETE) propagates — RLS can't evaluate the `to_user`/`from_user` gate
+against a default PK‑only delete payload (see migration `0011`).
+
+Client shape: `load()` returns the user's visible rows (RLS‑filtered); the app splits
+them into `favorites` (`kind='pin'`), `inbox` (`kind='share'`, to me) and `sent`
+(`kind='share'`, from me) — all filters over one array. The entry point is
+`OccurrenceSheet` (a star to pin, a "Share with…" picker), where dependency‑ and
+to‑do‑linking already live.
+
+**Background push is out of scope here.** A notification when the recipient's app is
+*closed* needs the app's first backend component (a Supabase Edge Function +
+web‑push subscriptions) and would serve reminders too; the in‑app inbox/toast is free.
+See [`NEXT_SESSION.md`](./NEXT_SESSION.md) §7 for the build plan and the two layers.
+
 ---
 
 ## What this maps to from Phase 1
@@ -294,4 +368,7 @@ Apply in order. See [`NEXT_SESSION.md`](./NEXT_SESSION.md) for the full connect�
 | `0006_realtime.sql` | Calendar tables → `supabase_realtime` publication |
 | `0007_user_preferences.sql` | Per‑user `user_preference` JSON blob (personal colour overrides) |
 | `0008_realtime_dependencies.sql` | `occurrence_dependency` → `supabase_realtime` publication |
-| `0009_lists.sql` *(planned)* | Standalone Lists: `list` + `list_item` + `list_item_event_link`, RLS, grants, realtime ([Decision 11](#11-standalone-lists--list--list_item-single-context-done-linkable-to-occurrences)) |
+| `0009_lists.sql` | Standalone Lists: `list` + `list_item` + `list_item_event_link`, RLS, grants, realtime ([Decision 11](#11-standalone-lists--list--list_item-single-context-done-linkable-to-occurrences)) |
+| `0010_occurrence_overrides.sql` | Per‑occurrence `rescheduled_duration` on `event_occurrence`; `split_series` re‑created to copy `event_person` |
+| `0011_realtime_delete_replica_identity.sql` | `REPLICA IDENTITY FULL` on RLS‑gated tables so DELETEs reach the other client over realtime |
+| `0012_shares.sql` *(planned)* | Shares & pins: `occurrence_share` (one table for both), RLS, grants, realtime + `REPLICA IDENTITY FULL` ([Decision 12](#12-shares--pins--one-occurrence-grain-table-occurrence_share)) |

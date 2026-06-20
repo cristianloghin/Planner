@@ -196,7 +196,45 @@ remove item all round-trip through a reload):
   never gates the occurrence's "done" (§4 math ignores it).
 - **One-time import:** migrate any existing `planner.lists.v1` items into a default list.
 
-## 6. Still unmapped (decide when you reach them)
+## 6. Shares & pins — designed, not built ([Decision 12](./DATA_MODEL.md#12-shares--pins--one-occurrence-grain-table-occurrence_share))
+
+A unified attention mechanism on a **concrete occurrence**: **share** it to another user
+(in-app inbox + toast) or **pin** it for yourself (private quick-jump, no notification).
+Both are rows in one `occurrence_share` table — a pin is just a self-share. See
+[DATA_MODEL Decision 12](./DATA_MODEL.md#12-shares--pins--one-occurrence-grain-table-occurrence_share)
+for the schema and the *why* (single RLS policy, `kind` flag, occurrence identity).
+
+Build in two layers:
+
+**Layer 1 — in-app (small, ~1 day, no new infra):**
+1. Migration `0012_shares.sql` — `occurrence_share` + RLS
+   (`to_user = auth.uid() or from_user = auth.uid()`) + grants + add to the realtime
+   publication **with `REPLICA IDENTITY FULL`** so dismiss/un-pin (DELETE) syncs (the
+   bug fixed in `0011`).
+2. `SupabaseStore`: a `loadShares()` (RLS returns just the user's visible rows); `apply`
+   cases `shareOccurrence` / `pinOccurrence` (insert) and `dismissShare` / `unpin`
+   (delete, or set `read_at` for read state). `occurrence_start` via the existing
+   `occurrenceTs(ev, date)` helper, exactly like dependencies / to-do links.
+3. `state.tsx`: add `shares` to `AppState`; reducer cases; the app splits the loaded
+   array into `favorites` (pins), `inbox` (shares to me) and `sent` (shares from me).
+   Realtime already calls `reloadFromStore`, so a partner's share lands within ~300ms
+   while their app is open.
+4. UI: a star + "Share with…" picker in `OccurrenceSheet` (where dependency- and to-do
+   linking already live); a favorites list and an inbox badge; clicking either jumps to
+   the occurrence's day. The toast fires only for
+   `kind='share', to_user = me, from_user <> me` — pins are silent.
+5. `split_series`: decide whether to migrate future `occurrence_share` rows onto the new
+   series id (mirror the other occurrence-grain tables in the `0010` RPC) or leave them.
+
+**Layer 2 — real background push (separate, larger; the app's first backend component):**
+A notification when the recipient's app is **closed** needs infra that doesn't exist
+yet: a Supabase **Edge Function** + a DB trigger/webhook on `occurrence_share` insert, a
+`push_subscription` table (per device), VAPID keys, and a service-worker `push` handler
+(the PWA service worker exists via `vite-plugin-pwa` but has no push handler). iOS only
+supports web push for *installed* PWAs (16.4+). Design it once to also cover **reminders**
+— which today only fire while the app is open (`AlertHost.tsx`) — not just shares.
+
+## 7. Still unmapped (decide when you reach them)
 
 - **RLS granularity:** the baseline lets any account member read/write the
   account's series. Add an `account_member.role` check if you need owner-only
