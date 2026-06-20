@@ -203,7 +203,14 @@ export function EventEditor({
       recurrence:
         repeat === "none"
           ? undefined
-          : { freq: repeat, interval: Math.max(1, interval) },
+          : {
+              freq: repeat,
+              interval: Math.max(1, interval),
+              // `until` is a structural cap (set when a series is split), not a
+              // form field — preserve it across edits so editing a split-off
+              // series doesn't silently un-cap it and run past the split.
+              ...(base?.recurrence?.until ? { until: base.recurrence.until } : {}),
+            },
       attendees,
       attachments: cleanedAttachments(),
     };
@@ -249,11 +256,18 @@ export function EventEditor({
     const start = allDay
       ? occurrenceDate!
       : `${occurrenceDate}T${startDT.slice(11)}`;
+    const ev = buildEvent();
+    // The new forward series runs indefinitely — never inherit the old series'
+    // cap (buildEvent copies `until` from the base, which here is the series
+    // being split).
+    const recurrence = ev.recurrence
+      ? { freq: ev.recurrence.freq, interval: ev.recurrence.interval }
+      : undefined;
     dispatch({
       type: "splitSeries",
       eventId: base!.id,
       fromDate: occurrenceDate!,
-      event: { ...buildEvent(), start },
+      event: { ...ev, start, recurrence },
     });
     onClose();
   }
