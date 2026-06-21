@@ -1,7 +1,5 @@
-import type { AppState, Person, PersonId } from '../types'
-
-/** Colour for an all-adults ('Both'/'Everyone') event — the `--shared` token. */
-export const SHARED_COLOR = 'var(--shared)'
+import type { AppState, CalendarEvent, Person, PersonId } from '../types'
+import { DEFAULT_USER_COLOR, USER_COLORS, eventColorCss, hsl, userColorKey, type UserColorKey } from './palette'
 
 /** Everyone, in lane order. */
 export function peopleList(state: AppState): Person[] {
@@ -9,12 +7,63 @@ export function peopleList(state: AppState): Person[] {
 }
 
 /**
- * The colour to draw a person's lane in — this user's personal override if set,
- * otherwise the shared `Person.color`. Every colour read should go through here
- * so overrides apply everywhere uniformly.
+ * The user color *key* a person resolves to: this user's personal override if
+ * set, else the shared `Person.color`, else the default. Both stored values are
+ * palette keys; legacy/unknown values fall back to the default.
+ */
+export function personColorKey(state: AppState, id: PersonId): UserColorKey {
+  const pref = state.preferences.personColors[id]
+  if (pref) return userColorKey(pref)
+  return userColorKey(state.people[id]?.color)
+}
+
+/**
+ * The CSS colour to draw a person's lane in — the `main` shade of their resolved
+ * user color. Every colour read should go through here so overrides apply
+ * everywhere uniformly.
  */
 export function personColor(state: AppState, id: PersonId): string {
-  return state.preferences.personColors[id] ?? state.people[id]?.color ?? SHARED_COLOR
+  return hsl(USER_COLORS[personColorKey(state, id)].main)
+}
+
+/** The person whose login is this app_user, if any. */
+export function personByUserId(state: AppState, userId: string | undefined): Person | undefined {
+  if (!userId) return undefined
+  return peopleList(state).find((p) => p.userId === userId)
+}
+
+/**
+ * The user-color key that drives an event block's background: the creator's, via
+ * `createdBy` -> person. Falls back to the first attendee (then the default) when
+ * the creator can't be resolved (e.g. an optimistic, not-yet-loaded event).
+ */
+export function eventOwnerColorKey(state: AppState, ev: CalendarEvent): UserColorKey {
+  const owner = personByUserId(state, ev.createdBy)
+  if (owner) return personColorKey(state, owner.id)
+  return ev.attendees[0] ? personColorKey(state, ev.attendees[0]) : DEFAULT_USER_COLOR
+}
+
+/** The creator's `main` shade — for compact spots that want a single color (e.g.
+ *  month dots) rather than the full background treatment. */
+export function eventMainColor(state: AppState, ev: CalendarEvent): string {
+  return hsl(USER_COLORS[eventOwnerColorKey(state, ev)].main)
+}
+
+/**
+ * The colors that paint an event block: the creator's two background shades plus
+ * the left-border color (the event's palette color, defaulting to the creator's
+ * main). Shared by the day timeline and the week agenda.
+ */
+export function eventBlockColors(
+  state: AppState,
+  ev: CalendarEvent,
+): { lightBg: string; darkBg: string; border: string } {
+  const c = USER_COLORS[eventOwnerColorKey(state, ev)]
+  return {
+    lightBg: hsl(c.lightBg),
+    darkBg: hsl(c.darkBg),
+    border: eventColorCss(ev.colorKey) ?? hsl(c.main),
+  }
 }
 
 export function adults(state: AppState): Person[] {
@@ -40,26 +89,6 @@ export function isAllAdults(state: AppState, attendees: PersonId[]): boolean {
   if (adultIds.length < 2 || attendees.length !== adultIds.length) return false
   const set = new Set(attendees)
   return adultIds.every((id) => set.has(id))
-}
-
-/**
- * The colour for an event block. An event involving a child borrows the child's
- * colour so "kid time" stands out; an all-adults event uses the shared accent;
- * otherwise the first person's colour.
- */
-export function eventColor(state: AppState, attendees: PersonId[]): string {
-  const childId = attendees.find((id) => state.people[id]?.kind === 'child')
-  if (childId) return personColor(state, childId)
-  if (isAllAdults(state, attendees)) return SHARED_COLOR
-  return attendees[0] ? personColor(state, attendees[0]) : SHARED_COLOR
-}
-
-/** Gradient blending the adult colours — used for the spanning all-adults block. */
-export function adultsGradient(state: AppState): string {
-  const cols = adults(state).map((p) => personColor(state, p.id))
-  if (cols.length === 0) return SHARED_COLOR
-  if (cols.length === 1) return cols[0]
-  return `linear-gradient(120deg, ${cols.join(', ')})`
 }
 
 /** Short label like "Both", "Everyone", "Cris + Nora", or just "Anna". */

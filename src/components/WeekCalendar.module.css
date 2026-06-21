@@ -33,10 +33,18 @@
 
 .event {
   position: relative;
-  background: var(--surface-2);
+  /* Creator's user color as background (theme shade picked below); the event
+     color is the inline left border. */
+  background: var(--ev-bg-dark);
   border-left: 3px solid var(--accent);
   border-radius: 8px;
   padding: 6px 8px;
+}
+
+@media (prefers-color-scheme: light) {
+  .event {
+    background: var(--ev-bg-light);
+  }
 }
 
 .eventTime {
@@ -63,8 +71,30 @@
 }
 
 .eventMeta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: var(--fs-sm);
   font-weight: 600;
+  color: var(--muted);
+}
+
+.avatars {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  color: var(--on-accent);
+  flex: none;
 }
 
 .addLink {

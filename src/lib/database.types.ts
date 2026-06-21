@@ -260,6 +260,7 @@ export type Database = {
         Row: {
           account_id: string
           all_day: boolean
+          color_key: string | null
           created_at: string
           created_by: string | null
           default_status: string | null
@@ -277,6 +278,7 @@ export type Database = {
         Insert: {
           account_id: string
           all_day?: boolean
+          color_key?: string | null
           created_at?: string
           created_by?: string | null
           default_status?: string | null
@@ -294,6 +296,7 @@ export type Database = {
         Update: {
           account_id?: string
           all_day?: boolean
+          color_key?: string | null
           created_at?: string
           created_by?: string | null
           default_status?: string | null

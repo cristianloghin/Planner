@@ -55,9 +55,9 @@ export function defaultState(): AppState {
   const today = new Date()
   return {
     people: {
-      me: { id: 'me', name: 'Me', color: '#4f46e5', kind: 'adult', sortOrder: 0 },
-      partner: { id: 'partner', name: 'Partner', color: '#ec4899', kind: 'adult', sortOrder: 1 },
-      kid: { id: 'kid', name: 'Nora', color: '#14b8a6', kind: 'child', sortOrder: 2 },
+      me: { id: 'me', name: 'Me', color: 'indigo', kind: 'adult', sortOrder: 0 },
+      partner: { id: 'partner', name: 'Partner', color: 'pink', kind: 'adult', sortOrder: 1 },
+      kid: { id: 'kid', name: 'Nora', color: 'teal', kind: 'child', sortOrder: 2 },
     },
     lists: [],
     events: [],

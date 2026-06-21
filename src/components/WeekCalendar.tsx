@@ -7,7 +7,11 @@ import {
   minutesToTime,
   weekRangeLabel,
 } from "../lib/dates";
-import { attendeeLabel, defaultAttendees, eventColor } from "../lib/people";
+import {
+  defaultAttendees,
+  eventBlockColors,
+  personColor,
+} from "../lib/people";
 import { occurrencesOnDate, recurrenceLabel } from "../lib/recurrence";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
@@ -66,12 +70,21 @@ export function WeekCalendar() {
                   )}
                   {occs.map((o) => {
                     const e = o.event;
-                    const color = eventColor(state, e.attendees);
+                    const { lightBg, darkBg, border } = eventBlockColors(
+                      state,
+                      e,
+                    );
                     return (
                       <div
                         key={`${e.id}:${o.start}`}
                         className={s.event}
-                        style={{ borderLeftColor: color }}
+                        style={
+                          {
+                            "--ev-bg-light": lightBg,
+                            "--ev-bg-dark": darkBg,
+                            borderLeftColor: border,
+                          } as React.CSSProperties
+                        }
                       >
                         <div className={s.eventTime}>
                           {e.allDay
@@ -92,10 +105,25 @@ export function WeekCalendar() {
                           }
                         >
                           <span className={s.eventTitle}>{e.title}</span>
-                          <span className={s.eventMeta} style={{ color }}>
-                            {attendeeLabel(state, e.attendees)}
+                          <span className={s.eventMeta}>
+                            <span className={s.avatars}>
+                              {e.attendees.map((id) => {
+                                const p = state.people[id];
+                                if (!p) return null;
+                                return (
+                                  <span
+                                    key={id}
+                                    className={s.avatar}
+                                    style={{ background: personColor(state, id) }}
+                                    title={p.name}
+                                  >
+                                    {p.name.slice(0, 1).toUpperCase()}
+                                  </span>
+                                );
+                              })}
+                            </span>
                             {e.recurrence &&
-                              ` · ${recurrenceLabel(e.recurrence).toLowerCase()}`}
+                              recurrenceLabel(e.recurrence).toLowerCase()}
                           </span>
                         </button>
                       </div>

@@ -1,3 +1,5 @@
+import type { EventColorKey, UserColorKey } from './lib/palette'
+
 /** A person's id. Now an opaque string (a backend uuid), not a fixed enum — the
  *  app is generic over however many people exist. */
 export type PersonId = string
@@ -9,10 +11,15 @@ export type PersonKind = 'adult' | 'child'
 export interface Person {
   id: PersonId
   name: string
+  /** The account-wide default user-color *key* (one of the nine in the palette).
+   *  A per-user override may sit on top in {@link Preferences.personColors}. */
   color: string
   kind: PersonKind
   /** Lane order, ascending. */
   sortOrder: number
+  /** The login (app_user id) this person is, if any — links an event's creator
+   *  (`createdBy`) back to a person, and thus to their color. */
+  userId?: string | null
 }
 
 /**
@@ -105,6 +112,15 @@ export interface CalendarEvent {
   recurrence?: Recurrence
   /** Everyone involved — one or more people. */
   attendees: PersonId[]
+  /**
+   * Optional event color, a key into the fixed event palette
+   * (`src/lib/palette.ts`). Absent = no event color chosen, so the timeline
+   * falls back to the creator's main color.
+   */
+  colorKey?: EventColorKey
+  /** The app_user who created the series (`event_series.created_by`). Drives the
+   *  event block's background color. Server-owned; absent until first load. */
+  createdBy?: string
   /** Notes, checklists and reminders, in display order. */
   attachments: Attachment[]
 }
@@ -185,7 +201,8 @@ export interface OccurrenceState {
  * `Person.color`.
  */
 export interface Preferences {
-  personColors: Record<PersonId, string>
+  /** Per-person user-color override, as a palette key (one of the nine). */
+  personColors: Record<PersonId, UserColorKey>
 }
 
 export interface AppState {

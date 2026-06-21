@@ -21,6 +21,7 @@ import { uid } from '../lib/id'
 import { toISODate, toDateTimeLocal } from '../lib/dates'
 import { notes as noteAttachments, checklists } from '../lib/attachments'
 import { recurrenceToRRule, rruleToRecurrence, truncatedRRule } from '../lib/rrule'
+import { isEventColorKey, isUserColorKey } from '../lib/palette'
 
 const MINS_PER_DAY = 24 * 60
 
@@ -90,6 +91,8 @@ interface SeriesRow {
   dtstart: string | null
   duration: string | null
   rrule: string | null
+  color_key: string | null
+  created_by: string | null
   event_person: { person_id: string }[]
   checklist_item: {
     id: string
@@ -160,13 +163,19 @@ export class SupabaseStore implements ScheduleStore {
       return empty
     }
     const prefs = (data?.prefs ?? {}) as Partial<Preferences>
-    return { ...empty, ...prefs, personColors: { ...empty.personColors, ...prefs.personColors } }
+    // Keep only valid palette keys; legacy hex overrides are dropped so the
+    // person falls back to their (migrated) shared color.
+    const personColors: Preferences['personColors'] = {}
+    for (const [id, key] of Object.entries(prefs.personColors ?? {})) {
+      if (isUserColorKey(key)) personColors[id] = key
+    }
+    return { ...empty, ...prefs, personColors }
   }
 
   private async loadPeople(): Promise<Record<string, Person>> {
     const { data, error } = await supabase
       .from('person')
-      .select('id, name, color, kind, sort_order')
+      .select('id, name, color, kind, sort_order, user_id')
       .eq('account_id', this.accountId)
       .order('sort_order')
     if (error) throw error
@@ -178,6 +187,7 @@ export class SupabaseStore implements ScheduleStore {
         color: p.color,
         kind: p.kind === 'child' ? 'child' : 'adult',
         sortOrder: p.sort_order,
+        userId: p.user_id,
       }
     }
     return out
@@ -190,7 +200,7 @@ export class SupabaseStore implements ScheduleStore {
       // more than one relationship between event_series and these children
       // (e.g. checklist_item also links many-to-many via occurrence_item_removed).
       .select(
-        `id, title, all_day, dtstart, duration, rrule,
+        `id, title, all_day, dtstart, duration, rrule, color_key, created_by,
          event_person!series_id ( person_id ),
          checklist_item!owner_series_id ( id, label, group_label, sort_order, occurrence_start ),
          note!owner_series_id ( id, body ),
@@ -211,6 +221,8 @@ export class SupabaseStore implements ScheduleStore {
         duration: intervalToDuration(r.duration, allDay),
         recurrence: rruleToRecurrence(r.rrule),
         attendees: r.event_person.map((ep) => ep.person_id),
+        colorKey: isEventColorKey(r.color_key) ? r.color_key : undefined,
+        createdBy: r.created_by ?? undefined,
         attachments: rebuildAttachments(r),
       }
     })
@@ -452,7 +464,7 @@ export class SupabaseStore implements ScheduleStore {
       case 'addEvent': {
         // The reducer appends the new (id-stamped) event; persist that one.
         const ev = next.events[next.events.length - 1]
-        if (ev) await this.writeEvent(ev, action.templateId)
+        if (ev) await this.writeEvent(ev, action.templateId, true)
         return
       }
       case 'updateEvent':
@@ -557,6 +569,7 @@ export class SupabaseStore implements ScheduleStore {
             dtstart: startToTs(e.start, e.allDay),
             duration: durationToInterval(e.duration, e.allDay),
             rrule: recurrenceToRRule(e.recurrence),
+            color_key: e.colorKey ?? null,
           })
           .eq('id', newId as string)
         if (up.error) throw up.error
@@ -754,7 +767,7 @@ export class SupabaseStore implements ScheduleStore {
 
   /** Upsert a series and reconcile its rosters/attachments. `templateId` records
    *  provenance when this event was created from a template (else left as-is). */
-  private async writeEvent(ev: CalendarEvent, templateId?: string): Promise<void> {
+  private async writeEvent(ev: CalendarEvent, templateId?: string, isNew = false): Promise<void> {
     const series = {
       id: ev.id,
       account_id: this.accountId,
@@ -763,11 +776,14 @@ export class SupabaseStore implements ScheduleStore {
       dtstart: startToTs(ev.start, ev.allDay),
       duration: durationToInterval(ev.duration, ev.allDay),
       rrule: recurrenceToRRule(ev.recurrence),
+      color_key: ev.colorKey ?? null,
       is_template: false,
       // Only stamp provenance on insert-from-template; updates omit it so an edit
       // never clobbers an existing link.
       ...(templateId ? { template_id: templateId } : {}),
-      created_by: this.userId,
+      // Stamp the creator only on insert; updates omit it so editing an event
+      // (even by a partner) never reassigns who created it — that drives its color.
+      ...(isNew ? { created_by: this.userId } : {}),
     }
     const up = await supabase.from('event_series').upsert(series, { onConflict: 'id' })
     if (up.error) throw up.error

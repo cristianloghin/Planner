@@ -6,6 +6,8 @@ import { eventDate, eventStartMinutes } from "../lib/timing";
 import { effectiveOccurrence } from "../lib/recurrence";
 import { useApp } from "../state";
 import { cloneAttachments } from "../lib/attachments";
+import { EVENT_COLOR_KEYS, hsl, EVENT_COLORS } from "../lib/palette";
+import type { EventColorKey } from "../lib/palette";
 import shared from "../styles/shared.module.css";
 import type {
   Attachment,
@@ -125,6 +127,9 @@ export function EventEditor({
   const [attendees, setAttendees] = useState<PersonId[]>(
     isEdit ? base!.attendees : target.attendees,
   );
+  const [colorKey, setColorKey] = useState<EventColorKey | undefined>(
+    base?.colorKey,
+  );
   const [repeat, setRepeat] = useState<RepeatChoice>(
     base?.recurrence?.freq ?? "none",
   );
@@ -214,6 +219,10 @@ export function EventEditor({
               ...(base?.recurrence?.until ? { until: base.recurrence.until } : {}),
             },
       attendees,
+      ...(colorKey ? { colorKey } : {}),
+      // Carry the creator across edits so the optimistic block keeps its color
+      // (the server preserves created_by on update regardless).
+      ...(base?.createdBy ? { createdBy: base.createdBy } : {}),
       attachments: cleanedAttachments(),
     };
   }
@@ -424,6 +433,28 @@ export function EventEditor({
 
         <label className={shared.label}>Who's involved?</label>
         <AttendeeChips value={attendees} onChange={setAttendees} />
+
+        <label className={shared.label}>Color</label>
+        <div className={s.colorRow} role="radiogroup" aria-label="Event color">
+          <button
+            type="button"
+            className={cx(s.colorSwatch, s.colorNone, !colorKey && s.colorOn)}
+            aria-label="No color"
+            aria-pressed={!colorKey}
+            onClick={() => setColorKey(undefined)}
+          />
+          {EVENT_COLOR_KEYS.map((key) => (
+            <button
+              key={key}
+              type="button"
+              className={cx(s.colorSwatch, colorKey === key && s.colorOn)}
+              style={{ background: hsl(EVENT_COLORS[key]) }}
+              aria-label={key}
+              aria-pressed={colorKey === key}
+              onClick={() => setColorKey(key)}
+            />
+          ))}
+        </div>
 
         <AttachmentsEditor attachments={attachments} onChange={setAttachments} />
 
