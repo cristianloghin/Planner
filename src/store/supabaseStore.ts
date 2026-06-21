@@ -119,11 +119,13 @@ export class SupabaseStore implements ScheduleStore {
   async load(): Promise<AppState> {
     const base = defaultState()
 
-    const [people, events, templates, completions, dependencies, preferences, lists, listLinks] =
+    // Templates are no longer part of the full-state load — they're owned by
+    // TanStack Query now (see src/data/templates.ts). The mapping below still
+    // lives here and is reused via the public template methods.
+    const [people, events, completions, dependencies, preferences, lists, listLinks] =
       await Promise.all([
         this.loadPeople(),
         this.loadEvents(),
-        this.loadTemplates(),
         this.loadCompletions(),
         this.loadDependencies(),
         this.loadPreferences(),
@@ -135,13 +137,32 @@ export class SupabaseStore implements ScheduleStore {
       ...base,
       people,
       events,
-      templates,
       completions,
       dependencies,
       preferences,
       lists,
       listLinks,
     }
+  }
+
+  // ---- TEMPLATES (owned by TanStack Query, served from the same mapping) ----
+  // Public wrappers so the query layer reuses this store's row conversions
+  // instead of duplicating the event_series shape. The first slice migrated off
+  // the reducer; events and the rest still flow through load()/apply().
+
+  listTemplates(): Promise<EventTemplate[]> {
+    return this.loadTemplates()
+  }
+
+  saveTemplate(t: EventTemplate): Promise<void> {
+    return this.writeTemplate(t)
+  }
+
+  async deleteTemplate(id: string): Promise<void> {
+    // Cascade drops the template's roster/attachments; `template_id` on any
+    // events made from it is `on delete set null`, so they're untouched.
+    const { error } = await supabase.from('event_series').delete().eq('id', id)
+    if (error) throw error
   }
 
   /**
@@ -468,22 +489,6 @@ export class SupabaseStore implements ScheduleStore {
         await this.writeEvent(action.event)
         return
       case 'removeEvent': {
-        const { error } = await supabase.from('event_series').delete().eq('id', action.id)
-        if (error) throw error
-        return
-      }
-      case 'addTemplate': {
-        // The reducer appended the new (id-stamped) template; persist that one.
-        const tmpl = next.templates[next.templates.length - 1]
-        if (tmpl) await this.writeTemplate(tmpl)
-        return
-      }
-      case 'updateTemplate':
-        await this.writeTemplate(action.template)
-        return
-      case 'removeTemplate': {
-        // Cascade drops the template's roster/attachments; `template_id` on any
-        // events made from it is `on delete set null`, so they're untouched.
         const { error } = await supabase.from('event_series').delete().eq('id', action.id)
         if (error) throw error
         return

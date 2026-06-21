@@ -13,6 +13,7 @@ import { Login } from "./components/Login";
 import { MonthView } from "./components/MonthView";
 import { Settings } from "./components/Settings";
 import { WeekCalendar } from "./components/WeekCalendar";
+import { useTemplatesRealtime } from "./data/templates";
 import { cx } from "./lib/cx";
 import { mondayOf, weekdayIndex } from "./lib/dates";
 import { AppProvider, useApp } from "./state";
@@ -60,6 +61,9 @@ export function Root() {
 export function App() {
   const [tab, setTab] = useState<Tab>("day");
   const { dispatch } = useApp();
+
+  // Keep the (Query-owned) templates cache fresh on a partner's change.
+  useTemplatesRealtime();
 
   function openDay(iso: string) {
     dispatch({

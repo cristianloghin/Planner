@@ -31,7 +31,6 @@ function state(over: Partial<AppState> = {}): AppState {
     people: {},
     lists: [],
     events: [],
-    templates: [],
     completions: {},
     dependencies: {},
     listLinks: {},

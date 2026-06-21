@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useApp } from "../state";
+import { useUpdateTemplate } from "../data/templates";
 import shared from "../styles/shared.module.css";
 import type { Attachment, EventTemplate, PersonId } from "../types";
 import { AttachmentsEditor } from "./AttachmentsEditor";
@@ -22,13 +22,10 @@ export function TemplateEditor({
   template: EventTemplate;
   onClose: () => void;
 }) {
-  const { dispatch, beginEdit, endEdit } = useApp();
+  const updateTemplate = useUpdateTemplate();
 
-  // Defer realtime reloads while the draft is open (same guard as EventEditor).
-  useEffect(() => {
-    beginEdit();
-    return endEdit;
-  }, [beginEdit, endEdit]);
+  // No reducer edit-guard here: templates are owned by TanStack Query, and this
+  // draft lives in local state, so a background refetch can't disturb it.
 
   const [title, setTitle] = useState(template.title);
   const [allDay, setAllDay] = useState(template.allDay);
@@ -67,16 +64,13 @@ export function TemplateEditor({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
-    dispatch({
-      type: "updateTemplate",
-      template: {
-        ...template,
-        title: title.trim(),
-        allDay,
-        duration: currentDuration(),
-        attendees,
-        attachments: cleanedAttachments(),
-      },
+    updateTemplate.mutate({
+      ...template,
+      title: title.trim(),
+      allDay,
+      duration: currentDuration(),
+      attendees,
+      attachments: cleanedAttachments(),
     });
     onClose();
   }

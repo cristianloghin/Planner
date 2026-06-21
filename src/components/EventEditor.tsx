@@ -5,6 +5,7 @@ import { addDays, diffDays, minutesToTime, toDateTimeLocal } from "../lib/dates"
 import { eventDate, eventStartMinutes } from "../lib/timing";
 import { effectiveOccurrence } from "../lib/recurrence";
 import { useApp } from "../state";
+import { useAddTemplate, useTemplates } from "../data/templates";
 import { cloneAttachments } from "../lib/attachments";
 import { COLOR_KEYS, DEFAULT_COLOR, colorVar } from "../lib/palette";
 import type { ColorKey } from "../lib/palette";
@@ -73,6 +74,8 @@ export function EventEditor({
   onClose: () => void;
 }) {
   const { state, dispatch, beginEdit, endEdit } = useApp();
+  const { data: templates = [] } = useTemplates();
+  const addTemplate = useAddTemplate();
   const isEdit = target.mode === "edit";
   const base = isEdit ? target.event : null;
 
@@ -193,15 +196,12 @@ export function EventEditor({
    *  if any, is untouched). Attachments are copied with fresh ids. */
   function saveAsTemplate() {
     if (!title.trim()) return;
-    dispatch({
-      type: "addTemplate",
-      template: {
-        title: title.trim(),
-        allDay,
-        duration: currentDuration(),
-        attendees,
-        attachments: cloneAttachments(cleanedAttachments()),
-      },
+    addTemplate.mutate({
+      title: title.trim(),
+      allDay,
+      duration: currentDuration(),
+      attendees,
+      attachments: cloneAttachments(cleanedAttachments()),
     });
     setSavedTemplate(true);
     clearTimeout(savedTimer.current);
@@ -318,20 +318,20 @@ export function EventEditor({
       </header>
 
       <div className={shared.editorBody}>
-        {!isEdit && state.templates.length > 0 && (
+        {!isEdit && templates.length > 0 && (
           <div className={shared.row}>
             <label className={shared.field}>
               Start from a template
               <select
                 value={templateId ?? ""}
                 onChange={(e) => {
-                  const t = state.templates.find((x) => x.id === e.target.value);
+                  const t = templates.find((x) => x.id === e.target.value);
                   if (t) applyTemplate(t);
                   else setTemplateId(null);
                 }}
               >
                 <option value="">Blank event</option>
-                {state.templates.map((t) => (
+                {templates.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.title || "Untitled template"}
                   </option>
