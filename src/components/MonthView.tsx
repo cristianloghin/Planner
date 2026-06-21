@@ -10,7 +10,7 @@ import {
   startOfMonth,
   toISODate,
 } from "../lib/dates";
-import { eventColor } from "../lib/people";
+import { eventMainColor } from "../lib/people";
 import { occurrencesOnDate } from "../lib/recurrence";
 import { eventStartMinutes } from "../lib/timing";
 import { useApp } from "../state";
@@ -87,7 +87,7 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
                       <span
                         key={`${e.id}:${i}`}
                         className={s.monthDot}
-                        style={{ background: eventColor(state, e.attendees) }}
+                        style={{ background: eventMainColor(state, e) }}
                       />
                     ))}
                     {dayEvents.length > MAX_DOTS && (

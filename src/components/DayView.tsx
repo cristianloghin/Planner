@@ -21,13 +21,12 @@ import {
 } from "../lib/dates";
 import { isOccurrenceDone, occKey, occurrenceStatus } from "../lib/occurrences";
 import {
-  eventOwnerColorKey,
+  eventBlockColors,
   isAllAdults,
   peopleList,
   personColor,
 } from "../lib/people";
 import { occurrencesOnDate, type DayOccurrence } from "../lib/recurrence";
-import { USER_COLORS, eventColorCss, hsl } from "../lib/palette";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import type { CalendarEvent, Person, PersonId } from "../types";
@@ -57,11 +56,10 @@ function blockStyle(
   state: ReturnType<typeof useApp>["state"],
   ev: CalendarEvent,
 ): React.CSSProperties {
-  const c = USER_COLORS[eventOwnerColorKey(state, ev)];
-  const border = eventColorCss(ev.colorKey) ?? hsl(c.main);
+  const { lightBg, darkBg, border } = eventBlockColors(state, ev);
   return {
-    "--ev-bg-light": hsl(c.lightBg),
-    "--ev-bg-dark": hsl(c.darkBg),
+    "--ev-bg-light": lightBg,
+    "--ev-bg-dark": darkBg,
     borderLeft: `3px solid ${border}`,
   } as React.CSSProperties;
 }
