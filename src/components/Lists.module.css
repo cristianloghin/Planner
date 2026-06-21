@@ -72,12 +72,19 @@
 
 .taskAdd {
   display: flex;
+  flex-direction: column;
   gap: 8px;
   margin-bottom: 16px;
 }
 
 .taskAdd input {
   flex: 1;
+}
+
+.taskAddDueContainer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .taskList {
@@ -92,19 +99,25 @@
 .task {
   position: relative;
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 36px 10px 12px;
+  border-radius: var(--radius);
+  padding: 8px;
+}
+
+.taskInput {
+  display: flex;
+  align-items: flex-start;
 }
 
 .task label {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex: 1;
+  gap: 8px;
+  flex: 1 1 auto;
   cursor: pointer;
 }
 
@@ -120,24 +133,25 @@
 }
 
 .taskDel {
-  position: absolute;
-  top: 4px;
-  right: 4px;
+  flex: 0 0 32px;
+  height: 32px;
   background: transparent;
   border: none;
+  outline: none;
   color: var(--muted);
-  font-size: var(--fs-2xl);
-  line-height: 1;
 }
 
 .badge {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-md);
   font-weight: 600;
   background: var(--c);
   color: var(--on-accent);
-  padding: 3px 8px;
+  padding: 3px 12px;
   border-radius: 999px;
   white-space: nowrap;
+
+  display: flex;
+  align-items: center;
 }
 
 .badge.shared {
@@ -156,6 +170,12 @@
   flex: 0 0 140px;
 }
 
+.dueContainer {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
 .dueInput {
   flex: 0 0 140px;
 }
@@ -166,9 +186,9 @@
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 4px 6px;
+  padding: 4px 12px;
   color: var(--muted);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-md);
 }
 
 .overdue {

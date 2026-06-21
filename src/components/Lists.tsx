@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { cx } from "../lib/cx";
 import { isOverdue } from "../lib/lists";
-import { personColorKey } from "../lib/people";
 import { colorVar } from "../lib/palette";
+import { personColorKey } from "../lib/people";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import type { ListItem, PersonId } from "../types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ListSearch } from "./ListSearch";
 import s from "./Lists.module.css";
+
+import { X } from "lucide-react";
 
 type Assignee = PersonId | "shared";
 
@@ -89,7 +91,11 @@ export function Lists() {
     return (
       <span
         className={s.badge}
-        style={{ "--c": colorVar(personColorKey(state, personId)) } as React.CSSProperties}
+        style={
+          {
+            "--c": colorVar(personColorKey(state, personId)),
+          } as React.CSSProperties
+        }
       >
         {p.name}
       </span>
@@ -102,43 +108,59 @@ export function Lists() {
       <li
         key={t.id}
         id={`list-item-${t.id}`}
-        className={cx(s.task, t.done && s.done, highlightId === t.id && s.highlight)}
+        className={cx(
+          s.task,
+          t.done && s.done,
+          highlightId === t.id && s.highlight,
+        )}
       >
-        <label>
-          <input
-            type="checkbox"
-            checked={t.done}
-            onChange={() =>
-              dispatch({ type: "toggleListItem", listId: selected.id, itemId: t.id })
+        <div className={s.taskInput}>
+          <label>
+            <input
+              type="checkbox"
+              checked={t.done}
+              onChange={() =>
+                dispatch({
+                  type: "toggleListItem",
+                  listId: selected.id,
+                  itemId: t.id,
+                })
+              }
+            />
+            <span className={s.taskTitle}>{t.title}</span>
+          </label>
+          <button
+            className={s.taskDel}
+            aria-label="Delete item"
+            onClick={() =>
+              dispatch({
+                type: "removeListItem",
+                listId: selected.id,
+                itemId: t.id,
+              })
             }
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className={s.dueContainer}>
+          <input
+            type="date"
+            className={cx(s.due, isOverdue(t) && s.overdue)}
+            value={t.dueOn ?? ""}
+            onChange={(e) =>
+              dispatch({
+                type: "setListItemDue",
+                listId: selected.id,
+                itemId: t.id,
+                dueOn: e.target.value || null,
+              })
+            }
+            aria-label="Deadline"
+            title={t.dueOn ? `Due ${t.dueOn}` : "Set a deadline"}
           />
-          <span className={s.taskTitle}>{t.title}</span>
-        </label>
-        <input
-          type="date"
-          className={cx(s.due, isOverdue(t) && s.overdue)}
-          value={t.dueOn ?? ""}
-          onChange={(e) =>
-            dispatch({
-              type: "setListItemDue",
-              listId: selected.id,
-              itemId: t.id,
-              dueOn: e.target.value || null,
-            })
-          }
-          aria-label="Deadline"
-          title={t.dueOn ? `Due ${t.dueOn}` : "Set a deadline"}
-        />
-        {badge(t.personId)}
-        <button
-          className={s.taskDel}
-          aria-label="Delete item"
-          onClick={() =>
-            dispatch({ type: "removeListItem", listId: selected.id, itemId: t.id })
-          }
-        >
-          ×
-        </button>
+          {badge(t.personId)}
+        </div>
       </li>
     );
   }
@@ -162,7 +184,13 @@ export function Lists() {
 
   // Distinct existing headers in this list, for the add-form's suggestions.
   const groupOptions = selected
-    ? [...new Set(selected.items.map((i) => i.groupLabel).filter((g): g is string => !!g))]
+    ? [
+        ...new Set(
+          selected.items
+            .map((i) => i.groupLabel)
+            .filter((g): g is string => !!g),
+        ),
+      ]
     : [];
 
   return (
@@ -209,7 +237,9 @@ export function Lists() {
         </form>
 
         {!selected && (
-          <p className={shared.empty}>No lists yet. Create one to get started.</p>
+          <p className={shared.empty}>
+            No lists yet. Create one to get started.
+          </p>
         )}
 
         {selected && (
@@ -221,8 +251,17 @@ export function Lists() {
                   className={s.renameForm}
                   onSubmit={(e) => {
                     e.preventDefault();
-                    const next = (e.currentTarget.elements.namedItem("name") as HTMLInputElement).value.trim();
-                    if (next) dispatch({ type: "renameList", id: selected.id, title: next });
+                    const next = (
+                      e.currentTarget.elements.namedItem(
+                        "name",
+                      ) as HTMLInputElement
+                    ).value.trim();
+                    if (next)
+                      dispatch({
+                        type: "renameList",
+                        id: selected.id,
+                        title: next,
+                      });
                     setRenaming(false);
                   }}
                 >
@@ -277,25 +316,27 @@ export function Lists() {
                   <option key={g} value={g} />
                 ))}
               </datalist>
-              <input
-                type="date"
-                className={s.dueInput}
-                value={due}
-                onChange={(e) => setDue(e.target.value)}
-                aria-label="Deadline (optional)"
-                title="Deadline (optional)"
-              />
-              <select
-                value={assignee}
-                onChange={(e) => setAssignee(e.target.value as Assignee)}
-              >
-                <option value="shared">Shared</option>
-                {Object.values(state.people).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              <div className={s.taskAddDueContainer}>
+                <input
+                  type="date"
+                  className={s.dueInput}
+                  value={due}
+                  onChange={(e) => setDue(e.target.value)}
+                  aria-label="Deadline (optional)"
+                  title="Deadline (optional)"
+                />
+                <select
+                  value={assignee}
+                  onChange={(e) => setAssignee(e.target.value as Assignee)}
+                >
+                  <option value="shared">Shared</option>
+                  {Object.values(state.people).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <button type="submit" className={shared.primary}>
                 Add
               </button>

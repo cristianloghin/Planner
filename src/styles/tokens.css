@@ -42,7 +42,7 @@
   /* ---- Surfaces: dark theme (default) ---- */
   --bg: hsl(240 15% 11%);
   --surface: hsl(240 15% 14%);
-  --surface-2: hsl(240 20% 17%);
+  --surface-2: hsl(240 25% 25%);
   --border: hsl(240 20% 20%);
   --text: hsl(240 15% 91%);
   --muted: hsl(240 5% 65%);
