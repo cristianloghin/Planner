@@ -11,8 +11,15 @@ import { USER_COLOR_KEYS, USER_COLORS, hsl } from "../lib/palette";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import type { EventTemplate } from "../types";
+import { ColorPicker } from "./ColorPicker";
 import { TemplateEditor } from "./TemplateEditor";
 import s from "./Settings.module.css";
+
+const USER_COLOR_OPTIONS = USER_COLOR_KEYS.map((key, i) => ({
+  value: key,
+  color: hsl(USER_COLORS[key].main),
+  label: `Colour ${i + 1}`,
+}));
 
 export function Settings() {
   const { state, dispatch } = useApp();
@@ -65,32 +72,19 @@ export function Settings() {
                   </button>
                 )}
               </div>
-              <div
-                className={s.colorRow}
-                role="radiogroup"
-                aria-label={`Your colour for ${p.name}`}
-              >
-                {USER_COLOR_KEYS.map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    className={cx(
-                      s.colorSwatch,
-                      activeKey === key && s.colorOn,
-                    )}
-                    style={{ background: hsl(USER_COLORS[key].main) }}
-                    aria-label={key}
-                    aria-pressed={activeKey === key}
-                    onClick={() =>
-                      dispatch({
-                        type: "setColorPref",
-                        personId: p.id,
-                        color: key,
-                      })
-                    }
-                  />
-                ))}
-              </div>
+              <ColorPicker
+                options={USER_COLOR_OPTIONS}
+                value={activeKey}
+                ariaLabel={`Your colour for ${p.name}`}
+                onChange={(color) =>
+                  color &&
+                  dispatch({
+                    type: "setColorPref",
+                    personId: p.id,
+                    color,
+                  })
+                }
+              />
             </div>
           );
         })}

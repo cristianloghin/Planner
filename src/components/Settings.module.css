@@ -18,26 +18,6 @@
   flex: 1;
 }
 
-.colorRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.colorSwatch {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  box-shadow: 0 0 0 1px var(--border) inset;
-  padding: 0;
-  cursor: pointer;
-}
-
-.colorOn {
-  border-color: var(--text);
-}
-
 .resetColor {
   flex: none;
   padding: 0 10px;
