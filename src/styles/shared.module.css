@@ -67,6 +67,11 @@
   min-height: 0;
   overflow-y: auto;
   padding: 16px max(16px, env(safe-area-inset-left));
+  /* WebKit/iOS: promote to its own compositing layer so the scrollable region
+     is established on first paint. Without this the overflow can render
+     "asleep" — frozen until a reflow wakes it — because this scroll container
+     is sized purely via the flex chain. See .plannerBody in DayView. */
+  transform: translateZ(0);
 }
 
 /* ---- Prev / next header (Day, Week, Month) ---- */
