@@ -34,7 +34,7 @@
 .event {
   position: relative;
   /* Tinted bg + solid colored left border (see swatches.css). */
-  background: var(--event-tint);
+  background: color-mix(in oklab, var(--c) var(--tint-strength), var(--surface));
   border-left: var(--event-accent) solid var(--c);
   border-radius: 8px;
   padding: 6px 8px;

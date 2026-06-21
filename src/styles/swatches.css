@@ -16,11 +16,12 @@
 :root {
   /* How a colored block is composed from its --c (set per element):
        --tint-strength  how much of --c bleeds into the surface (the soft bg)
-       --event-tint     the resolved background — uses each element's own --c and
-                        the current --surface, so it tracks the theme for free
-       --event-accent   width of the solid colored left border */
+       --event-accent   width of the solid colored left border
+     The tint itself is inlined per component as
+       color-mix(in oklab, var(--c) var(--tint-strength), var(--surface))
+     NOT wrapped in its own custom property: WebKit fails to resolve a var() that
+     points at a property whose value nests var() inside color-mix. */
   --tint-strength: 22%;
-  --event-tint: color-mix(in oklab, var(--c) var(--tint-strength), var(--surface));
   --event-accent: 3px;
 
   --color-1: hsl(0 90% 54%);
