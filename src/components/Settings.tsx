@@ -1,20 +1,16 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../auth";
 import { useDeleteTemplate, useTemplates } from "../data/templates";
+import { checklistEntries, notes, reminderOffsets } from "../lib/attachments";
 import { cx } from "../lib/cx";
-import {
-  checklistEntries,
-  notes,
-  reminderOffsets,
-} from "../lib/attachments";
-import { attendeeLabel, personColorKey } from "../lib/people";
 import { COLOR_KEYS, colorVar } from "../lib/palette";
+import { attendeeLabel, personColorKey } from "../lib/people";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import type { EventTemplate } from "../types";
 import { ColorPicker } from "./ColorPicker";
-import { TemplateEditor } from "./TemplateEditor";
 import s from "./Settings.module.css";
+import { TemplateEditor } from "./TemplateEditor";
 
 const COLOR_OPTIONS = COLOR_KEYS.map((key, i) => ({
   value: key,
@@ -47,6 +43,19 @@ export function Settings() {
           const activeKey = personColorKey(state, p.id);
           return (
             <div className={s.personRow} key={p.id}>
+              <ColorPicker
+                options={COLOR_OPTIONS}
+                value={activeKey}
+                ariaLabel={`Your colour for ${p.name}`}
+                onChange={(color) =>
+                  color &&
+                  dispatch({
+                    type: "setColorPref",
+                    personId: p.id,
+                    color,
+                  })
+                }
+              />
               <div className={s.personHead}>
                 <input
                   type="text"
@@ -73,19 +82,6 @@ export function Settings() {
                   </button>
                 )}
               </div>
-              <ColorPicker
-                options={COLOR_OPTIONS}
-                value={activeKey}
-                ariaLabel={`Your colour for ${p.name}`}
-                onChange={(color) =>
-                  color &&
-                  dispatch({
-                    type: "setColorPref",
-                    personId: p.id,
-                    color,
-                  })
-                }
-              />
             </div>
           );
         })}
@@ -126,23 +122,25 @@ function TemplatesSection() {
   return (
     <div className={s.templates}>
       <span className={cx(s.hint, s.small)}>
-        Event templates — reusable blueprints. Pick one when creating an event to
-        prefill its people, checklists, notes and reminders. Save a new one from
-        the event editor, or tap one here to edit it.
+        Event templates — reusable blueprints. Pick one when creating an event
+        to prefill its people, checklists, notes and reminders. Save a new one
+        from the event editor, or tap one here to edit it.
       </span>
       {templates.length === 0 ? (
         <p className={s.templatesEmpty}>No templates yet.</p>
       ) : (
         templates.map((t) => {
           const bits: string[] = [];
-          if (t.attendees.length)
-            bits.push(attendeeLabel(state, t.attendees));
+          if (t.attendees.length) bits.push(attendeeLabel(state, t.attendees));
           const checks = checklistEntries(t).length;
-          if (checks) bits.push(`${checks} checklist item${checks > 1 ? "s" : ""}`);
+          if (checks)
+            bits.push(`${checks} checklist item${checks > 1 ? "s" : ""}`);
           const noteCount = notes(t).length;
-          if (noteCount) bits.push(`${noteCount} note${noteCount > 1 ? "s" : ""}`);
+          if (noteCount)
+            bits.push(`${noteCount} note${noteCount > 1 ? "s" : ""}`);
           const reminders = reminderOffsets(t).length;
-          if (reminders) bits.push(`${reminders} reminder${reminders > 1 ? "s" : ""}`);
+          if (reminders)
+            bits.push(`${reminders} reminder${reminders > 1 ? "s" : ""}`);
           return (
             <div className={s.templateRow} key={t.id}>
               <button
@@ -169,10 +167,7 @@ function TemplatesSection() {
         })
       )}
       {editing && (
-        <TemplateEditor
-          template={editing}
-          onClose={() => setEditing(null)}
-        />
+        <TemplateEditor template={editing} onClose={() => setEditing(null)} />
       )}
     </div>
   );

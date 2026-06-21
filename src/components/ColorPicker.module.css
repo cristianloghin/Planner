@@ -4,19 +4,13 @@
  * tracks light/dark automatically.
  */
 .trigger {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: 2px solid var(--text);
-  box-shadow: 0 0 0 1px var(--border) inset;
+  height: 40px;
+  border-radius: 8px;
+  border: none;
   padding: 0;
   cursor: pointer;
-  flex: 0 0 30px;
-}
-
-.trigger:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  flex: 0 0 40px;
+  outline: none;
 }
 
 /* z-index sits above the full-page event editor shell (.editorPage is 2000). */

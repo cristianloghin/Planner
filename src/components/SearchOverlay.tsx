@@ -35,7 +35,9 @@ export function SearchOverlay({
   return (
     <div className={s.overlay} role="dialog" aria-modal="true" aria-label="Search">
       <div className={s.bar}>
-        <SearchIcon size={18} className={s.barIcon} />
+        <span className={s.barIcon}>
+          <SearchIcon size={18} />
+        </span>
         <input
           autoFocus
           className={s.input}

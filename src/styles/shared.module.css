@@ -23,9 +23,43 @@
 
 .viewHeadContainer {
   display: grid;
-  grid-template-columns: 24px 1fr 24px;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   margin-bottom: 14px;
+}
+
+/* Side header slots size to content and hug the edges; the nav stays centered. */
+.viewHeadContainer > :first-child {
+  justify-self: start;
+}
+
+.viewHeadContainer > :last-child {
+  justify-self: end;
+}
+
+/* A row of controls in a side slot: search on the left, today (+ badges) right. */
+.headSide {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* "Jump to today" icon button, shared by the Day / Week / Month headers. */
+.todayBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+}
+
+.todayBtn.todayActive {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-radius: 8px;
 }
 
 .viewBody {
@@ -44,13 +78,15 @@
   font-size: var(--fs-xl);
 }
 
+/* Bare icon buttons, matching the search / today controls — the calendar also
+   swipes, so the nav arrows don't need to read as prominent bordered controls. */
 .weekNav button {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text);
+  background: transparent;
+  border: none;
+  color: var(--accent);
   border-radius: 8px;
   width: 36px;
   height: 36px;

@@ -88,26 +88,6 @@
   outline-offset: -2px;
 }
 
-/* ---- Today button ---- */
-/* ---- Conflict legend ---- */
-
-.today,
-.conflictLegend {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.todayButton {
-  display: flex;
-  background-color: transparent;
-  border: none;
-  outline: none;
-  align-items: center;
-  justify-content: center;
-  color: var(--accent);
-}
-
 .alertBadge {
   color: var(--danger);
 }

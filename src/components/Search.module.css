@@ -1,15 +1,15 @@
-/* The header trigger that opens a search overlay. Sits in a view header's
-   narrow side column, so it stays compact. */
+/* The header trigger that opens a search overlay. Sits in a view header's side
+   slot; styled like the (unselected) Today button — a bare accent icon, not a
+   bordered chevron control. */
 .trigger {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 36px;
   height: 36px;
-  margin-left: auto;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text);
+  background: transparent;
+  border: none;
+  color: var(--accent);
   border-radius: 8px;
 }
 
@@ -17,6 +17,10 @@
 .overlay {
   position: fixed;
   inset: 0;
+  /* Match the app's centered column so the bar lines up with the view header
+     it covers (the app is max-width 1100px, centered). */
+  max-width: 1100px;
+  margin: 0 auto;
   z-index: 2000;
   display: flex;
   flex-direction: column;
@@ -28,14 +32,24 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: max(env(safe-area-inset-top), 16px) 16px 12px;
+  /* Left/right padding matches the view header so the leading icon lands on the
+     trigger button it replaces — opening search shouldn't make it jump. */
+  padding: max(env(safe-area-inset-top), 16px) max(16px, env(safe-area-inset-left))
+    12px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 
+/* Mirrors the 36×36 trigger button (accent icon centered) so its position and
+   look are unchanged when the overlay opens over it. */
 .barIcon {
   flex: none;
-  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: var(--accent);
 }
 
 .input {
@@ -45,7 +59,11 @@
   border: none;
   color: var(--text);
   font-size: var(--fs-xl);
-  padding: 6px 0;
+  /* Pin to 36px so the bar row matches the trigger button it replaces — WebKit's
+     default input height (~40px) would otherwise tug the leading icon down. */
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0;
 }
 
 .input:focus {
@@ -57,10 +75,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 36px;
+  height: 36px;
   background: transparent;
   border: none;
   color: var(--muted);
-  padding: 6px;
 }
 
 .results {
