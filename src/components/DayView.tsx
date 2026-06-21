@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   Bell,
-  Calendar,
   CheckSquare,
   ChevronLeft,
   ChevronRight,
@@ -20,15 +19,21 @@ import {
   weekdayIndex,
 } from "../lib/dates";
 import { isOccurrenceDone, occKey, occurrenceStatus } from "../lib/occurrences";
-import { eventColorKey, peopleList, personColorKey } from "../lib/people";
 import { colorVar, type ColorKey } from "../lib/palette";
-import { occurrencesOnDate, type DayOccurrence } from "../lib/recurrence";
+import { eventColorKey, peopleList, personColorKey } from "../lib/people";
+import {
+  nextStartOnOrAfter,
+  occurrencesOnDate,
+  type DayOccurrence,
+} from "../lib/recurrence";
+import { eventDate } from "../lib/timing";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import type { CalendarEvent, Person, PersonId } from "../types";
 import s from "./DayView.module.css";
 import { EventEditor, type EditorTarget } from "./EventEditor";
 import { OccurrenceSheet } from "./OccurrenceSheet";
+import { ViewHeader } from "./ViewHeader";
 
 // Layout scale. The hour height is user-zoomable (pinch); the rest are fixed.
 // The default must match --hour-h in tokens.css for the very first paint.
@@ -279,6 +284,21 @@ export function DayView() {
 
   const fullHeight = DAY_MIN * pxPerMin;
 
+  // Open a search hit: jump the day to the event's next upcoming occurrence
+  // (falling back to the series anchor for an ended series) and open its editor.
+  function openSearchHit(seriesId: string) {
+    const event = state.events.find((e) => e.id === seriesId);
+    if (!event) return;
+    const date =
+      nextStartOnOrAfter(event, toISODate(new Date())) ?? eventDate(event);
+    dispatch({
+      type: "setWeek",
+      weekStart: mondayOf(new Date(date + "T00:00:00")),
+    });
+    dispatch({ type: "setDay", day: weekdayIndex(date) });
+    setEditor({ mode: "edit", event, occurrenceDate: date });
+  }
+
   function goToday() {
     const todayISO = toISODate(new Date());
     dispatch({ type: "setWeek", weekStart: mondayOf(new Date()) });
@@ -290,16 +310,14 @@ export function DayView() {
 
   return (
     <section className={shared.view}>
-      <div className={shared.viewHead}>
-        <div className={shared.viewHeadContainer}>
-          <div className={s.today}>
-            <button
-              className={s.todayButton}
-              onClick={goToday}
-            >
-              <Calendar />
-            </button>
-          </div>
+      <ViewHeader
+        onToday={goToday}
+        todayActive={isToday}
+        onPickSearch={openSearchHit}
+        rightExtra={
+          hasWarnings && <AlertTriangle className={s.alertBadge} />
+        }
+        nav={
           <div className={shared.weekNav}>
             <button
               onClick={() => dispatch({ type: "shiftDay", delta: -1 })}
@@ -315,13 +333,8 @@ export function DayView() {
               <ChevronRight size={20} />
             </button>
           </div>
-
-          {hasWarnings && (
-            <div className={s.conflictLegend}>
-              <AlertTriangle className={s.alertBadge} />
-            </div>
-          )}
-        </div>
+        }
+      >
         <div className={s.plannerHead}>
           <div />
           <div className={s.laneHeads}>
@@ -352,7 +365,7 @@ export function DayView() {
             ))}
           </div>
         </div>
-      </div>
+      </ViewHeader>
       <div
         className={s.plannerBody}
         ref={scrollRef}

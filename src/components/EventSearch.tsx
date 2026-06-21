@@ -9,9 +9,9 @@ import s from "./Search.module.css";
 import { SearchOverlay } from "./SearchOverlay";
 
 /**
- * Event search for the Week header. Hits the `search_events` RPC (titles + note
- * and checklist text); picking a result hands its series id back to the calendar,
- * which navigates to and opens it.
+ * Event search in the shared view header (Day / Week / Month). Hits the
+ * `search_events` RPC (titles + note and checklist text); picking a result hands
+ * its series id back to the view, which navigates to and opens it.
  */
 export function EventSearch({ onPick }: { onPick: (seriesId: string) => void }) {
   const { accountId } = useAuth();

@@ -14,7 +14,7 @@
   color-scheme: light dark;
 
   /* ---- Brand & status (theme-independent) ---- */
-  --accent: hsl(240 35% 45%);
+  --accent: hsl(240 40% 53%);
   --on-accent: hsl(240 50% 97%); /* text/icons on a coloured block or accent button */
   --danger: hsl(0 80% 50%);
   --danger-glow: hsl(0 84% 60% / 0.25);

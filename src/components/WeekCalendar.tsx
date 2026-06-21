@@ -16,7 +16,7 @@ import { eventDate } from "../lib/timing";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import { EventEditor, type EditorTarget } from "./EventEditor";
-import { EventSearch } from "./EventSearch";
+import { ViewHeader } from "./ViewHeader";
 import s from "./WeekCalendar.module.css";
 
 export function WeekCalendar() {
@@ -35,9 +35,11 @@ export function WeekCalendar() {
 
   return (
     <section className={shared.view}>
-      <div className={shared.viewHead}>
-        <div className={shared.viewHeadContainer}>
-          <div></div>
+      <ViewHeader
+        onToday={() => dispatch({ type: "setWeek", weekStart: mondayOf(new Date()) })}
+        todayActive={state.weekStart === mondayOf(new Date())}
+        onPickSearch={openEvent}
+        nav={
           <div className={shared.weekNav}>
             <button
               onClick={() => dispatch({ type: "shiftWeek", delta: -1 })}
@@ -53,9 +55,8 @@ export function WeekCalendar() {
               <ChevronRight size={20} />
             </button>
           </div>
-          <EventSearch onPick={openEvent} />
-        </div>
-      </div>
+        }
+      />
 
       <div className={shared.viewBody}>
         <div className={s.days}>

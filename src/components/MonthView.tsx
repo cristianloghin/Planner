@@ -12,11 +12,12 @@ import {
 } from "../lib/dates";
 import { eventColorKey } from "../lib/people";
 import { colorVar } from "../lib/palette";
-import { occurrencesOnDate } from "../lib/recurrence";
-import { eventStartMinutes } from "../lib/timing";
+import { nextStartOnOrAfter, occurrencesOnDate } from "../lib/recurrence";
+import { eventDate, eventStartMinutes } from "../lib/timing";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import s from "./MonthView.module.css";
+import { ViewHeader } from "./ViewHeader";
 
 // Up to this many event dots before collapsing the rest into a "+N".
 const MAX_DOTS = 4;
@@ -29,11 +30,21 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
   const today = toISODate(new Date());
   const days = monthGridDays(cursor);
 
+  // Open a search hit: jump to the event's next upcoming occurrence (falling
+  // back to the series anchor for an ended series) in the Day view.
+  function openSearchHit(seriesId: string) {
+    const event = state.events.find((e) => e.id === seriesId);
+    if (!event) return;
+    onOpenDay(nextStartOnOrAfter(event, today) ?? eventDate(event));
+  }
+
   return (
     <section className={shared.view}>
-      <div className={shared.viewHead}>
-        <div className={shared.viewHeadContainer}>
-          <div />
+      <ViewHeader
+        onToday={() => setCursor(startOfMonth(today))}
+        todayActive={isSameMonth(today, cursor)}
+        onPickSearch={openSearchHit}
+        nav={
           <div className={shared.weekNav}>
             <button
               onClick={() => setCursor(addMonths(cursor, -1))}
@@ -49,9 +60,8 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
               <ChevronRight size={20} />
             </button>
           </div>
-          <div />
-        </div>
-      </div>
+        }
+      />
 
       <div className={shared.viewBody}>
         <div className={s.monthGrid}>

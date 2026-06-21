@@ -169,11 +169,13 @@ export function Lists() {
     <section className={shared.view}>
       <div className={shared.viewHead}>
         <div className={shared.viewHeadContainer}>
-          <div />
+          <div className={shared.headSide}>
+            <ListSearch onPick={jumpToItem} />
+          </div>
           <div className={shared.weekNav}>
             <strong>Lists</strong>
           </div>
-          <ListSearch onPick={jumpToItem} />
+          <div />
         </div>
       </div>
 
