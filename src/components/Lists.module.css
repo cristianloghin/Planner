@@ -113,6 +113,12 @@
   color: var(--muted);
 }
 
+/* Transient flash when a search result jumps to this row. */
+.task.highlight {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
 .taskDel {
   position: absolute;
   top: 4px;

@@ -106,6 +106,27 @@ export function latestStartOnOrBefore(e: CalendarEvent, date: string): string | 
 }
 
 /**
+ * The first occurrence start date of `e` on or after ISO `date`, or null when the
+ * series has already ended (capped before `date`, or a one-off whose only slot is
+ * in the past). The forward mirror of {@link latestStartOnOrBefore} — used to open
+ * a found event at its next upcoming occurrence rather than its (possibly
+ * long-past) series anchor. Scans day-by-day, which `startsOn` keeps correct
+ * across all frequencies and the `until` cap; bounded so a dead series can't loop.
+ */
+export function nextStartOnOrAfter(e: CalendarEvent, date: string): string | null {
+  const base = eventDate(e)
+  const from = diffDays(date, base) <= 0 ? base : date
+  // A one-off only ever sits on its anchor; recurring series walk forward.
+  if (!e.recurrence) return from === base ? base : null
+  for (let d = from, i = 0; i < 366 * 5; d = addDays(d, 1), i++) {
+    if (startsOn(e, d)) return d
+    // Past the inclusive cap there can be no further occurrence.
+    if (e.recurrence.until && diffDays(d, e.recurrence.until) > 0) return null
+  }
+  return null
+}
+
+/**
  * Occurrence start dates of `e` within the inclusive ISO range [from, to]. Used
  * to populate the prerequisite-occurrence picker, so the user links to a real
  * RRULE slot (never an arbitrary date). The range is walked day-by-day; callers
