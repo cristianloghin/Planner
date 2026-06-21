@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { cx } from "../lib/cx";
 import { isOverdue } from "../lib/lists";
-import { personColor } from "../lib/people";
+import { personColorKey } from "../lib/people";
+import { colorVar } from "../lib/palette";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import type { ListItem, PersonId } from "../types";
@@ -88,7 +89,7 @@ export function Lists() {
     return (
       <span
         className={s.badge}
-        style={{ background: personColor(state, personId) }}
+        style={{ "--c": colorVar(personColorKey(state, personId)) } as React.CSSProperties}
       >
         {p.name}
       </span>

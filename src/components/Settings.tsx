@@ -7,7 +7,7 @@ import {
   reminderOffsets,
 } from "../lib/attachments";
 import { attendeeLabel, personColorKey } from "../lib/people";
-import { USER_COLOR_KEYS, USER_COLORS, hsl } from "../lib/palette";
+import { COLOR_KEYS, colorVar } from "../lib/palette";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import type { EventTemplate } from "../types";
@@ -15,9 +15,9 @@ import { ColorPicker } from "./ColorPicker";
 import { TemplateEditor } from "./TemplateEditor";
 import s from "./Settings.module.css";
 
-const USER_COLOR_OPTIONS = USER_COLOR_KEYS.map((key, i) => ({
+const COLOR_OPTIONS = COLOR_KEYS.map((key, i) => ({
   value: key,
-  color: hsl(USER_COLORS[key].main),
+  color: colorVar(key),
   label: `Colour ${i + 1}`,
 }));
 
@@ -73,7 +73,7 @@ export function Settings() {
                 )}
               </div>
               <ColorPicker
-                options={USER_COLOR_OPTIONS}
+                options={COLOR_OPTIONS}
                 value={activeKey}
                 ariaLabel={`Your colour for ${p.name}`}
                 onChange={(color) =>

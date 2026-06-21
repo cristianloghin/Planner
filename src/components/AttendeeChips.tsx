@@ -1,6 +1,7 @@
 import { useApp } from '../state'
 import type { PersonId } from '../types'
-import { peopleList, personColor } from '../lib/people'
+import { peopleList, personColorKey } from '../lib/people'
+import { colorVar } from '../lib/palette'
 import { cx } from '../lib/cx'
 import shared from '../styles/shared.module.css'
 
@@ -25,7 +26,7 @@ export function AttendeeChips({
     <div className={shared.chips}>
       {peopleList(state).map((p) => {
         const on = value.includes(p.id)
-        const c = personColor(state, p.id)
+        const c = colorVar(personColorKey(state, p.id))
         return (
           <button
             type="button"

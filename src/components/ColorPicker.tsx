@@ -6,7 +6,7 @@ import s from "./ColorPicker.module.css";
 export interface ColorOption<T extends string> {
   /** Stable key stored against the picked value. */
   value: T;
-  /** CSS color for the swatch (e.g. an `hsl(...)` string). */
+  /** CSS color for the swatch (e.g. a `var(--color-N)` reference). */
   color: string;
   /** Accessible label for this swatch. */
   label: string;

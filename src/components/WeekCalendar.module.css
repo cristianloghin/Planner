@@ -33,18 +33,12 @@
 
 .event {
   position: relative;
-  /* Creator's user color as background (theme shade picked below); the event
-     color is the inline left border. */
-  background: var(--ev-bg-dark);
-  border-left: 3px solid var(--accent);
+  /* A tint of the event's color over the surface (theme-agnostic), with the solid
+     color as the left border. */
+  background: color-mix(in oklab, var(--c) 22%, var(--surface));
+  border-left: 3px solid var(--c);
   border-radius: 8px;
   padding: 6px 8px;
-}
-
-@media (prefers-color-scheme: light) {
-  .event {
-    background: var(--ev-bg-light);
-  }
 }
 
 .eventTime {
@@ -93,6 +87,7 @@
   border-radius: 50%;
   font-size: var(--fs-2xs);
   font-weight: 700;
+  background: var(--c);
   color: var(--on-accent);
   flex: none;
 }

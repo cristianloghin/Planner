@@ -1,4 +1,4 @@
-import type { EventColorKey, UserColorKey } from './lib/palette'
+import type { ColorKey } from './lib/palette'
 
 /** A person's id. Now an opaque string (a backend uuid), not a fixed enum — the
  *  app is generic over however many people exist. */
@@ -110,11 +110,10 @@ export interface CalendarEvent {
   /** Everyone involved — one or more people. */
   attendees: PersonId[]
   /**
-   * Optional event color, a key into the fixed event palette
-   * (`src/lib/palette.ts`). Absent = no event color chosen, so the block's left
-   * border falls back to the lane person's main color.
+   * Optional event color, a key into the unified palette (`src/lib/palette.ts`).
+   * Absent = inherit the (lane) person's color.
    */
-  colorKey?: EventColorKey
+  colorKey?: ColorKey
   /** Notes, checklists and reminders, in display order. */
   attachments: Attachment[]
 }
@@ -196,7 +195,7 @@ export interface OccurrenceState {
  */
 export interface Preferences {
   /** Per-person user-color override, as a palette key (one of the nine). */
-  personColors: Record<PersonId, UserColorKey>
+  personColors: Record<PersonId, ColorKey>
 }
 
 export interface AppState {
