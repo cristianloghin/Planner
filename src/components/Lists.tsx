@@ -6,6 +6,7 @@ import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import type { ListItem, PersonId } from "../types";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { ListSearch } from "./ListSearch";
 import s from "./Lists.module.css";
 
 type Assignee = PersonId | "shared";
@@ -21,6 +22,8 @@ export function Lists() {
   const [newListName, setNewListName] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Set when a search result jumps here; scrolls the row in and flashes it.
+  const [highlightId, setHighlightId] = useState<string | null>(null);
 
   // After creating a list, jump to it (the reducer appends it last).
   const jumpToLast = useRef(false);
@@ -35,6 +38,23 @@ export function Lists() {
   // delete, or on first load).
   const selected =
     state.lists.find((l) => l.id === selectedId) ?? state.lists[0] ?? null;
+
+  // Scroll the highlighted row into view (once it's rendered) and clear the
+  // flash after a moment.
+  useEffect(() => {
+    if (!highlightId) return;
+    document
+      .getElementById(`list-item-${highlightId}`)
+      ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    const t = setTimeout(() => setHighlightId(null), 2000);
+    return () => clearTimeout(t);
+  }, [highlightId]);
+
+  function jumpToItem(listId: string, itemId: string) {
+    setSelectedId(listId);
+    setRenaming(false);
+    setHighlightId(itemId);
+  }
 
   function createList(e: React.FormEvent) {
     e.preventDefault();
@@ -78,7 +98,11 @@ export function Lists() {
   function row(t: ListItem) {
     if (!selected) return null;
     return (
-      <li key={t.id} className={cx(s.task, t.done && s.done)}>
+      <li
+        key={t.id}
+        id={`list-item-${t.id}`}
+        className={cx(s.task, t.done && s.done, highlightId === t.id && s.highlight)}
+      >
         <label>
           <input
             type="checkbox"
@@ -148,7 +172,7 @@ export function Lists() {
           <div className={shared.weekNav}>
             <strong>Lists</strong>
           </div>
-          <div />
+          <ListSearch onPick={jumpToItem} />
         </div>
       </div>
 

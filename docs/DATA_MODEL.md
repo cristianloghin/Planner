@@ -447,3 +447,4 @@ Apply in order. See [`NEXT_SESSION.md`](./NEXT_SESSION.md) for the full connect�
 | `0011_realtime_delete_replica_identity.sql` | `REPLICA IDENTITY FULL` on RLS‑gated tables so DELETEs reach the other client over realtime |
 | `0012_shares.sql` *(planned)* | Shares & pins: `occurrence_share` (one table for both), RLS, grants, realtime + `REPLICA IDENTITY FULL` ([Decision 12](#12-shares--pins--one-occurrence-grain-table-occurrence_share)) |
 | `0013_list_visibility.sql` *(planned)* | Per‑list `owner_id` + `visibility` (private/account); `can_access_list` respects privacy; `list_item` SELECT OR‑exposes link‑attached items ([Decision 13](#13-private-lists--per-list-visibility-scope)) |
+| `0014_search.sql` | `search_events` / `search_list_items` account‑scoped FTS RPCs (SECURITY INVOKER, so RLS scopes results); `to_tsvector`/`@@`/`ts_rank` over titles + note/checklist text, ILIKE fallback for partial words |

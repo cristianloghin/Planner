@@ -965,6 +965,32 @@ export type Database = {
       can_access_series: { Args: { p_series: string }; Returns: boolean }
       create_account: { Args: { p_name: string }; Returns: string }
       is_account_member: { Args: { p_account: string }; Returns: boolean }
+      search_events: {
+        Args: { p_account: string; p_query: string }
+        Returns: {
+          series_id: string
+          title: string
+          dtstart: string | null
+          all_day: boolean
+          rrule: string | null
+          snippet: string | null
+          rank: number
+        }[]
+      }
+      search_list_items: {
+        Args: { p_account: string; p_query: string }
+        Returns: {
+          item_id: string
+          list_id: string
+          list_title: string
+          title: string
+          group_label: string | null
+          done: boolean
+          due_on: string | null
+          person_id: string | null
+          rank: number
+        }[]
+      }
       split_series: {
         Args: { p_cutover: string; p_series: string; p_truncated_rrule: string }
         Returns: string

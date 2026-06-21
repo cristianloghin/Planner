@@ -3,6 +3,7 @@ import type { CalendarEvent, Recurrence } from '../types'
 import {
   startsOn,
   latestStartOnOrBefore,
+  nextStartOnOrAfter,
   seriesOccurrenceDatesInRange,
   recurrenceLabel,
   occurrencesOnDate,
@@ -97,6 +98,37 @@ describe('latestStartOnOrBefore', () => {
     const e = ev('2026-01-31', { freq: 'monthly', interval: 1 })
     // Querying within Feb walks back to Jan 31 (Feb itself is skipped).
     expect(latestStartOnOrBefore(e, '2026-02-15')).toBe('2026-01-31')
+  })
+})
+
+describe('nextStartOnOrAfter', () => {
+  it('returns the anchor when it is on or after the date', () => {
+    const e = ev('2026-06-15', { freq: 'daily', interval: 1 })
+    expect(nextStartOnOrAfter(e, '2026-06-10')).toBe('2026-06-15')
+    expect(nextStartOnOrAfter(e, '2026-06-15')).toBe('2026-06-15')
+  })
+
+  it('finds the next daily slot after a past anchor', () => {
+    const e = ev('2026-06-15', { freq: 'daily', interval: 3 })
+    expect(nextStartOnOrAfter(e, '2026-06-16')).toBe('2026-06-18')
+    expect(nextStartOnOrAfter(e, '2026-06-18')).toBe('2026-06-18')
+  })
+
+  it('finds the next weekly slot', () => {
+    const e = ev('2026-06-15', { freq: 'weekly', interval: 2 })
+    expect(nextStartOnOrAfter(e, '2026-06-23')).toBe('2026-06-29')
+  })
+
+  it('returns null for a one-off whose only slot has passed', () => {
+    const e = ev('2026-06-15')
+    expect(nextStartOnOrAfter(e, '2026-06-16')).toBeNull()
+    expect(nextStartOnOrAfter(e, '2026-06-15')).toBe('2026-06-15')
+  })
+
+  it('returns null once the series UNTIL cap has passed', () => {
+    const e = ev('2026-06-15', { freq: 'daily', interval: 1, until: '2026-06-17' })
+    expect(nextStartOnOrAfter(e, '2026-06-17')).toBe('2026-06-17')
+    expect(nextStartOnOrAfter(e, '2026-06-18')).toBeNull()
   })
 })
 

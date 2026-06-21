@@ -1,0 +1,122 @@
+/* The header trigger that opens a search overlay. Sits in a view header's
+   narrow side column, so it stays compact. */
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+}
+
+/* Full-screen search surface, layered above the view (matches the editor shell). */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: max(env(safe-area-inset-top), 16px) 16px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.barIcon {
+  flex: none;
+  color: var(--muted);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: var(--fs-xl);
+  padding: 6px 0;
+}
+
+.input:focus {
+  outline: none;
+}
+
+.close {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 6px;
+}
+
+.results {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 16px calc(28px + env(safe-area-inset-bottom));
+}
+
+.hint {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  text-align: center;
+  margin: 16px 0;
+}
+
+.error {
+  color: var(--danger);
+}
+
+/* ---- Result rows ---- */
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  padding: 12px 4px;
+}
+
+.rowTitle {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+
+.rowTitle.done {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.rowMeta {
+  font-size: var(--fs-base);
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.snippet {
+  font-size: var(--fs-base);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

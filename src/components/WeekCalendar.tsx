@@ -5,18 +5,32 @@ import {
   addDays,
   dayLabel,
   minutesToTime,
+  mondayOf,
+  toISODate,
   weekRangeLabel,
 } from "../lib/dates";
 import { blockColors, defaultAttendees, personColor } from "../lib/people";
-import { occurrencesOnDate, recurrenceLabel } from "../lib/recurrence";
+import { nextStartOnOrAfter, occurrencesOnDate, recurrenceLabel } from "../lib/recurrence";
+import { eventDate } from "../lib/timing";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import { EventEditor, type EditorTarget } from "./EventEditor";
+import { EventSearch } from "./EventSearch";
 import s from "./WeekCalendar.module.css";
 
 export function WeekCalendar() {
   const { state, dispatch } = useApp();
   const [target, setTarget] = useState<EditorTarget | null>(null);
+
+  // Open a search hit: jump the week to its next upcoming occurrence (falling
+  // back to the series anchor for an ended series) and open the editor there.
+  function openEvent(seriesId: string) {
+    const event = state.events.find((e) => e.id === seriesId);
+    if (!event) return;
+    const date = nextStartOnOrAfter(event, toISODate(new Date())) ?? eventDate(event);
+    dispatch({ type: "setWeek", weekStart: mondayOf(new Date(date + "T00:00:00")) });
+    setTarget({ mode: "edit", event, occurrenceDate: date });
+  }
 
   return (
     <section className={shared.view}>
@@ -38,7 +52,7 @@ export function WeekCalendar() {
               <ChevronRight size={20} />
             </button>
           </div>
-          <div></div>
+          <EventSearch onPick={openEvent} />
         </div>
       </div>
 
