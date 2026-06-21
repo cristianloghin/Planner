@@ -1,3 +1,5 @@
+import type { EventColorKey } from './lib/palette'
+
 /** A person's id. Now an opaque string (a backend uuid), not a fixed enum — the
  *  app is generic over however many people exist. */
 export type PersonId = string
@@ -105,6 +107,12 @@ export interface CalendarEvent {
   recurrence?: Recurrence
   /** Everyone involved — one or more people. */
   attendees: PersonId[]
+  /**
+   * Optional event color, a key into the fixed event palette
+   * (`src/lib/palette.ts`). Absent = no event color chosen, so the timeline
+   * falls back to the attendee color.
+   */
+  colorKey?: EventColorKey
   /** Notes, checklists and reminders, in display order. */
   attachments: Attachment[]
 }

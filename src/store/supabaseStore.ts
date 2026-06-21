@@ -21,6 +21,7 @@ import { uid } from '../lib/id'
 import { toISODate, toDateTimeLocal } from '../lib/dates'
 import { notes as noteAttachments, checklists } from '../lib/attachments'
 import { recurrenceToRRule, rruleToRecurrence, truncatedRRule } from '../lib/rrule'
+import { isEventColorKey } from '../lib/palette'
 
 const MINS_PER_DAY = 24 * 60
 
@@ -90,6 +91,7 @@ interface SeriesRow {
   dtstart: string | null
   duration: string | null
   rrule: string | null
+  color_key: string | null
   event_person: { person_id: string }[]
   checklist_item: {
     id: string
@@ -190,7 +192,7 @@ export class SupabaseStore implements ScheduleStore {
       // more than one relationship between event_series and these children
       // (e.g. checklist_item also links many-to-many via occurrence_item_removed).
       .select(
-        `id, title, all_day, dtstart, duration, rrule,
+        `id, title, all_day, dtstart, duration, rrule, color_key,
          event_person!series_id ( person_id ),
          checklist_item!owner_series_id ( id, label, group_label, sort_order, occurrence_start ),
          note!owner_series_id ( id, body ),
@@ -211,6 +213,7 @@ export class SupabaseStore implements ScheduleStore {
         duration: intervalToDuration(r.duration, allDay),
         recurrence: rruleToRecurrence(r.rrule),
         attendees: r.event_person.map((ep) => ep.person_id),
+        colorKey: isEventColorKey(r.color_key) ? r.color_key : undefined,
         attachments: rebuildAttachments(r),
       }
     })
@@ -557,6 +560,7 @@ export class SupabaseStore implements ScheduleStore {
             dtstart: startToTs(e.start, e.allDay),
             duration: durationToInterval(e.duration, e.allDay),
             rrule: recurrenceToRRule(e.recurrence),
+            color_key: e.colorKey ?? null,
           })
           .eq('id', newId as string)
         if (up.error) throw up.error
@@ -763,6 +767,7 @@ export class SupabaseStore implements ScheduleStore {
       dtstart: startToTs(ev.start, ev.allDay),
       duration: durationToInterval(ev.duration, ev.allDay),
       rrule: recurrenceToRRule(ev.recurrence),
+      color_key: ev.colorKey ?? null,
       is_template: false,
       // Only stamp provenance on insert-from-template; updates omit it so an edit
       // never clobbers an existing link.

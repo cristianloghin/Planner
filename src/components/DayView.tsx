@@ -29,6 +29,7 @@ import {
   personColor,
 } from "../lib/people";
 import { occurrencesOnDate, type DayOccurrence } from "../lib/recurrence";
+import { eventColorCss } from "../lib/palette";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import type { CalendarEvent, Person, PersonId } from "../types";
@@ -49,6 +50,13 @@ const ZOOM_KEY = "planner:hourH";
 // the slide animation that commits the change runs for this many ms.
 const SWIPE_COMMIT = 60;
 const SWIPE_SLIDE_MS = 200;
+
+// A left border in the event's chosen palette color, layered over the attendee
+// background. Returns no style when the event has no color of its own.
+function borderFor(colorKey: CalendarEvent["colorKey"]): React.CSSProperties {
+  const color = eventColorCss(colorKey);
+  return color ? { borderLeft: `4px solid ${color}` } : {};
+}
 
 // A child's lane is narrower than an adult's (they share an adult's time).
 const CHILD_WEIGHT = 1;
@@ -521,7 +529,10 @@ function AllDayChip({
         status === "clash" && s.warnClash,
         status === "needs" && s.warnNeeds,
       )}
-      style={{ background: eventColor(state, event.attendees) }}
+      style={{
+        background: eventColor(state, event.attendees),
+        ...borderFor(event.colorKey),
+      }}
       onClick={onClick}
     >
       <span className={s.alldayMeta}>
@@ -657,6 +668,7 @@ function Lane({
               left: `calc(${(100 / cols) * col}% + 2px)`,
               width: `calc(${100 / cols}% - 4px)`,
               background: eventColor(state, ev.attendees),
+              ...borderFor(ev.colorKey),
             }}
             onClick={() => onOpen(block.occ)}
           >
