@@ -224,6 +224,6 @@
 }
 
 .todoOverdue {
-  color: var(--danger, #dc2626);
-  border-color: var(--danger, #dc2626);
+  color: var(--danger);
+  border-color: var(--danger);
 }

@@ -18,10 +18,17 @@ import type {
 } from "../types";
 import { AttachmentsEditor } from "./AttachmentsEditor";
 import { AttendeeChips } from "./AttendeeChips";
+import { ColorPicker } from "./ColorPicker";
 import { NumberField } from "./NumberField";
 import s from "./EventEditor.module.css";
 
 const SNAP = 15;
+
+const EVENT_COLOR_OPTIONS = EVENT_COLOR_KEYS.map((key, i) => ({
+  value: key,
+  color: hsl(EVENT_COLORS[key]),
+  label: `Colour ${i + 1}`,
+}));
 
 /** What the editor opens onto: a brand-new event or an existing one. */
 export type EditorTarget =
@@ -432,26 +439,13 @@ export function EventEditor({
         <AttendeeChips value={attendees} onChange={setAttendees} />
 
         <label className={shared.label}>Color</label>
-        <div className={s.colorRow} role="radiogroup" aria-label="Event color">
-          <button
-            type="button"
-            className={cx(s.colorSwatch, s.colorNone, !colorKey && s.colorOn)}
-            aria-label="No color"
-            aria-pressed={!colorKey}
-            onClick={() => setColorKey(undefined)}
-          />
-          {EVENT_COLOR_KEYS.map((key) => (
-            <button
-              key={key}
-              type="button"
-              className={cx(s.colorSwatch, colorKey === key && s.colorOn)}
-              style={{ background: hsl(EVENT_COLORS[key]) }}
-              aria-label={key}
-              aria-pressed={colorKey === key}
-              onClick={() => setColorKey(key)}
-            />
-          ))}
-        </div>
+        <ColorPicker
+          options={EVENT_COLOR_OPTIONS}
+          value={colorKey ?? null}
+          allowNone
+          ariaLabel="Event color"
+          onChange={(key) => setColorKey(key ?? undefined)}
+        />
 
         <AttachmentsEditor attachments={attachments} onChange={setAttachments} />
 

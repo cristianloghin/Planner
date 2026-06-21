@@ -18,39 +18,6 @@
   opacity: 0.5;
 }
 
-/* ---- event color picker ---- */
-.colorRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.colorSwatch {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  box-shadow: 0 0 0 1px var(--border) inset;
-  padding: 0;
-  cursor: pointer;
-}
-
-/* "No color" swatch — a neutral surface with a diagonal slash. */
-.colorNone {
-  background: var(--surface-2);
-  background-image: linear-gradient(
-    135deg,
-    transparent 45%,
-    var(--muted) 45%,
-    var(--muted) 55%,
-    transparent 55%
-  );
-}
-
-.colorOn {
-  border-color: var(--text);
-}
-
 /* ---- save-scope chooser (recurring-occurrence edits) ---- */
 /* Radix Dialog portals to <body> and renders the overlay + content as siblings,
    so the overlay is just the backdrop and the card positions itself. z-index sits

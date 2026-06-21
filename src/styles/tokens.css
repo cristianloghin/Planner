@@ -14,12 +14,12 @@
   color-scheme: light dark;
 
   /* ---- Brand & status (theme-independent) ---- */
-  --accent: hsl(240, 100%, 70%);
-  --on-accent: #ffffff; /* text/icons on a coloured block or accent button */
-  --danger: hsl(0, 80%, 50%);
-  --danger-glow: rgba(239, 68, 68, 0.25);
-  --warning: hsl(35, 100%, 50%);
-  --now: hsl(0, 50%, 50%); /* current-time line */
+  --accent: hsl(240 100% 70%);
+  --on-accent: hsl(240 50% 97%); /* text/icons on a coloured block or accent button */
+  --danger: hsl(0 80% 50%);
+  --danger-glow: hsl(0 84% 60% / 0.25);
+  --warning: hsl(35 100% 50%);
+  --now: hsl(0 50% 50%); /* current-time line */
 
   /* ---- Typography ---- */
   /* Source Sans 3 (self-hosted variable font, see main.tsx); system stack is
@@ -40,17 +40,17 @@
   --fs-3xl: 2.5rem;
 
   /* ---- Surfaces: dark theme (default) ---- */
-  --bg: #0f172a;
-  --surface: #1e293b;
-  --surface-2: #273449;
-  --border: #334155;
-  --text: #e2e8f0;
-  --muted: #94a3b8;
-  --grid-line: rgba(148, 163, 184, 0.09);
-  --grid-line-strong: rgba(148, 163, 184, 0.22);
-  --overlay: rgba(2, 6, 23, 0.6);
-  --shadow: rgba(0, 0, 0, 0.45);
-  --danger-border: #7f1d1d;
+  --bg: hsl(240 47% 11%);
+  --surface: hsl(240 33% 17%);
+  --surface-2: hsl(240 30% 22%);
+  --border: hsl(240 25% 27%);
+  --text: hsl(240 15% 91%);
+  --muted: hsl(240 5% 65%);
+  --grid-line: hsl(240 15% 65% / 0.09);
+  --grid-line-strong: hsl(240 15% 65% / 0.22);
+  --overlay: hsl(240 84% 5% / 0.6);
+  --shadow: hsl(0 0% 0% / 0.45);
+  --danger-border: hsl(0 63% 31%);
 
   /* ---- Layout ---- */
   --radius: 12px;
@@ -61,16 +61,16 @@
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: #f1f5f9;
-    --surface: #ffffff;
-    --surface-2: #eef2f7;
-    --border: #d4dbe5;
-    --text: #0f172a;
-    --muted: #64748b;
-    --grid-line: rgba(71, 85, 105, 0.1);
-    --grid-line-strong: rgba(71, 85, 105, 0.22);
-    --overlay: rgba(15, 23, 42, 0.4);
-    --shadow: rgba(15, 23, 42, 0.18);
-    --danger-border: #fca5a5;
+    --bg: hsl(240 40% 96%);
+    --surface: hsl(0 0% 100%);
+    --surface-2: hsl(240 36% 95%);
+    --border: hsl(240 25% 86%);
+    --text: hsl(240 47% 11%);
+    --muted: hsl(240 5% 47%);
+    --grid-line: hsl(240 15% 35% / 0.1);
+    --grid-line-strong: hsl(240 15% 35% / 0.22);
+    --overlay: hsl(240 47% 11% / 0.4);
+    --shadow: hsl(240 47% 11% / 0.18);
+    --danger-border: hsl(0 94% 82%);
   }
 }

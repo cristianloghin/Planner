@@ -66,8 +66,8 @@
 }
 
 .deleteList {
-  color: var(--danger, #dc2626);
-  border-color: var(--danger, #dc2626);
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 .taskAdd {
@@ -171,8 +171,8 @@
 }
 
 .overdue {
-  color: var(--danger, #dc2626);
-  border-color: var(--danger, #dc2626);
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 .groupHead {
