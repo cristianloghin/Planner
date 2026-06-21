@@ -21,19 +21,19 @@
        color-mix(in oklab, var(--c) var(--tint-strength), var(--surface))
      NOT wrapped in its own custom property: WebKit fails to resolve a var() that
      points at a property whose value nests var() inside color-mix. */
-  --tint-strength: 22%;
+  --tint-strength: 15%;
   --event-accent: 3px;
 
-  --color-1: hsl(0 90% 54%);
-  --color-2: hsl(30 100% 50%);
-  --color-3: hsl(60 100% 40%);
-  --color-4: hsl(90 75% 45%);
-  --color-5: hsl(120 90% 45%);
-  --color-6: hsl(150 85% 45%);
-  --color-7: hsl(180 85% 45%);
-  --color-8: hsl(210 90% 60%);
-  --color-9: hsl(240 90% 70%);
-  --color-10: hsl(270 70% 60%);
-  --color-11: hsl(300 90% 45%);
-  --color-12: hsl(330 100% 50%);
+  --color-1: hsl(355 80% 65%);
+  --color-2: hsl(30 65% 42%);
+  --color-3: hsl(55 77% 35%);
+  --color-4: hsl(75 67% 35%);
+  --color-5: hsl(155 73% 33%);
+  --color-6: hsl(174 68% 35%);
+  --color-7: hsl(202 68% 47%);
+  --color-8: hsl(216 76% 53%);
+  --color-9: hsl(239 75% 62%);
+  --color-10: hsl(263 74% 62%);
+  --color-11: hsl(287 74% 57%);
+  --color-12: hsl(317 74% 62%);
 }

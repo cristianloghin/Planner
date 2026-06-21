@@ -14,7 +14,7 @@
   color-scheme: light dark;
 
   /* ---- Brand & status (theme-independent) ---- */
-  --accent: hsl(240 100% 70%);
+  --accent: hsl(240 35% 45%);
   --on-accent: hsl(240 50% 97%); /* text/icons on a coloured block or accent button */
   --danger: hsl(0 80% 50%);
   --danger-glow: hsl(0 84% 60% / 0.25);
@@ -40,16 +40,16 @@
   --fs-3xl: 2.5rem;
 
   /* ---- Surfaces: dark theme (default) ---- */
-  --bg: hsl(240 47% 11%);
-  --surface: hsl(240 33% 17%);
-  --surface-2: hsl(240 30% 22%);
-  --border: hsl(240 25% 27%);
+  --bg: hsl(240 15% 11%);
+  --surface: hsl(240 15% 14%);
+  --surface-2: hsl(240 20% 17%);
+  --border: hsl(240 20% 20%);
   --text: hsl(240 15% 91%);
   --muted: hsl(240 5% 65%);
   --grid-line: hsl(240 15% 65% / 0.09);
   --grid-line-strong: hsl(240 15% 65% / 0.22);
   --overlay: hsl(240 84% 5% / 0.6);
-  --shadow: hsl(0 0% 0% / 0.45);
+  --shadow: hsl(240 15% 3% / 0.45);
   --danger-border: hsl(0 63% 31%);
 
   /* ---- Layout ---- */
@@ -61,12 +61,12 @@
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: hsl(240 40% 96%);
-    --surface: hsl(0 0% 100%);
-    --surface-2: hsl(240 36% 95%);
+    --bg: hsl(240 25% 92%);
+    --surface: hsl(240 20% 97%);
+    --surface-2: hsl(240 25% 94%);
     --border: hsl(240 25% 86%);
     --text: hsl(240 47% 11%);
-    --muted: hsl(240 5% 47%);
+    --muted: hsl(240 15% 47%);
     --grid-line: hsl(240 15% 35% / 0.1);
     --grid-line-strong: hsl(240 15% 35% / 0.22);
     --overlay: hsl(240 47% 11% / 0.4);

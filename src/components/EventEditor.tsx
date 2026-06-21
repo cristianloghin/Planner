@@ -6,8 +6,9 @@ import { eventDate, eventStartMinutes } from "../lib/timing";
 import { effectiveOccurrence } from "../lib/recurrence";
 import { useApp } from "../state";
 import { cloneAttachments } from "../lib/attachments";
-import { COLOR_KEYS, colorVar } from "../lib/palette";
+import { COLOR_KEYS, DEFAULT_COLOR, colorVar } from "../lib/palette";
 import type { ColorKey } from "../lib/palette";
+import { personColorKey } from "../lib/people";
 import shared from "../styles/shared.module.css";
 import type {
   Attachment,
@@ -442,9 +443,11 @@ export function EventEditor({
         <ColorPicker
           options={COLOR_OPTIONS}
           value={colorKey ?? null}
-          allowNone
+          defaultValue={
+            attendees[0] ? personColorKey(state, attendees[0]) : DEFAULT_COLOR
+          }
           ariaLabel="Event color"
-          onChange={(key) => setColorKey(key ?? undefined)}
+          onChange={setColorKey}
         />
 
         <AttachmentsEditor attachments={attachments} onChange={setAttachments} />
