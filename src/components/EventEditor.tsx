@@ -220,9 +220,6 @@ export function EventEditor({
             },
       attendees,
       ...(colorKey ? { colorKey } : {}),
-      // Carry the creator across edits so the optimistic block keeps its color
-      // (the server preserves created_by on update regardless).
-      ...(base?.createdBy ? { createdBy: base.createdBy } : {}),
       attachments: cleanedAttachments(),
     };
   }
