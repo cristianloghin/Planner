@@ -14,12 +14,12 @@
   color-scheme: light dark;
 
   /* ---- Brand & status (theme-independent) ---- */
-  --accent: hsl(240, 100, 70);
+  --accent: hsl(240, 100%, 70%);
   --on-accent: #ffffff; /* text/icons on a coloured block or accent button */
-  --danger: hsl(0, 80, 50);
+  --danger: hsl(0, 80%, 50%);
   --danger-glow: rgba(239, 68, 68, 0.25);
-  --warning: hsl(35, 100, 50);
-  --now: hsl(0, 50, 50); /* current-time line */
+  --warning: hsl(35, 100%, 50%);
+  --now: hsl(0, 50%, 50%); /* current-time line */
 
   /* ---- Typography ---- */
   /* Source Sans 3 (self-hosted variable font, see main.tsx); system stack is
