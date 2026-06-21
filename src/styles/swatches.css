@@ -14,6 +14,15 @@
  * light/dark variants needed.
  */
 :root {
+  /* How a colored block is composed from its --c (set per element):
+       --tint-strength  how much of --c bleeds into the surface (the soft bg)
+       --event-tint     the resolved background — uses each element's own --c and
+                        the current --surface, so it tracks the theme for free
+       --event-accent   width of the solid colored left border */
+  --tint-strength: 22%;
+  --event-tint: color-mix(in oklab, var(--c) var(--tint-strength), var(--surface));
+  --event-accent: 3px;
+
   --color-1: hsl(0 90% 54%);
   --color-2: hsl(30 100% 50%);
   --color-3: hsl(60 100% 40%);

@@ -20,11 +20,11 @@
   gap: 2px;
   height: 16px;
   border: none;
-  border-left: 3px solid var(--c);
+  border-left: var(--event-accent) solid var(--c);
   border-radius: 8px;
-  /* A tint of the event's color over the surface — works in both themes because
-     --surface flips. Text stays --text for readable contrast on the soft tint. */
-  background: color-mix(in oklab, var(--c) 22%, var(--surface));
+  /* Soft tint of the event's color over the surface (theme-agnostic); text stays
+     --text for readable contrast. See swatches.css for --event-tint. */
+  background: var(--event-tint);
   color: var(--text);
   text-align: left;
   box-shadow: 0 1px 3px var(--shadow);
@@ -222,12 +222,11 @@
 .tlEvent {
   position: absolute;
   border: none;
-  border-left: 3px solid var(--c);
+  border-left: var(--event-accent) solid var(--c);
   border-radius: 7px;
   padding: 3px 6px;
-  /* See .alldayChip: a tint of the event color over the surface, event color as
-     the left border, --text for readable copy. */
-  background: color-mix(in oklab, var(--c) 22%, var(--surface));
+  /* See .alldayChip / swatches.css: tinted bg + solid colored left border. */
+  background: var(--event-tint);
   color: var(--text);
   text-align: left;
   overflow: hidden;
