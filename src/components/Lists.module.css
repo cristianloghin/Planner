@@ -133,6 +133,7 @@
 .badge {
   font-size: var(--fs-sm);
   font-weight: 600;
+  background: var(--c);
   color: var(--on-accent);
   padding: 3px 8px;
   border-radius: 999px;

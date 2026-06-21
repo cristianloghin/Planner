@@ -6,8 +6,8 @@ import { eventDate, eventStartMinutes } from "../lib/timing";
 import { effectiveOccurrence } from "../lib/recurrence";
 import { useApp } from "../state";
 import { cloneAttachments } from "../lib/attachments";
-import { EVENT_COLOR_KEYS, hsl, EVENT_COLORS } from "../lib/palette";
-import type { EventColorKey } from "../lib/palette";
+import { COLOR_KEYS, colorVar } from "../lib/palette";
+import type { ColorKey } from "../lib/palette";
 import shared from "../styles/shared.module.css";
 import type {
   Attachment,
@@ -24,9 +24,9 @@ import s from "./EventEditor.module.css";
 
 const SNAP = 15;
 
-const EVENT_COLOR_OPTIONS = EVENT_COLOR_KEYS.map((key, i) => ({
+const COLOR_OPTIONS = COLOR_KEYS.map((key, i) => ({
   value: key,
-  color: hsl(EVENT_COLORS[key]),
+  color: colorVar(key),
   label: `Colour ${i + 1}`,
 }));
 
@@ -134,7 +134,7 @@ export function EventEditor({
   const [attendees, setAttendees] = useState<PersonId[]>(
     isEdit ? base!.attendees : target.attendees,
   );
-  const [colorKey, setColorKey] = useState<EventColorKey | undefined>(
+  const [colorKey, setColorKey] = useState<ColorKey | undefined>(
     base?.colorKey,
   );
   const [repeat, setRepeat] = useState<RepeatChoice>(
@@ -440,7 +440,7 @@ export function EventEditor({
 
         <label className={shared.label}>Color</label>
         <ColorPicker
-          options={EVENT_COLOR_OPTIONS}
+          options={COLOR_OPTIONS}
           value={colorKey ?? null}
           allowNone
           ariaLabel="Event color"

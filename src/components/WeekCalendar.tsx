@@ -9,7 +9,8 @@ import {
   toISODate,
   weekRangeLabel,
 } from "../lib/dates";
-import { blockColors, defaultAttendees, personColor } from "../lib/people";
+import { defaultAttendees, eventColorKey, personColorKey } from "../lib/people";
+import { colorVar } from "../lib/palette";
 import { nextStartOnOrAfter, occurrencesOnDate, recurrenceLabel } from "../lib/recurrence";
 import { eventDate } from "../lib/timing";
 import { useApp } from "../state";
@@ -80,20 +81,15 @@ export function WeekCalendar() {
                   )}
                   {occs.map((o) => {
                     const e = o.event;
-                    const { lightBg, darkBg, border } = blockColors(
-                      state,
-                      e.attendees[0],
-                      e.colorKey,
-                    );
                     return (
                       <div
                         key={`${e.id}:${o.start}`}
                         className={s.event}
                         style={
                           {
-                            "--ev-bg-light": lightBg,
-                            "--ev-bg-dark": darkBg,
-                            borderLeftColor: border,
+                            "--c": colorVar(
+                              eventColorKey(state, e.attendees[0], e),
+                            ),
                           } as React.CSSProperties
                         }
                       >
@@ -125,7 +121,13 @@ export function WeekCalendar() {
                                   <span
                                     key={id}
                                     className={s.avatar}
-                                    style={{ background: personColor(state, id) }}
+                                    style={
+                                      {
+                                        "--c": colorVar(
+                                          personColorKey(state, id),
+                                        ),
+                                      } as React.CSSProperties
+                                    }
                                     title={p.name}
                                   >
                                     {p.name.slice(0, 1).toUpperCase()}

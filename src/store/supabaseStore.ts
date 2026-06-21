@@ -21,7 +21,7 @@ import { uid } from '../lib/id'
 import { toISODate, toDateTimeLocal } from '../lib/dates'
 import { notes as noteAttachments, checklists } from '../lib/attachments'
 import { recurrenceToRRule, rruleToRecurrence, truncatedRRule } from '../lib/rrule'
-import { isEventColorKey, isUserColorKey } from '../lib/palette'
+import { isColorKey } from '../lib/palette'
 
 const MINS_PER_DAY = 24 * 60
 
@@ -166,7 +166,7 @@ export class SupabaseStore implements ScheduleStore {
     // person falls back to their (migrated) shared color.
     const personColors: Preferences['personColors'] = {}
     for (const [id, key] of Object.entries(prefs.personColors ?? {})) {
-      if (isUserColorKey(key)) personColors[id] = key
+      if (isColorKey(key)) personColors[id] = key
     }
     return { ...empty, ...prefs, personColors }
   }
@@ -219,7 +219,7 @@ export class SupabaseStore implements ScheduleStore {
         duration: intervalToDuration(r.duration, allDay),
         recurrence: rruleToRecurrence(r.rrule),
         attendees: r.event_person.map((ep) => ep.person_id),
-        colorKey: isEventColorKey(r.color_key) ? r.color_key : undefined,
+        colorKey: isColorKey(r.color_key) ? r.color_key : undefined,
         attachments: rebuildAttachments(r),
       }
     })

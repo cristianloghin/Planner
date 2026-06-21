@@ -10,7 +10,8 @@ import {
   startOfMonth,
   toISODate,
 } from "../lib/dates";
-import { eventMainColor } from "../lib/people";
+import { eventColorKey } from "../lib/people";
+import { colorVar } from "../lib/palette";
 import { occurrencesOnDate } from "../lib/recurrence";
 import { eventStartMinutes } from "../lib/timing";
 import { useApp } from "../state";
@@ -87,7 +88,13 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
                       <span
                         key={`${e.id}:${i}`}
                         className={s.monthDot}
-                        style={{ background: eventMainColor(state, e) }}
+                        style={
+                          {
+                            "--c": colorVar(
+                              eventColorKey(state, e.attendees[0], e),
+                            ),
+                          } as React.CSSProperties
+                        }
                       />
                     ))}
                     {dayEvents.length > MAX_DOTS && (

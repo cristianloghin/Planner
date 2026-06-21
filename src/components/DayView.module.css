@@ -3,6 +3,7 @@
   height: 12px;
   border-radius: 50%;
   display: inline-block;
+  background: var(--c);
 }
 
 /* ---- All-day bar ---- */
@@ -19,11 +20,11 @@
   gap: 2px;
   height: 16px;
   border: none;
+  border-left: var(--event-accent) solid var(--c);
   border-radius: 8px;
-  /* Background is the creator's user color; the stylesheet picks the shade for the
-     active theme from the two CSS vars set inline. Text follows --text so it stays
-     readable on either shade. */
-  background: var(--ev-bg-dark);
+  /* Soft tint of the event's color over the surface (theme-agnostic); text stays
+     --text for readable contrast. See swatches.css for --event-tint. */
+  background: var(--event-tint);
   color: var(--text);
   text-align: left;
   box-shadow: 0 1px 3px var(--shadow);
@@ -136,7 +137,7 @@
   flex-direction: column;
   align-items: stretch;
   gap: 8px;
-  
+  color: var(--c);
   padding: 8px 4px 4px 4px;
   border-left: 1px solid var(--border);
 
@@ -221,11 +222,11 @@
 .tlEvent {
   position: absolute;
   border: none;
+  border-left: var(--event-accent) solid var(--c);
   border-radius: 7px;
   padding: 3px 6px;
-  /* See .alldayChip: creator's color as background (theme shade picked below),
-     event color as the inline left border, --text for readable copy. */
-  background: var(--ev-bg-dark);
+  /* See .alldayChip / swatches.css: tinted bg + solid colored left border. */
+  background: var(--event-tint);
   color: var(--text);
   text-align: left;
   overflow: hidden;
@@ -236,14 +237,7 @@
   line-height: 1.15;
 }
 
-@media (prefers-color-scheme: light) {
-  .tlEvent,
-  .alldayChip {
-    background: var(--ev-bg-light);
-  }
-}
-
-/* Attendee avatars — small round initials in each person's main color. */
+/* Attendee avatars — small round initials in each person's solid color. */
 .avatars {
   display: flex;
   gap: 2px;
@@ -259,6 +253,7 @@
   border-radius: 50%;
   font-size: var(--fs-2xs);
   font-weight: 700;
+  background: var(--c);
   color: var(--on-accent);
   flex: none;
 }

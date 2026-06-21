@@ -20,7 +20,8 @@ import {
   weekdayIndex,
 } from "../lib/dates";
 import { isOccurrenceDone, occKey, occurrenceStatus } from "../lib/occurrences";
-import { blockColors, peopleList, personColor } from "../lib/people";
+import { eventColorKey, peopleList, personColorKey } from "../lib/people";
+import { colorVar, type ColorKey } from "../lib/palette";
 import { occurrencesOnDate, type DayOccurrence } from "../lib/recurrence";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
@@ -43,21 +44,10 @@ const ZOOM_KEY = "planner:hourH";
 const SWIPE_COMMIT = 60;
 const SWIPE_SLIDE_MS = 200;
 
-// The visual identity of an event block: the background is the user color of the
-// lane it sits in (both theme shades emitted as CSS vars; the stylesheet picks one
-// via prefers-color-scheme), with a left border in the event's own palette color,
-// defaulting to that person's main shade.
-function blockStyle(
-  state: ReturnType<typeof useApp>["state"],
-  personId: PersonId,
-  ev: CalendarEvent,
-): React.CSSProperties {
-  const { lightBg, darkBg, border } = blockColors(state, personId, ev.colorKey);
-  return {
-    "--ev-bg-light": lightBg,
-    "--ev-bg-dark": darkBg,
-    borderLeft: `3px solid ${border}`,
-  } as React.CSSProperties;
+// A colored element just carries its palette key as the `--c` custom property;
+// the stylesheet derives the tinted background, border and any solid fills from it.
+function colorOf(key: ColorKey): React.CSSProperties {
+  return { "--c": colorVar(key) } as React.CSSProperties;
 }
 
 const clampZoom = (h: number) => Math.min(MAX_HOUR_H, Math.max(MIN_HOUR_H, h));
@@ -339,13 +329,10 @@ export function DayView() {
               <div
                 key={p.id}
                 className={s.laneHead}
-                style={{ color: personColor(state, p.id) }}
+                style={colorOf(personColorKey(state, p.id))}
               >
                 <div>
-                  <span
-                    className={s.dot}
-                    style={{ background: personColor(state, p.id) }}
-                  />
+                  <span className={s.dot} />
                   {p.name}
                 </div>
                 <div>
@@ -442,7 +429,7 @@ function Avatars({ attendees }: { attendees: PersonId[] }) {
           <span
             key={id}
             className={s.avatar}
-            style={{ background: personColor(state, id) }}
+            style={colorOf(personColorKey(state, id))}
             title={p.name}
           >
             {p.name.slice(0, 1).toUpperCase()}
@@ -510,7 +497,7 @@ function AllDayChip({
         status === "clash" && s.warnClash,
         status === "needs" && s.warnNeeds,
       )}
-      style={blockStyle(state, personId, event)}
+      style={colorOf(eventColorKey(state, personId, event))}
       onClick={onClick}
     >
       <span className={s.alldayMeta}>
@@ -642,7 +629,7 @@ function Lane({
               height: Math.max((block.end - block.start) * pxPerMin, 16),
               left: `calc(${(100 / cols) * col}% + 2px)`,
               width: `calc(${100 / cols}% - 4px)`,
-              ...blockStyle(state, person.id, ev),
+              ...colorOf(eventColorKey(state, person.id, ev)),
             }}
             onClick={() => onOpen(block.occ)}
           >

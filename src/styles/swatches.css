@@ -1,0 +1,38 @@
+/*
+ * The 12-color palette — the single source of truth for color values.
+ *
+ * Keys "1".."12" (see src/lib/palette.ts) map to --color-1..12 here. A person and
+ * an event both reference one of these. Tune the values freely (keep text on the
+ * solid color AA-compatible); the keys are the stable contract with stored data.
+ *
+ * Components set `--c` to one of these (via colorVar()) on a colored element; the
+ * element's own stylesheet then derives what it needs:
+ *   - solid:  background: var(--c)               (dots, avatars, swatches)
+ *   - tinted: color-mix(in oklab, var(--c) N%, var(--surface))   (event blocks)
+ *   - accent: border-left-color: var(--c)
+ * Tinting against --surface means light/dark is handled for free — no per-color
+ * light/dark variants needed.
+ */
+:root {
+  /* How a colored block is composed from its --c (set per element):
+       --tint-strength  how much of --c bleeds into the surface (the soft bg)
+       --event-tint     the resolved background — uses each element's own --c and
+                        the current --surface, so it tracks the theme for free
+       --event-accent   width of the solid colored left border */
+  --tint-strength: 22%;
+  --event-tint: color-mix(in oklab, var(--c) var(--tint-strength), var(--surface));
+  --event-accent: 3px;
+
+  --color-1: hsl(0 90% 54%);
+  --color-2: hsl(30 100% 50%);
+  --color-3: hsl(60 100% 40%);
+  --color-4: hsl(90 75% 45%);
+  --color-5: hsl(120 90% 45%);
+  --color-6: hsl(150 85% 45%);
+  --color-7: hsl(180 85% 45%);
+  --color-8: hsl(210 90% 60%);
+  --color-9: hsl(240 90% 70%);
+  --color-10: hsl(270 70% 60%);
+  --color-11: hsl(300 90% 45%);
+  --color-12: hsl(330 100% 50%);
+}
