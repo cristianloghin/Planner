@@ -20,12 +20,7 @@ import {
   weekdayIndex,
 } from "../lib/dates";
 import { isOccurrenceDone, occKey, occurrenceStatus } from "../lib/occurrences";
-import {
-  eventBlockColors,
-  isAllAdults,
-  peopleList,
-  personColor,
-} from "../lib/people";
+import { blockColors, peopleList, personColor } from "../lib/people";
 import { occurrencesOnDate, type DayOccurrence } from "../lib/recurrence";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
@@ -48,25 +43,22 @@ const ZOOM_KEY = "planner:hourH";
 const SWIPE_COMMIT = 60;
 const SWIPE_SLIDE_MS = 200;
 
-// The visual identity of an event block: the creator's user color as the
-// background (both theme shades emitted as CSS vars; the stylesheet picks one via
-// prefers-color-scheme) and a left border in the event's own palette color,
-// defaulting to the creator's main shade.
+// The visual identity of an event block: the background is the user color of the
+// lane it sits in (both theme shades emitted as CSS vars; the stylesheet picks one
+// via prefers-color-scheme), with a left border in the event's own palette color,
+// defaulting to that person's main shade.
 function blockStyle(
   state: ReturnType<typeof useApp>["state"],
+  personId: PersonId,
   ev: CalendarEvent,
 ): React.CSSProperties {
-  const { lightBg, darkBg, border } = eventBlockColors(state, ev);
+  const { lightBg, darkBg, border } = blockColors(state, personId, ev.colorKey);
   return {
     "--ev-bg-light": lightBg,
     "--ev-bg-dark": darkBg,
     borderLeft: `3px solid ${border}`,
   } as React.CSSProperties;
 }
-
-// A child's lane is narrower than an adult's (they share an adult's time).
-const CHILD_WEIGHT = 1;
-const laneWeight = (p: Person) => (p.kind === "child" ? CHILD_WEIGHT : 1);
 
 const clampZoom = (h: number) => Math.min(MAX_HOUR_H, Math.max(MIN_HOUR_H, h));
 
@@ -284,9 +276,6 @@ export function DayView() {
     .filter((o) => !o.event.allDay)
     .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end }));
   const allDayOccs = occs.filter((o) => o.event.allDay);
-  const spanning = timedBlocks.filter((b) =>
-    isAllAdults(state, b.occ.event.attendees),
-  );
 
   // Coverage looks at the whole day: all-day events count as busy 00:00–24:00.
   const coverage: Busy[] = occs.map((o) => ({
@@ -299,13 +288,6 @@ export function DayView() {
   const hasWarnings = [...statuses.values()].some((s) => s !== "covered");
 
   const fullHeight = DAY_MIN * pxPerMin;
-  const totalWeight = people.reduce((s, p) => s + laneWeight(p), 0);
-  // The all-adults block spans only the leading adult lanes; size it to their
-  // share of the total. Assumes adults sort ahead of children (sortOrder).
-  const adultWeight = people
-    .filter((p) => p.kind === "adult")
-    .reduce((s, p) => s + laneWeight(p), 0);
-  const adultPct = (adultWeight / totalWeight) * 100;
 
   function goToday() {
     const todayISO = toISODate(new Date());
@@ -373,6 +355,7 @@ export function DayView() {
                       <AllDayChip
                         key={`${o.event.id}:${o.start}`}
                         occ={o}
+                        personId={p.id}
                         status={statuses.get(o.event.id)}
                         onClick={() => openSheet(o)}
                       />
@@ -420,40 +403,6 @@ export function DayView() {
                 onOpen={openSheet}
               />
             ))}
-
-            {/* 'Both' (two-parent) blocks span the two parent columns, layered on top. */}
-            <div
-              className={s.sharedLayer}
-              style={{ height: fullHeight, width: `${adultPct}%` }}
-            >
-              {layout(spanning).map(({ block, col, cols }) => {
-                const ev = block.occ.event;
-                const done = isOccurrenceDone(state, ev, block.occ.start);
-                return (
-                  <button
-                    key={`${ev.id}:${block.occ.start}`}
-                    className={cx(s.tlEvent, s.shared, done && s.done)}
-                    style={{
-                      top: block.start * pxPerMin,
-                      height: Math.max(
-                        (block.end - block.start) * pxPerMin,
-                        16,
-                      ),
-                      left: `calc(${(100 / cols) * col}% + 2px)`,
-                      width: `calc(${100 / cols}% - 4px)`,
-                      ...blockStyle(state, ev),
-                    }}
-                    onClick={() => openSheet(block.occ)}
-                  >
-                    <span className={s.tlTime}>
-                      {minutesToTime(block.start)}–{minutesToTime(block.end)}
-                    </span>
-                    <span className={s.tlTitle}>{ev.title}</span>
-                    <Avatars attendees={ev.attendees} />
-                  </button>
-                );
-              })}
-            </div>
           </div>
         </div>
       </div>
@@ -541,10 +490,12 @@ function badges(
 
 function AllDayChip({
   occ,
+  personId,
   status,
   onClick,
 }: {
   occ: DayOccurrence;
+  personId: PersonId;
   status: ChildStatus | undefined;
   onClick: () => void;
 }) {
@@ -559,7 +510,7 @@ function AllDayChip({
         status === "clash" && s.warnClash,
         status === "needs" && s.warnNeeds,
       )}
-      style={blockStyle(state, event)}
+      style={blockStyle(state, personId, event)}
       onClick={onClick}
     >
       <span className={s.alldayMeta}>
@@ -650,12 +601,9 @@ function Lane({
   onOpen: (occ: DayOccurrence) => void;
 }) {
   const { state } = useApp();
-  // This person's blocks, excluding all-adults 'Both' ones (those span instead).
-  const mine = blocks.filter(
-    (b) =>
-      b.occ.event.attendees.includes(person.id) &&
-      !isAllAdults(state, b.occ.event.attendees),
-  );
+  // Every block this person is on — shared events simply appear in each
+  // attendee's lane, colored by that lane.
+  const mine = blocks.filter((b) => b.occ.event.attendees.includes(person.id));
   const laid = layout(mine);
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
@@ -694,7 +642,7 @@ function Lane({
               height: Math.max((block.end - block.start) * pxPerMin, 16),
               left: `calc(${(100 / cols) * col}% + 2px)`,
               width: `calc(${100 / cols}% - 4px)`,
-              ...blockStyle(state, ev),
+              ...blockStyle(state, person.id, ev),
             }}
             onClick={() => onOpen(block.occ)}
           >

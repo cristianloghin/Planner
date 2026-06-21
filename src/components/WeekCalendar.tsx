@@ -7,11 +7,7 @@ import {
   minutesToTime,
   weekRangeLabel,
 } from "../lib/dates";
-import {
-  defaultAttendees,
-  eventBlockColors,
-  personColor,
-} from "../lib/people";
+import { blockColors, defaultAttendees, personColor } from "../lib/people";
 import { occurrencesOnDate, recurrenceLabel } from "../lib/recurrence";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
@@ -70,9 +66,10 @@ export function WeekCalendar() {
                   )}
                   {occs.map((o) => {
                     const e = o.event;
-                    const { lightBg, darkBg, border } = eventBlockColors(
+                    const { lightBg, darkBg, border } = blockColors(
                       state,
-                      e,
+                      e.attendees[0],
+                      e.colorKey,
                     );
                     return (
                       <div

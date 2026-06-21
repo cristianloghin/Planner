@@ -26,43 +26,29 @@ export function personColor(state: AppState, id: PersonId): string {
   return hsl(USER_COLORS[personColorKey(state, id)].main)
 }
 
-/** The person whose login is this app_user, if any. */
-export function personByUserId(state: AppState, userId: string | undefined): Person | undefined {
-  if (!userId) return undefined
-  return peopleList(state).find((p) => p.userId === userId)
-}
-
-/**
- * The user-color key that drives an event block's background: the creator's, via
- * `createdBy` -> person. Falls back to the first attendee (then the default) when
- * the creator can't be resolved (e.g. an optimistic, not-yet-loaded event).
- */
-export function eventOwnerColorKey(state: AppState, ev: CalendarEvent): UserColorKey {
-  const owner = personByUserId(state, ev.createdBy)
-  if (owner) return personColorKey(state, owner.id)
-  return ev.attendees[0] ? personColorKey(state, ev.attendees[0]) : DEFAULT_USER_COLOR
-}
-
-/** The creator's `main` shade — for compact spots that want a single color (e.g.
- *  month dots) rather than the full background treatment. */
+/** A single representative color for an event in list/dot views (e.g. month
+ *  dots): its first attendee's main shade. */
 export function eventMainColor(state: AppState, ev: CalendarEvent): string {
-  return hsl(USER_COLORS[eventOwnerColorKey(state, ev)].main)
+  return ev.attendees[0]
+    ? personColor(state, ev.attendees[0])
+    : hsl(USER_COLORS[DEFAULT_USER_COLOR].main)
 }
 
 /**
- * The colors that paint an event block: the creator's two background shades plus
- * the left-border color (the event's palette color, defaulting to the creator's
- * main). Shared by the day timeline and the week agenda.
+ * The colors that paint an event block: the two background shades of the person
+ * whose lane it sits in (or, in the week agenda, its first attendee) plus the
+ * left-border color — the event's palette color, defaulting to that person's main.
  */
-export function eventBlockColors(
+export function blockColors(
   state: AppState,
-  ev: CalendarEvent,
+  personId: PersonId | undefined,
+  colorKey: string | undefined,
 ): { lightBg: string; darkBg: string; border: string } {
-  const c = USER_COLORS[eventOwnerColorKey(state, ev)]
+  const c = USER_COLORS[personId ? personColorKey(state, personId) : DEFAULT_USER_COLOR]
   return {
     lightBg: hsl(c.lightBg),
     darkBg: hsl(c.darkBg),
-    border: eventColorCss(ev.colorKey) ?? hsl(c.main),
+    border: eventColorCss(colorKey) ?? hsl(c.main),
   }
 }
 

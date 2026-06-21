@@ -307,26 +307,6 @@
   background: var(--now);
 }
 
-/* Shared ('both') events: span both lanes, layered on top. */
-.sharedLayer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  /* width is set inline so the block spans only the parent columns. */
-  pointer-events: none;
-  z-index: 3;
-}
-
-.sharedLayer .tlEvent {
-  pointer-events: auto;
-}
-
-.tlEvent.shared {
-  box-shadow:
-    0 0 0 1px var(--block-ring),
-    0 2px 8px var(--shadow);
-}
-
 /* Completed occurrences fade and strike through. */
 .tlEvent.done,
 .alldayChip.done {
