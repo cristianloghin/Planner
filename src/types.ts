@@ -17,6 +17,9 @@ export interface Person {
   kind: PersonKind
   /** Lane order, ascending. */
   sortOrder: number
+  /** The login (app_user id) this person is, if any — links an event's creator
+   *  (`createdBy`) back to a person, and thus to their color. */
+  userId?: string | null
 }
 
 /**
@@ -112,9 +115,12 @@ export interface CalendarEvent {
   /**
    * Optional event color, a key into the fixed event palette
    * (`src/lib/palette.ts`). Absent = no event color chosen, so the timeline
-   * falls back to the attendee color.
+   * falls back to the creator's main color.
    */
   colorKey?: EventColorKey
+  /** The app_user who created the series (`event_series.created_by`). Drives the
+   *  event block's background color. Server-owned; absent until first load. */
+  createdBy?: string
   /** Notes, checklists and reminders, in display order. */
   attachments: Attachment[]
 }

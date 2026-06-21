@@ -1,5 +1,5 @@
-import type { AppState, Person, PersonId } from '../types'
-import { USER_COLORS, hsl, userColorKey, type UserColorKey } from './palette'
+import type { AppState, CalendarEvent, Person, PersonId } from '../types'
+import { DEFAULT_USER_COLOR, USER_COLORS, hsl, userColorKey, type UserColorKey } from './palette'
 
 /** Colour for an all-adults ('Both'/'Everyone') event — the `--shared` token. */
 export const SHARED_COLOR = 'var(--shared)'
@@ -27,6 +27,23 @@ export function personColorKey(state: AppState, id: PersonId): UserColorKey {
  */
 export function personColor(state: AppState, id: PersonId): string {
   return hsl(USER_COLORS[personColorKey(state, id)].main)
+}
+
+/** The person whose login is this app_user, if any. */
+export function personByUserId(state: AppState, userId: string | undefined): Person | undefined {
+  if (!userId) return undefined
+  return peopleList(state).find((p) => p.userId === userId)
+}
+
+/**
+ * The user-color key that drives an event block's background: the creator's, via
+ * `createdBy` -> person. Falls back to the first attendee (then the default) when
+ * the creator can't be resolved (e.g. an optimistic, not-yet-loaded event).
+ */
+export function eventOwnerColorKey(state: AppState, ev: CalendarEvent): UserColorKey {
+  const owner = personByUserId(state, ev.createdBy)
+  if (owner) return personColorKey(state, owner.id)
+  return ev.attendees[0] ? personColorKey(state, ev.attendees[0]) : DEFAULT_USER_COLOR
 }
 
 export function adults(state: AppState): Person[] {

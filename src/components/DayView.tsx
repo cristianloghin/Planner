@@ -21,15 +21,13 @@ import {
 } from "../lib/dates";
 import { isOccurrenceDone, occKey, occurrenceStatus } from "../lib/occurrences";
 import {
-  adultsGradient,
-  attendeeLabel,
-  eventColor,
+  eventOwnerColorKey,
   isAllAdults,
   peopleList,
   personColor,
 } from "../lib/people";
 import { occurrencesOnDate, type DayOccurrence } from "../lib/recurrence";
-import { eventColorCss } from "../lib/palette";
+import { USER_COLORS, eventColorCss, hsl } from "../lib/palette";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import type { CalendarEvent, Person, PersonId } from "../types";
@@ -51,11 +49,21 @@ const ZOOM_KEY = "planner:hourH";
 const SWIPE_COMMIT = 60;
 const SWIPE_SLIDE_MS = 200;
 
-// A left border in the event's chosen palette color, layered over the attendee
-// background. Returns no style when the event has no color of its own.
-function borderFor(colorKey: CalendarEvent["colorKey"]): React.CSSProperties {
-  const color = eventColorCss(colorKey);
-  return color ? { borderLeft: `4px solid ${color}` } : {};
+// The visual identity of an event block: the creator's user color as the
+// background (both theme shades emitted as CSS vars; the stylesheet picks one via
+// prefers-color-scheme) and a left border in the event's own palette color,
+// defaulting to the creator's main shade.
+function blockStyle(
+  state: ReturnType<typeof useApp>["state"],
+  ev: CalendarEvent,
+): React.CSSProperties {
+  const c = USER_COLORS[eventOwnerColorKey(state, ev)];
+  const border = eventColorCss(ev.colorKey) ?? hsl(c.main);
+  return {
+    "--ev-bg-light": hsl(c.lightBg),
+    "--ev-bg-dark": hsl(c.darkBg),
+    borderLeft: `3px solid ${border}`,
+  } as React.CSSProperties;
 }
 
 // A child's lane is narrower than an adult's (they share an adult's time).
@@ -435,15 +443,15 @@ export function DayView() {
                       ),
                       left: `calc(${(100 / cols) * col}% + 2px)`,
                       width: `calc(${100 / cols}% - 4px)`,
-                      background: adultsGradient(state),
+                      ...blockStyle(state, ev),
                     }}
                     onClick={() => openSheet(block.occ)}
                   >
                     <span className={s.tlTime}>
-                      {minutesToTime(block.start)}–{minutesToTime(block.end)} ·{" "}
-                      {attendeeLabel(state, ev.attendees)}
+                      {minutesToTime(block.start)}–{minutesToTime(block.end)}
                     </span>
                     <span className={s.tlTitle}>{ev.title}</span>
+                    <Avatars attendees={ev.attendees} />
                   </button>
                 );
               })}
@@ -471,6 +479,30 @@ export function DayView() {
         />
       )}
     </section>
+  );
+}
+
+/** A row of small round avatars, one per attendee, in each person's main color. */
+function Avatars({ attendees }: { attendees: PersonId[] }) {
+  const { state } = useApp();
+  if (attendees.length === 0) return null;
+  return (
+    <span className={s.avatars}>
+      {attendees.map((id) => {
+        const p = state.people[id];
+        if (!p) return null;
+        return (
+          <span
+            key={id}
+            className={s.avatar}
+            style={{ background: personColor(state, id) }}
+            title={p.name}
+          >
+            {p.name.slice(0, 1).toUpperCase()}
+          </span>
+        );
+      })}
+    </span>
   );
 }
 
@@ -529,10 +561,7 @@ function AllDayChip({
         status === "clash" && s.warnClash,
         status === "needs" && s.warnNeeds,
       )}
-      style={{
-        background: eventColor(state, event.attendees),
-        ...borderFor(event.colorKey),
-      }}
+      style={blockStyle(state, event)}
       onClick={onClick}
     >
       <span className={s.alldayMeta}>
@@ -667,8 +696,7 @@ function Lane({
               height: Math.max((block.end - block.start) * pxPerMin, 16),
               left: `calc(${(100 / cols) * col}% + 2px)`,
               width: `calc(${100 / cols}% - 4px)`,
-              background: eventColor(state, ev.attendees),
-              ...borderFor(ev.colorKey),
+              ...blockStyle(state, ev),
             }}
             onClick={() => onOpen(block.occ)}
           >
@@ -683,11 +711,7 @@ function Lane({
               {badges(state, ev, block.occ.start, status)}
             </span>
             <span className={s.tlTitle}>{ev.title}</span>
-            {joint && (
-              <span className={s.tlTag}>
-                {attendeeLabel(state, ev.attendees)}
-              </span>
-            )}
+            {joint && <Avatars attendees={ev.attendees} />}
           </button>
         );
       })}

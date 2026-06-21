@@ -92,6 +92,7 @@ interface SeriesRow {
   duration: string | null
   rrule: string | null
   color_key: string | null
+  created_by: string | null
   event_person: { person_id: string }[]
   checklist_item: {
     id: string
@@ -174,7 +175,7 @@ export class SupabaseStore implements ScheduleStore {
   private async loadPeople(): Promise<Record<string, Person>> {
     const { data, error } = await supabase
       .from('person')
-      .select('id, name, color, kind, sort_order')
+      .select('id, name, color, kind, sort_order, user_id')
       .eq('account_id', this.accountId)
       .order('sort_order')
     if (error) throw error
@@ -186,6 +187,7 @@ export class SupabaseStore implements ScheduleStore {
         color: p.color,
         kind: p.kind === 'child' ? 'child' : 'adult',
         sortOrder: p.sort_order,
+        userId: p.user_id,
       }
     }
     return out
@@ -198,7 +200,7 @@ export class SupabaseStore implements ScheduleStore {
       // more than one relationship between event_series and these children
       // (e.g. checklist_item also links many-to-many via occurrence_item_removed).
       .select(
-        `id, title, all_day, dtstart, duration, rrule, color_key,
+        `id, title, all_day, dtstart, duration, rrule, color_key, created_by,
          event_person!series_id ( person_id ),
          checklist_item!owner_series_id ( id, label, group_label, sort_order, occurrence_start ),
          note!owner_series_id ( id, body ),
@@ -220,6 +222,7 @@ export class SupabaseStore implements ScheduleStore {
         recurrence: rruleToRecurrence(r.rrule),
         attendees: r.event_person.map((ep) => ep.person_id),
         colorKey: isEventColorKey(r.color_key) ? r.color_key : undefined,
+        createdBy: r.created_by ?? undefined,
         attachments: rebuildAttachments(r),
       }
     })
@@ -461,7 +464,7 @@ export class SupabaseStore implements ScheduleStore {
       case 'addEvent': {
         // The reducer appends the new (id-stamped) event; persist that one.
         const ev = next.events[next.events.length - 1]
-        if (ev) await this.writeEvent(ev, action.templateId)
+        if (ev) await this.writeEvent(ev, action.templateId, true)
         return
       }
       case 'updateEvent':
@@ -764,7 +767,7 @@ export class SupabaseStore implements ScheduleStore {
 
   /** Upsert a series and reconcile its rosters/attachments. `templateId` records
    *  provenance when this event was created from a template (else left as-is). */
-  private async writeEvent(ev: CalendarEvent, templateId?: string): Promise<void> {
+  private async writeEvent(ev: CalendarEvent, templateId?: string, isNew = false): Promise<void> {
     const series = {
       id: ev.id,
       account_id: this.accountId,
@@ -778,7 +781,9 @@ export class SupabaseStore implements ScheduleStore {
       // Only stamp provenance on insert-from-template; updates omit it so an edit
       // never clobbers an existing link.
       ...(templateId ? { template_id: templateId } : {}),
-      created_by: this.userId,
+      // Stamp the creator only on insert; updates omit it so editing an event
+      // (even by a partner) never reassigns who created it — that drives its color.
+      ...(isNew ? { created_by: this.userId } : {}),
     }
     const up = await supabase.from('event_series').upsert(series, { onConflict: 'id' })
     if (up.error) throw up.error
