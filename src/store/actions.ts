@@ -1,4 +1,4 @@
-import type { CalendarEvent, EventTemplate, OccurrenceStatusCode, PersonId } from '../types'
+import type { CalendarEvent, OccurrenceStatusCode, PersonId } from '../types'
 import type { ColorKey } from '../lib/palette'
 
 /**
@@ -40,10 +40,7 @@ export type Action =
   // "Edit this and all following": split the series at `fromDate` into a new
   // series carrying `event`'s edits, capping the old one just before `fromDate`.
   | { type: 'splitSeries'; eventId: string; fromDate: string; event: Omit<CalendarEvent, 'id'> }
-  // Reusable event blueprints (`event_series` with `is_template = true`).
-  | { type: 'addTemplate'; template: Omit<EventTemplate, 'id'> }
-  | { type: 'updateTemplate'; template: EventTemplate }
-  | { type: 'removeTemplate'; id: string }
+  // (Templates moved off the reducer — owned by TanStack Query, src/data/templates.ts.)
   // Set (or clear, with status: null) an occurrence's explicit status.
   | { type: 'setOccurrenceStatus'; eventId: string; date: string; status: OccurrenceStatusCode | null }
   | { type: 'toggleChecklistEntry'; eventId: string; date: string; entryId: string }

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../auth";
+import { useDeleteTemplate, useTemplates } from "../data/templates";
 import { cx } from "../lib/cx";
 import {
   checklistEntries,
@@ -117,8 +118,9 @@ export function Settings() {
  * them. Clicking a row opens the full-page {@link TemplateEditor}.
  */
 function TemplatesSection() {
-  const { state, dispatch } = useApp();
-  const templates = state.templates;
+  const { state } = useApp();
+  const { data: templates = [] } = useTemplates();
+  const deleteTemplate = useDeleteTemplate();
   const [editing, setEditing] = useState<EventTemplate | null>(null);
 
   return (
@@ -157,7 +159,7 @@ function TemplatesSection() {
               <button
                 type="button"
                 className={s.resetColor}
-                onClick={() => dispatch({ type: "removeTemplate", id: t.id })}
+                onClick={() => deleteTemplate.mutate(t.id)}
                 aria-label={`Delete template ${t.title || "Untitled"}`}
               >
                 Delete

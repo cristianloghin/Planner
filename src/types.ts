@@ -202,8 +202,8 @@ export interface AppState {
   people: Record<PersonId, Person>
   lists: TodoList[]
   events: CalendarEvent[]
-  /** Reusable event blueprints (DATA_MODEL Decision 10); never on the calendar. */
-  templates: EventTemplate[]
+  // Reusable event blueprints (DATA_MODEL Decision 10) are owned by TanStack
+  // Query, not this state tree — see src/data/templates.ts.
   completions: Record<string, OccurrenceState>
   /**
    * Prerequisite edges keyed by the dependent occurrence (`${eventId}:${date}`),
