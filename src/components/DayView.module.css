@@ -23,8 +23,8 @@
   border-left: var(--event-accent) solid var(--c);
   border-radius: 8px;
   /* Soft tint of the event's color over the surface (theme-agnostic); text stays
-     --text for readable contrast. See swatches.css for --event-tint. */
-  background: var(--event-tint);
+     --text for readable contrast. (Inlined, not a wrapper var — WebKit.) */
+  background: color-mix(in oklab, var(--c) var(--tint-strength), var(--surface));
   color: var(--text);
   text-align: left;
   box-shadow: 0 1px 3px var(--shadow);
@@ -226,7 +226,7 @@
   border-radius: 7px;
   padding: 3px 6px;
   /* See .alldayChip / swatches.css: tinted bg + solid colored left border. */
-  background: var(--event-tint);
+  background: color-mix(in oklab, var(--c) var(--tint-strength), var(--surface));
   color: var(--text);
   text-align: left;
   overflow: hidden;
