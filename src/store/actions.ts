@@ -1,4 +1,5 @@
 import type { CalendarEvent, EventTemplate, OccurrenceStatusCode, PersonId } from '../types'
+import type { UserColorKey } from '../lib/palette'
 
 /**
  * Every state change flows through one of these. The reducer applies it to
@@ -64,10 +65,10 @@ export type Action =
       prerequisiteDate: string
     }
   | { type: 'renamePerson'; id: PersonId; name: string }
-  | { type: 'recolorPerson'; id: PersonId; color: string }
+  | { type: 'recolorPerson'; id: PersonId; color: UserColorKey }
   // Personal (per-user) colour override for a person's lane — only the current
   // user sees it. `clearColorPref` reverts to the shared `Person.color`.
-  | { type: 'setColorPref'; personId: PersonId; color: string }
+  | { type: 'setColorPref'; personId: PersonId; color: UserColorKey }
   | { type: 'clearColorPref'; personId: PersonId }
   | { type: 'shiftWeek'; delta: number }
   | { type: 'setWeek'; weekStart: string }

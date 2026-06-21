@@ -1,4 +1,5 @@
 import type { AppState, Person, PersonId } from '../types'
+import { USER_COLORS, hsl, userColorKey, type UserColorKey } from './palette'
 
 /** Colour for an all-adults ('Both'/'Everyone') event — the `--shared` token. */
 export const SHARED_COLOR = 'var(--shared)'
@@ -9,12 +10,23 @@ export function peopleList(state: AppState): Person[] {
 }
 
 /**
- * The colour to draw a person's lane in — this user's personal override if set,
- * otherwise the shared `Person.color`. Every colour read should go through here
- * so overrides apply everywhere uniformly.
+ * The user color *key* a person resolves to: this user's personal override if
+ * set, else the shared `Person.color`, else the default. Both stored values are
+ * palette keys; legacy/unknown values fall back to the default.
+ */
+export function personColorKey(state: AppState, id: PersonId): UserColorKey {
+  const pref = state.preferences.personColors[id]
+  if (pref) return userColorKey(pref)
+  return userColorKey(state.people[id]?.color)
+}
+
+/**
+ * The CSS colour to draw a person's lane in — the `main` shade of their resolved
+ * user color. Every colour read should go through here so overrides apply
+ * everywhere uniformly.
  */
 export function personColor(state: AppState, id: PersonId): string {
-  return state.preferences.personColors[id] ?? state.people[id]?.color ?? SHARED_COLOR
+  return hsl(USER_COLORS[personColorKey(state, id)].main)
 }
 
 export function adults(state: AppState): Person[] {

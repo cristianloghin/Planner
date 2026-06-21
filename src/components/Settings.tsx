@@ -6,7 +6,8 @@ import {
   notes,
   reminderOffsets,
 } from "../lib/attachments";
-import { attendeeLabel, personColor } from "../lib/people";
+import { attendeeLabel, personColorKey } from "../lib/people";
+import { USER_COLOR_KEYS, USER_COLORS, hsl } from "../lib/palette";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import type { EventTemplate } from "../types";
@@ -35,44 +36,61 @@ export function Settings() {
         </p>
         {Object.values(state.people).map((p) => {
           const overridden = state.preferences.personColors[p.id] !== undefined;
+          const activeKey = personColorKey(state, p.id);
           return (
             <div className={s.personRow} key={p.id}>
-              <input
-                type="color"
-                value={personColor(state, p.id)}
-                onChange={(e) =>
-                  dispatch({
-                    type: "setColorPref",
-                    personId: p.id,
-                    color: e.target.value,
-                  })
-                }
-                aria-label={`Your colour for ${p.name}`}
-              />
-              <input
-                type="text"
-                value={p.name}
-                onChange={(e) =>
-                  dispatch({
-                    type: "renamePerson",
-                    id: p.id,
-                    name: e.target.value,
-                  })
-                }
-                aria-label="Name"
-              />
-              {overridden && (
-                <button
-                  type="button"
-                  className={s.resetColor}
-                  onClick={() =>
-                    dispatch({ type: "clearColorPref", personId: p.id })
+              <div className={s.personHead}>
+                <input
+                  type="text"
+                  value={p.name}
+                  onChange={(e) =>
+                    dispatch({
+                      type: "renamePerson",
+                      id: p.id,
+                      name: e.target.value,
+                    })
                   }
-                  title="Reset to the default colour"
-                >
-                  Reset
-                </button>
-              )}
+                  aria-label="Name"
+                />
+                {overridden && (
+                  <button
+                    type="button"
+                    className={s.resetColor}
+                    onClick={() =>
+                      dispatch({ type: "clearColorPref", personId: p.id })
+                    }
+                    title="Reset to the default colour"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+              <div
+                className={s.colorRow}
+                role="radiogroup"
+                aria-label={`Your colour for ${p.name}`}
+              >
+                {USER_COLOR_KEYS.map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={cx(
+                      s.colorSwatch,
+                      activeKey === key && s.colorOn,
+                    )}
+                    style={{ background: hsl(USER_COLORS[key].main) }}
+                    aria-label={key}
+                    aria-pressed={activeKey === key}
+                    onClick={() =>
+                      dispatch({
+                        type: "setColorPref",
+                        personId: p.id,
+                        color: key,
+                      })
+                    }
+                  />
+                ))}
+              </div>
             </div>
           );
         })}

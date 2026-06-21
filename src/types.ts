@@ -1,4 +1,4 @@
-import type { EventColorKey } from './lib/palette'
+import type { EventColorKey, UserColorKey } from './lib/palette'
 
 /** A person's id. Now an opaque string (a backend uuid), not a fixed enum — the
  *  app is generic over however many people exist. */
@@ -11,6 +11,8 @@ export type PersonKind = 'adult' | 'child'
 export interface Person {
   id: PersonId
   name: string
+  /** The account-wide default user-color *key* (one of the nine in the palette).
+   *  A per-user override may sit on top in {@link Preferences.personColors}. */
   color: string
   kind: PersonKind
   /** Lane order, ascending. */
@@ -193,7 +195,8 @@ export interface OccurrenceState {
  * `Person.color`.
  */
 export interface Preferences {
-  personColors: Record<PersonId, string>
+  /** Per-person user-color override, as a palette key (one of the nine). */
+  personColors: Record<PersonId, UserColorKey>
 }
 
 export interface AppState {

@@ -21,7 +21,7 @@ import { uid } from '../lib/id'
 import { toISODate, toDateTimeLocal } from '../lib/dates'
 import { notes as noteAttachments, checklists } from '../lib/attachments'
 import { recurrenceToRRule, rruleToRecurrence, truncatedRRule } from '../lib/rrule'
-import { isEventColorKey } from '../lib/palette'
+import { isEventColorKey, isUserColorKey } from '../lib/palette'
 
 const MINS_PER_DAY = 24 * 60
 
@@ -162,7 +162,13 @@ export class SupabaseStore implements ScheduleStore {
       return empty
     }
     const prefs = (data?.prefs ?? {}) as Partial<Preferences>
-    return { ...empty, ...prefs, personColors: { ...empty.personColors, ...prefs.personColors } }
+    // Keep only valid palette keys; legacy hex overrides are dropped so the
+    // person falls back to their (migrated) shared color.
+    const personColors: Preferences['personColors'] = {}
+    for (const [id, key] of Object.entries(prefs.personColors ?? {})) {
+      if (isUserColorKey(key)) personColors[id] = key
+    }
+    return { ...empty, ...prefs, personColors }
   }
 
   private async loadPeople(): Promise<Record<string, Person>> {
