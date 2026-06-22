@@ -1,25 +1,37 @@
-.listTabs {
+/* ---- Index: the list of lists ---- */
+.listIndex {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
-  margin-bottom: 12px;
 }
 
-.listTab {
+.listIndexRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 6px 14px;
-  color: var(--muted);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  color: var(--text);
   cursor: pointer;
-  white-space: nowrap;
+  text-align: left;
 }
 
-.listTab.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--on-accent);
+.listIndexName {
+  font-size: var(--fs-lg);
   font-weight: 600;
+}
+
+.listIndexCount {
+  font-size: var(--fs-md);
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .newList {
@@ -33,6 +45,9 @@
 }
 
 .smallBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -42,30 +57,16 @@
   white-space: nowrap;
 }
 
-.listHeader {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.listTitle {
-  flex: 1;
-  margin: 0;
+/* Edit mode: the list name becomes a plain editable field. */
+.renameInput {
+  width: 100%;
   font-size: var(--fs-xl);
-}
-
-.renameForm {
-  display: flex;
-  gap: 8px;
-  flex: 1;
-}
-
-.renameForm input {
-  flex: 1;
+  font-weight: 600;
+  margin-bottom: 16px;
 }
 
 .deleteList {
+  margin-top: 8px;
   color: var(--danger);
   border-color: var(--danger);
 }
@@ -173,7 +174,41 @@
 .dueContainer {
   display: flex;
   gap: 8px;
-  align-items: stretch;
+  align-items: center;
+}
+
+/* Edit mode: full-width item text, then a row of secondary fields. */
+.editTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.editFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.editFields > * {
+  width: 100%;
+  min-width: 0;
+}
+
+.editFields .groupInput {
+  flex: none;
+}
+
+/* The deadline picker sizes to its content so it doesn't crowd the row. */
+.editFields .due {
+  width: auto;
+  justify-self: center;
+}
+
+/* Read-only deadline shown in view mode (the edit-mode picker is `.due`). */
+.dueLabel {
+  font-size: var(--fs-md);
+  color: var(--muted);
 }
 
 .dueInput {

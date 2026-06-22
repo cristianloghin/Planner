@@ -97,6 +97,27 @@ function reducer(state: AppState, action: Action): AppState {
             : l,
         ),
       }
+    case 'editListItem':
+      return {
+        ...state,
+        lists: state.lists.map((l) =>
+          l.id === action.listId
+            ? {
+                ...l,
+                items: l.items.map((t) =>
+                  t.id === action.itemId
+                    ? {
+                        ...t,
+                        title: action.title,
+                        personId: action.personId,
+                        groupLabel: action.group,
+                      }
+                    : t,
+                ),
+              }
+            : l,
+        ),
+      }
     case 'setListItemDue':
       return {
         ...state,

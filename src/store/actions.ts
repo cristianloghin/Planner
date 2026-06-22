@@ -21,6 +21,16 @@ export type Action =
     }
   | { type: 'toggleListItem'; listId: string; itemId: string }
   | { type: 'removeListItem'; listId: string; itemId: string }
+  // Edit a to-do's content (used by the list's edit mode): its text, assignee,
+  // and in-list header in one write. The deadline has its own action below.
+  | {
+      type: 'editListItem'
+      listId: string
+      itemId: string
+      title: string
+      personId: PersonId | null
+      group: string | null
+    }
   // Set (or clear, with dueOn: null) a to-do's optional deadline.
   | { type: 'setListItemDue'; listId: string; itemId: string; dueOn: string | null }
   // Surface a to-do inside a concrete occurrence (`list_item_event_link`). The
