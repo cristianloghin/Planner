@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Collapsible, Dialog } from "radix-ui";
 import { cx } from "../lib/cx";
 import { isoLabel } from "../lib/dates";
 import { uid } from "../lib/id";
@@ -6,19 +7,118 @@ import { isOverdue } from "../lib/lists";
 import { colorVar } from "../lib/palette";
 import { personColorKey } from "../lib/people";
 import { useApp } from "../state";
+import d from "./Dialog.module.css";
 import shared from "../styles/shared.module.css";
 import type { ListItem, PersonId, TodoList } from "../types";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ListSearch } from "./ListSearch";
 import s from "./Lists.module.css";
 
-import { ChevronLeft, Pencil, Plus, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronUp, Pencil, Plus, X } from "lucide-react";
 
 type Assignee = PersonId | "shared";
 
 type ItemPatch = Partial<
   Pick<ListItem, "title" | "personId" | "groupLabel" | "dueOn">
 >;
+
+/**
+ * The group field is a modal picker: it lists the headers already used in this
+ * list (plus "No group") and lets you mint a new one — shared by the add form
+ * and the per-item editor so grouping reads the same in both.
+ */
+function GroupPicker({
+  value,
+  options,
+  onChange,
+  className,
+}: {
+  value: string | null;
+  options: string[];
+  onChange: (group: string | null) => void;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+
+  function choose(group: string | null) {
+    onChange(group);
+    setOpen(false);
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className={cx(s.groupPick, !value && s.groupPickEmpty, className)}
+        onClick={() => {
+          setName("");
+          setOpen(true);
+        }}
+      >
+        {value || "Group"}
+      </button>
+
+      <Dialog.Root open={open} onOpenChange={setOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className={d.overlay} />
+          <Dialog.Content className={d.content} aria-describedby={undefined}>
+            <Dialog.Title className={d.title}>Group</Dialog.Title>
+            <div className={s.groupList}>
+              <button
+                type="button"
+                className={cx(s.groupOption, !value && s.groupOptionActive)}
+                onClick={() => choose(null)}
+              >
+                No group
+              </button>
+              {options.map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  className={cx(s.groupOption, value === g && s.groupOptionActive)}
+                  onClick={() => choose(g)}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+            <form
+              className={s.groupNew}
+              onSubmit={(e) => {
+                e.preventDefault();
+                // The picker can live inside the add-bar form; via the portal
+                // React would otherwise bubble this submit up to it.
+                e.stopPropagation();
+                const next = name.trim();
+                if (next) choose(next);
+              }}
+            >
+              <input
+                placeholder="New group…"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                aria-label="New group name"
+              />
+              <button
+                type="submit"
+                className={shared.primary}
+                disabled={!name.trim()}
+              >
+                Create
+              </button>
+            </form>
+            <Dialog.Close asChild>
+              <button type="button" className={cx(d.btn, d.cancel)}>
+                Cancel
+              </button>
+            </Dialog.Close>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </>
+  );
+}
 
 /**
  * The standalone to-do view, with three modes that never mix:
@@ -43,6 +143,8 @@ export function Lists() {
   const [assignee, setAssignee] = useState<Assignee>("shared");
   const [group, setGroup] = useState("");
   const [due, setDue] = useState("");
+  // Whether the add form's extra options (deadline / group / person) show.
+  const [addExpanded, setAddExpanded] = useState(false);
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   // The item awaiting a delete confirmation (null = no prompt open).
@@ -333,15 +435,11 @@ export function Lists() {
           </button>
         </div>
         <div className={s.editFields}>
-          <input
+          <GroupPicker
             className={s.groupInput}
-            placeholder="Group"
-            list="list-group-options"
-            value={t.groupLabel ?? ""}
-            aria-label="Group"
-            onChange={(e) =>
-              patchItem(t, { groupLabel: e.target.value.trim() || null })
-            }
+            value={t.groupLabel}
+            options={groupOptions}
+            onChange={(g) => patchItem(t, { groupLabel: g })}
           />
           <input
             type="date"
@@ -498,62 +596,15 @@ export function Lists() {
         {working && (
           <>
             {isEditing && (
-              <>
-                <input
-                  ref={nameRef}
-                  className={s.renameInput}
-                  value={working.title}
-                  placeholder="List name"
-                  aria-label="List name"
-                  onChange={(e) => patchTitle(e.target.value)}
-                />
-
-                <form className={cx(s.taskAdd)} onSubmit={addWorkingItem}>
-                  <input
-                    placeholder="Add to this list…"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                  />
-                  <input
-                    className={s.groupInput}
-                    placeholder="Group (optional)"
-                    list="list-group-options"
-                    value={group}
-                    onChange={(e) => setGroup(e.target.value)}
-                  />
-                  <div className={s.taskAddDueContainer}>
-                    <input
-                      type="date"
-                      className={s.dueInput}
-                      value={due}
-                      onChange={(e) => setDue(e.target.value)}
-                      aria-label="Deadline (optional)"
-                      title="Deadline (optional)"
-                    />
-                    <select
-                      value={assignee}
-                      onChange={(e) => setAssignee(e.target.value as Assignee)}
-                    >
-                      <option value="shared">Shared</option>
-                      {Object.values(state.people).map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <button type="submit" className={shared.primary}>
-                    Add
-                  </button>
-                </form>
-              </>
+              <input
+                ref={nameRef}
+                className={s.renameInput}
+                value={working.title}
+                placeholder="List name"
+                aria-label="List name"
+                onChange={(e) => patchTitle(e.target.value)}
+              />
             )}
-
-            <datalist id="list-group-options">
-              {groupOptions.map((g) => (
-                <option key={g} value={g} />
-              ))}
-            </datalist>
 
             {working.items.length === 0 && (
               <p className={shared.empty}>
@@ -588,6 +639,82 @@ export function Lists() {
           </>
         )}
       </div>
+
+      {/* Add bar pinned to the bottom while editing. Collapsed = quick add with
+          defaults; the chevron expands deadline / group / person. */}
+      {working && isEditing && (
+        <Collapsible.Root
+          open={addExpanded}
+          onOpenChange={setAddExpanded}
+          className={s.addBar}
+          asChild
+        >
+          <form onSubmit={addWorkingItem}>
+            <Collapsible.Content className={s.addOptions}>
+              <div className={s.addOptionsInner}>
+                <GroupPicker
+                  value={group || null}
+                  options={groupOptions}
+                  onChange={(g) => setGroup(g ?? "")}
+                />
+                <div className={s.taskAddDueContainer}>
+                  <input
+                    type="date"
+                    className={s.dueInput}
+                    value={due}
+                    onChange={(e) => setDue(e.target.value)}
+                    aria-label="Deadline (optional)"
+                    title="Deadline (optional)"
+                  />
+                  <select
+                    value={assignee}
+                    onChange={(e) => setAssignee(e.target.value as Assignee)}
+                    aria-label="Assignee"
+                  >
+                    <option value="shared">Shared</option>
+                    {Object.values(state.people).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </Collapsible.Content>
+
+            <div className={s.addQuick}>
+              <Collapsible.Trigger asChild>
+                <button
+                  type="button"
+                  className={shared.todayBtn}
+                  aria-label={addExpanded ? "Fewer options" : "More options"}
+                >
+                  {addExpanded ? (
+                    <ChevronDown size={22} />
+                  ) : (
+                    <ChevronUp size={22} />
+                  )}
+                </button>
+              </Collapsible.Trigger>
+              <input
+                className={s.addInput}
+                placeholder="Add item…"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                aria-label="Item text"
+              />
+              <button
+                type="submit"
+                className={cx(shared.primary, s.addBtn)}
+                aria-label="Add item"
+                disabled={!title.trim()}
+              >
+                <Plus size={22} />
+              </button>
+            </div>
+          </form>
+        </Collapsible.Root>
+      )}
 
       {selected && (
         <ConfirmDialog
