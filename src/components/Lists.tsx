@@ -340,8 +340,11 @@ export function Lists() {
             )}
             {selected &&
               (editing ? (
-                <button className={s.smallBtn} onClick={() => setEditing(false)}>
-                  Done
+                <button
+                  className={shared.primary}
+                  onClick={() => setEditing(false)}
+                >
+                  Save
                 </button>
               ) : (
                 <button
