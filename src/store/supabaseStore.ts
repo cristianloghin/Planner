@@ -723,6 +723,18 @@ export class SupabaseStore implements ScheduleStore {
         if (error) throw error
         return
       }
+      case 'editListItem': {
+        const { error } = await supabase
+          .from('list_item')
+          .update({
+            title: action.title,
+            person_id: action.personId,
+            group_label: action.group,
+          })
+          .eq('id', action.itemId)
+        if (error) throw error
+        return
+      }
       case 'setListItemDue': {
         const { error } = await supabase
           .from('list_item')
