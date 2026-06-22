@@ -61,15 +61,51 @@
   border-color: var(--danger);
 }
 
-.taskAdd {
+/* ---- Add bar: pinned to the bottom of the editor, collapsible ---- */
+.addBar {
+  flex: none;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  padding: 10px max(16px, env(safe-area-inset-left));
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+}
+
+/* The always-visible quick-add row: toggle, item name, add. */
+.addQuick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.addInput {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Square primary button holding just the Plus icon. */
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  padding: 8px 12px;
+}
+
+.addBtn:disabled {
+  opacity: 0.5;
+}
+
+/* Expanded options sit above the quick-add row, so the input stays at the
+   very bottom. */
+.addOptions {
+  overflow: hidden;
+}
+
+.addOptionsInner {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 16px;
-}
-
-.taskAdd input {
-  flex: 1;
+  padding-bottom: 10px;
 }
 
 .taskAddDueContainer {
@@ -228,4 +264,57 @@
   letter-spacing: 0.04em;
   color: var(--muted);
   margin: 12px 0 8px;
+}
+
+/* ---- Group picker (modal-backed field) ---- */
+/* Mimics an input/select so it sits flush with the deadline + person fields. */
+.groupPick {
+  width: 100%;
+  text-align: left;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groupPickEmpty {
+  color: var(--muted);
+}
+
+.groupList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.groupOption {
+  text-align: left;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+}
+
+.groupOptionActive {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.groupNew {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.groupNew input {
+  flex: 1;
+  min-width: 0;
 }
