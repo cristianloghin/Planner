@@ -11,13 +11,14 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { ListSearch } from "./ListSearch";
 import s from "./Lists.module.css";
 
-import { ChevronLeft, Pencil, X } from "lucide-react";
+import { ChevronLeft, Pencil, Plus, X } from "lucide-react";
 
 type Assignee = PersonId | "shared";
 
 /**
  * The standalone to-do view. Three distinct modes, never mixed:
- *  - index: every list, plus a form to create one (no list open);
+ *  - index: every list, plus a header "+" that creates one and drops straight
+ *    into editing it (no list open otherwise);
  *  - view: one list's items, checkable but otherwise read-only;
  *  - edit: that list's items become editable (add / delete / change) and the
  *    list name and deadlines/assignees can be changed.
@@ -30,20 +31,32 @@ export function Lists() {
   const [assignee, setAssignee] = useState<Assignee>("shared");
   const [group, setGroup] = useState("");
   const [due, setDue] = useState("");
-  const [newListName, setNewListName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // The item awaiting a delete confirmation (null = no prompt open).
+  const [confirmItem, setConfirmItem] = useState<ListItem | null>(null);
   // Set when a search result jumps here; scrolls the row in and flashes it.
   const [highlightId, setHighlightId] = useState<string | null>(null);
 
-  // After creating a list, open it (the reducer appends it last).
+  // After "+" creates a list, open it straight into edit mode (the reducer
+  // appends it last) and focus its name field so it's ready to be typed over.
   const openLast = useRef(false);
+  const justCreated = useRef(false);
+  const nameRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (openLast.current && state.lists.length) {
       setSelectedId(state.lists[state.lists.length - 1].id);
-      setEditing(false);
+      setEditing(true);
       openLast.current = false;
     }
   }, [state.lists]);
+
+  useEffect(() => {
+    if (editing && justCreated.current) {
+      nameRef.current?.focus();
+      nameRef.current?.select();
+      justCreated.current = false;
+    }
+  }, [editing]);
 
   // The open list, if its id still resolves. Unlike before, an unknown/cleared
   // id means the index (no implicit "first list") — selecting is explicit now.
@@ -87,13 +100,12 @@ export function Lists() {
     setHighlightId(itemId);
   }
 
-  function createList(e: React.FormEvent) {
-    e.preventDefault();
-    const name = newListName.trim();
-    if (!name) return;
+  // Create a list and jump straight into editing it — the name starts as a
+  // placeholder the focus effect selects, so the first keystroke renames it.
+  function createList() {
     openLast.current = true;
-    dispatch({ type: "addList", title: name });
-    setNewListName("");
+    justCreated.current = true;
+    dispatch({ type: "addList", title: "New list" });
   }
 
   function addItem(e: React.FormEvent) {
@@ -199,13 +211,7 @@ export function Lists() {
           <button
             className={s.taskDel}
             aria-label="Delete item"
-            onClick={() =>
-              dispatch({
-                type: "removeListItem",
-                listId: selected.id,
-                itemId: t.id,
-              })
-            }
+            onClick={() => setConfirmItem(t)}
           >
             <X size={20} />
           </button>
@@ -323,21 +329,30 @@ export function Lists() {
             <strong>{selected ? selected.title : "Lists"}</strong>
           </div>
           <div className={shared.headSide}>
+            {!selected && (
+              <button
+                className={shared.todayBtn}
+                onClick={createList}
+                aria-label="New list"
+              >
+                <Plus size={22} />
+              </button>
+            )}
             {selected &&
               (editing ? (
                 <button
-                  className={s.smallBtn}
+                  className={shared.primary}
                   onClick={() => setEditing(false)}
                 >
-                  Done
+                  Save
                 </button>
               ) : (
                 <button
-                  className={s.smallBtn}
+                  className={shared.todayBtn}
                   onClick={() => setEditing(true)}
                   aria-label="Edit list"
                 >
-                  <Pencil size={16} /> Edit
+                  <Pencil size={20} />
                 </button>
               ))}
           </div>
@@ -345,50 +360,36 @@ export function Lists() {
       </div>
 
       <div className={shared.viewBody}>
-        {/* ---- Index: every list + create a new one ---- */}
-        {!selected && (
-          <>
-            {state.lists.length === 0 ? (
-              <p className={shared.empty}>
-                No lists yet. Create one to get started.
-              </p>
-            ) : (
-              <ul className={s.listIndex}>
-                {state.lists.map((l) => {
-                  const remaining = l.items.filter((i) => !i.done).length;
-                  return (
-                    <li key={l.id}>
-                      <button
-                        className={s.listIndexRow}
-                        onClick={() => openList(l.id)}
-                      >
-                        <span className={s.listIndexName}>{l.title}</span>
-                        <span className={s.listIndexCount}>
-                          {remaining
-                            ? `${remaining} to do`
-                            : l.items.length
-                              ? "All done"
-                              : "Empty"}
-                        </span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-
-            <form className={s.newList} onSubmit={createList}>
-              <input
-                placeholder="New list…"
-                value={newListName}
-                onChange={(e) => setNewListName(e.target.value)}
-              />
-              <button type="submit" className={shared.primary}>
-                Add list
-              </button>
-            </form>
-          </>
-        )}
+        {/* ---- Index: every list (create via the header "+") ---- */}
+        {!selected &&
+          (state.lists.length === 0 ? (
+            <p className={shared.empty}>
+              No lists yet. Tap + to create one.
+            </p>
+          ) : (
+            <ul className={s.listIndex}>
+              {state.lists.map((l) => {
+                const remaining = l.items.filter((i) => !i.done).length;
+                return (
+                  <li key={l.id}>
+                    <button
+                      className={s.listIndexRow}
+                      onClick={() => openList(l.id)}
+                    >
+                      <span className={s.listIndexName}>{l.title}</span>
+                      <span className={s.listIndexCount}>
+                        {remaining
+                          ? `${remaining} to do`
+                          : l.items.length
+                            ? "All done"
+                            : "Empty"}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          ))}
 
         {/* ---- A list is open (view or edit) ---- */}
         {selected && (
@@ -396,6 +397,7 @@ export function Lists() {
             {editing && (
               <>
                 <input
+                  ref={nameRef}
                   className={s.renameInput}
                   value={selected.title}
                   aria-label="List name"
@@ -502,6 +504,28 @@ export function Lists() {
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmItem !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmItem(null);
+        }}
+        title="Delete this item?"
+        message={
+          confirmItem ? `“${confirmItem.title}” will be removed.` : undefined
+        }
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => {
+          if (selected && confirmItem)
+            dispatch({
+              type: "removeListItem",
+              listId: selected.id,
+              itemId: confirmItem.id,
+            });
+          setConfirmItem(null);
+        }}
+      />
     </section>
   );
 }
