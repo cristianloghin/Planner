@@ -30,6 +30,7 @@ save from the event editor and start a new event from, an app-side deep copy tha
 stamps a real start and fresh attachment rows.
 
 - [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) — the schema and the reasoning behind every decision.
+- [`docs/REACT_PATTERNS.md`](docs/REACT_PATTERNS.md) — frontend conventions: data ownership, write paths, component/hook idioms.
 - [`docs/NEXT_SESSION.md`](docs/NEXT_SESSION.md) — runbook + current status and remaining work.
 - [`supabase/migrations/`](supabase/migrations) — schema, RLS, functions, grants, and the `person` model.
 
