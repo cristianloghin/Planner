@@ -155,14 +155,15 @@ export class SupabaseStore implements ScheduleStore {
   async load(): Promise<AppState> {
     const base = defaultState()
 
-    // Templates are no longer part of the full-state load — they're owned by
-    // TanStack Query now (see src/data/templates.ts). The mapping below still
-    // lives here and is reused via the public template methods.
-    const [people, events, completions, dependencies, preferences, lists, listLinks] =
+    // Not loaded here: templates and per-occurrence state (completions) are
+    // owned by TanStack Query (src/data/templates.ts, src/data/completions.ts)
+    // and fetched per window — completions grow with every tick ever made, so
+    // hydrating them whole would scale startup with account age. The mappings
+    // still live in this class and are reused via the public methods.
+    const [people, events, dependencies, preferences, lists, listLinks] =
       await Promise.all([
         this.loadPeople(),
         this.loadEvents(),
-        this.loadCompletions(),
         this.loadDependencies(),
         this.loadPreferences(),
         this.loadLists(),
@@ -173,7 +174,6 @@ export class SupabaseStore implements ScheduleStore {
       ...base,
       people,
       events,
-      completions,
       dependencies,
       preferences,
       lists,
@@ -347,15 +347,28 @@ export class SupabaseStore implements ScheduleStore {
     return out
   }
 
-  private async loadCompletions(): Promise<Record<string, import('../types').OccurrenceState>> {
+  /**
+   * Per-occurrence state whose occurrence date falls in [fromDate, toDate)
+   * (local ISO dates), as a `CompletionsMap`. Owned by the TanStack Query layer
+   * (src/data/completions.ts), which fetches per month window — these tables
+   * grow with every tick ever made, so they are never loaded whole. Rows whose
+   * `rescheduled_to` lands in the window are included too, so an occurrence
+   * moved INTO the window from a distant origin still renders.
+   */
+  async loadCompletionsRange(
+    fromDate: string,
+    toDate: string,
+  ): Promise<Record<string, import('../types').OccurrenceState>> {
     const completions: Record<string, import('../types').OccurrenceState> = {}
     const key = (seriesId: string, ts: string) => `${seriesId}:${tsToDateKey(ts)}`
+    const fromTs = dayRange(fromDate).from
+    const toTs = dayRange(toDate).from
 
     const [occData, itemData] = await Promise.all([
       // Embed the parent's all_day so reschedule columns map back into the same
       // unit convention as CalendarEvent (timed = minutes, all-day = days). The
       // inner join also scopes the scan to this account, and both queries page
-      // past the 1000-row response cap (these tables grow with every tick).
+      // past the 1000-row response cap.
       fetchAll((from, to) =>
         supabase
           .from('event_occurrence')
@@ -363,6 +376,9 @@ export class SupabaseStore implements ScheduleStore {
             'series_id, occurrence_start, status, rescheduled_to, rescheduled_duration, cancelled, event_series!inner(all_day, account_id)',
           )
           .eq('event_series.account_id', this.accountId)
+          .or(
+            `and(occurrence_start.gte."${fromTs}",occurrence_start.lt."${toTs}"),and(rescheduled_to.gte."${fromTs}",rescheduled_to.lt."${toTs}")`,
+          )
           .order('series_id')
           .order('occurrence_start')
           .range(from, to),
@@ -372,6 +388,8 @@ export class SupabaseStore implements ScheduleStore {
           .from('occurrence_item_state')
           .select('series_id, occurrence_start, item_id, status, event_series!inner()')
           .eq('event_series.account_id', this.accountId)
+          .gte('occurrence_start', fromTs)
+          .lt('occurrence_start', toTs)
           .order('series_id')
           .order('occurrence_start')
           .order('item_id')
@@ -543,7 +561,7 @@ export class SupabaseStore implements ScheduleStore {
    * stream to this user's account, so no per-account filter is needed. Returns
    * an unsubscribe fn.
    */
-  subscribe(onChange: () => void): () => void {
+  subscribe(onChange: (table?: string) => void): () => void {
     let disposed = false
     let hadError = false
     let retryTimer: ReturnType<typeof setTimeout> | undefined
@@ -552,7 +570,11 @@ export class SupabaseStore implements ScheduleStore {
     const open = () => {
       channel = supabase
         .channel('account-data')
-        .on('postgres_changes', { event: '*', schema: 'public' }, () => onChange())
+        // The changed table lets the caller route Query-owned slices (per-
+        // occurrence state) to targeted invalidation instead of a full reload.
+        .on('postgres_changes', { event: '*', schema: 'public' }, (payload) =>
+          onChange(payload.table),
+        )
         .subscribe((status) => {
           if (disposed) return
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -591,105 +613,6 @@ export class SupabaseStore implements ScheduleStore {
         return
       case 'removeEvent': {
         const { error } = await supabase.from('event_series').delete().eq('id', action.id)
-        if (error) throw error
-        return
-      }
-      case 'setOccurrenceStatus': {
-        const ev = next.events.find((e) => e.id === action.eventId)
-        if (!ev) return
-        const { from, to } = dayRange(action.date)
-        if (action.status) {
-          // Update the day's existing row if there is one (it may carry a
-          // reschedule/cancel, and its timestamp may predate a series time
-          // edit); insert a fresh row only when none exists.
-          const { data, error: selErr } = await supabase
-            .from('event_occurrence')
-            .select('occurrence_start')
-            .eq('series_id', ev.id)
-            .gte('occurrence_start', from)
-            .lt('occurrence_start', to)
-            .limit(1)
-          if (selErr) throw selErr
-          const existing = data?.[0]
-          const { error } = existing
-            ? await supabase
-                .from('event_occurrence')
-                .update({ status: action.status })
-                .eq('series_id', ev.id)
-                .eq('occurrence_start', existing.occurrence_start)
-            : await supabase.from('event_occurrence').upsert(
-                { series_id: ev.id, occurrence_start: occurrenceTs(ev, action.date), status: action.status },
-                { onConflict: 'series_id,occurrence_start' },
-              )
-          if (error) throw error
-        } else {
-          // Clearing the status must not destroy a reschedule or cancellation
-          // sharing the row: drop only rows that carry nothing else, and null
-          // the status on any that do.
-          const del = await supabase
-            .from('event_occurrence')
-            .delete()
-            .eq('series_id', ev.id)
-            .gte('occurrence_start', from)
-            .lt('occurrence_start', to)
-            .is('rescheduled_to', null)
-            .is('rescheduled_duration', null)
-            .eq('cancelled', false)
-          if (del.error) throw del.error
-          const upd = await supabase
-            .from('event_occurrence')
-            .update({ status: null })
-            .eq('series_id', ev.id)
-            .gte('occurrence_start', from)
-            .lt('occurrence_start', to)
-          if (upd.error) throw upd.error
-        }
-        return
-      }
-      case 'setOccurrenceOverride': {
-        const ev = next.events.find((e) => e.id === action.eventId)
-        if (!ev) return
-        // Identity stays the ORIGINAL slot; the new time/length go in the
-        // reschedule columns, leaving any status/checklist ticks on the row
-        // intact. The day's existing row is matched by range (see dayRange).
-        const { from, to } = dayRange(action.date)
-        const override = {
-          rescheduled_to: startToTs(action.start, ev.allDay),
-          rescheduled_duration: durationToInterval(action.duration, ev.allDay),
-        }
-        const { data, error: selErr } = await supabase
-          .from('event_occurrence')
-          .select('occurrence_start')
-          .eq('series_id', ev.id)
-          .gte('occurrence_start', from)
-          .lt('occurrence_start', to)
-          .limit(1)
-        if (selErr) throw selErr
-        const existing = data?.[0]
-        const { error } = existing
-          ? await supabase
-              .from('event_occurrence')
-              .update(override)
-              .eq('series_id', ev.id)
-              .eq('occurrence_start', existing.occurrence_start)
-          : await supabase.from('event_occurrence').upsert(
-              { series_id: ev.id, occurrence_start: occurrenceTs(ev, action.date), ...override },
-              { onConflict: 'series_id,occurrence_start' },
-            )
-        if (error) throw error
-        return
-      }
-      case 'clearOccurrenceOverride': {
-        const ev = next.events.find((e) => e.id === action.eventId)
-        if (!ev) return
-        // Null the timing override but keep the row (it may still carry status).
-        const { from, to } = dayRange(action.date)
-        const { error } = await supabase
-          .from('event_occurrence')
-          .update({ rescheduled_to: null, rescheduled_duration: null })
-          .eq('series_id', ev.id)
-          .gte('occurrence_start', from)
-          .lt('occurrence_start', to)
         if (error) throw error
         return
       }
@@ -777,36 +700,6 @@ export class SupabaseStore implements ScheduleStore {
           .gte('prerequisite_occurrence', pre.from)
           .lt('prerequisite_occurrence', pre.to)
         if (error) throw error
-        return
-      }
-      case 'toggleChecklistEntry': {
-        const ev = next.events.find((e) => e.id === action.eventId)
-        if (!ev) return
-        const { from, to } = dayRange(action.date)
-        const nowChecked = next.completions[`${action.eventId}:${action.date}`]?.checked?.[action.entryId]
-        // Both branches clear the day's row(s) by range first, so a tick written
-        // before a series time edit (different stored timestamp, same date) can
-        // still be found — and never duplicated.
-        const del = await supabase
-          .from('occurrence_item_state')
-          .delete()
-          .eq('series_id', ev.id)
-          .eq('item_id', action.entryId)
-          .gte('occurrence_start', from)
-          .lt('occurrence_start', to)
-        if (del.error) throw del.error
-        if (nowChecked) {
-          const { error } = await supabase.from('occurrence_item_state').upsert(
-            {
-              series_id: ev.id,
-              occurrence_start: occurrenceTs(ev, action.date),
-              item_id: action.entryId,
-              status: 'done',
-            },
-            { onConflict: 'series_id,occurrence_start,item_id' },
-          )
-          if (error) throw error
-        }
         return
       }
       case 'renamePerson': {
@@ -965,6 +858,149 @@ export class SupabaseStore implements ScheduleStore {
       case 'setDay':
       case 'hydrate':
         return
+    }
+  }
+
+  // ---- PER-OCCURRENCE STATE (owned by TanStack Query, src/data/completions.ts)
+  // Direct write methods rather than apply() actions: this slice left the
+  // reducer, so mutations carry the event object instead of reading it back
+  // out of AppState. All row matching is by day range (see dayRange).
+
+  /** Set (or clear, with null) an occurrence's explicit status. */
+  async setOccurrenceStatus(
+    ev: CalendarEvent,
+    date: string,
+    status: OccurrenceStatusCode | null,
+  ): Promise<void> {
+    const { from, to } = dayRange(date)
+    if (status) {
+      // Update the day's existing row if there is one (it may carry a
+      // reschedule/cancel, and its timestamp may predate a series time edit);
+      // insert a fresh row only when none exists.
+      const { data, error: selErr } = await supabase
+        .from('event_occurrence')
+        .select('occurrence_start')
+        .eq('series_id', ev.id)
+        .gte('occurrence_start', from)
+        .lt('occurrence_start', to)
+        .limit(1)
+      if (selErr) throw selErr
+      const existing = data?.[0]
+      const { error } = existing
+        ? await supabase
+            .from('event_occurrence')
+            .update({ status })
+            .eq('series_id', ev.id)
+            .eq('occurrence_start', existing.occurrence_start)
+        : await supabase.from('event_occurrence').upsert(
+            { series_id: ev.id, occurrence_start: occurrenceTs(ev, date), status },
+            { onConflict: 'series_id,occurrence_start' },
+          )
+      if (error) throw error
+    } else {
+      // Clearing the status must not destroy a reschedule or cancellation
+      // sharing the row: drop only rows that carry nothing else, and null the
+      // status on any that do.
+      const del = await supabase
+        .from('event_occurrence')
+        .delete()
+        .eq('series_id', ev.id)
+        .gte('occurrence_start', from)
+        .lt('occurrence_start', to)
+        .is('rescheduled_to', null)
+        .is('rescheduled_duration', null)
+        .eq('cancelled', false)
+      if (del.error) throw del.error
+      const upd = await supabase
+        .from('event_occurrence')
+        .update({ status: null })
+        .eq('series_id', ev.id)
+        .gte('occurrence_start', from)
+        .lt('occurrence_start', to)
+      if (upd.error) throw upd.error
+    }
+  }
+
+  /**
+   * One-off timing override for a single occurrence. Identity stays the
+   * ORIGINAL slot; the new time/length go in the reschedule columns, leaving
+   * any status/checklist ticks on the row intact.
+   */
+  async setOccurrenceOverride(
+    ev: CalendarEvent,
+    date: string,
+    start: string,
+    duration: number,
+  ): Promise<void> {
+    const { from, to } = dayRange(date)
+    const override = {
+      rescheduled_to: startToTs(start, ev.allDay),
+      rescheduled_duration: durationToInterval(duration, ev.allDay),
+    }
+    const { data, error: selErr } = await supabase
+      .from('event_occurrence')
+      .select('occurrence_start')
+      .eq('series_id', ev.id)
+      .gte('occurrence_start', from)
+      .lt('occurrence_start', to)
+      .limit(1)
+    if (selErr) throw selErr
+    const existing = data?.[0]
+    const { error } = existing
+      ? await supabase
+          .from('event_occurrence')
+          .update(override)
+          .eq('series_id', ev.id)
+          .eq('occurrence_start', existing.occurrence_start)
+      : await supabase.from('event_occurrence').upsert(
+          { series_id: ev.id, occurrence_start: occurrenceTs(ev, date), ...override },
+          { onConflict: 'series_id,occurrence_start' },
+        )
+    if (error) throw error
+  }
+
+  /** Null the timing override but keep the row (it may still carry status). */
+  async clearOccurrenceOverride(ev: CalendarEvent, date: string): Promise<void> {
+    const { from, to } = dayRange(date)
+    const { error } = await supabase
+      .from('event_occurrence')
+      .update({ rescheduled_to: null, rescheduled_duration: null })
+      .eq('series_id', ev.id)
+      .gte('occurrence_start', from)
+      .lt('occurrence_start', to)
+    if (error) throw error
+  }
+
+  /** Set one checklist entry's per-occurrence tick to an explicit value. */
+  async setChecklistEntry(
+    ev: CalendarEvent,
+    date: string,
+    entryId: string,
+    checked: boolean,
+  ): Promise<void> {
+    const { from, to } = dayRange(date)
+    // Both branches clear the day's row(s) by range first, so a tick written
+    // before a series time edit (different stored timestamp, same date) can
+    // still be found — and never duplicated.
+    const del = await supabase
+      .from('occurrence_item_state')
+      .delete()
+      .eq('series_id', ev.id)
+      .eq('item_id', entryId)
+      .gte('occurrence_start', from)
+      .lt('occurrence_start', to)
+    if (del.error) throw del.error
+    if (checked) {
+      const { error } = await supabase.from('occurrence_item_state').upsert(
+        {
+          series_id: ev.id,
+          occurrence_start: occurrenceTs(ev, date),
+          item_id: entryId,
+          status: 'done',
+        },
+        { onConflict: 'series_id,occurrence_start,item_id' },
+      )
+      if (error) throw error
     }
   }
 

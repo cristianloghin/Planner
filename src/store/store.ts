@@ -42,13 +42,14 @@ function normalizeLists(raw: unknown): TodoList[] {
  *    translates the action into targeted row writes.
  *  - `subscribe(onChange)` fires when the backing data changes elsewhere (a
  *    partner's edit) and returns an unsubscribe fn. localStorage has no remote
- *    changes, so it's a no-op. (This is the seam a future TanStack Query layer
- *    would hook for cache invalidation.)
+ *    changes, so it's a no-op. The changed table's name (when known) lets the
+ *    caller route Query-owned slices to targeted cache invalidation instead of
+ *    a full reload.
  */
 export interface ScheduleStore {
   load(): Promise<AppState>
   apply(action: Action, next: AppState): Promise<void>
-  subscribe(onChange: () => void): () => void
+  subscribe(onChange: (table?: string) => void): () => void
 }
 
 export function defaultState(): AppState {
@@ -61,7 +62,6 @@ export function defaultState(): AppState {
     },
     lists: [],
     events: [],
-    completions: {},
     dependencies: {},
     listLinks: {},
     preferences: { personColors: {} },
@@ -91,7 +91,6 @@ export class LocalStorageStore implements ScheduleStore {
         people: { ...base.people, ...(parsed.people ?? {}) },
         lists: normalizeLists(parsed.lists),
         events: parsed.events ?? base.events,
-        completions: parsed.completions ?? base.completions,
         dependencies: parsed.dependencies ?? base.dependencies,
         listLinks: parsed.listLinks ?? base.listLinks,
         preferences: { ...base.preferences, ...(parsed.preferences ?? {}) },

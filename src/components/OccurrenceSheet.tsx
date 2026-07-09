@@ -1,6 +1,12 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useApp } from '../state'
-import type { CalendarEvent, OccurrenceStatusCode } from '../types'
+import {
+  useClearOccurrenceOverride,
+  useCompletionsForRange,
+  useSetChecklistEntry,
+  useSetOccurrenceStatus,
+} from '../data/completions'
+import type { CalendarEvent, CompletionsMap, OccurrenceStatusCode } from '../types'
 import { addDays, isoLabel, minutesToTime } from '../lib/dates'
 import { eventStartMinutes, eventSpanDays, MINS_PER_DAY } from '../lib/timing'
 import { attendeeLabel } from '../lib/people'
@@ -36,14 +42,27 @@ export function OccurrenceSheet({
   onEdit: () => void
   onClose: () => void
 }) {
-  const { state, dispatch } = useApp()
+  const { state } = useApp()
+  // Windowed per-occurrence state: this occurrence's month, plus the dates of
+  // any prerequisites it waits on (they may live outside the window).
+  const edges = state.dependencies[occKey(event.id, date)] ?? []
+  const prereqDates = useMemo(
+    () => [...new Set(edges.map((e) => e.prerequisiteDate))].sort(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [edges.map((e) => e.prerequisiteDate).join(',')],
+  )
+  const { completions } = useCompletionsForRange(date, date, prereqDates)
+  const setOccurrenceStatus = useSetOccurrenceStatus()
+  const setChecklistEntry = useSetChecklistEntry()
+  const clearOverride = useClearOccurrenceOverride()
+
   const cls = checklists(event).filter((c) => c.items.length > 0)
   const hasChecklist = cls.length > 0
-  const done = isOccurrenceDone(state, event, date)
-  const occState = state.completions[occKey(event.id, date)]
+  const done = isOccurrenceDone(completions, event, date)
+  const occState = completions[occKey(event.id, date)]
   const checked = occState?.checked ?? {}
   const status = occState?.status
-  const blockers = blockingPrerequisites(state, event, date)
+  const blockers = blockingPrerequisites(state, completions, event, date)
   // A one-off override on this slot. `date` is the occurrence's identity (the day
   // the series would normally place it); if the override's start lands on another
   // day, it's been moved there.
@@ -51,12 +70,12 @@ export function OccurrenceSheet({
   const movedFromOrigin = occState?.start != null && occState.start.slice(0, 10) !== date
 
   function setStatus(next: OccurrenceStatusCode | null) {
-    dispatch({ type: 'setOccurrenceStatus', eventId: event.id, date, status: next })
+    setOccurrenceStatus.mutate({ event, date, status: next })
   }
 
   // Show this occurrence's *effective* timing — a one-off override moves the time
   // and length for this date only, while `event` stays the series for editing.
-  const eff = effectiveOccurrence(event, date, state.completions)
+  const eff = effectiveOccurrence(event, date, completions)
   const startMin = eventStartMinutes(eff)
   const endMin = startMin + eff.duration
   const span = eventSpanDays(eff)
@@ -97,7 +116,7 @@ export function OccurrenceSheet({
             <button
               type="button"
               className={s.resetOverride}
-              onClick={() => dispatch({ type: 'clearOccurrenceOverride', eventId: event.id, date })}
+              onClick={() => clearOverride.mutate({ event, date })}
             >
               Reset to series time
             </button>
@@ -125,7 +144,7 @@ export function OccurrenceSheet({
                         type="checkbox"
                         checked={!!checked[it.id]}
                         onChange={() =>
-                          dispatch({ type: 'toggleChecklistEntry', eventId: event.id, date, entryId: it.id })
+                          setChecklistEntry.mutate({ event, date, entryId: it.id, checked: !checked[it.id] })
                         }
                       />
                       <span className={cx(checked[it.id] && s.doneTitle)}>{it.title}</span>
@@ -167,7 +186,7 @@ export function OccurrenceSheet({
 
         <LinkedTodos event={event} date={date} />
 
-        <DependencyEditor event={event} date={date} />
+        <DependencyEditor event={event} date={date} completions={completions} />
       </div>
     </div>
   )
@@ -270,7 +289,15 @@ function LinkedTodos({ event, date }: { event: CalendarEvent; date: string }) {
  * edges. Each link names another event, one of its real occurrences, and the
  * status that occurrence must reach.
  */
-function DependencyEditor({ event, date }: { event: CalendarEvent; date: string }) {
+function DependencyEditor({
+  event,
+  date,
+  completions,
+}: {
+  event: CalendarEvent
+  date: string
+  completions: CompletionsMap
+}) {
   const { state, dispatch } = useApp()
   const edges = state.dependencies[occKey(event.id, date)] ?? []
   const others = state.events.filter((e) => e.id !== event.id)
@@ -309,7 +336,7 @@ function DependencyEditor({ event, date }: { event: CalendarEvent; date: string 
         <ul className={s.depList}>
           {edges.map((edge) => {
             const dep = state.events.find((e) => e.id === edge.prerequisiteSeriesId)
-            const actual = dep ? occurrenceEffectiveStatus(state, dep, edge.prerequisiteDate) : null
+            const actual = dep ? occurrenceEffectiveStatus(completions, dep, edge.prerequisiteDate) : null
             const met = actual === edge.requiredStatus
             return (
               <li key={`${edge.prerequisiteSeriesId}:${edge.prerequisiteDate}`} className={s.depRow}>

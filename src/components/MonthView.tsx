@@ -10,6 +10,7 @@ import {
   startOfMonth,
   toISODate,
 } from "../lib/dates";
+import { useCompletionsForRange } from "../data/completions";
 import { eventColorKey } from "../lib/people";
 import { colorVar } from "../lib/palette";
 import { nextStartOnOrAfter, occurrencesOnDate } from "../lib/recurrence";
@@ -30,6 +31,10 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
   const today = toISODate(new Date());
   const days = useMemo(() => monthGridDays(cursor), [cursor]);
 
+  // Windowed per-occurrence state covering the whole visible grid (the grid
+  // pads to full weeks, so it can straddle two months).
+  const { completions } = useCompletionsForRange(days[0], days[days.length - 1]);
+
   // Expanding recurrences over 42 cells is O(events × occurrence state); do it
   // only when the grid or the data actually changes, not on every render.
   const eventsByDay = useMemo(
@@ -37,7 +42,7 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
       new Map(
         days.map((iso) => [
           iso,
-          occurrencesOnDate(state.events, iso, state.completions)
+          occurrencesOnDate(state.events, iso, completions)
             .map((o) => o.event)
             .sort(
               (a, b) =>
@@ -46,7 +51,7 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
             ),
         ]),
       ),
-    [days, state.events, state.completions],
+    [days, state.events, completions],
   );
 
   // Open a search hit: jump to the event's next upcoming occurrence (falling

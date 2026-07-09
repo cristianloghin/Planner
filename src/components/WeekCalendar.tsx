@@ -9,6 +9,7 @@ import {
   toISODate,
   weekRangeLabel,
 } from "../lib/dates";
+import { useCompletionsForRange } from "../data/completions";
 import { defaultAttendees, eventColorKey, personColorKey } from "../lib/people";
 import { colorVar } from "../lib/palette";
 import { nextStartOnOrAfter, occurrencesOnDate, recurrenceLabel } from "../lib/recurrence";
@@ -23,13 +24,17 @@ export function WeekCalendar() {
   const { state, dispatch } = useApp();
   const [target, setTarget] = useState<EditorTarget | null>(null);
 
+  // Windowed per-occurrence state covering the visible week.
+  const weekEnd = addDays(state.weekStart, 6);
+  const { completions } = useCompletionsForRange(state.weekStart, weekEnd);
+
   // Expand the week's occurrences once per data/week change, not per render.
   const weekDays = useMemo(
     () =>
       DAY_NAMES.map((_, dayIdx) => {
         const dateISO = addDays(state.weekStart, dayIdx);
         // All-day items first, then timed by start.
-        const occs = occurrencesOnDate(state.events, dateISO, state.completions).sort(
+        const occs = occurrencesOnDate(state.events, dateISO, completions).sort(
           (a, b) => {
             if (a.event.allDay !== b.event.allDay)
               return a.event.allDay ? -1 : 1;
@@ -38,7 +43,7 @@ export function WeekCalendar() {
         );
         return { dateISO, occs };
       }),
-    [state.weekStart, state.events, state.completions],
+    [state.weekStart, state.events, completions],
   );
 
   // Open a search hit: jump the week to its next upcoming occurrence (falling

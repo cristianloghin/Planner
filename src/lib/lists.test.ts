@@ -22,7 +22,6 @@ function stateWithLists(lists: TodoList[]): AppState {
     people: {},
     lists,
     events: [],
-    completions: {},
     dependencies: {},
     listLinks: {},
     preferences: { personColors: {} },

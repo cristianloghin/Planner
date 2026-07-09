@@ -12,8 +12,10 @@ import type { AppState, ListItem, TodoList } from './types'
 import { createStore, type ScheduleStore } from './store/store'
 import type { Action } from './store/actions'
 import { useAuth } from './auth'
+import { completionsPrefix } from './data/completions'
 import { addDays } from './lib/dates'
 import { occKey } from './lib/occurrences'
+import { queryClient } from './lib/queryClient'
 import { uid } from './lib/id'
 
 /**
@@ -151,14 +153,12 @@ function reducer(state: AppState, action: Action): AppState {
         events: state.events.map((e) => (e.id === action.event.id ? action.event : e)),
       }
     case 'removeEvent': {
-      // Drop the event, all of its per-occurrence state, and every dependency
-      // edge that touches it — whether it's the dependent occurrence (key prefix)
-      // or a prerequisite of someone else's occurrence (DB cascades both ends).
+      // Drop the event and every dependency edge that touches it — whether
+      // it's the dependent occurrence (key prefix) or a prerequisite of someone
+      // else's occurrence (DB cascades both ends). Its per-occurrence state is
+      // Query-owned (src/data/completions.ts); realtime invalidation prunes it.
       const events = state.events.filter((e) => e.id !== action.id)
       const prefix = action.id + ':'
-      const completions = Object.fromEntries(
-        Object.entries(state.completions).filter(([k]) => !k.startsWith(prefix)),
-      )
       const dependencies: typeof state.dependencies = {}
       for (const [k, edges] of Object.entries(state.dependencies)) {
         if (k.startsWith(prefix)) continue
@@ -170,30 +170,7 @@ function reducer(state: AppState, action: Action): AppState {
       const listLinks = Object.fromEntries(
         Object.entries(state.listLinks).filter(([k]) => !k.startsWith(prefix)),
       )
-      return { ...state, events, completions, dependencies, listLinks }
-    }
-    case 'setOccurrenceStatus': {
-      const key = occKey(action.eventId, action.date)
-      const { status: _drop, ...rest } = state.completions[key] ?? {}
-      const next = action.status === null ? rest : { ...rest, status: action.status }
-      return { ...state, completions: { ...state.completions, [key]: next } }
-    }
-    case 'setOccurrenceOverride': {
-      const key = occKey(action.eventId, action.date)
-      const prev = state.completions[key] ?? {}
-      return {
-        ...state,
-        completions: {
-          ...state.completions,
-          [key]: { ...prev, start: action.start, duration: action.duration },
-        },
-      }
-    }
-    case 'clearOccurrenceOverride': {
-      const key = occKey(action.eventId, action.date)
-      // Drop only the timing override; keep any status/checklist ticks on this slot.
-      const { start: _s, duration: _d, ...rest } = state.completions[key] ?? {}
-      return { ...state, completions: { ...state.completions, [key]: rest } }
+      return { ...state, events, dependencies, listLinks }
     }
     case 'splitSeries': {
       // Optimistic only: cap the old series and append the edited clone. The
@@ -248,13 +225,6 @@ function reducer(state: AppState, action: Action): AppState {
       if (ids.length) listLinks[key] = ids
       else delete listLinks[key]
       return { ...state, listLinks }
-    }
-    case 'toggleChecklistEntry': {
-      const key = occKey(action.eventId, action.date)
-      const prev = state.completions[key] ?? {}
-      const checked = { ...(prev.checked ?? {}) }
-      checked[action.entryId] = !checked[action.entryId]
-      return { ...state, completions: { ...state.completions, [key]: { ...prev, checked } } }
     }
     case 'renamePerson':
       return {
@@ -414,7 +384,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const onRemoteChange = useCallback(() => {
+  const scheduleReload = useCallback(() => {
     if (editCountRef.current > 0) {
       pendingReloadRef.current = true
       return
@@ -422,7 +392,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     clearTimeout(reloadTimerRef.current)
     reloadTimerRef.current = setTimeout(() => void reloadFromStore(), 300)
   }, [reloadFromStore])
-  scheduleReloadRef.current = onRemoteChange
+  scheduleReloadRef.current = scheduleReload
+
+  // Tables owned by the TanStack Query completions slice: their changes route
+  // to targeted cache invalidation, not a full-state reload. Not deferred by
+  // the edit guard — a partner's tick streaming into an open sheet is a
+  // feature, and no form state derives from these rows.
+  const invalidateTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const invalidateCompletions = useCallback(() => {
+    clearTimeout(invalidateTimerRef.current)
+    invalidateTimerRef.current = setTimeout(() => {
+      void queryClient.invalidateQueries({ queryKey: completionsPrefix(accountId) })
+    }, 200)
+  }, [accountId])
+
+  const onRemoteChange = useCallback(
+    (table?: string) => {
+      if (table === 'event_occurrence' || table === 'occurrence_item_state') {
+        invalidateCompletions()
+        return
+      }
+      if (table === undefined) {
+        // Recovery after a dead channel (or an unknown source): anything may
+        // have been missed, so refresh both worlds.
+        invalidateCompletions()
+      }
+      scheduleReload()
+    },
+    [invalidateCompletions, scheduleReload],
+  )
 
   const beginEdit = useCallback(() => {
     editCountRef.current += 1
@@ -441,6 +439,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       unsubscribe()
       clearTimeout(reloadTimerRef.current)
+      clearTimeout(invalidateTimerRef.current)
     }
   }, [onRemoteChange])
 

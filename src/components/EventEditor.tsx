@@ -5,6 +5,7 @@ import { addDays, diffDays, minutesToTime, toDateTimeLocal } from "../lib/dates"
 import { eventDate, eventStartMinutes } from "../lib/timing";
 import { effectiveOccurrence } from "../lib/recurrence";
 import { useApp } from "../state";
+import { useCompletionsForRange, useSetOccurrenceOverride } from "../data/completions";
 import { useAddTemplate, useTemplates } from "../data/templates";
 import { cloneAttachments } from "../lib/attachments";
 import { COLOR_KEYS, DEFAULT_COLOR, colorVar } from "../lib/palette";
@@ -14,6 +15,7 @@ import shared from "../styles/shared.module.css";
 import type {
   Attachment,
   CalendarEvent,
+  CompletionsMap,
   EventTemplate,
   PersonId,
   RecurrenceFreq,
@@ -94,7 +96,31 @@ export function EventEditor({
   target: EditorTarget;
   onClose: () => void;
 }) {
+  // When opened on a specific occurrence, the form seeds from that
+  // occurrence's timing override — which lives in the windowed completions
+  // cache. Hold rendering until the window is in (normally a warm cache hit:
+  // the view that opened the editor fetched the same month), otherwise the
+  // form's initial state would be built without the override.
+  const occurrenceDate =
+    target.mode === "edit" ? (target.occurrenceDate ?? null) : null;
+  const { completions, isLoading } = useCompletionsForRange(occurrenceDate);
+  if (occurrenceDate && isLoading) return null;
+  return (
+    <EventEditorForm target={target} completions={completions} onClose={onClose} />
+  );
+}
+
+function EventEditorForm({
+  target,
+  completions,
+  onClose,
+}: {
+  target: EditorTarget;
+  completions: CompletionsMap;
+  onClose: () => void;
+}) {
   const { state, dispatch, beginEdit, endEdit } = useApp();
+  const setOccurrenceOverride = useSetOccurrenceOverride();
   const { data: templates = [] } = useTemplates();
   const addTemplate = useAddTemplate();
   const isEdit = target.mode === "edit";
@@ -122,7 +148,7 @@ export function EventEditor({
   const seed: CalendarEvent | null =
     isEdit && occurrenceDate
       ? (() => {
-          const eff = effectiveOccurrence(base!, occurrenceDate, state.completions);
+          const eff = effectiveOccurrence(base!, occurrenceDate, completions);
           return {
             ...eff,
             start: eff.allDay
@@ -282,9 +308,8 @@ export function EventEditor({
     // The override's identity stays the original slot (`occurrenceDate`); `start`
     // carries the form's chosen day + time, so changing the day relocates just
     // this occurrence (it stays part of the series, rendered on the new day).
-    dispatch({
-      type: "setOccurrenceOverride",
-      eventId: base!.id,
+    setOccurrenceOverride.mutate({
+      event: base!,
       date: occurrenceDate!,
       start: allDay ? date : startDT,
       duration: currentDuration(),
