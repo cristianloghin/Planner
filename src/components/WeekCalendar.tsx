@@ -17,6 +17,7 @@ import { eventDate } from "../lib/timing";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import { EventEditor, type EditorTarget } from "./EventEditor";
+import { LoadingPill } from "./Spinner";
 import { ViewHeader } from "./ViewHeader";
 import s from "./WeekCalendar.module.css";
 
@@ -26,7 +27,10 @@ export function WeekCalendar() {
 
   // Windowed per-occurrence state covering the visible week.
   const weekEnd = addDays(state.weekStart, 6);
-  const { completions } = useCompletionsForRange(state.weekStart, weekEnd);
+  const { completions, isLoading: completionsLoading } = useCompletionsForRange(
+    state.weekStart,
+    weekEnd,
+  );
 
   // Expand the week's occurrences once per data/week change, not per render.
   const weekDays = useMemo(
@@ -176,6 +180,8 @@ export function WeekCalendar() {
           })}
         </div>
       </div>
+
+      {completionsLoading && <LoadingPill />}
 
       {target && (
         <EventEditor target={target} onClose={() => setTarget(null)} />

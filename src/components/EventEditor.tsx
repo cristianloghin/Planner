@@ -24,6 +24,7 @@ import { AttachmentsEditor } from "./AttachmentsEditor";
 import { AttendeeChips } from "./AttendeeChips";
 import { ColorPicker } from "./ColorPicker";
 import { NumberField } from "./NumberField";
+import { PageLoader } from "./Spinner";
 import s from "./EventEditor.module.css";
 
 const SNAP = 15;
@@ -104,7 +105,13 @@ export function EventEditor({
   const occurrenceDate =
     target.mode === "edit" ? (target.occurrenceDate ?? null) : null;
   const { completions, isLoading } = useCompletionsForRange(occurrenceDate);
-  if (occurrenceDate && isLoading) return null;
+  if (occurrenceDate && isLoading) {
+    return (
+      <div className={shared.editorPage}>
+        <PageLoader />
+      </div>
+    );
+  }
   return (
     <EventEditorForm target={target} completions={completions} onClose={onClose} />
   );

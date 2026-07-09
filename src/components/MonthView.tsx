@@ -18,6 +18,7 @@ import { eventDate, eventStartMinutes } from "../lib/timing";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import s from "./MonthView.module.css";
+import { LoadingPill } from "./Spinner";
 import { ViewHeader } from "./ViewHeader";
 
 // Up to this many event dots before collapsing the rest into a "+N".
@@ -33,7 +34,10 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
 
   // Windowed per-occurrence state covering the whole visible grid (the grid
   // pads to full weeks, so it can straddle two months).
-  const { completions } = useCompletionsForRange(days[0], days[days.length - 1]);
+  const { completions, isLoading: completionsLoading } = useCompletionsForRange(
+    days[0],
+    days[days.length - 1],
+  );
 
   // Expanding recurrences over 42 cells is O(events × occurrence state); do it
   // only when the grid or the data actually changes, not on every render.
@@ -136,6 +140,8 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
           })}
         </div>
       </div>
+
+      {completionsLoading && <LoadingPill />}
     </section>
   );
 }

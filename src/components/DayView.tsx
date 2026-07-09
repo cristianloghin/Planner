@@ -19,6 +19,7 @@ import {
   weekdayIndex,
 } from "../lib/dates";
 import { useCompletionsForRange } from "../data/completions";
+import { LoadingPill } from "./Spinner";
 import {
   isOccurrenceDone,
   occKey,
@@ -117,7 +118,11 @@ export function DayView() {
     () => prerequisiteDatesInRange(state.dependencies, dateISO, dateISO),
     [state.dependencies, dateISO],
   );
-  const { completions } = useCompletionsForRange(dateISO, dateISO, prereqDates);
+  const { completions, isLoading: completionsLoading } = useCompletionsForRange(
+    dateISO,
+    dateISO,
+    prereqDates,
+  );
 
   // Scroll the timeline so `minute` sits a little below the top edge.
   function scrollToMinute(minute: number) {
@@ -435,6 +440,8 @@ export function DayView() {
           </div>
         </div>
       </div>
+
+      {completionsLoading && <LoadingPill />}
 
       {editor && (
         <EventEditor target={editor} onClose={() => setEditor(null)} />

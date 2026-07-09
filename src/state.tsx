@@ -12,6 +12,7 @@ import type { AppState, ListItem, TodoList } from './types'
 import { createStore, type ScheduleStore } from './store/store'
 import type { Action } from './store/actions'
 import { useAuth } from './auth'
+import { PageLoader } from './components/Spinner'
 import { completionsPrefix } from './data/completions'
 import { addDays } from './lib/dates'
 import { occKey } from './lib/occurrences'
@@ -447,7 +448,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     () => (state ? { state, dispatch, beginEdit, endEdit } : null),
     [state, dispatch, beginEdit, endEdit],
   )
-  if (!value) return null
+  // Initial hydration: the store's first load() hasn't resolved yet.
+  if (!value) return <PageLoader label="Loading your planner…" />
   return (
     <AppContext.Provider value={value}>
       {children}

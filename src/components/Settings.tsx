@@ -112,7 +112,7 @@ export function Settings() {
  */
 function TemplatesSection() {
   const { state } = useApp();
-  const { data: templates = [] } = useTemplates();
+  const { data: templates = [], isPending } = useTemplates();
   const deleteTemplate = useDeleteTemplate();
   const [editing, setEditing] = useState<EventTemplate | null>(null);
 
@@ -123,7 +123,9 @@ function TemplatesSection() {
         to prefill its people, checklists, notes and reminders. Save a new one
         from the event editor, or tap one here to edit it.
       </span>
-      {templates.length === 0 ? (
+      {isPending ? (
+        <p className={s.templatesEmpty}>Loading templates…</p>
+      ) : templates.length === 0 ? (
         <p className={s.templatesEmpty}>No templates yet.</p>
       ) : (
         templates.map((t) => {

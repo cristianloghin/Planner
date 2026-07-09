@@ -21,6 +21,7 @@ import { offsetLabel } from '../lib/notifications'
 import { effectiveOccurrence, recurrenceLabel, seriesOccurrenceDatesInRange } from '../lib/recurrence'
 import { findListItem, isOverdue } from '../lib/lists'
 import { cx } from '../lib/cx'
+import { PageLoader } from './Spinner'
 import shared from '../styles/shared.module.css'
 import s from './OccurrenceSheet.module.css'
 
@@ -51,7 +52,7 @@ export function OccurrenceSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [edges.map((e) => e.prerequisiteDate).join(',')],
   )
-  const { completions } = useCompletionsForRange(date, date, prereqDates)
+  const { completions, isLoading } = useCompletionsForRange(date, date, prereqDates)
   const setOccurrenceStatus = useSetOccurrenceStatus()
   const setChecklistEntry = useSetChecklistEntry()
   const clearOverride = useClearOccurrenceOverride()
@@ -88,6 +89,27 @@ export function OccurrenceSheet({
   // For a checklist event, "done" is derived from ticks — only skipped/blocked
   // are set explicitly. Otherwise all three statuses are selectable.
   const statusOptions = hasChecklist ? STATUSES.filter((o) => o !== 'done') : STATUSES
+
+  // Cold window (e.g. a deep search jump): hold the interactive body until the
+  // occurrence's real ticks/status are in, so a tap can't act on bare defaults.
+  if (isLoading) {
+    return (
+      <div className={shared.editorPage}>
+        <header className={shared.editorHead}>
+          <button type="button" className={shared.editorCancel} onClick={onClose}>
+            Close
+          </button>
+          <strong>{event.title}</strong>
+          <button type="button" className={shared.primary} onClick={onEdit}>
+            Edit
+          </button>
+        </header>
+        <div className={shared.editorBody}>
+          <PageLoader />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={shared.editorPage}>
