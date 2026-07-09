@@ -32,8 +32,10 @@ const inFlight = new Map<string, Promise<string>>()
  * Find the user's account, creating one the first time. A signed-in user with no
  * `account_member` row calls the `create_account` RPC once; the returned id is
  * the active account. (RLS scopes every series read/write to this account.)
+ * Exported for non-hook contexts (resumed offline mutations resolve their
+ * store through it); the in-flight map makes repeat calls cheap.
  */
-function ensureAccount(userId: string): Promise<string> {
+export function ensureAccount(userId: string): Promise<string> {
   const existing = inFlight.get(userId)
   if (existing) return existing
 

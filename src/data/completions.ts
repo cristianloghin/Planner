@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "../auth";
+import { ensureAccount, useAuth } from "../auth";
 import { addDays } from "../lib/dates";
 import { occKey } from "../lib/occurrences";
+import { queryClient } from "../lib/queryClient";
+import { supabase } from "../lib/supabase";
 import { SupabaseStore } from "../store/supabaseStore";
 import type {
   CalendarEvent,
@@ -154,92 +156,143 @@ export function useCompletionsForRange(
 }
 
 // ---- mutations --------------------------------------------------------------
+//
+// One shared mutation identity with its behaviour registered as MUTATION
+// DEFAULTS on the query client, not inline in the hooks. That is what makes
+// offline writes durable: a mutation paused while offline is dehydrated by the
+// cache persister (only paused ones are, by default), rehydrated on the next
+// launch carrying just its key + variables, and resumed by
+// resumePausedMutations() — at which point the runtime looks up the mutationFn
+// by key from these defaults. The variables are fully serializable (the event
+// object rides along) so a resumed write needs no other context.
 
-interface OccurrenceVars {
-  event: CalendarEvent;
-  date: string;
-}
+/** All occurrence writes, as one serializable discriminated union. */
+export type OccurrenceWrite =
+  | { kind: "status"; event: CalendarEvent; date: string; status: OccurrenceStatusCode | null }
+  | { kind: "tick"; event: CalendarEvent; date: string; entryId: string; checked: boolean }
+  | { kind: "override"; event: CalendarEvent; date: string; start: string; duration: number }
+  | { kind: "clearOverride"; event: CalendarEvent; date: string };
+
+const OCCURRENCE_WRITE_KEY = ["occurrence-write"] as const;
+// Bare prefix (no accountId): defaults are registered at module scope, before
+// any session exists. Only the signed-in account's queries are ever cached
+// (sign-out clears the client), so the wider match is safe.
+const ANY_COMPLETIONS = ["completions"] as const;
 
 /**
- * Shared optimistic plumbing: patch the occurrence's entry in EVERY cached
- * month window (they overlap via margins), roll back on error, re-sync on
- * settle. An entry patched to empty is dropped, mirroring the load-side "skip
- * rows that carry no app-visible state".
+ * Resolve the store without hooks: a resumed mutation runs outside any
+ * component. Session and account come from supabase directly; `ensureAccount`
+ * caches in-flight lookups, so this is cheap after the first call.
  */
-function useOccurrenceMutation<V extends OccurrenceVars>(
-  run: (store: SupabaseStore, vars: V) => Promise<void>,
-  patch: (entry: OccurrenceState | undefined, vars: V) => OccurrenceState,
-) {
-  const { accountId } = useAuth();
-  const store = useCompletionsStore();
-  const qc = useQueryClient();
-  const prefix = completionsPrefix(accountId);
+async function resolveWriteStore(): Promise<SupabaseStore> {
+  const { data } = await supabase.auth.getSession();
+  const userId = data.session?.user.id;
+  if (!userId) throw new Error("Occurrence write: not signed in");
+  const accountId = await ensureAccount(userId);
+  return new SupabaseStore(accountId, userId);
+}
 
-  return useMutation({
-    mutationFn: (vars: V) => {
-      if (!store) throw new Error("Completions: not signed in yet");
-      return run(store, vars);
-    },
-    onMutate: async (vars: V) => {
-      await qc.cancelQueries({ queryKey: prefix });
-      const prev = qc.getQueriesData<CompletionsMap>({ queryKey: prefix });
-      const k = occKey(vars.event.id, vars.date);
-      qc.setQueriesData<CompletionsMap>({ queryKey: prefix }, (map) => {
-        if (!map) return map;
-        const next = { ...map };
-        const patched = patch(map[k], vars);
-        if (Object.keys(patched).length) next[k] = patched;
-        else delete next[k];
-        return next;
-      });
-      return { prev };
-    },
-    onError: (_err, _vars, ctx) => {
-      for (const [key, data] of ctx?.prev ?? []) qc.setQueryData(key, data);
-    },
-    onSettled: () => {
-      void qc.invalidateQueries({ queryKey: prefix });
-    },
-  });
+/** The optimistic patch for a write — mirrors the server semantics. An entry
+ *  patched to empty is dropped, matching the load-side "skip rows that carry
+ *  no app-visible state". */
+function patchEntry(entry: OccurrenceState | undefined, w: OccurrenceWrite): OccurrenceState {
+  switch (w.kind) {
+    case "status": {
+      const { status: _drop, ...rest } = entry ?? {};
+      return w.status ? { ...rest, status: w.status } : rest;
+    }
+    case "tick":
+      return { ...entry, checked: { ...(entry?.checked ?? {}), [w.entryId]: w.checked } };
+    case "override":
+      return { ...entry, start: w.start, duration: w.duration };
+    case "clearOverride": {
+      const { start: _s, duration: _d, ...rest } = entry ?? {};
+      return rest;
+    }
+  }
+}
+
+queryClient.setMutationDefaults(OCCURRENCE_WRITE_KEY, {
+  mutationFn: async (w: OccurrenceWrite) => {
+    const store = await resolveWriteStore();
+    switch (w.kind) {
+      case "status":
+        return store.setOccurrenceStatus(w.event, w.date, w.status);
+      case "tick":
+        return store.setChecklistEntry(w.event, w.date, w.entryId, w.checked);
+      case "override":
+        return store.setOccurrenceOverride(w.event, w.date, w.start, w.duration);
+      case "clearOverride":
+        return store.clearOccurrenceOverride(w.event, w.date);
+    }
+  },
+  // Patch the occurrence's entry in EVERY cached month window (they overlap
+  // via fetch margins), snapshot for rollback, re-sync on settle. A mutation
+  // resumed after a restart has no ctx to roll back — the persisted cache
+  // already carries its optimistic patch, and onSettled reconciles.
+  onMutate: async (w: OccurrenceWrite) => {
+    await queryClient.cancelQueries({ queryKey: ANY_COMPLETIONS });
+    const prev = queryClient.getQueriesData<CompletionsMap>({ queryKey: ANY_COMPLETIONS });
+    const k = occKey(w.event.id, w.date);
+    queryClient.setQueriesData<CompletionsMap>({ queryKey: ANY_COMPLETIONS }, (map) => {
+      if (!map) return map;
+      const next = { ...map };
+      const patched = patchEntry(map[k], w);
+      if (Object.keys(patched).length) next[k] = patched;
+      else delete next[k];
+      return next;
+    });
+    return { prev };
+  },
+  onError: (_err, _w, ctx) => {
+    const prev = (ctx as { prev?: [readonly unknown[], CompletionsMap | undefined][] } | undefined)?.prev;
+    for (const [key, data] of prev ?? []) queryClient.setQueryData(key as readonly unknown[], data);
+  },
+  onSettled: () => {
+    void queryClient.invalidateQueries({ queryKey: ANY_COMPLETIONS });
+  },
+});
+
+function useOccurrenceWrite() {
+  return useMutation<void, Error, OccurrenceWrite>({ mutationKey: [...OCCURRENCE_WRITE_KEY] });
 }
 
 /** Set (or clear, with status: null) an occurrence's explicit status. */
 export function useSetOccurrenceStatus() {
-  return useOccurrenceMutation<OccurrenceVars & { status: OccurrenceStatusCode | null }>(
-    (store, v) => store.setOccurrenceStatus(v.event, v.date, v.status),
-    (entry, v) => {
-      const { status: _drop, ...rest } = entry ?? {};
-      return v.status ? { ...rest, status: v.status } : rest;
-    },
-  );
+  const m = useOccurrenceWrite();
+  return {
+    ...m,
+    mutate: (v: { event: CalendarEvent; date: string; status: OccurrenceStatusCode | null }) =>
+      m.mutate({ kind: "status", ...v }),
+  };
 }
 
 /** Set one checklist entry's tick for an occurrence to an explicit value. */
 export function useSetChecklistEntry() {
-  return useOccurrenceMutation<OccurrenceVars & { entryId: string; checked: boolean }>(
-    (store, v) => store.setChecklistEntry(v.event, v.date, v.entryId, v.checked),
-    (entry, v) => ({
-      ...entry,
-      checked: { ...(entry?.checked ?? {}), [v.entryId]: v.checked },
-    }),
-  );
+  const m = useOccurrenceWrite();
+  return {
+    ...m,
+    mutate: (v: { event: CalendarEvent; date: string; entryId: string; checked: boolean }) =>
+      m.mutate({ kind: "tick", ...v }),
+  };
 }
 
 /** One-off timing override for a single occurrence (reschedule). */
 export function useSetOccurrenceOverride() {
-  return useOccurrenceMutation<OccurrenceVars & { start: string; duration: number }>(
-    (store, v) => store.setOccurrenceOverride(v.event, v.date, v.start, v.duration),
-    (entry, v) => ({ ...entry, start: v.start, duration: v.duration }),
-  );
+  const m = useOccurrenceWrite();
+  return {
+    ...m,
+    mutate: (v: { event: CalendarEvent; date: string; start: string; duration: number }) =>
+      m.mutate({ kind: "override", ...v }),
+  };
 }
 
 /** Drop an occurrence's timing override, keeping its status/ticks. */
 export function useClearOccurrenceOverride() {
-  return useOccurrenceMutation<OccurrenceVars>(
-    (store, v) => store.clearOccurrenceOverride(v.event, v.date),
-    (entry) => {
-      const { start: _s, duration: _d, ...rest } = entry ?? {};
-      return rest;
-    },
-  );
+  const m = useOccurrenceWrite();
+  return {
+    ...m,
+    mutate: (v: { event: CalendarEvent; date: string }) =>
+      m.mutate({ kind: "clearOverride", ...v }),
+  };
 }
