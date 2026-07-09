@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { AppState, ListItem, TodoList } from '../types'
 import { addDays, toISODate } from './dates'
 import { findListItem, isOverdue } from './lists'

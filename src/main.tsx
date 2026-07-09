@@ -1,6 +1,6 @@
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { Root } from './App'
 import { AuthProvider } from './auth'
 import { UpdatePrompt } from './components/UpdatePrompt'

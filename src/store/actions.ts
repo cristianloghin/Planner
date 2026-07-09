@@ -1,5 +1,5 @@
-import type { CalendarEvent, OccurrenceStatusCode, PersonId } from '../types'
 import type { ColorKey } from '../lib/palette'
+import type { CalendarEvent, OccurrenceStatusCode, PersonId } from '../types'
 
 /**
  * Every state change flows through one of these. The reducer applies it to

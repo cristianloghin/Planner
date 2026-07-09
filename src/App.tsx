@@ -1,34 +1,30 @@
-import {
-  ListChecks,
-  Settings as SettingsIcon,
-  type LucideIcon,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-import s from "./App.module.css";
-import { useAuth } from "./auth";
-import { AlertHost } from "./components/AlertHost";
-import { DayView } from "./components/DayView";
-import { Lists } from "./components/Lists";
-import { Login } from "./components/Login";
-import { MonthView } from "./components/MonthView";
-import { Settings } from "./components/Settings";
-import { PageLoader } from "./components/Spinner";
-import { WeekCalendar } from "./components/WeekCalendar";
-import { useTemplatesRealtime } from "./data/templates";
-import { cx } from "./lib/cx";
-import { mondayOf, weekdayIndex } from "./lib/dates";
-import { syncPushSubscription } from "./lib/push";
-import { AppProvider, useApp } from "./state";
+import { ListChecks, type LucideIcon, Settings as SettingsIcon } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import s from './App.module.css'
+import { useAuth } from './auth'
+import { AlertHost } from './components/AlertHost'
+import { DayView } from './components/DayView'
+import { Lists } from './components/Lists'
+import { Login } from './components/Login'
+import { MonthView } from './components/MonthView'
+import { Settings } from './components/Settings'
+import { PageLoader } from './components/Spinner'
+import { WeekCalendar } from './components/WeekCalendar'
+import { useTemplatesRealtime } from './data/templates'
+import { cx } from './lib/cx'
+import { mondayOf, weekdayIndex } from './lib/dates'
+import { syncPushSubscription } from './lib/push'
+import { AppProvider, useApp } from './state'
 
-type Tab = "day" | "calendar" | "month" | "lists" | "settings";
+type Tab = 'day' | 'calendar' | 'month' | 'lists' | 'settings'
 
 const TABS: { id: Tab; label: string; icon?: LucideIcon }[] = [
-  { id: "lists", label: "Lists", icon: ListChecks },
-  { id: "day", label: "Day" },
-  { id: "calendar", label: "Week" },
-  { id: "month", label: "Month" },
-  { id: "settings", label: "Settings", icon: SettingsIcon },
-];
+  { id: 'lists', label: 'Lists', icon: ListChecks },
+  { id: 'day', label: 'Day' },
+  { id: 'calendar', label: 'Week' },
+  { id: 'month', label: 'Month' },
+  { id: 'settings', label: 'Settings', icon: SettingsIcon },
+]
 
 /**
  * Auth gate. Decides what to mount: a spinner while the session resolves, the
@@ -37,7 +33,7 @@ const TABS: { id: Tab; label: string; icon?: LucideIcon }[] = [
  * loads for a signed-out user.
  */
 export function Root() {
-  const { session, accountId, loading } = useAuth();
+  const { session, accountId, loading } = useAuth()
 
   // Spinner while the session resolves, or while the account bootstraps (the
   // store is built from accountId, so wait for it before mounting the data layer).
@@ -46,7 +42,7 @@ export function Root() {
       <div className={s.app}>
         <PageLoader />
       </div>
-    );
+    )
   }
 
   if (!session) {
@@ -54,7 +50,7 @@ export function Root() {
       <div className={s.app}>
         <Login />
       </div>
-    );
+    )
   }
 
   return (
@@ -64,30 +60,30 @@ export function Root() {
     <AppProvider key={accountId}>
       <App />
     </AppProvider>
-  );
+  )
 }
 
 export function App() {
-  const [tab, setTab] = useState<Tab>("day");
-  const { dispatch } = useApp();
-  const { session } = useAuth();
+  const [tab, setTab] = useState<Tab>('day')
+  const { dispatch } = useApp()
+  const { session } = useAuth()
 
   // Keep the (Query-owned) templates cache fresh on a partner's change.
-  useTemplatesRealtime();
+  useTemplatesRealtime()
 
   // Self-heal this device's push registration (the push service can rotate a
   // subscription behind our back; the worker re-subscribes, we re-record it).
   useEffect(() => {
-    if (session) void syncPushSubscription(session.user.id);
-  }, [session]);
+    if (session) void syncPushSubscription(session.user.id)
+  }, [session])
 
   function openDay(iso: string) {
     dispatch({
-      type: "setWeek",
-      weekStart: mondayOf(new Date(iso + "T00:00:00")),
-    });
-    dispatch({ type: "setDay", day: weekdayIndex(iso) });
-    setTab("day");
+      type: 'setWeek',
+      weekStart: mondayOf(new Date(iso + 'T00:00:00')),
+    })
+    dispatch({ type: 'setDay', day: weekdayIndex(iso) })
+    setTab('day')
   }
 
   return (
@@ -95,11 +91,11 @@ export function App() {
       <AlertHost />
 
       <main className={s.appMain}>
-        {tab === "day" && <DayView />}
-        {tab === "calendar" && <WeekCalendar />}
-        {tab === "month" && <MonthView onOpenDay={openDay} />}
-        {tab === "lists" && <Lists />}
-        {tab === "settings" && <Settings />}
+        {tab === 'day' && <DayView />}
+        {tab === 'calendar' && <WeekCalendar />}
+        {tab === 'month' && <MonthView onOpenDay={openDay} />}
+        {tab === 'lists' && <Lists />}
+        {tab === 'settings' && <Settings />}
       </main>
 
       <nav className={s.tabbar}>
@@ -115,5 +111,5 @@ export function App() {
         ))}
       </nav>
     </div>
-  );
+  )
 }

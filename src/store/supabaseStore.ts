@@ -1,3 +1,10 @@
+import { checklists, notes as noteAttachments } from '../lib/attachments'
+import type { Json } from '../lib/database.types'
+import { toDateTimeLocal, toISODate } from '../lib/dates'
+import { uid } from '../lib/id'
+import { isColorKey } from '../lib/palette'
+import { recurrenceToRRule, rruleToRecurrence, truncatedRRule } from '../lib/rrule'
+import { supabase } from '../lib/supabase'
 import type {
   AppState,
   Attachment,
@@ -13,15 +20,8 @@ import type {
   TodoList,
 } from '../types'
 import type { Action } from './actions'
-import type { Json } from '../lib/database.types'
 import type { ScheduleStore } from './store'
 import { defaultState } from './store'
-import { supabase } from '../lib/supabase'
-import { uid } from '../lib/id'
-import { toISODate, toDateTimeLocal } from '../lib/dates'
-import { notes as noteAttachments, checklists } from '../lib/attachments'
-import { recurrenceToRRule, rruleToRecurrence, truncatedRRule } from '../lib/rrule'
-import { isColorKey } from '../lib/palette'
 
 const MINS_PER_DAY = 24 * 60
 
@@ -160,15 +160,14 @@ export class SupabaseStore implements ScheduleStore {
     // and fetched per window — completions grow with every tick ever made, so
     // hydrating them whole would scale startup with account age. The mappings
     // still live in this class and are reused via the public methods.
-    const [people, events, dependencies, preferences, lists, listLinks] =
-      await Promise.all([
-        this.loadPeople(),
-        this.loadEvents(),
-        this.loadDependencies(),
-        this.loadPreferences(),
-        this.loadLists(),
-        this.loadListLinks(),
-      ])
+    const [people, events, dependencies, preferences, lists, listLinks] = await Promise.all([
+      this.loadPeople(),
+      this.loadEvents(),
+      this.loadDependencies(),
+      this.loadPreferences(),
+      this.loadLists(),
+      this.loadListLinks(),
+    ])
 
     return {
       ...base,
@@ -256,12 +255,12 @@ export class SupabaseStore implements ScheduleStore {
         // more than one relationship between event_series and these children
         // (e.g. checklist_item also links many-to-many via occurrence_item_removed).
         .select(
-        `id, title, all_day, dtstart, duration, rrule, color_key,
+          `id, title, all_day, dtstart, duration, rrule, color_key,
          event_person!series_id ( person_id ),
          checklist_item!owner_series_id ( id, label, group_label, sort_order, occurrence_start ),
          note!owner_series_id ( id, body ),
          reminder!series_id ( id, offset_seconds )`,
-      )
+        )
         .eq('account_id', this.accountId)
         .eq('is_template', false)
         .order('id')
@@ -400,11 +399,14 @@ export class SupabaseStore implements ScheduleStore {
     for (const o of occData) {
       // PostgREST returns the to-one parent embed as an object.
       const allDay = (o.event_series as { all_day: boolean } | null)?.all_day ?? false
-      const entry: import('../types').OccurrenceState = { ...completions[key(o.series_id, o.occurrence_start)] }
+      const entry: import('../types').OccurrenceState = {
+        ...completions[key(o.series_id, o.occurrence_start)],
+      }
       if (o.status) entry.status = o.status as OccurrenceStatusCode
       if (o.cancelled) entry.cancelled = true
       if (o.rescheduled_to) entry.start = tsToStart(o.rescheduled_to, allDay)
-      if (o.rescheduled_duration) entry.duration = intervalToDuration(o.rescheduled_duration, allDay)
+      if (o.rescheduled_duration)
+        entry.duration = intervalToDuration(o.rescheduled_duration, allDay)
       // Skip rows that carry no app-visible state (e.g. a cleared override).
       if (entry.status || entry.cancelled || entry.start != null || entry.duration != null) {
         completions[key(o.series_id, o.occurrence_start)] = entry
@@ -437,7 +439,9 @@ export class SupabaseStore implements ScheduleStore {
       fetchAll((from, to) =>
         supabase
           .from('list_item')
-          .select('id, list_id, group_label, title, done, person_id, due_on, sort_order, created_at, list!inner()')
+          .select(
+            'id, list_id, group_label, title, done, person_id, due_on, sort_order, created_at, list!inner()',
+          )
           .eq('list.account_id', this.accountId)
           .order('sort_order')
           .order('id')
@@ -489,7 +493,9 @@ export class SupabaseStore implements ScheduleStore {
     if (!Array.isArray(legacy) || legacy.length === 0) {
       try {
         localStorage.setItem(LEGACY_LISTS_IMPORTED_KEY, '1')
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       return
     }
 
@@ -503,7 +509,9 @@ export class SupabaseStore implements ScheduleStore {
     if ((existing.data ?? []).length > 0) {
       try {
         localStorage.setItem(LEGACY_LISTS_IMPORTED_KEY, '1')
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       return
     }
 
@@ -526,7 +534,9 @@ export class SupabaseStore implements ScheduleStore {
 
     try {
       localStorage.setItem(LEGACY_LISTS_IMPORTED_KEY, '1')
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   /**
@@ -650,7 +660,11 @@ export class SupabaseStore implements ScheduleStore {
           })
           .eq('id', newId as string)
         if (up.error) throw up.error
-        await this.syncAttendees({ id: newId as string, attendees: e.attendees, attachments: e.attachments })
+        await this.syncAttendees({
+          id: newId as string,
+          attendees: e.attendees,
+          attachments: e.attachments,
+        })
         // A full reload (driven by the realtime change + edit-guard flush) then
         // replaces the optimistic clone with the real, migrated shape.
         return
@@ -681,7 +695,10 @@ export class SupabaseStore implements ScheduleStore {
             prerequisite_occurrence: occurrenceTs(prerequisite, action.prerequisiteDate),
             required_status: action.requiredStatus,
           },
-          { onConflict: 'dependent_series,dependent_occurrence,prerequisite_series,prerequisite_occurrence' },
+          {
+            onConflict:
+              'dependent_series,dependent_occurrence,prerequisite_series,prerequisite_occurrence',
+          },
         )
         if (error) throw error
         return
@@ -749,12 +766,20 @@ export class SupabaseStore implements ScheduleStore {
         if (!list) return
         const { error } = await supabase
           .from('list')
-          .insert({ id: list.id, account_id: this.accountId, title: list.title, sort_order: list.sortOrder })
+          .insert({
+            id: list.id,
+            account_id: this.accountId,
+            title: list.title,
+            sort_order: list.sortOrder,
+          })
         if (error) throw error
         return
       }
       case 'renameList': {
-        const { error } = await supabase.from('list').update({ title: action.title }).eq('id', action.id)
+        const { error } = await supabase
+          .from('list')
+          .update({ title: action.title })
+          .eq('id', action.id)
         if (error) throw error
         return
       }
@@ -903,10 +928,12 @@ export class SupabaseStore implements ScheduleStore {
             .update({ status })
             .eq('series_id', ev.id)
             .eq('occurrence_start', existing.occurrence_start)
-        : await supabase.from('event_occurrence').upsert(
-            { series_id: ev.id, occurrence_start: occurrenceTs(ev, date), status },
-            { onConflict: 'series_id,occurrence_start' },
-          )
+        : await supabase
+            .from('event_occurrence')
+            .upsert(
+              { series_id: ev.id, occurrence_start: occurrenceTs(ev, date), status },
+              { onConflict: 'series_id,occurrence_start' },
+            )
       if (error) throw error
     } else {
       // Clearing the status must not destroy a reschedule or cancellation
@@ -963,10 +990,12 @@ export class SupabaseStore implements ScheduleStore {
           .update(override)
           .eq('series_id', ev.id)
           .eq('occurrence_start', existing.occurrence_start)
-      : await supabase.from('event_occurrence').upsert(
-          { series_id: ev.id, occurrence_start: occurrenceTs(ev, date), ...override },
-          { onConflict: 'series_id,occurrence_start' },
-        )
+      : await supabase
+          .from('event_occurrence')
+          .upsert(
+            { series_id: ev.id, occurrence_start: occurrenceTs(ev, date), ...override },
+            { onConflict: 'series_id,occurrence_start' },
+          )
     if (error) throw error
   }
 
@@ -1081,12 +1110,10 @@ export class SupabaseStore implements ScheduleStore {
     // empty mid-sync for a concurrent reader, and two devices saving at once
     // can't fail the whole insert on a shared attendee's duplicate key.
     if (ev.attendees.length) {
-      const up = await supabase
-        .from('event_person')
-        .upsert(
-          ev.attendees.map((person_id) => ({ series_id: ev.id, person_id })),
-          { onConflict: 'series_id,person_id', ignoreDuplicates: true },
-        )
+      const up = await supabase.from('event_person').upsert(
+        ev.attendees.map((person_id) => ({ series_id: ev.id, person_id })),
+        { onConflict: 'series_id,person_id', ignoreDuplicates: true },
+      )
       if (up.error) throw up.error
     }
     let del = supabase.from('event_person').delete().eq('series_id', ev.id)
@@ -1114,7 +1141,11 @@ export class SupabaseStore implements ScheduleStore {
       if (up.error) throw up.error
     }
     const keepIds = desired.map((d) => d.id)
-    let del = supabase.from('checklist_item').delete().eq('owner_series_id', ev.id).is('occurrence_start', null)
+    let del = supabase
+      .from('checklist_item')
+      .delete()
+      .eq('owner_series_id', ev.id)
+      .is('occurrence_start', null)
     if (keepIds.length) del = del.not('id', 'in', `(${keepIds.join(',')})`)
     const res = await del
     if (res.error) throw res.error
@@ -1166,7 +1197,6 @@ export class SupabaseStore implements ScheduleStore {
     const res = await del
     if (res.error) throw res.error
   }
-
 }
 
 /**

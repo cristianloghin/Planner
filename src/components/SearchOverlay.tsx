@@ -1,6 +1,6 @@
-import { useEffect, type ReactNode } from "react";
-import { Search as SearchIcon, X } from "lucide-react";
-import s from "./Search.module.css";
+import { Search as SearchIcon, X } from 'lucide-react'
+import { type ReactNode, useEffect } from 'react'
+import s from './Search.module.css'
 
 /**
  * Presentational shell for a search surface: a full-screen overlay with a search
@@ -16,21 +16,21 @@ export function SearchOverlay({
   loading,
   children,
 }: {
-  placeholder: string;
-  query: string;
-  onQueryChange: (q: string) => void;
-  onClose: () => void;
-  loading: boolean;
-  children: ReactNode;
+  placeholder: string
+  query: string
+  onQueryChange: (q: string) => void
+  onClose: () => void
+  loading: boolean
+  children: ReactNode
 }) {
   // Close on Escape from anywhere in the overlay.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   return (
     <div className={s.overlay} role="dialog" aria-modal="true" aria-label="Search">
@@ -54,5 +54,5 @@ export function SearchOverlay({
         {children}
       </div>
     </div>
-  );
+  )
 }

@@ -1,9 +1,9 @@
 import type { CalendarEvent, OccurrenceState } from '../types'
+import { reminderOffsets } from './attachments'
 import { addDays, diffDays, toISODate } from './dates'
 import { occKey } from './occurrences'
 import { startsOn } from './recurrence'
 import { eventStartMinutes } from './timing'
-import { reminderOffsets } from './attachments'
 
 /** Reminder offsets (minutes before start) offered in the event editor. */
 export const REMINDER_OFFSETS = [0, 15, 30, 60, 120, 1440]

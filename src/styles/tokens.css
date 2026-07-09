@@ -24,12 +24,12 @@
   /* ---- Typography ---- */
   /* Source Sans 3 (self-hosted variable font, see main.tsx); system stack is
      the fallback so text shows instantly while the font loads. */
-  --font: 'Source Sans 3 Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font: "Source Sans 3 Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   /* Font-size scale — the single place to tune text sizing. Bumped +1px over
      the original values since Source Sans 3 renders a touch smaller than the
      system stack. (Original px noted in comments.) */
-  --fs-2xs: 0.6rem; 
+  --fs-2xs: 0.6rem;
   --fs-xs: 0.75rem;
   --fs-sm: 0.8rem;
   --fs-md: 0.85rem;

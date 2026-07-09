@@ -1,7 +1,7 @@
 import type { CalendarEvent, OccurrenceState, Recurrence } from '../types'
 import { addDays, diffDays, toISODate } from './dates'
-import { eventDate, eventSpanDays, timedSegment } from './timing'
 import { occKey } from './occurrences'
+import { eventDate, eventSpanDays, timedSegment } from './timing'
 
 /**
  * The event as it actually occurs on `date`, with any one-off timing override
@@ -95,8 +95,7 @@ export function latestStartOnOrBefore(e: CalendarEvent, date: string): string | 
       const start = new Date(base + 'T00:00:00')
       const target = new Date(date + 'T00:00:00')
       const months =
-        (target.getFullYear() - start.getFullYear()) * 12 +
-        (target.getMonth() - start.getMonth())
+        (target.getFullYear() - start.getFullYear()) * 12 + (target.getMonth() - start.getMonth())
       for (let k = Math.floor(months / n); k >= 0; k--) {
         const d = new Date(start)
         d.setMonth(d.getMonth() + k * n)

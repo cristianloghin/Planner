@@ -1,7 +1,7 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { supabase } from './lib/supabase'
+import { type ReactNode, createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { queryClient } from './lib/queryClient'
+import { supabase } from './lib/supabase'
 import { clearSnapshot } from './store/offline'
 
 interface AuthCtx {
@@ -49,7 +49,9 @@ export function ensureAccount(userId: string): Promise<string> {
     if (error) throw error
     if (data) return data.account_id
 
-    const { data: newId, error: rpcError } = await supabase.rpc('create_account', { p_name: 'Home' })
+    const { data: newId, error: rpcError } = await supabase.rpc('create_account', {
+      p_name: 'Home',
+    })
     if (rpcError) throw rpcError
     return newId as string
   })()

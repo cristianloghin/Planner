@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
   ALLDAY_REMINDER_MIN,
+  type SenderReminder,
+  type SenderSeries,
   computeDueReminders,
   parseRRule,
   startsOn as senderStartsOn,
   wallParts,
   wallToInstantMs,
-  type SenderReminder,
-  type SenderSeries,
 } from '../../supabase/functions/send-reminders/logic.ts'
+import type { CalendarEvent, Recurrence } from '../types'
 import { startsOn as clientStartsOn } from './recurrence'
 import { recurrenceToRRule } from './rrule'
-import type { CalendarEvent, Recurrence } from '../types'
 
 /** The sender must expand recurrences EXACTLY like the client, or a partner
  *  gets pushed about occurrences the calendar doesn't show. Cross-validate
@@ -164,7 +164,12 @@ describe('computeDueReminders', () => {
 
   it('skips a cancelled occurrence but keeps the next week', () => {
     const overrides = [
-      { series_id: 's1', occurrence_start: '2026-07-09T06:00:00Z', rescheduled_to: null, cancelled: true },
+      {
+        series_id: 's1',
+        occurrence_start: '2026-07-09T06:00:00Z',
+        rescheduled_to: null,
+        cancelled: true,
+      },
     ]
     expect(
       computeDueReminders({
@@ -222,7 +227,12 @@ describe('computeDueReminders', () => {
     // the series has since moved to 09:00. Day-range identity must still find
     // the cancellation.
     const overrides = [
-      { series_id: 's1', occurrence_start: '2026-07-09T07:00:00Z', rescheduled_to: null, cancelled: true },
+      {
+        series_id: 's1',
+        occurrence_start: '2026-07-09T07:00:00Z',
+        rescheduled_to: null,
+        cancelled: true,
+      },
     ]
     expect(
       computeDueReminders({

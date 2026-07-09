@@ -69,7 +69,12 @@ export function blockingPrerequisites(
     if (!dep) continue
     const actualStatus = occurrenceEffectiveStatus(completions, dep, edge.prerequisiteDate)
     if (actualStatus !== edge.requiredStatus) {
-      out.push({ event: dep, date: edge.prerequisiteDate, requiredStatus: edge.requiredStatus, actualStatus })
+      out.push({
+        event: dep,
+        date: edge.prerequisiteDate,
+        requiredStatus: edge.requiredStatus,
+        actualStatus,
+      })
     }
   }
   return out

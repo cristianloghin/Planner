@@ -1,7 +1,7 @@
-import type { AppState, ListItem, TodoList } from '../types'
-import type { Action } from './actions'
 import { mondayOf } from '../lib/dates'
 import { uid } from '../lib/id'
+import type { AppState, ListItem, TodoList } from '../types'
+import type { Action } from './actions'
 import { SupabaseStore } from './supabaseStore'
 
 /**

@@ -8,9 +8,7 @@
 // event_series.color_key, plus helpers to validate them and build the CSS var
 // reference. No color values in JS.
 
-export const COLOR_KEYS = [
-  '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12',
-] as const
+export const COLOR_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'] as const
 
 export type ColorKey = (typeof COLOR_KEYS)[number]
 

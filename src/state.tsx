@@ -1,4 +1,5 @@
 import {
+  type ReactNode,
   createContext,
   useCallback,
   useContext,
@@ -6,10 +7,14 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from 'react'
-import type { AppState, ListItem, TodoList } from './types'
-import { createStore, defaultState, type ScheduleStore } from './store/store'
+import { useAuth } from './auth'
+import { PageLoader } from './components/Spinner'
+import { completionsPrefix } from './data/completions'
+import { addDays } from './lib/dates'
+import { uid } from './lib/id'
+import { occKey } from './lib/occurrences'
+import { queryClient } from './lib/queryClient'
 import type { Action } from './store/actions'
 import {
   enrichForQueue,
@@ -20,13 +25,8 @@ import {
   writeQueue,
   writeSnapshot,
 } from './store/offline'
-import { useAuth } from './auth'
-import { PageLoader } from './components/Spinner'
-import { completionsPrefix } from './data/completions'
-import { addDays } from './lib/dates'
-import { occKey } from './lib/occurrences'
-import { queryClient } from './lib/queryClient'
-import { uid } from './lib/id'
+import { type ScheduleStore, createStore, defaultState } from './store/store'
+import type { AppState, ListItem, TodoList } from './types'
 
 /**
  * Remove the given to-do ids from every occurrence's link list, dropping keys
@@ -71,7 +71,10 @@ function reducer(state: AppState, action: Action): AppState {
         lists: state.lists.filter((l) => l.id !== action.id),
         // The DB cascades the list's items and their links; mirror it in memory.
         listLinks: removed
-          ? dropLinkedItems(state.listLinks, removed.items.map((i) => i.id))
+          ? dropLinkedItems(
+              state.listLinks,
+              removed.items.map((i) => i.id),
+            )
           : state.listLinks,
       }
     }
@@ -102,9 +105,7 @@ function reducer(state: AppState, action: Action): AppState {
           l.id === action.listId
             ? {
                 ...l,
-                items: l.items.map((t) =>
-                  t.id === action.itemId ? { ...t, done: !t.done } : t,
-                ),
+                items: l.items.map((t) => (t.id === action.itemId ? { ...t, done: !t.done } : t)),
               }
             : l,
         ),
@@ -202,7 +203,10 @@ function reducer(state: AppState, action: Action): AppState {
       // Dedupe by prerequisite slot; a re-add updates the required status.
       const without = edges.filter(
         (e) =>
-          !(e.prerequisiteSeriesId === action.prerequisiteSeriesId && e.prerequisiteDate === action.prerequisiteDate),
+          !(
+            e.prerequisiteSeriesId === action.prerequisiteSeriesId &&
+            e.prerequisiteDate === action.prerequisiteDate
+          ),
       )
       const edge = {
         prerequisiteSeriesId: action.prerequisiteSeriesId,
@@ -215,7 +219,10 @@ function reducer(state: AppState, action: Action): AppState {
       const key = occKey(action.eventId, action.date)
       const edges = (state.dependencies[key] ?? []).filter(
         (e) =>
-          !(e.prerequisiteSeriesId === action.prerequisiteSeriesId && e.prerequisiteDate === action.prerequisiteDate),
+          !(
+            e.prerequisiteSeriesId === action.prerequisiteSeriesId &&
+            e.prerequisiteDate === action.prerequisiteDate
+          ),
       )
       const dependencies = { ...state.dependencies }
       if (edges.length) dependencies[key] = edges
@@ -244,7 +251,10 @@ function reducer(state: AppState, action: Action): AppState {
     case 'recolorPerson':
       return {
         ...state,
-        people: { ...state.people, [action.id]: { ...state.people[action.id], color: action.color } },
+        people: {
+          ...state.people,
+          [action.id]: { ...state.people[action.id], color: action.color },
+        },
       }
     case 'setColorPref':
       return {
@@ -305,9 +315,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const storeRef = useRef<ScheduleStore>()
   if (!storeRef.current) {
     storeRef.current =
-      accountId && session
-        ? createStore({ accountId, userId: session.user.id })
-        : createStore()
+      accountId && session ? createStore({ accountId, userId: session.user.id }) : createStore()
   }
 
   // State lives in useState; a ref mirrors it so the custom dispatch can compute
@@ -330,9 +338,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const pendingRef = useRef<Action[]>()
   if (!pendingRef.current) pendingRef.current = accountId ? readQueue(accountId) : []
   const [pendingCount, setPendingCount] = useState(pendingRef.current.length)
-  const [offline, setOffline] = useState(
-    typeof navigator !== 'undefined' && !navigator.onLine,
-  )
+  const [offline, setOffline] = useState(typeof navigator !== 'undefined' && !navigator.onLine)
   const pumpingRef = useRef(false)
   const pumpRef = useRef<() => void>()
   const retryTimerRef = useRef<ReturnType<typeof setTimeout>>()
@@ -683,7 +689,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
           <button
             onClick={() => setSyncError(null)}
             aria-label="Dismiss"
-            style={{ background: 'none', border: 'none', color: 'inherit', fontSize: 16, cursor: 'pointer' }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'inherit',
+              fontSize: 16,
+              cursor: 'pointer',
+            }}
           >
             ×
           </button>

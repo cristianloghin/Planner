@@ -6,7 +6,11 @@
  * worker did is reproduced here: precache + SPA navigation fallback +
  * prompt-mode updates.
  */
-import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching'
+import {
+  cleanupOutdatedCaches,
+  createHandlerBoundToURL,
+  precacheAndRoute,
+} from 'workbox-precaching'
 import { NavigationRoute, registerRoute } from 'workbox-routing'
 
 declare let self: ServiceWorkerGlobalScope

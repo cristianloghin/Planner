@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useApp } from '../state'
 import { useCompletionsForRange } from '../data/completions'
 import { addDays, toISODate } from '../lib/dates'
-import { dueAlerts, type FiredAlert } from '../lib/notifications'
+import { type FiredAlert, dueAlerts } from '../lib/notifications'
+import { useApp } from '../state'
 import s from './AlertHost.module.css'
 
 const SEEN_KEY = 'planner.alertsSeen'
@@ -29,10 +29,7 @@ export function AlertHost() {
   // rescheduled ones fire at their overridden time. The range mirrors
   // dueAlerts' relocation lookaround.
   const today = toISODate(new Date())
-  const alertRange = useMemo(
-    () => ({ from: addDays(today, -31), to: addDays(today, 31) }),
-    [today],
-  )
+  const alertRange = useMemo(() => ({ from: addDays(today, -31), to: addDays(today, 31) }), [today])
   const { completions } = useCompletionsForRange(alertRange.from, alertRange.to)
 
   useEffect(() => {
