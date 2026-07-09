@@ -603,8 +603,12 @@ export class SupabaseStore implements ScheduleStore {
   async apply(action: Action, next: AppState): Promise<void> {
     switch (action.type) {
       case 'addEvent': {
-        // The reducer appends the new (id-stamped) event; persist that one.
-        const ev = next.events[next.events.length - 1]
+        // The queued action carries the minted id (backfilled by the
+        // dispatcher), so an offline replay against a later state still finds
+        // its own event; fall back to the just-appended one.
+        const ev = action.id
+          ? next.events.find((e) => e.id === action.id)
+          : next.events[next.events.length - 1]
         if (ev) await this.writeEvent(ev, { isNew: true, templateId: action.templateId })
         return
       }
@@ -736,8 +740,11 @@ export class SupabaseStore implements ScheduleStore {
         return
       }
       case 'addList': {
-        // The reducer appended the new (id-stamped) list; persist that one.
-        const list = next.lists[next.lists.length - 1]
+        // Resolve by id when the action carries one (see addEvent); else the
+        // reducer just appended it.
+        const list = action.id
+          ? next.lists.find((l) => l.id === action.id)
+          : next.lists[next.lists.length - 1]
         if (!list) return
         const { error } = await supabase
           .from('list')
@@ -757,9 +764,12 @@ export class SupabaseStore implements ScheduleStore {
         return
       }
       case 'addListItem': {
-        // The reducer appended the new item to its list; persist that one.
+        // Resolve by id when the action carries one (see addEvent); else the
+        // reducer just appended it to its list.
         const list = next.lists.find((l) => l.id === action.listId)
-        const item = list?.items[list.items.length - 1]
+        const item = action.id
+          ? list?.items.find((i) => i.id === action.id)
+          : list?.items[list.items.length - 1]
         if (!item) return
         const { error } = await supabase.from('list_item').insert({
           id: item.id,

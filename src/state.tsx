@@ -9,8 +9,17 @@ import {
   type ReactNode,
 } from 'react'
 import type { AppState, ListItem, TodoList } from './types'
-import { createStore, type ScheduleStore } from './store/store'
+import { createStore, defaultState, type ScheduleStore } from './store/store'
 import type { Action } from './store/actions'
+import {
+  enrichForQueue,
+  isNetworkError,
+  isPersistedAction,
+  readQueue,
+  readSnapshot,
+  writeQueue,
+  writeSnapshot,
+} from './store/offline'
 import { useAuth } from './auth'
 import { PageLoader } from './components/Spinner'
 import { completionsPrefix } from './data/completions'
@@ -68,7 +77,7 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case 'addListItem': {
       const item: ListItem = {
-        id: uid(),
+        id: action.id ?? uid(),
         title: action.title,
         done: false,
         personId: action.personId,
@@ -147,7 +156,7 @@ function reducer(state: AppState, action: Action): AppState {
         listLinks: dropLinkedItems(state.listLinks, [action.itemId]),
       }
     case 'addEvent':
-      return { ...state, events: [...state.events, { ...action.event, id: uid() }] }
+      return { ...state, events: [...state.events, { ...action.event, id: action.id ?? uid() }] }
     case 'updateEvent':
       return {
         ...state,
@@ -304,47 +313,156 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState | null>(null)
   const stateRef = useRef<AppState | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    storeRef.current!.load().then((loaded) => {
-      if (cancelled) return
-      stateRef.current = loaded
-      setState(loaded)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  // Writes are SERIALIZED through one promise chain: each dispatch's persist
-  // starts only after the previous one settles, so dependent writes (create a
-  // list, add its items) can never reach the server out of order. A failure
-  // surfaces a banner and triggers a reload, rolling the optimistic state back
-  // to server truth instead of silently diverging until the next restart.
-  const writeChainRef = useRef<Promise<void>>(Promise.resolve())
   // Bumped on every dispatch; a reload whose snapshot predates the latest
   // dispatch is stale and must not clobber newer optimistic state.
   const writeEpochRef = useRef(0)
   const [syncError, setSyncError] = useState<string | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
 
-  const dispatch = useCallback((action: Action) => {
-    const prev = stateRef.current
-    if (!prev) return
-    const next = reducer(prev, action)
-    stateRef.current = next
-    setState(next)
-    writeEpochRef.current += 1
-    const store = storeRef.current!
-    writeChainRef.current = writeChainRef.current.then(async () => {
-      try {
-        await store.apply(action, next)
-      } catch (e) {
-        console.error('Failed to persist change:', e)
-        setSyncError('A change could not be saved — reloading from the server.')
-        scheduleReloadRef.current?.()
+  // ---- write queue --------------------------------------------------------
+  // Writes drain in order through one pump, so dependent writes (create a
+  // list, add its items) can never reach the server out of order. The queue
+  // is persisted per account: a network failure leaves the action at the head
+  // to retry (offline mode), a server rejection drops it and resyncs, and a
+  // queue left over from a killed offline session replays on next launch.
+  const pendingRef = useRef<Action[]>()
+  if (!pendingRef.current) pendingRef.current = accountId ? readQueue(accountId) : []
+  const [pendingCount, setPendingCount] = useState(pendingRef.current.length)
+  const [offline, setOffline] = useState(
+    typeof navigator !== 'undefined' && !navigator.onLine,
+  )
+  const pumpingRef = useRef(false)
+  const pumpRef = useRef<() => void>()
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  const pump = useCallback(async () => {
+    if (pumpingRef.current) return
+    pumpingRef.current = true
+    let drained = 0
+    let rejected = false
+    try {
+      while (pendingRef.current!.length) {
+        const action = pendingRef.current![0]
+        const st = stateRef.current
+        if (!st) {
+          // A queue with no state to replay against shouldn't exist (the
+          // snapshot is written on every dispatch); don't wedge on it.
+          console.warn('Dropping pending writes: no state to replay against')
+          pendingRef.current = []
+          if (accountId) writeQueue(accountId, [])
+          setPendingCount(0)
+          break
+        }
+        try {
+          await storeRef.current!.apply(action, st)
+        } catch (e) {
+          if (isNetworkError(e)) {
+            // Leave the action at the head; retry on 'online' or by timer
+            // (flaky connections don't always flip navigator.onLine).
+            setOffline(true)
+            clearTimeout(retryTimerRef.current)
+            retryTimerRef.current = setTimeout(() => pumpRef.current?.(), 15_000)
+            return
+          }
+          console.error('Server rejected a queued change; dropping it:', e)
+          setSyncError('A change could not be saved — reloading from the server.')
+          rejected = true
+        }
+        pendingRef.current = pendingRef.current!.slice(1)
+        if (accountId) writeQueue(accountId, pendingRef.current!)
+        setPendingCount(pendingRef.current!.length)
+        drained += 1
       }
-    })
+      setOffline(typeof navigator !== 'undefined' && !navigator.onLine)
+    } finally {
+      pumpingRef.current = false
+    }
+    // Reconcile once the backlog lands (reload skips while a queue exists).
+    if (drained > 0 || rejected) scheduleReloadRef.current?.()
+  }, [accountId])
+  pumpRef.current = () => void pump()
+
+  const dispatch = useCallback(
+    (action: Action) => {
+      const prev = stateRef.current
+      if (!prev) return
+      const next = reducer(prev, action)
+      stateRef.current = next
+      setState(next)
+      if (!isPersistedAction(action)) return
+      writeEpochRef.current += 1
+      if (accountId) writeSnapshot(accountId, next)
+      pendingRef.current = [...pendingRef.current!, enrichForQueue(action, next)]
+      if (accountId) writeQueue(accountId, pendingRef.current!)
+      setPendingCount(pendingRef.current!.length)
+      void pump()
+    },
+    [accountId, pump],
+  )
+
+  // ---- startup: paint the snapshot, replay leftovers, then load ----------
+  const bootstrap = useCallback(async () => {
+    setLoadFailed(false)
+    try {
+      // Replay writes left over from a previous (offline) session first, so
+      // the load below already reflects them. Still offline → the queue stays
+      // intact and the snapshot remains the UI until 'online' fires.
+      await pump()
+      if (pendingRef.current!.length) return
+      const epoch = writeEpochRef.current
+      const loaded = await storeRef.current!.load()
+      // A dispatch raced the initial load: this snapshot predates it. Defer to
+      // the normal reload path (which waits out the write queue) instead of
+      // clobbering the optimistic state.
+      if (writeEpochRef.current !== epoch) {
+        scheduleReloadRef.current?.()
+        return
+      }
+      const prev = stateRef.current
+      const merged = prev
+        ? { ...loaded, weekStart: prev.weekStart, selectedDay: prev.selectedDay }
+        : loaded
+      stateRef.current = merged
+      setState(merged)
+      if (accountId) writeSnapshot(accountId, merged)
+    } catch (e) {
+      console.error('Initial load failed:', e)
+      if (isNetworkError(e)) setOffline(true)
+      // With a snapshot on screen the offline banner tells the story; with
+      // nothing at all, show the retry screen instead of an eternal spinner.
+      if (!stateRef.current) setLoadFailed(true)
+    }
+  }, [accountId, pump])
+
+  useEffect(() => {
+    // Last-known data paints immediately — the fast path online, the only
+    // path offline. weekStart/selectedDay re-derive from "today".
+    const snap = accountId ? readSnapshot(accountId) : null
+    if (snap && !stateRef.current) {
+      const hydrated = { ...defaultState(), ...snap }
+      stateRef.current = hydrated
+      setState(hydrated)
+    }
+    void bootstrap()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const onOnline = () => {
+      setOffline(false)
+      // Drain the backlog; if the initial load never succeeded, run it now.
+      if (stateRef.current) void pump()
+      else void bootstrap()
+    }
+    const onOffline = () => setOffline(true)
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+      clearTimeout(retryTimerRef.current)
+    }
+  }, [pump, bootstrap])
 
   // ---- realtime: reload on a partner's change ----------------------------
   // Edit guard: while an editor is open we defer reloads (the open form holds an
@@ -357,8 +475,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const reloadFromStore = useCallback(async () => {
     try {
       for (;;) {
-        // Let in-flight writes land first so the snapshot includes them.
-        await writeChainRef.current
+        // Unsent writes exist: a reload now would clobber their optimistic
+        // rows. The pump reconciles once the queue drains.
+        if (pendingRef.current!.length) return
         if (editCountRef.current > 0) {
           pendingReloadRef.current = true
           return
@@ -378,12 +497,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         stateRef.current = merged
         setState(merged)
         setSyncError(null)
+        if (accountId) writeSnapshot(accountId, merged)
         return
       }
     } catch (e) {
       console.error('Reload from store failed:', e)
+      if (isNetworkError(e)) setOffline(true)
     }
-  }, [])
+  }, [accountId])
 
   const scheduleReload = useCallback(() => {
     if (editCountRef.current > 0) {
@@ -444,15 +565,92 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [onRemoteChange])
 
+  // The queue is nonzero for a moment on every online write; only surface it
+  // once it has clearly stalled, so the banner doesn't flash on each tap.
+  const [pendingStalled, setPendingStalled] = useState(false)
+  useEffect(() => {
+    if (pendingCount === 0) {
+      setPendingStalled(false)
+      return
+    }
+    const t = setTimeout(() => setPendingStalled(true), 1500)
+    return () => clearTimeout(t)
+  }, [pendingCount])
+
   const value = useMemo(
     () => (state ? { state, dispatch, beginEdit, endEdit } : null),
     [state, dispatch, beginEdit, endEdit],
   )
-  // Initial hydration: the store's first load() hasn't resolved yet.
+  // First launch with no snapshot and no network: offer a retry instead of an
+  // eternal spinner.
+  if (!value && loadFailed) {
+    return (
+      <div
+        style={{
+          minHeight: '60dvh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+          color: 'var(--muted)',
+          padding: 24,
+          textAlign: 'center',
+        }}
+      >
+        <p>
+          Couldn&apos;t load your planner
+          {offline ? ' — you appear to be offline.' : '.'}
+        </p>
+        <button
+          onClick={() => void bootstrap()}
+          style={{
+            background: 'var(--accent)',
+            color: 'var(--on-accent)',
+            border: 'none',
+            borderRadius: 8,
+            padding: '8px 16px',
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
+  // Initial hydration: neither the snapshot nor the first load() is in yet.
   if (!value) return <PageLoader label="Loading your planner…" />
+
+  const showOfflineBanner = !syncError && (offline || (pendingStalled && pendingCount > 0))
+  const offlineText = offline
+    ? pendingCount > 0
+      ? `Offline — ${pendingCount} change${pendingCount === 1 ? '' : 's'} will sync when you're back online`
+      : 'Offline — showing saved data'
+    : `Syncing ${pendingCount} change${pendingCount === 1 ? '' : 's'}…`
+
   return (
     <AppContext.Provider value={value}>
       {children}
+      {showOfflineBanner && (
+        <div
+          role="status"
+          style={{
+            position: 'fixed',
+            left: '50%',
+            bottom: 'calc(64px + env(safe-area-inset-bottom))',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            padding: '8px 12px',
+            borderRadius: 8,
+            background: 'var(--surface-2)',
+            color: 'var(--text)',
+            fontSize: 14,
+            whiteSpace: 'nowrap',
+            boxShadow: '0 2px 8px rgba(0,0,0,.3)',
+          }}
+        >
+          {offlineText}
+        </div>
+      )}
       {syncError && (
         <div
           role="alert"

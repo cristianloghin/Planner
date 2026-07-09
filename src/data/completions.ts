@@ -144,7 +144,13 @@ export function useCompletionsForRange(
   }, [accountId, store, qc, monthsKey]);
 
   const completions = useStableMerge(results.map((r) => r.data));
-  return { completions, isLoading: results.some((r) => r.isPending) };
+  return {
+    completions,
+    // A paused fetch (offline, no cached window) is not "loading" — nothing is
+    // coming until connectivity returns, and the offline banner tells that
+    // story. Holding a loader for it would wedge the UI.
+    isLoading: results.some((r) => r.isPending && r.fetchStatus === "fetching"),
+  };
 }
 
 // ---- mutations --------------------------------------------------------------
