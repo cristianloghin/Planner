@@ -6,6 +6,7 @@ import { cx } from "../lib/cx";
 import { COLOR_KEYS, colorVar } from "../lib/palette";
 import { attendeeLabel, personColorKey } from "../lib/people";
 import { useApp } from "../state";
+import { CommitTextInput } from "./CommitTextInput";
 import shared from "../styles/shared.module.css";
 import type { EventTemplate } from "../types";
 import { ColorPicker } from "./ColorPicker";
@@ -57,15 +58,11 @@ export function Settings() {
                 }
               />
               <div className={s.personHead}>
-                <input
+                <CommitTextInput
                   type="text"
                   value={p.name}
-                  onChange={(e) =>
-                    dispatch({
-                      type: "renamePerson",
-                      id: p.id,
-                      name: e.target.value,
-                    })
+                  onCommit={(name) =>
+                    dispatch({ type: "renamePerson", id: p.id, name })
                   }
                   aria-label="Name"
                 />
@@ -115,7 +112,7 @@ export function Settings() {
  */
 function TemplatesSection() {
   const { state } = useApp();
-  const { data: templates = [] } = useTemplates();
+  const { data: templates = [], isPending } = useTemplates();
   const deleteTemplate = useDeleteTemplate();
   const [editing, setEditing] = useState<EventTemplate | null>(null);
 
@@ -126,7 +123,9 @@ function TemplatesSection() {
         to prefill its people, checklists, notes and reminders. Save a new one
         from the event editor, or tap one here to edit it.
       </span>
-      {templates.length === 0 ? (
+      {isPending ? (
+        <p className={s.templatesEmpty}>Loading templates…</p>
+      ) : templates.length === 0 ? (
         <p className={s.templatesEmpty}>No templates yet.</p>
       ) : (
         templates.map((t) => {

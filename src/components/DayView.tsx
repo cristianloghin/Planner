@@ -6,7 +6,7 @@ import {
   ChevronRight,
   CircleDashed,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { checklistEntries, hasReminders } from "../lib/attachments";
 import { childStatuses, type Busy, type ChildStatus } from "../lib/conflicts";
 import { cx } from "../lib/cx";
@@ -18,7 +18,14 @@ import {
   toISODate,
   weekdayIndex,
 } from "../lib/dates";
-import { isOccurrenceDone, occKey, occurrenceStatus } from "../lib/occurrences";
+import { useCompletionsForRange } from "../data/completions";
+import { LoadingPill } from "./Spinner";
+import {
+  isOccurrenceDone,
+  occKey,
+  occurrenceStatus,
+  prerequisiteDatesInRange,
+} from "../lib/occurrences";
 import { colorVar, type ColorKey } from "../lib/palette";
 import { eventColorKey, peopleList, personColorKey } from "../lib/people";
 import {
@@ -29,7 +36,7 @@ import {
 import { eventDate } from "../lib/timing";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
-import type { CalendarEvent, Person, PersonId } from "../types";
+import type { CalendarEvent, CompletionsMap, Person, PersonId } from "../types";
 import s from "./DayView.module.css";
 import { EventEditor, type EditorTarget } from "./EventEditor";
 import { OccurrenceSheet } from "./OccurrenceSheet";
@@ -92,11 +99,30 @@ export function DayView() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
+  // Tick once a minute so the "now" line moves and today-detection rolls over
+  // at midnight — without it both freeze at whatever the last interaction saw.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const iv = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(iv);
+  }, []);
+
   const dateISO = addDays(state.weekStart, day);
-  const isToday = dateISO === toISODate(new Date());
-  const nowMin = isToday
-    ? new Date().getHours() * 60 + new Date().getMinutes()
-    : null;
+  const isToday = dateISO === toISODate(now);
+  const nowMin = isToday ? now.getHours() * 60 + now.getMinutes() : null;
+
+  // Windowed per-occurrence state for this day (plus the dates of any
+  // prerequisites its occurrences wait on, so their met/unmet resolves even
+  // when they live outside the window).
+  const prereqDates = useMemo(
+    () => prerequisiteDatesInRange(state.dependencies, dateISO, dateISO),
+    [state.dependencies, dateISO],
+  );
+  const { completions, isLoading: completionsLoading } = useCompletionsForRange(
+    dateISO,
+    dateISO,
+    prereqDates,
+  );
 
   // Scroll the timeline so `minute` sits a little below the top edge.
   function scrollToMinute(minute: number) {
@@ -266,21 +292,27 @@ export function DayView() {
     setSheet({ event: occ.event, date: occ.start });
   }
 
-  const occs = occurrencesOnDate(state.events, dateISO, state.completions);
-  const timedBlocks: DayBlock[] = occs
-    .filter((o) => !o.event.allDay)
-    .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end }));
-  const allDayOccs = occs.filter((o) => o.event.allDay);
+  // None of this depends on zoom or gesture state, and it's the expensive part
+  // of a render (recurrence expansion + conflict analysis) — memoize so a
+  // pinch-zoom frame or timer tick doesn't recompute it.
+  const { timedBlocks, allDayOccs, statuses, hasWarnings } = useMemo(() => {
+    const occs = occurrencesOnDate(state.events, dateISO, completions);
+    const timedBlocks: DayBlock[] = occs
+      .filter((o) => !o.event.allDay)
+      .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end }));
+    const allDayOccs = occs.filter((o) => o.event.allDay);
 
-  // Coverage looks at the whole day: all-day events count as busy 00:00–24:00.
-  const coverage: Busy[] = occs.map((o) => ({
-    id: o.event.id,
-    attendees: o.event.attendees,
-    start: o.event.allDay ? 0 : o.segment.start,
-    end: o.event.allDay ? DAY_MIN : o.segment.end,
-  }));
-  const statuses = childStatuses(coverage, state.people);
-  const hasWarnings = [...statuses.values()].some((s) => s !== "covered");
+    // Coverage looks at the whole day: all-day events count as busy 00:00–24:00.
+    const coverage: Busy[] = occs.map((o) => ({
+      id: o.event.id,
+      attendees: o.event.attendees,
+      start: o.event.allDay ? 0 : o.segment.start,
+      end: o.event.allDay ? DAY_MIN : o.segment.end,
+    }));
+    const statuses = childStatuses(coverage, state.people);
+    const hasWarnings = [...statuses.values()].some((s) => s !== "covered");
+    return { timedBlocks, allDayOccs, statuses, hasWarnings };
+  }, [state.events, completions, state.people, dateISO]);
 
   const fullHeight = DAY_MIN * pxPerMin;
 
@@ -357,6 +389,7 @@ export function DayView() {
                         occ={o}
                         personId={p.id}
                         status={statuses.get(o.event.id)}
+                        completions={completions}
                         onClick={() => openSheet(o)}
                       />
                     ))}
@@ -397,6 +430,7 @@ export function DayView() {
                 person={p}
                 blocks={timedBlocks}
                 statuses={statuses}
+                completions={completions}
                 nowMin={nowMin}
                 pxPerMin={pxPerMin}
                 onAddAt={(min) => addAt([p.id], min)}
@@ -406,6 +440,8 @@ export function DayView() {
           </div>
         </div>
       </div>
+
+      {completionsLoading && <LoadingPill />}
 
       {editor && (
         <EventEditor target={editor} onClose={() => setEditor(null)} />
@@ -455,7 +491,7 @@ function Avatars({ attendees }: { attendees: PersonId[] }) {
 
 /** Compact badges shown on a block / chip: reminders, checklist progress, done, kid status. */
 function badges(
-  state: ReturnType<typeof useApp>["state"],
+  completions: CompletionsMap,
   event: CalendarEvent,
   date: string,
   status: ChildStatus | undefined,
@@ -463,7 +499,7 @@ function badges(
   const entries = checklistEntries(event);
   let checklist: { n: number; total: number } | null = null;
   if (entries.length) {
-    const checked = state.completions[occKey(event.id, date)]?.checked ?? {};
+    const checked = completions[occKey(event.id, date)]?.checked ?? {};
     const n = entries.filter((e) => checked[e.id]).length;
     checklist = { n, total: entries.length };
   }
@@ -492,16 +528,18 @@ function AllDayChip({
   occ,
   personId,
   status,
+  completions,
   onClick,
 }: {
   occ: DayOccurrence;
   personId: PersonId;
   status: ChildStatus | undefined;
+  completions: CompletionsMap;
   onClick: () => void;
 }) {
   const { state } = useApp();
   const { event } = occ;
-  const done = isOccurrenceDone(state, event, occ.start);
+  const done = isOccurrenceDone(completions, event, occ.start);
   return (
     <button
       className={cx(
@@ -514,7 +552,7 @@ function AllDayChip({
       onClick={onClick}
     >
       <span className={s.alldayMeta}>
-        {badges(state, event, occ.start, status)}
+        {badges(completions, event, occ.start, status)}
       </span>
       <span className={s.alldayTitle}>{event.title}</span>
       {occ.span > 1 && (
@@ -587,6 +625,7 @@ function Lane({
   person,
   blocks,
   statuses,
+  completions,
   nowMin,
   pxPerMin,
   onAddAt,
@@ -595,6 +634,7 @@ function Lane({
   person: Person;
   blocks: DayBlock[];
   statuses: Map<string, ChildStatus>;
+  completions: CompletionsMap;
   nowMin: number | null;
   pxPerMin: number;
   onAddAt: (minute: number) => void;
@@ -624,9 +664,9 @@ function Lane({
         const ev = block.occ.event;
         const status = statuses.get(ev.id);
         const joint = ev.attendees.length > 1;
-        const done = isOccurrenceDone(state, ev, block.occ.start);
+        const done = isOccurrenceDone(completions, ev, block.occ.start);
         const blocked =
-          occurrenceStatus(state, ev, block.occ.start) === "blocked";
+          occurrenceStatus(state, completions, ev, block.occ.start) === "blocked";
         return (
           <button
             key={`${ev.id}:${block.occ.start}`}
@@ -654,7 +694,7 @@ function Lane({
                   ↔ moved
                 </span>
               )}
-              {badges(state, ev, block.occ.start, status)}
+              {badges(completions, ev, block.occ.start, status)}
             </span>
             <span className={s.tlTitle}>{ev.title}</span>
             {joint && <Avatars attendees={ev.attendees} />}

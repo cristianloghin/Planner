@@ -1,6 +1,6 @@
 import { RRule, Frequency } from 'rrule'
 import type { Recurrence, RecurrenceFreq } from '../types'
-import { addDays, toISODate } from './dates'
+import { addDays } from './dates'
 
 /**
  * The bridge between the app's lightweight `Recurrence` ({freq, interval}) and
@@ -35,10 +35,12 @@ export function recurrenceToRRule(r: Recurrence | undefined): string | null {
   const rule = new RRule({
     freq: FREQ_TO_RRULE[r.freq],
     interval: Math.max(1, r.interval),
-    // UNTIL is an RFC-5545 UTC instant; the app's `until` is a local ISO date.
-    // Encode it as the local end of that day so a round-trip back through
-    // `toISODate` (also local) lands on the same date.
-    ...(r.until ? { until: new Date(`${r.until}T23:59:59`) } : {}),
+    // UNTIL is an RFC-5545 UTC instant; the app's `until` is a plain ISO date.
+    // Encode it as the UTC end of that day so the stored instant identifies the
+    // date without reference to the writer's timezone — a partner in another
+    // timezone must decode the same date, and the app's own `until` comparisons
+    // are date-level (see `startsOn`), never instant-level.
+    ...(r.until ? { until: new Date(`${r.until}T23:59:59Z`) } : {}),
   })
   // RRule.toString() yields "RRULE:FREQ=WEEKLY;INTERVAL=2"; store the bare rule.
   return rule.toString().replace(/^RRULE:/, '')
@@ -70,9 +72,14 @@ export function rruleToRecurrence(rrule: string | null | undefined): Recurrence 
   }
   const freq = options.freq != null ? RRULE_TO_FREQ[options.freq] : undefined
   if (!freq) return undefined
-  // UNTIL comes back as a Date (UTC instant); reduce it to the local ISO date the
-  // rest of the app compares against. Without this a capped (split) series would
-  // reload as infinite and re-render occurrences past its cap.
-  const until = options.until ? toISODate(new Date(options.until)) : undefined
+  // UNTIL comes back as a Date (UTC instant); reduce it to the ISO date it
+  // identifies — in UTC, so every reader decodes the same date regardless of
+  // device timezone. Rewinding 10h first keeps legacy values (encoded as the
+  // *writer's local* 23:59:59, i.e. up to ±half a day off UTC end-of-day)
+  // decoding to their intended date for writer offsets in [-10h, +13h]; the
+  // current UTC encoding (23:59:59Z) is unaffected by the rewind.
+  const until = options.until
+    ? new Date(options.until.getTime() - 10 * 3_600_000).toISOString().slice(0, 10)
+    : undefined
   return { freq, interval: options.interval ?? 1, ...(until ? { until } : {}) }
 }

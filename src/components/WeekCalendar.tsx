@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   DAY_NAMES,
   addDays,
@@ -9,6 +9,7 @@ import {
   toISODate,
   weekRangeLabel,
 } from "../lib/dates";
+import { useCompletionsForRange } from "../data/completions";
 import { defaultAttendees, eventColorKey, personColorKey } from "../lib/people";
 import { colorVar } from "../lib/palette";
 import { nextStartOnOrAfter, occurrencesOnDate, recurrenceLabel } from "../lib/recurrence";
@@ -16,12 +17,38 @@ import { eventDate } from "../lib/timing";
 import { useApp } from "../state";
 import shared from "../styles/shared.module.css";
 import { EventEditor, type EditorTarget } from "./EventEditor";
+import { LoadingPill } from "./Spinner";
 import { ViewHeader } from "./ViewHeader";
 import s from "./WeekCalendar.module.css";
 
 export function WeekCalendar() {
   const { state, dispatch } = useApp();
   const [target, setTarget] = useState<EditorTarget | null>(null);
+
+  // Windowed per-occurrence state covering the visible week.
+  const weekEnd = addDays(state.weekStart, 6);
+  const { completions, isLoading: completionsLoading } = useCompletionsForRange(
+    state.weekStart,
+    weekEnd,
+  );
+
+  // Expand the week's occurrences once per data/week change, not per render.
+  const weekDays = useMemo(
+    () =>
+      DAY_NAMES.map((_, dayIdx) => {
+        const dateISO = addDays(state.weekStart, dayIdx);
+        // All-day items first, then timed by start.
+        const occs = occurrencesOnDate(state.events, dateISO, completions).sort(
+          (a, b) => {
+            if (a.event.allDay !== b.event.allDay)
+              return a.event.allDay ? -1 : 1;
+            return a.segment.start - b.segment.start;
+          },
+        );
+        return { dateISO, occs };
+      }),
+    [state.weekStart, state.events, completions],
+  );
 
   // Open a search hit: jump the week to its next upcoming occurrence (falling
   // back to the series anchor for an ended series) and open the editor there.
@@ -60,16 +87,7 @@ export function WeekCalendar() {
 
       <div className={shared.viewBody}>
         <div className={s.days}>
-          {DAY_NAMES.map((_, dayIdx) => {
-            const dateISO = addDays(state.weekStart, dayIdx);
-            // All-day items first, then timed by start.
-            const occs = occurrencesOnDate(state.events, dateISO, state.completions).sort(
-              (a, b) => {
-                if (a.event.allDay !== b.event.allDay)
-                  return a.event.allDay ? -1 : 1;
-                return a.segment.start - b.segment.start;
-              },
-            );
+          {weekDays.map(({ dateISO, occs }, dayIdx) => {
             return (
               <div className={s.dayCol} key={dayIdx}>
                 <div className={s.dayHead}>
@@ -162,6 +180,8 @@ export function WeekCalendar() {
           })}
         </div>
       </div>
+
+      {completionsLoading && <LoadingPill />}
 
       {target && (
         <EventEditor target={target} onClose={() => setTarget(null)} />

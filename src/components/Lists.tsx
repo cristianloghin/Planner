@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Collapsible, Dialog } from "radix-ui";
 import { cx } from "../lib/cx";
 import { isoLabel } from "../lib/dates";
@@ -10,6 +10,7 @@ import { useApp } from "../state";
 import d from "./Dialog.module.css";
 import shared from "../styles/shared.module.css";
 import type { ListItem, PersonId, TodoList } from "../types";
+import { CommitTextInput } from "./CommitTextInput";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ListSearch } from "./ListSearch";
 import s from "./Lists.module.css";
@@ -132,7 +133,7 @@ function GroupPicker({
  * Editing an *existing* list, by contrast, writes through on every change.
  */
 export function Lists() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, beginEdit, endEdit } = useApp();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   // The unsaved new list, or null when we're not creating one.
@@ -153,8 +154,6 @@ export function Lists() {
   // Set when a search result jumps here; scrolls the row in and flashes it.
   const [highlightId, setHighlightId] = useState<string | null>(null);
 
-  const nameRef = useRef<HTMLInputElement>(null);
-
   const selected = selectedId
     ? (state.lists.find((l) => l.id === selectedId) ?? null)
     : null;
@@ -163,37 +162,14 @@ export function Lists() {
   const isDraft = draft !== null;
   const isEditing = isDraft || editing;
 
-  // Committing a draft: create the list, then (once it appears in state) create
-  // its items against the new id and open it. The reducer mints the list id, so
-  // we can't know it up front — we grab the freshly-appended list here.
-  const pendingItems = useRef<ListItem[] | null>(null);
+  // While edit mode is active (draft or live), defer realtime reloads: the
+  // controlled inputs would otherwise be clobbered by a reload racing the
+  // user's own keystrokes (or a partner's change).
   useEffect(() => {
-    if (!pendingItems.current || !state.lists.length) return;
-    const created = state.lists[state.lists.length - 1];
-    for (const it of pendingItems.current) {
-      dispatch({
-        type: "addListItem",
-        listId: created.id,
-        title: it.title,
-        personId: it.personId,
-        group: it.groupLabel,
-        dueOn: it.dueOn,
-      });
-    }
-    pendingItems.current = null;
-    setDraft(null);
-    setSelectedId(created.id);
-    setEditing(false);
-  }, [state.lists, dispatch]);
-
-  // Focus the name field when a draft opens (keyed on its id, so typing into it
-  // doesn't keep stealing focus back).
-  useEffect(() => {
-    if (draft) {
-      nameRef.current?.focus();
-      nameRef.current?.select();
-    }
-  }, [draft?.id]);
+    if (!isEditing) return;
+    beginEdit();
+    return endEdit;
+  }, [isEditing, beginEdit, endEdit]);
 
   // A deleted list (only existing ones can be deleted) drops us to the index.
   useEffect(() => {
@@ -267,8 +243,23 @@ export function Lists() {
 
   function saveDraft() {
     if (!draft) return;
-    pendingItems.current = draft.items;
-    dispatch({ type: "addList", title: draft.title.trim() || "New list" });
+    // The draft already carries its id, so the items can be dispatched against
+    // it directly — no guessing which list the reducer appended (a realtime
+    // reload landing in between could make "the last list" someone else's).
+    dispatch({ type: "addList", id: draft.id, title: draft.title.trim() || "New list" });
+    for (const it of draft.items) {
+      dispatch({
+        type: "addListItem",
+        listId: draft.id,
+        title: it.title,
+        personId: it.personId,
+        group: it.groupLabel,
+        dueOn: it.dueOn,
+      });
+    }
+    setSelectedId(draft.id);
+    setDraft(null);
+    setEditing(false);
     resetAddForm();
   }
 
@@ -356,6 +347,9 @@ export function Lists() {
   function badge(personId: PersonId | null) {
     if (!personId) return <span className={cx(s.badge, s.shared)}>Shared</span>;
     const p = state.people[personId];
+    // An assignee missing from the local snapshot (mid-reload, or a person a
+    // partner just removed) must not crash the whole view.
+    if (!p) return null;
     return (
       <span
         className={s.badge}
@@ -420,11 +414,11 @@ export function Lists() {
         className={cx(s.task, highlightId === t.id && s.highlight)}
       >
         <div className={s.taskInput}>
-          <input
+          <CommitTextInput
             className={s.editTitle}
             value={t.title}
             aria-label="Item text"
-            onChange={(e) => patchItem(t, { title: e.target.value })}
+            onCommit={(next) => patchItem(t, { title: next })}
           />
           <button
             className={s.taskDel}
@@ -596,13 +590,15 @@ export function Lists() {
         {working && (
           <>
             {isEditing && (
-              <input
-                ref={nameRef}
+              <CommitTextInput
+                key={working.id}
                 className={s.renameInput}
                 value={working.title}
                 placeholder="List name"
                 aria-label="List name"
-                onChange={(e) => patchTitle(e.target.value)}
+                autoFocus={isDraft}
+                onFocus={isDraft ? (e) => e.currentTarget.select() : undefined}
+                onCommit={patchTitle}
               />
             )}
 

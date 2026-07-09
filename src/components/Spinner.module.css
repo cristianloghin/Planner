@@ -1,0 +1,60 @@
+.ring {
+  display: inline-block;
+  flex: none;
+  width: var(--spinner-size, 20px);
+  height: var(--spinner-size, 20px);
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Fills its region and centres the spinner + label. */
+.page {
+  flex: 1;
+  width: 100%;
+  min-height: 50dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: var(--fs-md);
+}
+
+/*
+ * Unobtrusive floating indicator for background window fetches. Fixed just
+ * above the tab bar so it works identically in every view and never shifts
+ * layout; pointer-events off so it can't block taps.
+ */
+.pill {
+  position: fixed;
+  left: 50%;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  box-shadow: 0 2px 8px hsl(0 0% 0% / 0.25);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring {
+    animation-duration: 1.6s;
+  }
+}

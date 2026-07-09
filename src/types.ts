@@ -159,9 +159,10 @@ export interface OccurrenceDependency {
 }
 
 /**
- * Mutable per-occurrence state, keyed `${eventId}:${date}` in `completions`,
- * where `date` is the occurrence's start date. This is where everything you
- * *tick* lives, so a recurring event tracks completion per day.
+ * Mutable per-occurrence state, keyed `${eventId}:${date}` (see
+ * {@link CompletionsMap}), where `date` is the occurrence's start date. This is
+ * where everything you *tick* lives, so a recurring event tracks completion
+ * per day.
  */
 export interface OccurrenceState {
   /**
@@ -187,6 +188,14 @@ export interface OccurrenceState {
 }
 
 /**
+ * Per-occurrence state keyed `${eventId}:${date}`. Owned by TanStack Query
+ * (src/data/completions.ts), fetched per calendar-month window — this table
+ * grows with every tick ever made, so it is never loaded whole. Views fetch
+ * the window(s) covering what they render.
+ */
+export type CompletionsMap = Record<string, OccurrenceState>
+
+/**
  * Per-user, per-account settings — personal, never shared with a partner. Stored
  * as one JSON document (the `user_preference` table) so new settings are just new
  * fields here, no schema change. The first one is `personColors`: an override for
@@ -202,9 +211,8 @@ export interface AppState {
   people: Record<PersonId, Person>
   lists: TodoList[]
   events: CalendarEvent[]
-  // Reusable event blueprints (DATA_MODEL Decision 10) are owned by TanStack
-  // Query, not this state tree — see src/data/templates.ts.
-  completions: Record<string, OccurrenceState>
+  // Not here: event templates (src/data/templates.ts) and per-occurrence state
+  // (src/data/completions.ts) are owned by TanStack Query, not this state tree.
   /**
    * Prerequisite edges keyed by the dependent occurrence (`${eventId}:${date}`),
    * mirroring `occurrence_dependency`. Each value lists the concrete prerequisite

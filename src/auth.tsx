@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
+import { queryClient } from './lib/queryClient'
 
 interface AuthCtx {
   session: Session | null
@@ -63,10 +64,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false
+    // Monotonic call id: `resolve` runs concurrently (getSession + every auth
+    // event), and a slow `ensureAccount` from an OLD session must not commit
+    // its account after a newer resolve (sign-out, different user) has settled.
+    let seq = 0
 
     // Resolve account membership for a session, then settle loading.
     async function resolve(next: Session | null) {
       if (cancelled) return
+      const call = ++seq
       setSession(next)
       if (!next) {
         setAccountId(null)
@@ -75,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       try {
         const id = await ensureAccount(next.user.id)
-        if (!cancelled) setAccountId(id)
+        if (!cancelled && call === seq) setAccountId(id)
       } catch (e) {
         // Leave accountId null; the app can surface a retry. Don't trap the user
         // on a blank screen — let them at least reach a signed-in state.
@@ -113,6 +119,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       async signOut() {
         await supabase.auth.signOut()
+        // Drop the previous account's cached query data (templates, …) so
+        // nothing lingers in memory for the next sign-in.
+        queryClient.clear()
       },
       async updatePassword(password) {
         const { error } = await supabase.auth.updateUser({ password })

@@ -12,8 +12,11 @@ import type { AppState, ListItem, TodoList } from './types'
 import { createStore, type ScheduleStore } from './store/store'
 import type { Action } from './store/actions'
 import { useAuth } from './auth'
+import { PageLoader } from './components/Spinner'
+import { completionsPrefix } from './data/completions'
 import { addDays } from './lib/dates'
 import { occKey } from './lib/occurrences'
+import { queryClient } from './lib/queryClient'
 import { uid } from './lib/id'
 
 /**
@@ -40,7 +43,7 @@ function reducer(state: AppState, action: Action): AppState {
       return action.state
     case 'addList': {
       const list: TodoList = {
-        id: uid(),
+        id: action.id ?? uid(),
         title: action.title,
         sortOrder: state.lists.length,
         items: [],
@@ -151,14 +154,12 @@ function reducer(state: AppState, action: Action): AppState {
         events: state.events.map((e) => (e.id === action.event.id ? action.event : e)),
       }
     case 'removeEvent': {
-      // Drop the event, all of its per-occurrence state, and every dependency
-      // edge that touches it — whether it's the dependent occurrence (key prefix)
-      // or a prerequisite of someone else's occurrence (DB cascades both ends).
+      // Drop the event and every dependency edge that touches it — whether
+      // it's the dependent occurrence (key prefix) or a prerequisite of someone
+      // else's occurrence (DB cascades both ends). Its per-occurrence state is
+      // Query-owned (src/data/completions.ts); realtime invalidation prunes it.
       const events = state.events.filter((e) => e.id !== action.id)
       const prefix = action.id + ':'
-      const completions = Object.fromEntries(
-        Object.entries(state.completions).filter(([k]) => !k.startsWith(prefix)),
-      )
       const dependencies: typeof state.dependencies = {}
       for (const [k, edges] of Object.entries(state.dependencies)) {
         if (k.startsWith(prefix)) continue
@@ -170,30 +171,7 @@ function reducer(state: AppState, action: Action): AppState {
       const listLinks = Object.fromEntries(
         Object.entries(state.listLinks).filter(([k]) => !k.startsWith(prefix)),
       )
-      return { ...state, events, completions, dependencies, listLinks }
-    }
-    case 'setOccurrenceStatus': {
-      const key = occKey(action.eventId, action.date)
-      const { status: _drop, ...rest } = state.completions[key] ?? {}
-      const next = action.status === null ? rest : { ...rest, status: action.status }
-      return { ...state, completions: { ...state.completions, [key]: next } }
-    }
-    case 'setOccurrenceOverride': {
-      const key = occKey(action.eventId, action.date)
-      const prev = state.completions[key] ?? {}
-      return {
-        ...state,
-        completions: {
-          ...state.completions,
-          [key]: { ...prev, start: action.start, duration: action.duration },
-        },
-      }
-    }
-    case 'clearOccurrenceOverride': {
-      const key = occKey(action.eventId, action.date)
-      // Drop only the timing override; keep any status/checklist ticks on this slot.
-      const { start: _s, duration: _d, ...rest } = state.completions[key] ?? {}
-      return { ...state, completions: { ...state.completions, [key]: rest } }
+      return { ...state, events, dependencies, listLinks }
     }
     case 'splitSeries': {
       // Optimistic only: cap the old series and append the edited clone. The
@@ -248,13 +226,6 @@ function reducer(state: AppState, action: Action): AppState {
       if (ids.length) listLinks[key] = ids
       else delete listLinks[key]
       return { ...state, listLinks }
-    }
-    case 'toggleChecklistEntry': {
-      const key = occKey(action.eventId, action.date)
-      const prev = state.completions[key] ?? {}
-      const checked = { ...(prev.checked ?? {}) }
-      checked[action.entryId] = !checked[action.entryId]
-      return { ...state, completions: { ...state.completions, [key]: { ...prev, checked } } }
     }
     case 'renamePerson':
       return {
@@ -345,15 +316,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Writes are SERIALIZED through one promise chain: each dispatch's persist
+  // starts only after the previous one settles, so dependent writes (create a
+  // list, add its items) can never reach the server out of order. A failure
+  // surfaces a banner and triggers a reload, rolling the optimistic state back
+  // to server truth instead of silently diverging until the next restart.
+  const writeChainRef = useRef<Promise<void>>(Promise.resolve())
+  // Bumped on every dispatch; a reload whose snapshot predates the latest
+  // dispatch is stale and must not clobber newer optimistic state.
+  const writeEpochRef = useRef(0)
+  const [syncError, setSyncError] = useState<string | null>(null)
+
   const dispatch = useCallback((action: Action) => {
     const prev = stateRef.current
     if (!prev) return
     const next = reducer(prev, action)
     stateRef.current = next
     setState(next)
-    void storeRef.current!.apply(action, next).catch((e) =>
-      console.error('Failed to persist change:', e),
-    )
+    writeEpochRef.current += 1
+    const store = storeRef.current!
+    writeChainRef.current = writeChainRef.current.then(async () => {
+      try {
+        await store.apply(action, next)
+      } catch (e) {
+        console.error('Failed to persist change:', e)
+        setSyncError('A change could not be saved — reloading from the server.')
+        scheduleReloadRef.current?.()
+      }
+    })
   }, [])
 
   // ---- realtime: reload on a partner's change ----------------------------
@@ -362,20 +352,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const editCountRef = useRef(0)
   const pendingReloadRef = useRef(false)
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const scheduleReloadRef = useRef<() => void>()
 
   const reloadFromStore = useCallback(async () => {
-    const fresh = await storeRef.current!.load()
-    const prev = stateRef.current
-    // weekStart/selectedDay are local UI navigation, not server data — keep them
-    // so a remote change never yanks the user back to today's view.
-    const merged = prev
-      ? { ...fresh, weekStart: prev.weekStart, selectedDay: prev.selectedDay }
-      : fresh
-    stateRef.current = merged
-    setState(merged)
+    try {
+      for (;;) {
+        // Let in-flight writes land first so the snapshot includes them.
+        await writeChainRef.current
+        if (editCountRef.current > 0) {
+          pendingReloadRef.current = true
+          return
+        }
+        const epoch = writeEpochRef.current
+        const fresh = await storeRef.current!.load()
+        // The user acted while the load was in flight: this snapshot would
+        // visibly revert their change (only to have it reappear on the next
+        // echo). Throw it away and take a fresh one.
+        if (writeEpochRef.current !== epoch) continue
+        const prev = stateRef.current
+        // weekStart/selectedDay are local UI navigation, not server data — keep
+        // them so a remote change never yanks the user back to today's view.
+        const merged = prev
+          ? { ...fresh, weekStart: prev.weekStart, selectedDay: prev.selectedDay }
+          : fresh
+        stateRef.current = merged
+        setState(merged)
+        setSyncError(null)
+        return
+      }
+    } catch (e) {
+      console.error('Reload from store failed:', e)
+    }
   }, [])
 
-  const onRemoteChange = useCallback(() => {
+  const scheduleReload = useCallback(() => {
     if (editCountRef.current > 0) {
       pendingReloadRef.current = true
       return
@@ -383,6 +393,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     clearTimeout(reloadTimerRef.current)
     reloadTimerRef.current = setTimeout(() => void reloadFromStore(), 300)
   }, [reloadFromStore])
+  scheduleReloadRef.current = scheduleReload
+
+  // Tables owned by the TanStack Query completions slice: their changes route
+  // to targeted cache invalidation, not a full-state reload. Not deferred by
+  // the edit guard — a partner's tick streaming into an open sheet is a
+  // feature, and no form state derives from these rows.
+  const invalidateTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const invalidateCompletions = useCallback(() => {
+    clearTimeout(invalidateTimerRef.current)
+    invalidateTimerRef.current = setTimeout(() => {
+      void queryClient.invalidateQueries({ queryKey: completionsPrefix(accountId) })
+    }, 200)
+  }, [accountId])
+
+  const onRemoteChange = useCallback(
+    (table?: string) => {
+      if (table === 'event_occurrence' || table === 'occurrence_item_state') {
+        invalidateCompletions()
+        return
+      }
+      if (table === undefined) {
+        // Recovery after a dead channel (or an unknown source): anything may
+        // have been missed, so refresh both worlds.
+        invalidateCompletions()
+      }
+      scheduleReload()
+    },
+    [invalidateCompletions, scheduleReload],
+  )
 
   const beginEdit = useCallback(() => {
     editCountRef.current += 1
@@ -401,6 +440,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       unsubscribe()
       clearTimeout(reloadTimerRef.current)
+      clearTimeout(invalidateTimerRef.current)
     }
   }, [onRemoteChange])
 
@@ -408,8 +448,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     () => (state ? { state, dispatch, beginEdit, endEdit } : null),
     [state, dispatch, beginEdit, endEdit],
   )
-  if (!value) return null
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>
+  // Initial hydration: the store's first load() hasn't resolved yet.
+  if (!value) return <PageLoader label="Loading your planner…" />
+  return (
+    <AppContext.Provider value={value}>
+      {children}
+      {syncError && (
+        <div
+          role="alert"
+          style={{
+            position: 'fixed',
+            left: '50%',
+            bottom: 'calc(64px + env(safe-area-inset-bottom))',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 12px',
+            borderRadius: 8,
+            background: '#b3261e',
+            color: '#fff',
+            fontSize: 14,
+            boxShadow: '0 2px 8px rgba(0,0,0,.3)',
+          }}
+        >
+          {syncError}
+          <button
+            onClick={() => setSyncError(null)}
+            aria-label="Dismiss"
+            style={{ background: 'none', border: 'none', color: 'inherit', fontSize: 16, cursor: 'pointer' }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+    </AppContext.Provider>
+  )
 }
 
 export function useApp(): Ctx {

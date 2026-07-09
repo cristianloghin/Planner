@@ -29,8 +29,10 @@ export function useSearch<T>(
   const runRef = useRef(run)
   runRef.current = run
 
+  // Key the effect on the trimmed query so trailing-whitespace edits don't
+  // cancel and re-issue an identical request.
+  const q = query.trim()
   useEffect(() => {
-    const q = query.trim()
     if (!q) {
       setState({ results: [], loading: false, error: null })
       return
@@ -59,7 +61,7 @@ export function useSearch<T>(
       cancelled = true
       clearTimeout(timer)
     }
-  }, [query, delay])
+  }, [q, delay])
 
   return state
 }

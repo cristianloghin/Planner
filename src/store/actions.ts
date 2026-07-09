@@ -8,7 +8,9 @@ import type { ColorKey } from '../lib/palette'
  */
 export type Action =
   // Named lists (the `list` table). Items live nested under their list.
-  | { type: 'addList'; title: string }
+  // `id` lets the caller mint the id up front (e.g. to add items to the new
+  // list in the same breath without guessing which list the reducer created).
+  | { type: 'addList'; title: string; id?: string }
   | { type: 'renameList'; id: string; title: string }
   | { type: 'removeList'; id: string }
   | {
@@ -42,18 +44,12 @@ export type Action =
   | { type: 'addEvent'; event: Omit<CalendarEvent, 'id'>; templateId?: string }
   | { type: 'updateEvent'; event: CalendarEvent }
   | { type: 'removeEvent'; id: string }
-  // One-off timing override for a single occurrence (`event_occurrence`'s
-  // `rescheduled_to`/`rescheduled_duration`). `date` is the occurrence's fixed
-  // date; `start` is the new `yyyy-mm-ddThh:mm` on that date, `duration` minutes.
-  | { type: 'setOccurrenceOverride'; eventId: string; date: string; start: string; duration: number }
-  | { type: 'clearOccurrenceOverride'; eventId: string; date: string }
   // "Edit this and all following": split the series at `fromDate` into a new
   // series carrying `event`'s edits, capping the old one just before `fromDate`.
   | { type: 'splitSeries'; eventId: string; fromDate: string; event: Omit<CalendarEvent, 'id'> }
-  // (Templates moved off the reducer — owned by TanStack Query, src/data/templates.ts.)
-  // Set (or clear, with status: null) an occurrence's explicit status.
-  | { type: 'setOccurrenceStatus'; eventId: string; date: string; status: OccurrenceStatusCode | null }
-  | { type: 'toggleChecklistEntry'; eventId: string; date: string; entryId: string }
+  // (Not here: templates and per-occurrence state — status, checklist ticks,
+  // timing overrides — moved off the reducer to TanStack Query; see
+  // src/data/templates.ts and src/data/completions.ts.)
   // Occurrence→occurrence prerequisite edges (occurrence_dependency). The
   // dependent end is (eventId, date); the prerequisite end is a concrete slot.
   | {

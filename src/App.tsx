@@ -12,6 +12,7 @@ import { Lists } from "./components/Lists";
 import { Login } from "./components/Login";
 import { MonthView } from "./components/MonthView";
 import { Settings } from "./components/Settings";
+import { PageLoader } from "./components/Spinner";
 import { WeekCalendar } from "./components/WeekCalendar";
 import { useTemplatesRealtime } from "./data/templates";
 import { cx } from "./lib/cx";
@@ -40,7 +41,11 @@ export function Root() {
   // Spinner while the session resolves, or while the account bootstraps (the
   // store is built from accountId, so wait for it before mounting the data layer).
   if (loading || (session && !accountId)) {
-    return <div className={s.app} />;
+    return (
+      <div className={s.app}>
+        <PageLoader />
+      </div>
+    );
   }
 
   if (!session) {
@@ -52,7 +57,10 @@ export function Root() {
   }
 
   return (
-    <AppProvider>
+    // Key the data layer by account: the store captures accountId at mount, so
+    // if it ever changes (account switch, delayed bootstrap race) the provider
+    // must remount with a fresh store rather than keep writing to the old one.
+    <AppProvider key={accountId}>
       <App />
     </AppProvider>
   );
