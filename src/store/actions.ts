@@ -8,7 +8,9 @@ import type { ColorKey } from '../lib/palette'
  */
 export type Action =
   // Named lists (the `list` table). Items live nested under their list.
-  | { type: 'addList'; title: string }
+  // `id` lets the caller mint the id up front (e.g. to add items to the new
+  // list in the same breath without guessing which list the reducer created).
+  | { type: 'addList'; title: string; id?: string }
   | { type: 'renameList'; id: string; title: string }
   | { type: 'removeList'; id: string }
   | {

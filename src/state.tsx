@@ -40,7 +40,7 @@ function reducer(state: AppState, action: Action): AppState {
       return action.state
     case 'addList': {
       const list: TodoList = {
-        id: uid(),
+        id: action.id ?? uid(),
         title: action.title,
         sortOrder: state.lists.length,
         items: [],
@@ -345,15 +345,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Writes are SERIALIZED through one promise chain: each dispatch's persist
+  // starts only after the previous one settles, so dependent writes (create a
+  // list, add its items) can never reach the server out of order. A failure
+  // surfaces a banner and triggers a reload, rolling the optimistic state back
+  // to server truth instead of silently diverging until the next restart.
+  const writeChainRef = useRef<Promise<void>>(Promise.resolve())
+  // Bumped on every dispatch; a reload whose snapshot predates the latest
+  // dispatch is stale and must not clobber newer optimistic state.
+  const writeEpochRef = useRef(0)
+  const [syncError, setSyncError] = useState<string | null>(null)
+
   const dispatch = useCallback((action: Action) => {
     const prev = stateRef.current
     if (!prev) return
     const next = reducer(prev, action)
     stateRef.current = next
     setState(next)
-    void storeRef.current!.apply(action, next).catch((e) =>
-      console.error('Failed to persist change:', e),
-    )
+    writeEpochRef.current += 1
+    const store = storeRef.current!
+    writeChainRef.current = writeChainRef.current.then(async () => {
+      try {
+        await store.apply(action, next)
+      } catch (e) {
+        console.error('Failed to persist change:', e)
+        setSyncError('A change could not be saved — reloading from the server.')
+        scheduleReloadRef.current?.()
+      }
+    })
   }, [])
 
   // ---- realtime: reload on a partner's change ----------------------------
@@ -362,17 +381,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const editCountRef = useRef(0)
   const pendingReloadRef = useRef(false)
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const scheduleReloadRef = useRef<() => void>()
 
   const reloadFromStore = useCallback(async () => {
-    const fresh = await storeRef.current!.load()
-    const prev = stateRef.current
-    // weekStart/selectedDay are local UI navigation, not server data — keep them
-    // so a remote change never yanks the user back to today's view.
-    const merged = prev
-      ? { ...fresh, weekStart: prev.weekStart, selectedDay: prev.selectedDay }
-      : fresh
-    stateRef.current = merged
-    setState(merged)
+    try {
+      for (;;) {
+        // Let in-flight writes land first so the snapshot includes them.
+        await writeChainRef.current
+        if (editCountRef.current > 0) {
+          pendingReloadRef.current = true
+          return
+        }
+        const epoch = writeEpochRef.current
+        const fresh = await storeRef.current!.load()
+        // The user acted while the load was in flight: this snapshot would
+        // visibly revert their change (only to have it reappear on the next
+        // echo). Throw it away and take a fresh one.
+        if (writeEpochRef.current !== epoch) continue
+        const prev = stateRef.current
+        // weekStart/selectedDay are local UI navigation, not server data — keep
+        // them so a remote change never yanks the user back to today's view.
+        const merged = prev
+          ? { ...fresh, weekStart: prev.weekStart, selectedDay: prev.selectedDay }
+          : fresh
+        stateRef.current = merged
+        setState(merged)
+        setSyncError(null)
+        return
+      }
+    } catch (e) {
+      console.error('Reload from store failed:', e)
+    }
   }, [])
 
   const onRemoteChange = useCallback(() => {
@@ -383,6 +422,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     clearTimeout(reloadTimerRef.current)
     reloadTimerRef.current = setTimeout(() => void reloadFromStore(), 300)
   }, [reloadFromStore])
+  scheduleReloadRef.current = onRemoteChange
 
   const beginEdit = useCallback(() => {
     editCountRef.current += 1
@@ -409,7 +449,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [state, dispatch, beginEdit, endEdit],
   )
   if (!value) return null
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>
+  return (
+    <AppContext.Provider value={value}>
+      {children}
+      {syncError && (
+        <div
+          role="alert"
+          style={{
+            position: 'fixed',
+            left: '50%',
+            bottom: 'calc(64px + env(safe-area-inset-bottom))',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '8px 12px',
+            borderRadius: 8,
+            background: '#b3261e',
+            color: '#fff',
+            fontSize: 14,
+            boxShadow: '0 2px 8px rgba(0,0,0,.3)',
+          }}
+        >
+          {syncError}
+          <button
+            onClick={() => setSyncError(null)}
+            aria-label="Dismiss"
+            style={{ background: 'none', border: 'none', color: 'inherit', fontSize: 16, cursor: 'pointer' }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+    </AppContext.Provider>
+  )
 }
 
 export function useApp(): Ctx {

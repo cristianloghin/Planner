@@ -60,7 +60,8 @@ function intervalToMinutes(iv: string | null): number {
   let min = 0
   const dayM = iv.match(/(\d+)\s+days?/)
   if (dayM) min += Number(dayM[1]) * MINS_PER_DAY
-  const timeM = iv.match(/(\d{1,2}):(\d{2}):(\d{2})/)
+  // Anchor at the end so a 3+ digit hour count ("100:00:00") parses whole.
+  const timeM = iv.match(/(\d+):(\d{2}):(\d{2})\s*$/)
   if (timeM) min += Number(timeM[1]) * 60 + Number(timeM[2])
   return min
 }
@@ -80,6 +81,41 @@ function occurrenceTs(event: CalendarEvent, date: string): string {
 /** completions key from a stored occurrence_start. */
 function tsToDateKey(ts: string): string {
   return toISODate(new Date(ts))
+}
+
+/**
+ * UTC timestamp bounds of local ISO `date` — the half-open [from, to) window an
+ * occurrence-row `occurrence_start` for that date falls in. Occurrence rows are
+ * MATCHED by this window rather than by an exact timestamp: the stored value
+ * carries the time-of-day the series had when the row was written, so after the
+ * series' start time is edited an exact match would silently miss every
+ * existing row (orphaning ticks, statuses and overrides), while the app itself
+ * only ever keys occurrence state by date (`tsToDateKey`).
+ */
+function dayRange(date: string): { from: string; to: string } {
+  const d = new Date(date + 'T00:00:00')
+  const from = d.toISOString()
+  d.setDate(d.getDate() + 1)
+  return { from, to: d.toISOString() }
+}
+
+/**
+ * Drain a query in pages: PostgREST silently caps a response at 1000 rows, so
+ * any unpaginated table scan starts dropping data once an account outgrows the
+ * cap. `build` must apply a stable `.order(...)` so pages tile correctly.
+ */
+const PAGE = 1000
+async function fetchAll<Row>(
+  build: (from: number, to: number) => PromiseLike<{ data: Row[] | null; error: unknown }>,
+): Promise<Row[]> {
+  const out: Row[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await build(from, from + PAGE - 1)
+    if (error) throw error
+    const rows = data ?? []
+    out.push(...rows)
+    if (rows.length < PAGE) return out
+  }
 }
 
 // ---- Row shapes (kept local; the generated types don't model embeds well) --
@@ -213,23 +249,25 @@ export class SupabaseStore implements ScheduleStore {
   }
 
   private async loadEvents(): Promise<CalendarEvent[]> {
-    const { data, error } = await supabase
-      .from('event_series')
-      // FK-column hints (table!fk_col) disambiguate the embeds: PostgREST sees
-      // more than one relationship between event_series and these children
-      // (e.g. checklist_item also links many-to-many via occurrence_item_removed).
-      .select(
+    const data = await fetchAll((from, to) =>
+      supabase
+        .from('event_series')
+        // FK-column hints (table!fk_col) disambiguate the embeds: PostgREST sees
+        // more than one relationship between event_series and these children
+        // (e.g. checklist_item also links many-to-many via occurrence_item_removed).
+        .select(
         `id, title, all_day, dtstart, duration, rrule, color_key,
          event_person!series_id ( person_id ),
          checklist_item!owner_series_id ( id, label, group_label, sort_order, occurrence_start ),
          note!owner_series_id ( id, body ),
          reminder!series_id ( id, offset_seconds )`,
       )
-      .eq('account_id', this.accountId)
-      .eq('is_template', false)
-    if (error) throw error
-
-    const rows = (data ?? []) as unknown as SeriesRow[]
+        .eq('account_id', this.accountId)
+        .eq('is_template', false)
+        .order('id')
+        .range(from, to),
+    )
+    const rows = data as unknown as SeriesRow[]
     return rows.map((r) => {
       const allDay = r.all_day
       return {
@@ -282,10 +320,21 @@ export class SupabaseStore implements ScheduleStore {
    * timestamptz slots on both ends; we key/store them as occurrence dates.
    */
   private async loadDependencies(): Promise<Record<string, OccurrenceDependency[]>> {
-    const { data, error } = await supabase
-      .from('occurrence_dependency')
-      .select('dependent_series, dependent_occurrence, prerequisite_series, prerequisite_occurrence, required_status')
-    if (error) throw error
+    // Scope to this account via the dependent series (RLS alone would also let a
+    // user in several accounts pull the others' rows) and page past the row cap.
+    const data = await fetchAll((from, to) =>
+      supabase
+        .from('occurrence_dependency')
+        .select(
+          'dependent_series, dependent_occurrence, prerequisite_series, prerequisite_occurrence, required_status, event_series!dependent_series!inner()',
+        )
+        .eq('event_series.account_id', this.accountId)
+        .order('dependent_series')
+        .order('dependent_occurrence')
+        .order('prerequisite_series')
+        .order('prerequisite_occurrence')
+        .range(from, to),
+    )
     const out: Record<string, OccurrenceDependency[]> = {}
     for (const row of data ?? []) {
       const k = `${row.dependent_series}:${tsToDateKey(row.dependent_occurrence)}`
@@ -302,18 +351,35 @@ export class SupabaseStore implements ScheduleStore {
     const completions: Record<string, import('../types').OccurrenceState> = {}
     const key = (seriesId: string, ts: string) => `${seriesId}:${tsToDateKey(ts)}`
 
-    const [occ, items] = await Promise.all([
+    const [occData, itemData] = await Promise.all([
       // Embed the parent's all_day so reschedule columns map back into the same
-      // unit convention as CalendarEvent (timed = minutes, all-day = days).
-      supabase
-        .from('event_occurrence')
-        .select('series_id, occurrence_start, status, rescheduled_to, rescheduled_duration, cancelled, event_series(all_day)'),
-      supabase.from('occurrence_item_state').select('series_id, occurrence_start, item_id, status'),
+      // unit convention as CalendarEvent (timed = minutes, all-day = days). The
+      // inner join also scopes the scan to this account, and both queries page
+      // past the 1000-row response cap (these tables grow with every tick).
+      fetchAll((from, to) =>
+        supabase
+          .from('event_occurrence')
+          .select(
+            'series_id, occurrence_start, status, rescheduled_to, rescheduled_duration, cancelled, event_series!inner(all_day, account_id)',
+          )
+          .eq('event_series.account_id', this.accountId)
+          .order('series_id')
+          .order('occurrence_start')
+          .range(from, to),
+      ),
+      fetchAll((from, to) =>
+        supabase
+          .from('occurrence_item_state')
+          .select('series_id, occurrence_start, item_id, status, event_series!inner()')
+          .eq('event_series.account_id', this.accountId)
+          .order('series_id')
+          .order('occurrence_start')
+          .order('item_id')
+          .range(from, to),
+      ),
     ])
-    if (occ.error) throw occ.error
-    if (items.error) throw items.error
 
-    for (const o of occ.data ?? []) {
+    for (const o of occData) {
       // PostgREST returns the to-one parent embed as an object.
       const allDay = (o.event_series as { all_day: boolean } | null)?.all_day ?? false
       const entry: import('../types').OccurrenceState = { ...completions[key(o.series_id, o.occurrence_start)] }
@@ -326,7 +392,7 @@ export class SupabaseStore implements ScheduleStore {
         completions[key(o.series_id, o.occurrence_start)] = entry
       }
     }
-    for (const it of items.data ?? []) {
+    for (const it of itemData) {
       const k = key(it.series_id, it.occurrence_start)
       const checked = { ...(completions[k]?.checked ?? {}) }
       checked[it.item_id] = it.status === 'done'
@@ -348,16 +414,22 @@ export class SupabaseStore implements ScheduleStore {
         .select('id, title, sort_order')
         .eq('account_id', this.accountId)
         .order('sort_order'),
-      supabase
-        .from('list_item')
-        .select('id, list_id, group_label, title, done, person_id, due_on, sort_order, created_at')
-        .order('sort_order'),
+      // Scoped to the account through the parent list, and paged: an unfiltered
+      // scan is capped at 1000 rows and would silently drop items.
+      fetchAll((from, to) =>
+        supabase
+          .from('list_item')
+          .select('id, list_id, group_label, title, done, person_id, due_on, sort_order, created_at, list!inner()')
+          .eq('list.account_id', this.accountId)
+          .order('sort_order')
+          .order('id')
+          .range(from, to),
+      ),
     ])
     if (lists.error) throw lists.error
-    if (items.error) throw items.error
 
     const byList = new Map<string, ListItem[]>()
-    for (const it of items.data ?? []) {
+    for (const it of items) {
       const arr = byList.get(it.list_id) ?? []
       arr.push({
         id: it.id,
@@ -445,10 +517,16 @@ export class SupabaseStore implements ScheduleStore {
    * the original slot; we store it as the occurrence date.
    */
   private async loadListLinks(): Promise<Record<string, string[]>> {
-    const { data, error } = await supabase
-      .from('list_item_event_link')
-      .select('list_item_id, series_id, occurrence_start')
-    if (error) throw error
+    const data = await fetchAll((from, to) =>
+      supabase
+        .from('list_item_event_link')
+        .select('list_item_id, series_id, occurrence_start, event_series!inner()')
+        .eq('event_series.account_id', this.accountId)
+        .order('list_item_id')
+        .order('series_id')
+        .order('occurrence_start')
+        .range(from, to),
+    )
     const out: Record<string, string[]> = {}
     for (const row of data ?? []) {
       const k = `${row.series_id}:${tsToDateKey(row.occurrence_start)}`
@@ -466,11 +544,34 @@ export class SupabaseStore implements ScheduleStore {
    * an unsubscribe fn.
    */
   subscribe(onChange: () => void): () => void {
-    const channel = supabase
-      .channel('account-data')
-      .on('postgres_changes', { event: '*', schema: 'public' }, () => onChange())
-      .subscribe()
+    let disposed = false
+    let hadError = false
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
+    let channel: ReturnType<typeof supabase.channel>
+
+    const open = () => {
+      channel = supabase
+        .channel('account-data')
+        .on('postgres_changes', { event: '*', schema: 'public' }, () => onChange())
+        .subscribe((status) => {
+          if (disposed) return
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            // A dead channel means sync silently stops; tear down and retry.
+            hadError = true
+            void supabase.removeChannel(channel)
+            retryTimer = setTimeout(open, 5_000)
+          } else if (status === 'SUBSCRIBED' && hadError) {
+            // Recovered — reload once to pick up anything missed while down.
+            hadError = false
+            onChange()
+          }
+        })
+    }
+    open()
+
     return () => {
+      disposed = true
+      clearTimeout(retryTimer)
       void supabase.removeChannel(channel)
     }
   }
@@ -482,11 +583,11 @@ export class SupabaseStore implements ScheduleStore {
       case 'addEvent': {
         // The reducer appends the new (id-stamped) event; persist that one.
         const ev = next.events[next.events.length - 1]
-        if (ev) await this.writeEvent(ev, action.templateId)
+        if (ev) await this.writeEvent(ev, { isNew: true, templateId: action.templateId })
         return
       }
       case 'updateEvent':
-        await this.writeEvent(action.event)
+        await this.writeEvent(action.event, { isNew: false })
         return
       case 'removeEvent': {
         const { error } = await supabase.from('event_series').delete().eq('id', action.id)
@@ -496,22 +597,52 @@ export class SupabaseStore implements ScheduleStore {
       case 'setOccurrenceStatus': {
         const ev = next.events.find((e) => e.id === action.eventId)
         if (!ev) return
-        const occurrence_start = occurrenceTs(ev, action.date)
+        const { from, to } = dayRange(action.date)
         if (action.status) {
-          const { error } = await supabase
+          // Update the day's existing row if there is one (it may carry a
+          // reschedule/cancel, and its timestamp may predate a series time
+          // edit); insert a fresh row only when none exists.
+          const { data, error: selErr } = await supabase
             .from('event_occurrence')
-            .upsert(
-              { series_id: ev.id, occurrence_start, status: action.status },
-              { onConflict: 'series_id,occurrence_start' },
-            )
+            .select('occurrence_start')
+            .eq('series_id', ev.id)
+            .gte('occurrence_start', from)
+            .lt('occurrence_start', to)
+            .limit(1)
+          if (selErr) throw selErr
+          const existing = data?.[0]
+          const { error } = existing
+            ? await supabase
+                .from('event_occurrence')
+                .update({ status: action.status })
+                .eq('series_id', ev.id)
+                .eq('occurrence_start', existing.occurrence_start)
+            : await supabase.from('event_occurrence').upsert(
+                { series_id: ev.id, occurrence_start: occurrenceTs(ev, action.date), status: action.status },
+                { onConflict: 'series_id,occurrence_start' },
+              )
           if (error) throw error
         } else {
-          const { error } = await supabase
+          // Clearing the status must not destroy a reschedule or cancellation
+          // sharing the row: drop only rows that carry nothing else, and null
+          // the status on any that do.
+          const del = await supabase
             .from('event_occurrence')
             .delete()
             .eq('series_id', ev.id)
-            .eq('occurrence_start', occurrence_start)
-          if (error) throw error
+            .gte('occurrence_start', from)
+            .lt('occurrence_start', to)
+            .is('rescheduled_to', null)
+            .is('rescheduled_duration', null)
+            .eq('cancelled', false)
+          if (del.error) throw del.error
+          const upd = await supabase
+            .from('event_occurrence')
+            .update({ status: null })
+            .eq('series_id', ev.id)
+            .gte('occurrence_start', from)
+            .lt('occurrence_start', to)
+          if (upd.error) throw upd.error
         }
         return
       }
@@ -519,17 +650,32 @@ export class SupabaseStore implements ScheduleStore {
         const ev = next.events.find((e) => e.id === action.eventId)
         if (!ev) return
         // Identity stays the ORIGINAL slot; the new time/length go in the
-        // reschedule columns. Upsert touches only those, leaving any existing
-        // status/checklist ticks on the row intact.
-        const { error } = await supabase.from('event_occurrence').upsert(
-          {
-            series_id: ev.id,
-            occurrence_start: occurrenceTs(ev, action.date),
-            rescheduled_to: startToTs(action.start, ev.allDay),
-            rescheduled_duration: durationToInterval(action.duration, ev.allDay),
-          },
-          { onConflict: 'series_id,occurrence_start' },
-        )
+        // reschedule columns, leaving any status/checklist ticks on the row
+        // intact. The day's existing row is matched by range (see dayRange).
+        const { from, to } = dayRange(action.date)
+        const override = {
+          rescheduled_to: startToTs(action.start, ev.allDay),
+          rescheduled_duration: durationToInterval(action.duration, ev.allDay),
+        }
+        const { data, error: selErr } = await supabase
+          .from('event_occurrence')
+          .select('occurrence_start')
+          .eq('series_id', ev.id)
+          .gte('occurrence_start', from)
+          .lt('occurrence_start', to)
+          .limit(1)
+        if (selErr) throw selErr
+        const existing = data?.[0]
+        const { error } = existing
+          ? await supabase
+              .from('event_occurrence')
+              .update(override)
+              .eq('series_id', ev.id)
+              .eq('occurrence_start', existing.occurrence_start)
+          : await supabase.from('event_occurrence').upsert(
+              { series_id: ev.id, occurrence_start: occurrenceTs(ev, action.date), ...override },
+              { onConflict: 'series_id,occurrence_start' },
+            )
         if (error) throw error
         return
       }
@@ -537,11 +683,13 @@ export class SupabaseStore implements ScheduleStore {
         const ev = next.events.find((e) => e.id === action.eventId)
         if (!ev) return
         // Null the timing override but keep the row (it may still carry status).
+        const { from, to } = dayRange(action.date)
         const { error } = await supabase
           .from('event_occurrence')
           .update({ rescheduled_to: null, rescheduled_duration: null })
           .eq('series_id', ev.id)
-          .eq('occurrence_start', occurrenceTs(ev, action.date))
+          .gte('occurrence_start', from)
+          .lt('occurrence_start', to)
         if (error) throw error
         return
       }
@@ -584,6 +732,20 @@ export class SupabaseStore implements ScheduleStore {
         const dependent = next.events.find((e) => e.id === action.eventId)
         const prerequisite = next.events.find((e) => e.id === action.prerequisiteSeriesId)
         if (!dependent || !prerequisite) return
+        // Clear any same-day edge first (its stored timestamps may predate a
+        // series time edit) so re-adding can't create a duplicate row.
+        const dep = dayRange(action.date)
+        const pre = dayRange(action.prerequisiteDate)
+        const del = await supabase
+          .from('occurrence_dependency')
+          .delete()
+          .eq('dependent_series', dependent.id)
+          .gte('dependent_occurrence', dep.from)
+          .lt('dependent_occurrence', dep.to)
+          .eq('prerequisite_series', prerequisite.id)
+          .gte('prerequisite_occurrence', pre.from)
+          .lt('prerequisite_occurrence', pre.to)
+        if (del.error) throw del.error
         const { error } = await supabase.from('occurrence_dependency').upsert(
           {
             dependent_series: dependent.id,
@@ -601,34 +763,48 @@ export class SupabaseStore implements ScheduleStore {
         const dependent = next.events.find((e) => e.id === action.eventId)
         const prerequisite = next.events.find((e) => e.id === action.prerequisiteSeriesId)
         if (!dependent || !prerequisite) return
+        // Match both occurrence slots by day range: their stored timestamps may
+        // predate a series time edit.
+        const dep = dayRange(action.date)
+        const pre = dayRange(action.prerequisiteDate)
         const { error } = await supabase
           .from('occurrence_dependency')
           .delete()
           .eq('dependent_series', dependent.id)
-          .eq('dependent_occurrence', occurrenceTs(dependent, action.date))
+          .gte('dependent_occurrence', dep.from)
+          .lt('dependent_occurrence', dep.to)
           .eq('prerequisite_series', prerequisite.id)
-          .eq('prerequisite_occurrence', occurrenceTs(prerequisite, action.prerequisiteDate))
+          .gte('prerequisite_occurrence', pre.from)
+          .lt('prerequisite_occurrence', pre.to)
         if (error) throw error
         return
       }
       case 'toggleChecklistEntry': {
         const ev = next.events.find((e) => e.id === action.eventId)
         if (!ev) return
-        const occurrence_start = occurrenceTs(ev, action.date)
+        const { from, to } = dayRange(action.date)
         const nowChecked = next.completions[`${action.eventId}:${action.date}`]?.checked?.[action.entryId]
+        // Both branches clear the day's row(s) by range first, so a tick written
+        // before a series time edit (different stored timestamp, same date) can
+        // still be found — and never duplicated.
+        const del = await supabase
+          .from('occurrence_item_state')
+          .delete()
+          .eq('series_id', ev.id)
+          .eq('item_id', action.entryId)
+          .gte('occurrence_start', from)
+          .lt('occurrence_start', to)
+        if (del.error) throw del.error
         if (nowChecked) {
           const { error } = await supabase.from('occurrence_item_state').upsert(
-            { series_id: ev.id, occurrence_start, item_id: action.entryId, status: 'done' },
+            {
+              series_id: ev.id,
+              occurrence_start: occurrenceTs(ev, action.date),
+              item_id: action.entryId,
+              status: 'done',
+            },
             { onConflict: 'series_id,occurrence_start,item_id' },
           )
-          if (error) throw error
-        } else {
-          const { error } = await supabase
-            .from('occurrence_item_state')
-            .delete()
-            .eq('series_id', ev.id)
-            .eq('occurrence_start', occurrence_start)
-            .eq('item_id', action.entryId)
           if (error) throw error
         }
         return
@@ -746,6 +922,16 @@ export class SupabaseStore implements ScheduleStore {
       case 'linkListItem': {
         const ev = next.events.find((e) => e.id === action.eventId)
         if (!ev) return
+        // Clear any same-day link first (see addDependency) to avoid duplicates.
+        const { from, to } = dayRange(action.date)
+        const del = await supabase
+          .from('list_item_event_link')
+          .delete()
+          .eq('list_item_id', action.itemId)
+          .eq('series_id', ev.id)
+          .gte('occurrence_start', from)
+          .lt('occurrence_start', to)
+        if (del.error) throw del.error
         const { error } = await supabase.from('list_item_event_link').upsert(
           {
             list_item_id: action.itemId,
@@ -760,12 +946,15 @@ export class SupabaseStore implements ScheduleStore {
       case 'unlinkListItem': {
         const ev = next.events.find((e) => e.id === action.eventId)
         if (!ev) return
+        // Range-match the slot: the stored timestamp may predate a series edit.
+        const { from, to } = dayRange(action.date)
         const { error } = await supabase
           .from('list_item_event_link')
           .delete()
           .eq('list_item_id', action.itemId)
           .eq('series_id', ev.id)
-          .eq('occurrence_start', occurrenceTs(ev, action.date))
+          .gte('occurrence_start', from)
+          .lt('occurrence_start', to)
         if (error) throw error
         return
       }
@@ -781,7 +970,10 @@ export class SupabaseStore implements ScheduleStore {
 
   /** Upsert a series and reconcile its rosters/attachments. `templateId` records
    *  provenance when this event was created from a template (else left as-is). */
-  private async writeEvent(ev: CalendarEvent, templateId?: string): Promise<void> {
+  private async writeEvent(
+    ev: CalendarEvent,
+    { isNew, templateId }: { isNew: boolean; templateId?: string },
+  ): Promise<void> {
     const series = {
       id: ev.id,
       account_id: this.accountId,
@@ -795,7 +987,9 @@ export class SupabaseStore implements ScheduleStore {
       // Only stamp provenance on insert-from-template; updates omit it so an edit
       // never clobbers an existing link.
       ...(templateId ? { template_id: templateId } : {}),
-      created_by: this.userId,
+      // Only stamp the creator on insert — an edit by a partner must not
+      // reassign the series to them.
+      ...(isNew ? { created_by: this.userId } : {}),
     }
     const up = await supabase.from('event_series').upsert(series, { onConflict: 'id' })
     if (up.error) throw up.error
@@ -836,15 +1030,22 @@ export class SupabaseStore implements ScheduleStore {
   }
 
   private async syncAttendees(ev: SeriesAttachments): Promise<void> {
-    // No per-row dependents — delete-all then insert is safe and simplest.
-    const del = await supabase.from('event_person').delete().eq('series_id', ev.id)
-    if (del.error) throw del.error
+    // Upsert-then-prune rather than delete-all-then-insert: the roster is never
+    // empty mid-sync for a concurrent reader, and two devices saving at once
+    // can't fail the whole insert on a shared attendee's duplicate key.
     if (ev.attendees.length) {
-      const ins = await supabase
+      const up = await supabase
         .from('event_person')
-        .insert(ev.attendees.map((person_id) => ({ series_id: ev.id, person_id })))
-      if (ins.error) throw ins.error
+        .upsert(
+          ev.attendees.map((person_id) => ({ series_id: ev.id, person_id })),
+          { onConflict: 'series_id,person_id', ignoreDuplicates: true },
+        )
+      if (up.error) throw up.error
     }
+    let del = supabase.from('event_person').delete().eq('series_id', ev.id)
+    if (ev.attendees.length) del = del.not('person_id', 'in', `(${ev.attendees.join(',')})`)
+    const res = await del
+    if (res.error) throw res.error
   }
 
   private async syncChecklist(ev: SeriesAttachments): Promise<void> {
@@ -873,11 +1074,19 @@ export class SupabaseStore implements ScheduleStore {
   }
 
   private async syncNotes(ev: SeriesAttachments): Promise<void> {
+    // Keep the original author on notes that already exist — editing an event
+    // must not reassign a partner's notes to the editor.
+    const { data: existing, error: exErr } = await supabase
+      .from('note')
+      .select('id, author_id')
+      .eq('owner_series_id', ev.id)
+    if (exErr) throw exErr
+    const authorById = new Map((existing ?? []).map((n) => [n.id, n.author_id]))
     const desired = noteAttachments(ev).map((n) => ({
       id: n.id,
       owner_series_id: ev.id,
       body: n.text,
-      author_id: this.userId,
+      author_id: authorById.get(n.id) ?? this.userId,
     }))
     if (desired.length) {
       const up = await supabase.from('note').upsert(desired, { onConflict: 'id' })
@@ -922,7 +1131,12 @@ export class SupabaseStore implements ScheduleStore {
 function rebuildAttachments(r: SeriesRow): Attachment[] {
   const out: Attachment[] = []
 
-  const listItems = r.checklist_item.filter((c) => c.occurrence_start === null)
+  // Sort before grouping: the embed arrives in arbitrary order, and sort_order
+  // encodes the group order (ci*1000+idx), so first-encounter grouping over the
+  // sorted rows reproduces the authored checklist order deterministically.
+  const listItems = r.checklist_item
+    .filter((c) => c.occurrence_start === null)
+    .sort((a, b) => a.sort_order - b.sort_order)
   const groups = new Map<string, typeof listItems>()
   for (const item of listItems) {
     const key = item.group_label ?? ''
@@ -931,12 +1145,11 @@ function rebuildAttachments(r: SeriesRow): Attachment[] {
   }
   for (const [groupLabel, items] of groups) {
     out.push({
-      id: uid(),
+      // Deterministic id so a checklist keeps its identity across reloads.
+      id: `${r.id}:checklist:${groupLabel}`,
       kind: 'checklist',
       title: groupLabel || undefined,
-      items: items
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .map((i) => ({ id: i.id, title: i.label })),
+      items: items.map((i) => ({ id: i.id, title: i.label })),
     })
   }
 

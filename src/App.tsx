@@ -52,7 +52,10 @@ export function Root() {
   }
 
   return (
-    <AppProvider>
+    // Key the data layer by account: the store captures accountId at mount, so
+    // if it ever changes (account switch, delayed bootstrap race) the provider
+    // must remount with a fresh store rather than keep writing to the old one.
+    <AppProvider key={accountId}>
       <App />
     </AppProvider>
   );
