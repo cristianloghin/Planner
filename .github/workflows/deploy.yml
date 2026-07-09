@@ -62,6 +62,10 @@ jobs:
           # they live as public repository variables, not secrets.
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          # VAPID *public* key for Web Push — client-safe by design (the
+          # private half lives with the sender, never here). Unset = the
+          # notifications section simply doesn't render.
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

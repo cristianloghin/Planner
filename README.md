@@ -46,6 +46,12 @@ Create `.env.local` (gitignored) with your Supabase project credentials:
 ```bash
 VITE_SUPABASE_URL=https://<project-ref>.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+# Optional — Web Push. Generate a key pair once with
+# `npx web-push generate-vapid-keys`; the PUBLIC key goes here (and in the
+# repo's Actions variables as VITE_VAPID_PUBLIC_KEY for deploys), the private
+# key stays with the reminder sender. Unset = the notifications section in
+# Settings doesn't render.
+VITE_VAPID_PUBLIC_KEY=B...
 ```
 
 ```bash

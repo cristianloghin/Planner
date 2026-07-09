@@ -17,9 +17,15 @@ export default defineConfig({
       // update when it's safe. Registration is handled by `useRegisterSW`, so the
       // default `injectRegister: 'auto'` injects nothing.
       registerType: 'prompt',
-      // Default Workbox glob omits fonts; add woff2 so the self-hosted
-      // Source Sans 3 files are precached and work offline.
-      workbox: {
+      // Custom worker (src/sw.ts) instead of the generated one: Web Push needs
+      // push/notificationclick handlers. It reproduces the generated worker's
+      // precache + SPA fallback + prompt-update behaviour.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      injectManifest: {
+        // Default Workbox glob omits fonts; add woff2 so the self-hosted
+        // Source Sans 3 files are precached and work offline.
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
       },
       // Generate PNG/apple-touch/favicon assets from the SVG source and
