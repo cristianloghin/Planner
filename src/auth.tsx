@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { queryClient } from './lib/queryClient'
+import { clearSnapshot } from './store/offline'
 
 interface AuthCtx {
   session: Session | null
@@ -31,8 +32,10 @@ const inFlight = new Map<string, Promise<string>>()
  * Find the user's account, creating one the first time. A signed-in user with no
  * `account_member` row calls the `create_account` RPC once; the returned id is
  * the active account. (RLS scopes every series read/write to this account.)
+ * Exported for non-hook contexts (resumed offline mutations resolve their
+ * store through it); the in-flight map makes repeat calls cheap.
  */
-function ensureAccount(userId: string): Promise<string> {
+export function ensureAccount(userId: string): Promise<string> {
   const existing = inFlight.get(userId)
   if (existing) return existing
 
@@ -119,9 +122,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       async signOut() {
         await supabase.auth.signOut()
-        // Drop the previous account's cached query data (templates, …) so
-        // nothing lingers in memory for the next sign-in.
+        // Drop the previous account's cached data — the in-memory query cache
+        // (whose persister mirrors the clear into storage) and the offline
+        // state snapshot — so nothing readable lingers for the next sign-in.
         queryClient.clear()
+        if (accountId) clearSnapshot(accountId)
       },
       async updatePassword(password) {
         const { error } = await supabase.auth.updateUser({ password })

@@ -20,6 +20,10 @@ export type Action =
       personId: PersonId | null
       group: string | null
       dueOn: string | null
+      /** Optional caller-minted id (see `addList.id`); the reducer mints one
+       *  when absent, and the dispatcher backfills it onto the queued action
+       *  so an offline replay targets the same row. */
+      id?: string
     }
   | { type: 'toggleListItem'; listId: string; itemId: string }
   | { type: 'removeListItem'; listId: string; itemId: string }
@@ -41,7 +45,7 @@ export type Action =
   | { type: 'unlinkListItem'; eventId: string; date: string; itemId: string }
   // `templateId` is pure provenance — the source template, written to the new
   // series' `template_id` column. Omitted for an event built from scratch.
-  | { type: 'addEvent'; event: Omit<CalendarEvent, 'id'>; templateId?: string }
+  | { type: 'addEvent'; event: Omit<CalendarEvent, 'id'>; templateId?: string; id?: string }
   | { type: 'updateEvent'; event: CalendarEvent }
   | { type: 'removeEvent'; id: string }
   // "Edit this and all following": split the series at `fromDate` into a new
