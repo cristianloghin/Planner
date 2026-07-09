@@ -205,6 +205,12 @@ export type CompletionsMap = Record<string, OccurrenceState>
 export interface Preferences {
   /** Per-person user-color override, as a palette key (one of the nine). */
   personColors: Record<PersonId, ColorKey>
+  /**
+   * IANA timezone of this user's device, stamped automatically on startup.
+   * The reminder sender (supabase/functions/send-reminders) computes each
+   * user's wall-clock fire times from it; absent = UTC.
+   */
+  timezone?: string
 }
 
 export interface AppState {

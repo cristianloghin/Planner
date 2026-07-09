@@ -725,7 +725,8 @@ export class SupabaseStore implements ScheduleStore {
       // Preferences are a per-user JSON blob: any preference change writes the
       // whole (already-updated) `next.preferences` document for this user.
       case 'setColorPref':
-      case 'clearColorPref': {
+      case 'clearColorPref':
+      case 'setTimezone': {
         const { error } = await supabase.from('user_preference').upsert(
           {
             account_id: this.accountId,

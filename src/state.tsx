@@ -259,6 +259,8 @@ function reducer(state: AppState, action: Action): AppState {
       delete personColors[action.personId]
       return { ...state, preferences: { ...state.preferences, personColors } }
     }
+    case 'setTimezone':
+      return { ...state, preferences: { ...state.preferences, timezone: action.timezone } }
     case 'shiftWeek':
       return { ...state, weekStart: addDays(state.weekStart, action.delta * 7) }
     case 'setWeek':
@@ -425,6 +427,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       stateRef.current = merged
       setState(merged)
       if (accountId) writeSnapshot(accountId, merged)
+      // Keep the per-user timezone stamp current — the server-side reminder
+      // sender computes this user's wall-clock fire times from it.
+      const deviceTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      if (deviceTz && merged.preferences.timezone !== deviceTz) {
+        dispatch({ type: 'setTimezone', timezone: deviceTz })
+      }
     } catch (e) {
       console.error('Initial load failed:', e)
       if (isNetworkError(e)) setOffline(true)
@@ -432,7 +440,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // nothing at all, show the retry screen instead of an eternal spinner.
       if (!stateRef.current) setLoadFailed(true)
     }
-  }, [accountId, pump])
+  }, [accountId, pump, dispatch])
 
   useEffect(() => {
     // Last-known data paints immediately — the fast path online, the only

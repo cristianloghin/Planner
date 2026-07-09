@@ -7,6 +7,7 @@ import { COLOR_KEYS, colorVar } from "../lib/palette";
 import { attendeeLabel, personColorKey } from "../lib/people";
 import { useApp } from "../state";
 import { CommitTextInput } from "./CommitTextInput";
+import { NotificationSettings } from "./NotificationSettings";
 import shared from "../styles/shared.module.css";
 import type { EventTemplate } from "../types";
 import { ColorPicker } from "./ColorPicker";
@@ -84,6 +85,8 @@ export function Settings() {
         })}
 
         <TemplatesSection />
+
+        <NotificationSettings />
 
         {session && (
           <div className={s.account}>

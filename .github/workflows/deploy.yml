@@ -44,6 +44,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
       - run: supabase db push
+      # Deploy edge functions alongside the schema they depend on. Like
+      # `db push`, redeploying an unchanged function is a cheap no-op.
+      - run: supabase functions deploy send-reminders --project-ref "$SUPABASE_PROJECT_ID"
 
   build:
     needs: migrate
@@ -62,6 +65,10 @@ jobs:
           # they live as public repository variables, not secrets.
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          # VAPID *public* key for Web Push — client-safe by design (the
+          # private half lives with the sender, never here). Unset = the
+          # notifications section simply doesn't render.
+          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

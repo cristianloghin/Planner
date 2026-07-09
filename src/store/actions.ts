@@ -77,6 +77,9 @@ export type Action =
   // user sees it. `clearColorPref` reverts to the shared `Person.color`.
   | { type: 'setColorPref'; personId: PersonId; color: ColorKey }
   | { type: 'clearColorPref'; personId: PersonId }
+  // Stamp the device's IANA timezone into the per-user preferences, for the
+  // server-side reminder sender. Dispatched automatically on startup.
+  | { type: 'setTimezone'; timezone: string }
   | { type: 'shiftWeek'; delta: number }
   | { type: 'setWeek'; weekStart: string }
   | { type: 'shiftDay'; delta: number }
