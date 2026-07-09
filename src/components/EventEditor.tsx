@@ -55,14 +55,35 @@ export type EditorTarget =
 
 type RepeatChoice = "none" | RecurrenceFreq;
 
-/** datetime-local value for a date + minutes-from-midnight. */
+/** datetime-local value for a date + minutes-from-midnight. Minutes past the
+ *  day roll into the next date — `<input type="datetime-local">` rejects the
+ *  out-of-range "T24:00" and would render an empty field. */
 function dtLocal(date: string, minute: number): string {
+  const day = 24 * 60;
+  if (minute >= day) {
+    return `${addDays(date, Math.floor(minute / day))}T${minutesToTime(minute % day)}`;
+  }
   return `${date}T${minutesToTime(minute)}`;
 }
 
-/** Whole minutes between two datetime-local strings (b - a). */
+function clockMinutes(dt: string): number {
+  const [h, m] = dt.slice(11).split(":").map(Number);
+  return h * 60 + m;
+}
+
+/** Whole minutes between two datetime-local strings (b - a), in wall-clock
+ *  terms: day difference × 24h + clock difference. Subtracting epoch times
+ *  would shift durations by ±60 min across a DST transition. */
 function minutesBetween(a: string, b: string): number {
-  return Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60_000);
+  return diffDays(b.slice(0, 10), a.slice(0, 10)) * 24 * 60 + (clockMinutes(b) - clockMinutes(a));
+}
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** A complete, parseable datetime-local value ("yyyy-mm-ddThh:mm"). A cleared
+ *  or half-typed picker emits "" — saving that would persist NaN durations. */
+function isCompleteDT(v: string): boolean {
+  return v.length >= 16 && ISO_DATE_RE.test(v.slice(0, 10)) && !Number.isNaN(new Date(v).getTime());
 }
 
 /** Shared full-page editor for the event *template* (timing, attendees, attachments, deps). */
@@ -232,9 +253,14 @@ export function EventEditor({
     };
   }
 
+  // Timing the form can actually save: complete pickers and finite numbers.
+  const timingValid = allDay
+    ? ISO_DATE_RE.test(date) && Number.isFinite(days)
+    : isCompleteDT(startDT) && isCompleteDT(endDT);
+
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || !timingValid) return;
     // Editing one occurrence of a recurring series: ask for the save scope first.
     if (isRecurringOccurrence) {
       setShowScope(true);
@@ -375,9 +401,12 @@ export function EventEditor({
                 // inclusive: ending on the start date is a one-day event.
                 value={addDays(date, Math.max(1, days) - 1)}
                 min={date}
-                onChange={(e) =>
-                  setDays(Math.max(1, diffDays(e.target.value, date) + 1))
-                }
+                onChange={(e) => {
+                  // A cleared/incomplete picker emits "" — ignore it rather
+                  // than compute NaN days.
+                  if (!ISO_DATE_RE.test(e.target.value)) return;
+                  setDays(Math.max(1, diffDays(e.target.value, date) + 1));
+                }}
               />
             </label>
           </div>
@@ -391,11 +420,14 @@ export function EventEditor({
                 value={startDT}
                 onChange={(e) => {
                   const next = e.target.value;
-                  // Keep the same duration when the start moves.
+                  setStartDT(next);
+                  // Keep the same duration when the start moves — but only
+                  // when both ends are complete values, else leave the end
+                  // untouched until the picker settles.
+                  if (!isCompleteDT(next) || !isCompleteDT(startDT) || !isCompleteDT(endDT)) return;
                   const dur = Math.max(SNAP, minutesBetween(startDT, endDT));
                   const ne = new Date(next);
                   ne.setMinutes(ne.getMinutes() + dur);
-                  setStartDT(next);
                   setEndDT(toDateTimeLocal(ne));
                 }}
               />

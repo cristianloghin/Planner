@@ -6,7 +6,7 @@ import {
   ChevronRight,
   CircleDashed,
 } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { checklistEntries, hasReminders } from "../lib/attachments";
 import { childStatuses, type Busy, type ChildStatus } from "../lib/conflicts";
 import { cx } from "../lib/cx";
@@ -92,11 +92,17 @@ export function DayView() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
+  // Tick once a minute so the "now" line moves and today-detection rolls over
+  // at midnight — without it both freeze at whatever the last interaction saw.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const iv = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(iv);
+  }, []);
+
   const dateISO = addDays(state.weekStart, day);
-  const isToday = dateISO === toISODate(new Date());
-  const nowMin = isToday
-    ? new Date().getHours() * 60 + new Date().getMinutes()
-    : null;
+  const isToday = dateISO === toISODate(now);
+  const nowMin = isToday ? now.getHours() * 60 + now.getMinutes() : null;
 
   // Scroll the timeline so `minute` sits a little below the top edge.
   function scrollToMinute(minute: number) {
@@ -266,21 +272,27 @@ export function DayView() {
     setSheet({ event: occ.event, date: occ.start });
   }
 
-  const occs = occurrencesOnDate(state.events, dateISO, state.completions);
-  const timedBlocks: DayBlock[] = occs
-    .filter((o) => !o.event.allDay)
-    .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end }));
-  const allDayOccs = occs.filter((o) => o.event.allDay);
+  // None of this depends on zoom or gesture state, and it's the expensive part
+  // of a render (recurrence expansion + conflict analysis) — memoize so a
+  // pinch-zoom frame or timer tick doesn't recompute it.
+  const { timedBlocks, allDayOccs, statuses, hasWarnings } = useMemo(() => {
+    const occs = occurrencesOnDate(state.events, dateISO, state.completions);
+    const timedBlocks: DayBlock[] = occs
+      .filter((o) => !o.event.allDay)
+      .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end }));
+    const allDayOccs = occs.filter((o) => o.event.allDay);
 
-  // Coverage looks at the whole day: all-day events count as busy 00:00–24:00.
-  const coverage: Busy[] = occs.map((o) => ({
-    id: o.event.id,
-    attendees: o.event.attendees,
-    start: o.event.allDay ? 0 : o.segment.start,
-    end: o.event.allDay ? DAY_MIN : o.segment.end,
-  }));
-  const statuses = childStatuses(coverage, state.people);
-  const hasWarnings = [...statuses.values()].some((s) => s !== "covered");
+    // Coverage looks at the whole day: all-day events count as busy 00:00–24:00.
+    const coverage: Busy[] = occs.map((o) => ({
+      id: o.event.id,
+      attendees: o.event.attendees,
+      start: o.event.allDay ? 0 : o.segment.start,
+      end: o.event.allDay ? DAY_MIN : o.segment.end,
+    }));
+    const statuses = childStatuses(coverage, state.people);
+    const hasWarnings = [...statuses.values()].some((s) => s !== "covered");
+    return { timedBlocks, allDayOccs, statuses, hasWarnings };
+  }, [state.events, state.completions, state.people, dateISO]);
 
   const fullHeight = DAY_MIN * pxPerMin;
 

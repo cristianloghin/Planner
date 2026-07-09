@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { cx } from "../lib/cx";
 import {
   DAY_NAMES,
@@ -28,7 +28,26 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
     startOfMonth(toISODate(new Date())),
   );
   const today = toISODate(new Date());
-  const days = monthGridDays(cursor);
+  const days = useMemo(() => monthGridDays(cursor), [cursor]);
+
+  // Expanding recurrences over 42 cells is O(events × occurrence state); do it
+  // only when the grid or the data actually changes, not on every render.
+  const eventsByDay = useMemo(
+    () =>
+      new Map(
+        days.map((iso) => [
+          iso,
+          occurrencesOnDate(state.events, iso, state.completions)
+            .map((o) => o.event)
+            .sort(
+              (a, b) =>
+                Number(b.allDay) - Number(a.allDay) ||
+                eventStartMinutes(a) - eventStartMinutes(b),
+            ),
+        ]),
+      ),
+    [days, state.events, state.completions],
+  );
 
   // Open a search hit: jump to the event's next upcoming occurrence (falling
   // back to the series anchor for an ended series) in the Day view.
@@ -72,14 +91,7 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
           ))}
 
           {days.map((iso) => {
-            // Expand recurring/multi-day events onto this concrete date.
-            const dayEvents = occurrencesOnDate(state.events, iso, state.completions)
-              .map((o) => o.event)
-              .sort(
-                (a, b) =>
-                  Number(b.allDay) - Number(a.allDay) ||
-                  eventStartMinutes(a) - eventStartMinutes(b),
-              );
+            const dayEvents = eventsByDay.get(iso) ?? [];
             return (
               <button
                 key={iso}

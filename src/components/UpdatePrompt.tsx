@@ -5,6 +5,10 @@ import s from './UpdatePrompt.module.css'
 // on launch/navigation; poll so a fresh deploy is noticed within the half-hour.
 const UPDATE_CHECK_MS = 30 * 60 * 1000
 
+// `onRegisteredSW` has no cleanup hook, so a remount (StrictMode double-mounts
+// in dev) would stack a second interval + listener. Install them once.
+let checksInstalled = false
+
 /**
  * "Update available" toast. We register in `prompt` mode (see vite.config.ts), so
  * a new deploy never reloads on its own — it surfaces here and the user applies
@@ -17,7 +21,8 @@ export function UpdatePrompt() {
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(_swUrl, registration) {
-      if (!registration) return
+      if (!registration || checksInstalled) return
+      checksInstalled = true
       const check = () => {
         if (!document.hidden) void registration.update()
       }

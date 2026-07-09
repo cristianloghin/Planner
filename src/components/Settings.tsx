@@ -6,6 +6,7 @@ import { cx } from "../lib/cx";
 import { COLOR_KEYS, colorVar } from "../lib/palette";
 import { attendeeLabel, personColorKey } from "../lib/people";
 import { useApp } from "../state";
+import { CommitTextInput } from "./CommitTextInput";
 import shared from "../styles/shared.module.css";
 import type { EventTemplate } from "../types";
 import { ColorPicker } from "./ColorPicker";
@@ -57,15 +58,11 @@ export function Settings() {
                 }
               />
               <div className={s.personHead}>
-                <input
+                <CommitTextInput
                   type="text"
                   value={p.name}
-                  onChange={(e) =>
-                    dispatch({
-                      type: "renamePerson",
-                      id: p.id,
-                      name: e.target.value,
-                    })
+                  onCommit={(name) =>
+                    dispatch({ type: "renamePerson", id: p.id, name })
                   }
                   aria-label="Name"
                 />

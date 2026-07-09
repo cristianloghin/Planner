@@ -69,6 +69,9 @@ export function useTemplates() {
     queryKey: templatesKey(accountId),
     queryFn: () => store!.listTemplates(),
     enabled: !!store,
+    // Realtime invalidation (useTemplatesRealtime) keeps this fresh; without a
+    // staleTime every consumer mount and window focus refetches redundantly.
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -106,12 +109,17 @@ function useTemplateMutation<V>(
 }
 
 export function useAddTemplate() {
-  return useTemplateMutation<TemplateInput>(
-    (store, input) => store.saveTemplate({ ...input, id: uid() }),
-    // The real id is minted in the write; a temp id keeps the optimistic row
-    // keyed until invalidation swaps in the persisted row.
-    (current, input) => [...current, { ...input, id: `optimistic-${uid()}` }],
+  const mutation = useTemplateMutation<EventTemplate>(
+    (store, t) => store.saveTemplate(t),
+    // The optimistic row carries the REAL id (minted below, before the write),
+    // so editing/deleting it before invalidation lands targets a valid uuid —
+    // a placeholder id would fail the server's uuid cast.
+    (current, t) => [...current, t],
   );
+  return {
+    ...mutation,
+    mutate: (input: TemplateInput) => mutation.mutate({ ...input, id: uid() }),
+  };
 }
 
 export function useUpdateTemplate() {
