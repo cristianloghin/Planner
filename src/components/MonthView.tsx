@@ -71,11 +71,19 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
         onPickSearch={openSearchHit}
         nav={
           <div className={shared.weekNav}>
-            <button onClick={() => setCursor(addMonths(cursor, -1))} aria-label="Previous month">
+            <button
+              type="button"
+              onClick={() => setCursor(addMonths(cursor, -1))}
+              aria-label="Previous month"
+            >
               <ChevronLeft size={20} />
             </button>
             <strong>{monthLabel(cursor)}</strong>
-            <button onClick={() => setCursor(addMonths(cursor, 1))} aria-label="Next month">
+            <button
+              type="button"
+              onClick={() => setCursor(addMonths(cursor, 1))}
+              aria-label="Next month"
+            >
               <ChevronRight size={20} />
             </button>
           </div>
@@ -94,6 +102,7 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
             const dayEvents = eventsByDay.get(iso) ?? []
             return (
               <button
+                type="button"
                 key={iso}
                 className={cx(
                   s.monthCell,

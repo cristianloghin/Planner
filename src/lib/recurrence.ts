@@ -62,8 +62,8 @@ export function startsOn(e: CalendarEvent, date: string): boolean {
     case 'weekly':
       return delta % 7 === 0 && (delta / 7) % n === 0
     case 'monthly': {
-      const a = new Date(base + 'T00:00:00')
-      const b = new Date(date + 'T00:00:00')
+      const a = new Date(`${base}T00:00:00`)
+      const b = new Date(`${date}T00:00:00`)
       // Same day-of-month only (months missing that day simply skip).
       if (a.getDate() !== b.getDate()) return false
       const months = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth())
@@ -92,8 +92,8 @@ export function latestStartOnOrBefore(e: CalendarEvent, date: string): string | 
     case 'weekly':
       return addDays(base, Math.floor(delta / (7 * n)) * 7 * n)
     case 'monthly': {
-      const start = new Date(base + 'T00:00:00')
-      const target = new Date(date + 'T00:00:00')
+      const start = new Date(`${base}T00:00:00`)
+      const target = new Date(`${date}T00:00:00`)
       const months =
         (target.getFullYear() - start.getFullYear()) * 12 + (target.getMonth() - start.getMonth())
       for (let k = Math.floor(months / n); k >= 0; k--) {
@@ -195,7 +195,10 @@ export function occurrencesOnDate(
     if (sep < 0) continue
     const id = k.slice(0, sep)
     let arr = overridesByEvent.get(id)
-    if (!arr) overridesByEvent.set(id, (arr = []))
+    if (!arr) {
+      arr = []
+      overridesByEvent.set(id, arr)
+    }
     arr.push([k.slice(sep + 1), st])
   }
   const NONE: [string, OccurrenceState][] = []

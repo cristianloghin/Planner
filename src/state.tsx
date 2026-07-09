@@ -169,7 +169,7 @@ function reducer(state: AppState, action: Action): AppState {
       // else's occurrence (DB cascades both ends). Its per-occurrence state is
       // Query-owned (src/data/completions.ts); realtime invalidation prunes it.
       const events = state.events.filter((e) => e.id !== action.id)
-      const prefix = action.id + ':'
+      const prefix = `${action.id}:`
       const dependencies: typeof state.dependencies = {}
       for (const [k, edges] of Object.entries(state.dependencies)) {
         if (k.startsWith(prefix)) continue
@@ -448,6 +448,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [accountId, pump, dispatch])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run on mount only — accountId is fixed for this provider's lifetime (Root keys it)
   useEffect(() => {
     // Last-known data paints immediately — the fast path online, the only
     // path offline. weekStart/selectedDay re-derive from "today".
@@ -458,7 +459,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setState(hydrated)
     }
     void bootstrap()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -617,6 +617,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           {offline ? ' — you appear to be offline.' : '.'}
         </p>
         <button
+          type="button"
           onClick={() => void bootstrap()}
           style={{
             background: 'var(--accent)',
@@ -687,6 +688,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         >
           {syncError}
           <button
+            type="button"
             onClick={() => setSyncError(null)}
             aria-label="Dismiss"
             style={{

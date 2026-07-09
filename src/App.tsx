@@ -80,7 +80,7 @@ export function App() {
   function openDay(iso: string) {
     dispatch({
       type: 'setWeek',
-      weekStart: mondayOf(new Date(iso + 'T00:00:00')),
+      weekStart: mondayOf(new Date(`${iso}T00:00:00`)),
     })
     dispatch({ type: 'setDay', day: weekdayIndex(iso) })
     setTab('day')
@@ -101,6 +101,7 @@ export function App() {
       <nav className={s.tabbar}>
         {TABS.map((t) => (
           <button
+            type="button"
             key={t.id}
             className={cx(s.tab, t.id === tab && s.active)}
             onClick={() => setTab(t.id)}

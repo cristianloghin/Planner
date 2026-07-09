@@ -39,13 +39,14 @@ export function SearchOverlay({
           <SearchIcon size={18} />
         </span>
         <input
+          // biome-ignore lint/a11y/noAutofocus: the overlay exists to type a query; focusing the input is the expected behaviour
           autoFocus
           className={s.input}
           placeholder={placeholder}
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
         />
-        <button className={s.close} onClick={onClose} aria-label="Close search">
+        <button type="button" className={s.close} onClick={onClose} aria-label="Close search">
           <X size={20} />
         </button>
       </div>

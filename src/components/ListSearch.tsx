@@ -35,6 +35,7 @@ export function ListSearch({
   return (
     <>
       <button
+        type="button"
         className={s.trigger}
         onClick={() => {
           setQuery('')
@@ -59,6 +60,7 @@ export function ListSearch({
           )}
           {results.map((r) => (
             <button
+              type="button"
               key={r.itemId}
               className={s.row}
               onClick={() => {

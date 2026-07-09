@@ -121,9 +121,9 @@ export function DayView() {
 
   // First mount only: focus now (or 7am). Day navigation deliberately keeps the
   // user's scroll position — jumping the timeline on every day change is jarring.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run on mount only
   useEffect(() => {
     scrollToMinute(nowMin ?? 7 * 60)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ---- touch gestures: swipe to change day, pinch to zoom -----------------
@@ -153,6 +153,7 @@ export function DayView() {
     el.scrollTop = a.focalMin * (hourH / 60) - a.focalOff
   }, [hourH])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the listeners bind once and read live values through refs (hourHRef, g); `dispatch` is stable
   useEffect(() => {
     const el = scrollRef.current
     const grid = gridRef.current
@@ -258,7 +259,6 @@ export function DayView() {
       el.removeEventListener('touchcancel', onEnd)
       el.removeEventListener('gesturestart', noGesture)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function addAt(attendees: PersonId[], minute: number) {
@@ -308,7 +308,7 @@ export function DayView() {
     const date = nextStartOnOrAfter(event, toISODate(new Date())) ?? eventDate(event)
     dispatch({
       type: 'setWeek',
-      weekStart: mondayOf(new Date(date + 'T00:00:00')),
+      weekStart: mondayOf(new Date(`${date}T00:00:00`)),
     })
     dispatch({ type: 'setDay', day: weekdayIndex(date) })
     setEditor({ mode: 'edit', event, occurrenceDate: date })
@@ -333,13 +333,18 @@ export function DayView() {
         nav={
           <div className={shared.weekNav}>
             <button
+              type="button"
               onClick={() => dispatch({ type: 'shiftDay', delta: -1 })}
               aria-label="Previous day"
             >
               <ChevronLeft size={20} />
             </button>
             <strong>{isoLabel(dateISO)}</strong>
-            <button onClick={() => dispatch({ type: 'shiftDay', delta: 1 })} aria-label="Next day">
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'shiftDay', delta: 1 })}
+              aria-label="Next day"
+            >
               <ChevronRight size={20} />
             </button>
           </div>
@@ -508,6 +513,7 @@ function AllDayChip({
   const done = isOccurrenceDone(completions, event, occ.start)
   return (
     <button
+      type="button"
       className={cx(
         s.alldayChip,
         done && s.done,
@@ -524,10 +530,12 @@ function AllDayChip({
   )
 }
 
+const GUTTER_HOURS = Array.from({ length: 25 }, (_, h) => h)
+
 function TimeGutter({ hourH }: { hourH: number }) {
   return (
     <div className={s.timeGutter} style={{ height: DAY_MIN * (hourH / 60) }}>
-      {Array.from({ length: 25 }, (_, h) => (
+      {GUTTER_HOURS.map((h) => (
         <div key={h} className={s.gutterLabel} style={{ top: h * hourH }}>
           {String(h).padStart(2, '0')}:00
         </div>
@@ -611,6 +619,7 @@ function Lane({
   }
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: tap-on-empty-space is a pointer affordance to prefill the editor; the keyboard path is the header's + button
     <div className={s.lane} onClick={handleClick}>
       {nowMin != null && (
         <div className={s.nowLine} style={{ top: nowMin * pxPerMin }}>
@@ -626,6 +635,7 @@ function Lane({
         const blocked = occurrenceStatus(state, completions, ev, block.occ.start) === 'blocked'
         return (
           <button
+            type="button"
             key={`${ev.id}:${block.occ.start}`}
             className={cx(
               s.tlEvent,

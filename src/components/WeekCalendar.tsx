@@ -53,7 +53,7 @@ export function WeekCalendar() {
     const event = state.events.find((e) => e.id === seriesId)
     if (!event) return
     const date = nextStartOnOrAfter(event, toISODate(new Date())) ?? eventDate(event)
-    dispatch({ type: 'setWeek', weekStart: mondayOf(new Date(date + 'T00:00:00')) })
+    dispatch({ type: 'setWeek', weekStart: mondayOf(new Date(`${date}T00:00:00`)) })
     setTarget({ mode: 'edit', event, occurrenceDate: date })
   }
 
@@ -66,6 +66,7 @@ export function WeekCalendar() {
         nav={
           <div className={shared.weekNav}>
             <button
+              type="button"
               onClick={() => dispatch({ type: 'shiftWeek', delta: -1 })}
               aria-label="Previous week"
             >
@@ -73,6 +74,7 @@ export function WeekCalendar() {
             </button>
             <strong>{weekRangeLabel(state.weekStart)}</strong>
             <button
+              type="button"
               onClick={() => dispatch({ type: 'shiftWeek', delta: 1 })}
               aria-label="Next week"
             >
@@ -86,7 +88,7 @@ export function WeekCalendar() {
         <div className={s.days}>
           {weekDays.map(({ dateISO, occs }, dayIdx) => {
             return (
-              <div className={s.dayCol} key={dayIdx}>
+              <div className={s.dayCol} key={dateISO}>
                 <div className={s.dayHead}>{dayLabel(state.weekStart, dayIdx)}</div>
 
                 <div className={s.eventList}>
@@ -112,6 +114,7 @@ export function WeekCalendar() {
                           {o.moved && ' · ↔ moved'}
                         </div>
                         <button
+                          type="button"
                           className={s.eventBody}
                           onClick={() =>
                             setTarget({
@@ -152,6 +155,7 @@ export function WeekCalendar() {
                 </div>
 
                 <button
+                  type="button"
                   className={s.addLink}
                   onClick={() =>
                     setTarget({

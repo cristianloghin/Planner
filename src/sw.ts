@@ -84,7 +84,7 @@ self.addEventListener('pushsubscriptionchange', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const url = (event.notification.data as { url?: string } | null)?.url
-  const target = url && url.startsWith(self.registration.scope) ? url : self.registration.scope
+  const target = url?.startsWith(self.registration.scope) ? url : self.registration.scope
   event.waitUntil(
     (async () => {
       // Focus an existing window when there is one; else open a fresh one.

@@ -24,7 +24,7 @@ export function offsetLabel(min: number): string {
 
 /** Local epoch ms for ISO `date` at `minutes` past midnight. */
 function atMs(date: string, minutes: number): number {
-  const d = new Date(date + 'T00:00:00')
+  const d = new Date(`${date}T00:00:00`)
   d.setMinutes(d.getMinutes() + minutes)
   return d.getTime()
 }

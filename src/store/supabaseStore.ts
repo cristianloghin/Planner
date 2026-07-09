@@ -34,7 +34,7 @@ const LEGACY_LISTS_IMPORTED_KEY = 'planner.lists.v1.imported'
 
 /** Phase-1 start string -> timestamptz (UTC ISO). Local naive time in, UTC out. */
 function startToTs(start: string, allDay: boolean): string {
-  const d = allDay ? new Date(start + 'T00:00:00') : new Date(start)
+  const d = allDay ? new Date(`${start}T00:00:00`) : new Date(start)
   return d.toISOString()
 }
 
@@ -73,7 +73,7 @@ function intervalToDuration(iv: string | null, allDay: boolean): number {
 
 /** The original-slot timestamptz of `event`'s occurrence starting on ISO `date`. */
 function occurrenceTs(event: CalendarEvent, date: string): string {
-  if (event.allDay) return new Date(date + 'T00:00:00').toISOString()
+  if (event.allDay) return new Date(`${date}T00:00:00`).toISOString()
   const timeOfDay = event.start.slice(11) || '00:00'
   return new Date(`${date}T${timeOfDay}`).toISOString()
 }
@@ -93,7 +93,7 @@ function tsToDateKey(ts: string): string {
  * only ever keys occurrence state by date (`tsToDateKey`).
  */
 function dayRange(date: string): { from: string; to: string } {
-  const d = new Date(date + 'T00:00:00')
+  const d = new Date(`${date}T00:00:00`)
   const from = d.toISOString()
   d.setDate(d.getDate() + 1)
   return { from, to: d.toISOString() }
@@ -337,7 +337,8 @@ export class SupabaseStore implements ScheduleStore {
     const out: Record<string, OccurrenceDependency[]> = {}
     for (const row of data ?? []) {
       const k = `${row.dependent_series}:${tsToDateKey(row.dependent_occurrence)}`
-      ;(out[k] ??= []).push({
+      out[k] ??= []
+      out[k].push({
         prerequisiteSeriesId: row.prerequisite_series,
         prerequisiteDate: tsToDateKey(row.prerequisite_occurrence),
         requiredStatus: row.required_status as OccurrenceDependency['requiredStatus'],
@@ -558,7 +559,8 @@ export class SupabaseStore implements ScheduleStore {
     const out: Record<string, string[]> = {}
     for (const row of data ?? []) {
       const k = `${row.series_id}:${tsToDateKey(row.occurrence_start)}`
-      ;(out[k] ??= []).push(row.list_item_id)
+      out[k] ??= []
+      out[k].push(row.list_item_id)
     }
     return out
   }
@@ -764,14 +766,12 @@ export class SupabaseStore implements ScheduleStore {
           ? next.lists.find((l) => l.id === action.id)
           : next.lists[next.lists.length - 1]
         if (!list) return
-        const { error } = await supabase
-          .from('list')
-          .insert({
-            id: list.id,
-            account_id: this.accountId,
-            title: list.title,
-            sort_order: list.sortOrder,
-          })
+        const { error } = await supabase.from('list').insert({
+          id: list.id,
+          account_id: this.accountId,
+          title: list.title,
+          sort_order: list.sortOrder,
+        })
         if (error) throw error
         return
       }

@@ -51,9 +51,9 @@ export function OccurrenceSheet({
   // Windowed per-occurrence state: this occurrence's month, plus the dates of
   // any prerequisites it waits on (they may live outside the window).
   const edges = state.dependencies[occKey(event.id, date)] ?? []
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the joined dates so the memo survives `edges` getting a fresh identity with unchanged contents
   const prereqDates = useMemo(
     () => [...new Set(edges.map((e) => e.prerequisiteDate))].sort(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [edges.map((e) => e.prerequisiteDate).join(',')],
   )
   const { completions, isLoading } = useCompletionsForRange(date, date, prereqDates)

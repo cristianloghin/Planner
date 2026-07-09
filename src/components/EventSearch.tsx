@@ -31,6 +31,7 @@ export function EventSearch({ onPick }: { onPick: (seriesId: string) => void }) 
   return (
     <>
       <button
+        type="button"
         className={s.trigger}
         onClick={() => {
           setQuery('')
@@ -55,6 +56,7 @@ export function EventSearch({ onPick }: { onPick: (seriesId: string) => void }) 
           )}
           {results.map((r) => (
             <button
+              type="button"
               key={r.seriesId}
               className={s.row}
               onClick={() => {

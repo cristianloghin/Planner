@@ -36,6 +36,7 @@ export function ViewHeader({
         <div className={shared.headSide}>
           {rightExtra}
           <button
+            type="button"
             className={cx(shared.todayBtn, todayActive && shared.todayActive)}
             onClick={onToday}
             aria-label="Go to today"

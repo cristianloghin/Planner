@@ -88,7 +88,7 @@ function AlertCard({ alert, onDismiss }: { alert: FiredAlert; onDismiss: () => v
         <strong>{alert.title}</strong>
         {alert.sub && <span>{alert.sub}</span>}
       </div>
-      <button className={s.alertDismiss} onClick={onDismiss} aria-label="Dismiss">
+      <button type="button" className={s.alertDismiss} onClick={onDismiss} aria-label="Dismiss">
         ×
       </button>
     </div>

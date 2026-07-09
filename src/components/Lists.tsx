@@ -400,7 +400,12 @@ export function Lists() {
             aria-label="Item text"
             onCommit={(next) => patchItem(t, { title: next })}
           />
-          <button className={s.taskDel} aria-label="Delete item" onClick={() => setConfirmItem(t)}>
+          <button
+            type="button"
+            className={s.taskDel}
+            aria-label="Delete item"
+            onClick={() => setConfirmItem(t)}
+          >
             <X size={20} />
           </button>
         </div>
@@ -471,6 +476,7 @@ export function Lists() {
             {working &&
               (isDraft ? (
                 <button
+                  type="button"
                   className={shared.todayBtn}
                   onClick={cancelDraft}
                   aria-label="Cancel new list"
@@ -479,6 +485,7 @@ export function Lists() {
                 </button>
               ) : (
                 <button
+                  type="button"
                   className={shared.todayBtn}
                   onClick={editing ? () => setEditing(false) : backToIndex}
                   aria-label={editing ? 'Stop editing' : 'Back to lists'}
@@ -492,13 +499,19 @@ export function Lists() {
           </div>
           <div className={shared.headSide}>
             {!working && (
-              <button className={shared.todayBtn} onClick={startDraft} aria-label="New list">
+              <button
+                type="button"
+                className={shared.todayBtn}
+                onClick={startDraft}
+                aria-label="New list"
+              >
                 <Plus size={22} />
               </button>
             )}
             {working &&
               (isEditing ? (
                 <button
+                  type="button"
                   className={shared.primary}
                   onClick={isDraft ? saveDraft : () => setEditing(false)}
                 >
@@ -506,6 +519,7 @@ export function Lists() {
                 </button>
               ) : (
                 <button
+                  type="button"
                   className={shared.todayBtn}
                   onClick={() => setEditing(true)}
                   aria-label="Edit list"
@@ -528,7 +542,7 @@ export function Lists() {
                 const remaining = l.items.filter((i) => !i.done).length
                 return (
                   <li key={l.id}>
-                    <button className={s.listIndexRow} onClick={() => openList(l.id)}>
+                    <button type="button" className={s.listIndexRow} onClick={() => openList(l.id)}>
                       <span className={s.listIndexName}>{l.title}</span>
                       <span className={s.listIndexCount}>
                         {remaining ? `${remaining} to do` : l.items.length ? 'All done' : 'Empty'}
@@ -579,6 +593,7 @@ export function Lists() {
             {/* Existing lists can be deleted; a draft is just discarded (X). */}
             {editing && !isDraft && (
               <button
+                type="button"
                 className={cx(s.smallBtn, s.deleteList)}
                 aria-label="Delete list"
                 onClick={() => setConfirmDelete(true)}

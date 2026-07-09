@@ -125,6 +125,7 @@ export function useCompletionsForRange(
   // Warm the neighbouring months so day/week swipes across a boundary don't
   // hit a cold cache.
   const monthsKey = months.join(',')
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on monthsKey so a same-months array with fresh identity doesn't re-prefetch
   useEffect(() => {
     if (!store || !months.length) return
     for (const m of [shiftMonth(months[0], -1), shiftMonth(months[months.length - 1], 1)]) {
@@ -137,7 +138,6 @@ export function useCompletionsForRange(
         staleTime: STALE_MS,
       })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId, store, qc, monthsKey])
 
   const completions = useStableMerge(results.map((r) => r.data))

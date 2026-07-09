@@ -41,10 +41,10 @@ export function UpdatePrompt() {
           <strong>Update available</strong>
           <span>A new version of Planner is ready.</span>
         </div>
-        <button className={s.reload} onClick={() => void updateServiceWorker()}>
+        <button type="button" className={s.reload} onClick={() => void updateServiceWorker()}>
           Reload
         </button>
-        <button className={s.later} onClick={() => setNeedRefresh(false)}>
+        <button type="button" className={s.later} onClick={() => setNeedRefresh(false)}>
           Later
         </button>
       </div>
