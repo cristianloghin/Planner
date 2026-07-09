@@ -55,6 +55,28 @@ self.addEventListener('push', (event) => {
   )
 })
 
+/** Fired when the push service rotates this device's subscription. The worker
+ *  has no Supabase session, so it can't fix the DB row itself — it re-subscribes
+ *  immediately (keeping a deliverable subscription alive) and the app upserts
+ *  the row on its next open (syncPushSubscription in src/lib/push.ts). Until
+ *  then, sends to the dead endpoint 404 and the sender prunes the old row. */
+interface PushSubscriptionChangeEvent extends ExtendableEvent {
+  readonly oldSubscription: PushSubscription | null
+  readonly newSubscription: PushSubscription | null
+}
+
+self.addEventListener('pushsubscriptionchange', (event) => {
+  const e = event as PushSubscriptionChangeEvent
+  e.waitUntil(
+    (async () => {
+      if (e.newSubscription) return // browser already re-subscribed
+      const applicationServerKey = e.oldSubscription?.options.applicationServerKey
+      if (!applicationServerKey) return
+      await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey })
+    })(),
+  )
+})
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const url = (event.notification.data as { url?: string } | null)?.url

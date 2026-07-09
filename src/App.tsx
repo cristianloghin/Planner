@@ -3,7 +3,7 @@ import {
   Settings as SettingsIcon,
   type LucideIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import s from "./App.module.css";
 import { useAuth } from "./auth";
 import { AlertHost } from "./components/AlertHost";
@@ -17,6 +17,7 @@ import { WeekCalendar } from "./components/WeekCalendar";
 import { useTemplatesRealtime } from "./data/templates";
 import { cx } from "./lib/cx";
 import { mondayOf, weekdayIndex } from "./lib/dates";
+import { syncPushSubscription } from "./lib/push";
 import { AppProvider, useApp } from "./state";
 
 type Tab = "day" | "calendar" | "month" | "lists" | "settings";
@@ -69,9 +70,16 @@ export function Root() {
 export function App() {
   const [tab, setTab] = useState<Tab>("day");
   const { dispatch } = useApp();
+  const { session } = useAuth();
 
   // Keep the (Query-owned) templates cache fresh on a partner's change.
   useTemplatesRealtime();
+
+  // Self-heal this device's push registration (the push service can rotate a
+  // subscription behind our back; the worker re-subscribes, we re-record it).
+  useEffect(() => {
+    if (session) void syncPushSubscription(session.user.id);
+  }, [session]);
 
   function openDay(iso: string) {
     dispatch({

@@ -96,6 +96,37 @@ export async function enablePush(userId: string): Promise<'subscribed' | 'denied
   return 'subscribed'
 }
 
+/**
+ * Self-healing row sync, called on every app start: if this device holds a
+ * live subscription (permission granted, previously enabled), re-upsert its
+ * row. Covers push-service subscription ROTATION — the worker re-subscribes
+ * (see src/sw.ts pushsubscriptionchange) but cannot write the DB row; the
+ * stale row 404s and gets pruned by the sender, and this write registers the
+ * fresh endpoint. Cheap and idempotent when nothing changed.
+ */
+export async function syncPushSubscription(userId: string): Promise<void> {
+  try {
+    if (!pushConfigured || notificationPermission() !== 'granted') return
+    const sub = await currentSubscription()
+    const keys = sub?.toJSON().keys
+    if (!sub || !keys?.p256dh || !keys?.auth) return
+    await supabase.from('push_subscription').upsert(
+      {
+        endpoint: sub.endpoint,
+        user_id: userId,
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+        user_agent: navigator.userAgent,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'endpoint' },
+    )
+  } catch (e) {
+    // Best-effort: a failed sync self-heals on the next launch.
+    console.warn('Push subscription sync failed:', e)
+  }
+}
+
 /** Unsubscribe this device and drop its row. */
 export async function disablePush(): Promise<void> {
   const sub = await currentSubscription()
