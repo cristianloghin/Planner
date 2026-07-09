@@ -187,4 +187,50 @@ describe('occurrencesOnDate', () => {
     expect(moved[0].start).toBe('2026-06-15')
     expect(moved[0].moved).toBe(true)
   })
+
+  it('still renders a stretched earlier occurrence when a nearer slot is cancelled', () => {
+    // Weekly all-day; the 06-15 occurrence is stretched to 8 days (covers 06-22),
+    // and the separate 06-22 occurrence is cancelled. The cancelled slot must not
+    // abort the back-scan that finds 06-15's tail on 06-22.
+    const e = ev('2026-06-15', { freq: 'weekly', interval: 1 })
+    const completions = {
+      'e1:2026-06-15': { duration: 8 },
+      'e1:2026-06-22': { cancelled: true },
+    }
+    const occs = occurrencesOnDate([e], '2026-06-22', completions)
+    expect(occs).toHaveLength(1)
+    expect(occs[0].start).toBe('2026-06-15')
+    expect(occs[0].offset).toBe(7)
+    expect(occs[0].span).toBe(8)
+  })
+
+  it('still renders a stretched earlier occurrence when a nearer slot moved away', () => {
+    const e = ev('2026-06-15', { freq: 'weekly', interval: 1 })
+    const completions = {
+      'e1:2026-06-15': { duration: 8 },
+      'e1:2026-06-22': { start: '2026-06-25' }, // relocated off its slot
+    }
+    const occs = occurrencesOnDate([e], '2026-06-22', completions)
+    expect(occs).toHaveLength(1)
+    expect(occs[0].start).toBe('2026-06-15')
+  })
+
+  it('accounts for a start-only override that pushes a timed occurrence past midnight', () => {
+    // 23:30 + 2h crosses into the next day; the back-scan must widen even though
+    // only `start` (not `duration`) is overridden.
+    const e = ev('2026-06-15T10:00', { freq: 'weekly', interval: 1 }, { allDay: false, duration: 120 })
+    const completions = { 'e1:2026-06-15': { start: '2026-06-15T23:30' } }
+    const nextDay = occurrencesOnDate([e], '2026-06-16', completions)
+    expect(nextDay).toHaveLength(1)
+    expect(nextDay[0].start).toBe('2026-06-15')
+    expect(nextDay[0].segment).toEqual({ start: 0, end: 90 })
+  })
+
+  it('does not ghost-render a relocation whose origin slot the rule no longer produces', () => {
+    // Override written while the slot existed; the series has since changed so
+    // 2026-06-16 is no longer a slot (weekly from 06-15).
+    const e = ev('2026-06-15', { freq: 'weekly', interval: 1 })
+    const completions = { 'e1:2026-06-16': { start: '2026-06-18' } }
+    expect(occurrencesOnDate([e], '2026-06-18', completions)).toHaveLength(0)
+  })
 })

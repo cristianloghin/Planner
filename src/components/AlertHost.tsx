@@ -27,7 +27,7 @@ export function AlertHost() {
     function check() {
       const now = Date.now()
       const from = Math.max(seenRef.current, now - MAX_LOOKBACK_MS)
-      const due = dueAlerts(state.events, from, now)
+      const due = dueAlerts(state.events, state.completions, from, now)
       seenRef.current = now
       localStorage.setItem(SEEN_KEY, String(now))
       if (due.length) {
@@ -45,7 +45,7 @@ export function AlertHost() {
       window.clearInterval(iv)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [state.events])
+  }, [state.events, state.completions])
 
   function dismiss(id: string) {
     setActive((prev) => prev.filter((a) => a.id !== id))
@@ -62,10 +62,15 @@ export function AlertHost() {
 }
 
 function AlertCard({ alert, onDismiss }: { alert: FiredAlert; onDismiss: () => void }) {
+  // Arm the auto-dismiss once per card. `onDismiss` is a fresh closure on every
+  // parent render (any app dispatch), so depending on it would restart the timer
+  // and keep a banner alive indefinitely while the user is active.
+  const onDismissRef = useRef(onDismiss)
+  onDismissRef.current = onDismiss
   useEffect(() => {
-    const t = window.setTimeout(onDismiss, AUTO_DISMISS_MS)
+    const t = window.setTimeout(() => onDismissRef.current(), AUTO_DISMISS_MS)
     return () => window.clearTimeout(t)
-  }, [onDismiss])
+  }, [])
 
   return (
     <div className={s.alertCard} role="status">
