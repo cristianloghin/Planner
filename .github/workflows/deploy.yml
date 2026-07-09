@@ -44,6 +44,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
       - run: supabase db push
+      # Deploy edge functions alongside the schema they depend on. Like
+      # `db push`, redeploying an unchanged function is a cheap no-op.
+      - run: supabase functions deploy send-reminders --project-ref "$SUPABASE_PROJECT_ID"
 
   build:
     needs: migrate
