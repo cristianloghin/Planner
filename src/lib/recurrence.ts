@@ -1,7 +1,7 @@
 import type { CalendarEvent, OccurrenceState, Recurrence } from '../types'
 import { addDays, diffDays, toISODate } from './dates'
-import { eventDate, eventSpanDays, timedSegment } from './timing'
 import { occKey } from './occurrences'
+import { eventDate, eventSpanDays, timedSegment } from './timing'
 
 /**
  * The event as it actually occurs on `date`, with any one-off timing override
@@ -62,8 +62,8 @@ export function startsOn(e: CalendarEvent, date: string): boolean {
     case 'weekly':
       return delta % 7 === 0 && (delta / 7) % n === 0
     case 'monthly': {
-      const a = new Date(base + 'T00:00:00')
-      const b = new Date(date + 'T00:00:00')
+      const a = new Date(`${base}T00:00:00`)
+      const b = new Date(`${date}T00:00:00`)
       // Same day-of-month only (months missing that day simply skip).
       if (a.getDate() !== b.getDate()) return false
       const months = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth())
@@ -92,11 +92,10 @@ export function latestStartOnOrBefore(e: CalendarEvent, date: string): string | 
     case 'weekly':
       return addDays(base, Math.floor(delta / (7 * n)) * 7 * n)
     case 'monthly': {
-      const start = new Date(base + 'T00:00:00')
-      const target = new Date(date + 'T00:00:00')
+      const start = new Date(`${base}T00:00:00`)
+      const target = new Date(`${date}T00:00:00`)
       const months =
-        (target.getFullYear() - start.getFullYear()) * 12 +
-        (target.getMonth() - start.getMonth())
+        (target.getFullYear() - start.getFullYear()) * 12 + (target.getMonth() - start.getMonth())
       for (let k = Math.floor(months / n); k >= 0; k--) {
         const d = new Date(start)
         d.setMonth(d.getMonth() + k * n)
@@ -129,6 +128,12 @@ export function nextStartOnOrAfter(e: CalendarEvent, date: string): string | nul
     if (e.recurrence.until && diffDays(d, e.recurrence.until) > 0) return null
   }
   return null
+}
+
+/** Where to land when jumping to `e` (e.g. from a search hit): its next
+ *  occurrence on or after today, or the series anchor once the series ended. */
+export function nextRelevantDate(e: CalendarEvent): string {
+  return nextStartOnOrAfter(e, toISODate(new Date())) ?? eventDate(e)
 }
 
 /**
@@ -196,7 +201,10 @@ export function occurrencesOnDate(
     if (sep < 0) continue
     const id = k.slice(0, sep)
     let arr = overridesByEvent.get(id)
-    if (!arr) overridesByEvent.set(id, (arr = []))
+    if (!arr) {
+      arr = []
+      overridesByEvent.set(id, arr)
+    }
     arr.push([k.slice(sep + 1), st])
   }
   const NONE: [string, OccurrenceState][] = []

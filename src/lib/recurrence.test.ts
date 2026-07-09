@@ -1,16 +1,20 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { CalendarEvent, Recurrence } from '../types'
 import {
-  startsOn,
   latestStartOnOrBefore,
   nextStartOnOrAfter,
-  seriesOccurrenceDatesInRange,
-  recurrenceLabel,
   occurrencesOnDate,
+  recurrenceLabel,
+  seriesOccurrenceDatesInRange,
+  startsOn,
 } from './recurrence'
 
 /** Minimal all-day event factory; the recurrence math only reads start/recurrence. */
-function ev(start: string, recurrence?: Recurrence, over: Partial<CalendarEvent> = {}): CalendarEvent {
+function ev(
+  start: string,
+  recurrence?: Recurrence,
+  over: Partial<CalendarEvent> = {},
+): CalendarEvent {
   return {
     id: 'e1',
     title: 'T',
@@ -218,7 +222,11 @@ describe('occurrencesOnDate', () => {
   it('accounts for a start-only override that pushes a timed occurrence past midnight', () => {
     // 23:30 + 2h crosses into the next day; the back-scan must widen even though
     // only `start` (not `duration`) is overridden.
-    const e = ev('2026-06-15T10:00', { freq: 'weekly', interval: 1 }, { allDay: false, duration: 120 })
+    const e = ev(
+      '2026-06-15T10:00',
+      { freq: 'weekly', interval: 1 },
+      { allDay: false, duration: 120 },
+    )
     const completions = { 'e1:2026-06-15': { start: '2026-06-15T23:30' } }
     const nextDay = occurrencesOnDate([e], '2026-06-16', completions)
     expect(nextDay).toHaveLength(1)

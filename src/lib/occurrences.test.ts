@@ -1,17 +1,17 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type {
   AppState,
   Attachment,
   CalendarEvent,
   CompletionsMap,
-  OccurrenceState,
   OccurrenceDependency,
+  OccurrenceState,
 } from '../types'
 import {
-  occKey,
-  isOccurrenceDone,
-  occurrenceEffectiveStatus,
   blockingPrerequisites,
+  isOccurrenceDone,
+  occKey,
+  occurrenceEffectiveStatus,
   occurrenceStatus,
   prerequisiteDatesInRange,
 } from './occurrences'
@@ -112,7 +112,10 @@ describe('blockingPrerequisites / occurrenceStatus', () => {
     return {
       dependent,
       completions,
-      s: state({ events: [prereq, dependent], dependencies: { [occKey('dependent', date)]: [edge] } }),
+      s: state({
+        events: [prereq, dependent],
+        dependencies: { [occKey('dependent', date)]: [edge] },
+      }),
     }
   }
 
@@ -150,7 +153,9 @@ describe('prerequisiteDatesInRange', () => {
         { prerequisiteSeriesId: 'p', prerequisiteDate: '2026-07-19', requiredStatus: 'done' },
       ],
     }
-    expect(prerequisiteDatesInRange(dependencies, '2026-06-01', '2026-06-30')).toEqual(['2026-04-01'])
+    expect(prerequisiteDatesInRange(dependencies, '2026-06-01', '2026-06-30')).toEqual([
+      '2026-04-01',
+    ])
     expect(prerequisiteDatesInRange(dependencies, '2026-06-01', '2026-07-31')).toEqual([
       '2026-04-01',
       '2026-07-19',

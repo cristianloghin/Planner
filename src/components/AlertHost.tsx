@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useApp } from '../state'
 import { useCompletionsForRange } from '../data/completions'
 import { addDays, toISODate } from '../lib/dates'
-import { dueAlerts, type FiredAlert } from '../lib/notifications'
+import { type FiredAlert, dueAlerts } from '../lib/notifications'
+import { useLatest } from '../lib/useLatest'
+import { useApp } from '../state'
 import s from './AlertHost.module.css'
 
 const SEEN_KEY = 'planner.alertsSeen'
@@ -29,10 +30,7 @@ export function AlertHost() {
   // rescheduled ones fire at their overridden time. The range mirrors
   // dueAlerts' relocation lookaround.
   const today = toISODate(new Date())
-  const alertRange = useMemo(
-    () => ({ from: addDays(today, -31), to: addDays(today, 31) }),
-    [today],
-  )
+  const alertRange = useMemo(() => ({ from: addDays(today, -31), to: addDays(today, 31) }), [today])
   const { completions } = useCompletionsForRange(alertRange.from, alertRange.to)
 
   useEffect(() => {
@@ -77,8 +75,7 @@ function AlertCard({ alert, onDismiss }: { alert: FiredAlert; onDismiss: () => v
   // Arm the auto-dismiss once per card. `onDismiss` is a fresh closure on every
   // parent render (any app dispatch), so depending on it would restart the timer
   // and keep a banner alive indefinitely while the user is active.
-  const onDismissRef = useRef(onDismiss)
-  onDismissRef.current = onDismiss
+  const onDismissRef = useLatest(onDismiss)
   useEffect(() => {
     const t = window.setTimeout(() => onDismissRef.current(), AUTO_DISMISS_MS)
     return () => window.clearTimeout(t)
@@ -91,7 +88,7 @@ function AlertCard({ alert, onDismiss }: { alert: FiredAlert; onDismiss: () => v
         <strong>{alert.title}</strong>
         {alert.sub && <span>{alert.sub}</span>}
       </div>
-      <button className={s.alertDismiss} onClick={onDismiss} aria-label="Dismiss">
+      <button type="button" className={s.alertDismiss} onClick={onDismiss} aria-label="Dismiss">
         ×
       </button>
     </div>

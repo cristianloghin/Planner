@@ -31,10 +31,7 @@ export interface ListItemSearchResult {
   personId: string | null
 }
 
-export async function searchEvents(
-  accountId: string,
-  query: string,
-): Promise<EventSearchResult[]> {
+export async function searchEvents(accountId: string, query: string): Promise<EventSearchResult[]> {
   const q = query.trim()
   if (!q) return []
   const { data, error } = await supabase.rpc('search_events', {

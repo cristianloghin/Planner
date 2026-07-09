@@ -1,5 +1,5 @@
-import type { Action } from './actions'
 import type { AppState } from '../types'
+import type { Action } from './actions'
 
 /**
  * Offline durability for the reducer-owned slice: a per-account snapshot of
@@ -80,7 +80,7 @@ export function writeQueue(accountId: string, actions: Action[]): void {
 }
 
 /** Pure UI navigation — never persisted, so never queued. */
-const UI_ACTIONS = new Set(['shiftWeek', 'setWeek', 'shiftDay', 'setDay', 'hydrate'])
+const UI_ACTIONS = new Set(['shiftWeek', 'setWeek', 'shiftDay', 'setDay', 'goToDate', 'hydrate'])
 
 export function isPersistedAction(action: Action): boolean {
   return !UI_ACTIONS.has(action.type)
@@ -119,6 +119,10 @@ export function isNetworkError(e: unknown): boolean {
   // expose navigator but not onLine, and undefined must not read as offline.
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
   const message =
-    e instanceof Error ? e.message : typeof e === 'object' && e !== null && 'message' in e ? String((e as { message: unknown }).message) : ''
+    e instanceof Error
+      ? e.message
+      : typeof e === 'object' && e !== null && 'message' in e
+        ? String((e as { message: unknown }).message)
+        : ''
   return /fetch|network|load failed|connection|timed?\s?out/i.test(message)
 }

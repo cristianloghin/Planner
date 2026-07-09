@@ -1,27 +1,25 @@
-import { useEffect, useState } from "react";
-import { Collapsible, Dialog } from "radix-ui";
-import { cx } from "../lib/cx";
-import { isoLabel } from "../lib/dates";
-import { uid } from "../lib/id";
-import { isOverdue } from "../lib/lists";
-import { colorVar } from "../lib/palette";
-import { personColorKey } from "../lib/people";
-import { useApp } from "../state";
-import d from "./Dialog.module.css";
-import shared from "../styles/shared.module.css";
-import type { ListItem, PersonId, TodoList } from "../types";
-import { CommitTextInput } from "./CommitTextInput";
-import { ConfirmDialog } from "./ConfirmDialog";
-import { ListSearch } from "./ListSearch";
-import s from "./Lists.module.css";
+import { Collapsible, Dialog } from 'radix-ui'
+import { useEffect, useState } from 'react'
+import { cx } from '../lib/cx'
+import { isoLabel } from '../lib/dates'
+import { uid } from '../lib/id'
+import { isOverdue } from '../lib/lists'
+import { colorStyle } from '../lib/palette'
+import { personColorKey } from '../lib/people'
+import { useApp } from '../state'
+import shared from '../styles/shared.module.css'
+import type { ListItem, PersonId, TodoList } from '../types'
+import { CommitTextInput } from './CommitTextInput'
+import { ConfirmDialog } from './ConfirmDialog'
+import d from './Dialog.module.css'
+import { ListSearch } from './ListSearch'
+import s from './Lists.module.css'
 
-import { ChevronDown, ChevronLeft, ChevronUp, Pencil, Plus, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronUp, Pencil, Plus, X } from 'lucide-react'
 
-type Assignee = PersonId | "shared";
+type Assignee = PersonId | 'shared'
 
-type ItemPatch = Partial<
-  Pick<ListItem, "title" | "personId" | "groupLabel" | "dueOn">
->;
+type ItemPatch = Partial<Pick<ListItem, 'title' | 'personId' | 'groupLabel' | 'dueOn'>>
 
 /**
  * The group field is a modal picker: it lists the headers already used in this
@@ -34,17 +32,17 @@ function GroupPicker({
   onChange,
   className,
 }: {
-  value: string | null;
-  options: string[];
-  onChange: (group: string | null) => void;
-  className?: string;
+  value: string | null
+  options: string[]
+  onChange: (group: string | null) => void
+  className?: string
 }) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
 
   function choose(group: string | null) {
-    onChange(group);
-    setOpen(false);
+    onChange(group)
+    setOpen(false)
   }
 
   return (
@@ -53,11 +51,11 @@ function GroupPicker({
         type="button"
         className={cx(s.groupPick, !value && s.groupPickEmpty, className)}
         onClick={() => {
-          setName("");
-          setOpen(true);
+          setName('')
+          setOpen(true)
         }}
       >
-        {value || "Group"}
+        {value || 'Group'}
       </button>
 
       <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -87,12 +85,12 @@ function GroupPicker({
             <form
               className={s.groupNew}
               onSubmit={(e) => {
-                e.preventDefault();
+                e.preventDefault()
                 // The picker can live inside the add-bar form; via the portal
                 // React would otherwise bubble this submit up to it.
-                e.stopPropagation();
-                const next = name.trim();
-                if (next) choose(next);
+                e.stopPropagation()
+                const next = name.trim()
+                if (next) choose(next)
               }}
             >
               <input
@@ -101,11 +99,7 @@ function GroupPicker({
                 onChange={(e) => setName(e.target.value)}
                 aria-label="New group name"
               />
-              <button
-                type="submit"
-                className={shared.primary}
-                disabled={!name.trim()}
-              >
+              <button type="submit" className={shared.primary} disabled={!name.trim()}>
                 Create
               </button>
             </form>
@@ -118,7 +112,7 @@ function GroupPicker({
         </Dialog.Portal>
       </Dialog.Root>
     </>
-  );
+  )
 }
 
 /**
@@ -133,151 +127,145 @@ function GroupPicker({
  * Editing an *existing* list, by contrast, writes through on every change.
  */
 export function Lists() {
-  const { state, dispatch, beginEdit, endEdit } = useApp();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
+  const { state, dispatch, beginEdit, endEdit } = useApp()
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
   // The unsaved new list, or null when we're not creating one.
-  const [draft, setDraft] = useState<TodoList | null>(null);
+  const [draft, setDraft] = useState<TodoList | null>(null)
 
   // Add-item form fields (shared by draft-create and live-edit).
-  const [title, setTitle] = useState("");
-  const [assignee, setAssignee] = useState<Assignee>("shared");
-  const [group, setGroup] = useState("");
-  const [due, setDue] = useState("");
+  const [title, setTitle] = useState('')
+  const [assignee, setAssignee] = useState<Assignee>('shared')
+  const [group, setGroup] = useState('')
+  const [due, setDue] = useState('')
   // Whether the add form's extra options (deadline / group / person) show.
-  const [addExpanded, setAddExpanded] = useState(false);
+  const [addExpanded, setAddExpanded] = useState(false)
 
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false)
   // The item awaiting a delete confirmation (null = no prompt open).
-  const [confirmItem, setConfirmItem] = useState<ListItem | null>(null);
-  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmItem, setConfirmItem] = useState<ListItem | null>(null)
+  const [confirmCancel, setConfirmCancel] = useState(false)
   // Set when a search result jumps here; scrolls the row in and flashes it.
-  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null)
 
-  const selected = selectedId
-    ? (state.lists.find((l) => l.id === selectedId) ?? null)
-    : null;
+  const selected = selectedId ? (state.lists.find((l) => l.id === selectedId) ?? null) : null
   // The list on screen when we're not on the index: the draft takes precedence.
-  const working = draft ?? selected;
-  const isDraft = draft !== null;
-  const isEditing = isDraft || editing;
+  const working = draft ?? selected
+  const isDraft = draft !== null
+  const isEditing = isDraft || editing
 
   // While edit mode is active (draft or live), defer realtime reloads: the
   // controlled inputs would otherwise be clobbered by a reload racing the
   // user's own keystrokes (or a partner's change).
   useEffect(() => {
-    if (!isEditing) return;
-    beginEdit();
-    return endEdit;
-  }, [isEditing, beginEdit, endEdit]);
+    if (!isEditing) return
+    beginEdit()
+    return endEdit
+  }, [isEditing, beginEdit, endEdit])
 
   // A deleted list (only existing ones can be deleted) drops us to the index.
   useEffect(() => {
     if (selectedId && !selected) {
-      setSelectedId(null);
-      setEditing(false);
+      setSelectedId(null)
+      setEditing(false)
     }
-  }, [selectedId, selected]);
+  }, [selectedId, selected])
 
   // Scroll the highlighted row into view (once it's rendered) and clear the
   // flash after a moment.
   useEffect(() => {
-    if (!highlightId) return;
+    if (!highlightId) return
     document
       .getElementById(`list-item-${highlightId}`)
-      ?.scrollIntoView({ block: "center", behavior: "smooth" });
-    const t = setTimeout(() => setHighlightId(null), 2000);
-    return () => clearTimeout(t);
-  }, [highlightId]);
+      ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    const t = setTimeout(() => setHighlightId(null), 2000)
+    return () => clearTimeout(t)
+  }, [highlightId])
 
   function resetAddForm() {
-    setTitle("");
-    setGroup("");
-    setDue("");
-    setAssignee("shared");
+    setTitle('')
+    setGroup('')
+    setDue('')
+    setAssignee('shared')
   }
 
   function openList(id: string) {
-    setSelectedId(id);
-    setEditing(false);
+    setSelectedId(id)
+    setEditing(false)
   }
 
   function backToIndex() {
-    setSelectedId(null);
-    setEditing(false);
+    setSelectedId(null)
+    setEditing(false)
   }
 
   // A search hit lands on its list in (read-only) view mode, highlighted.
   function jumpToItem(listId: string, itemId: string) {
-    setSelectedId(listId);
-    setEditing(false);
-    setHighlightId(itemId);
+    setSelectedId(listId)
+    setEditing(false)
+    setHighlightId(itemId)
   }
 
   // ---- new-list draft -------------------------------------------------------
 
   function startDraft() {
-    setSelectedId(null);
-    setEditing(false);
-    resetAddForm();
-    setDraft({ id: uid(), title: "", sortOrder: state.lists.length, items: [] });
+    setSelectedId(null)
+    setEditing(false)
+    resetAddForm()
+    setDraft({ id: uid(), title: '', sortOrder: state.lists.length, items: [] })
   }
 
   // Anything entered that would be lost? Guards the cancel confirmation.
   const draftDirty =
-    isDraft &&
-    (draft!.title.trim() !== "" ||
-      draft!.items.length > 0 ||
-      title.trim() !== "");
+    isDraft && (draft!.title.trim() !== '' || draft!.items.length > 0 || title.trim() !== '')
 
   function cancelDraft() {
-    if (draftDirty) setConfirmCancel(true);
-    else discardDraft();
+    if (draftDirty) setConfirmCancel(true)
+    else discardDraft()
   }
 
   function discardDraft() {
-    setDraft(null);
-    setConfirmCancel(false);
-    resetAddForm();
+    setDraft(null)
+    setConfirmCancel(false)
+    resetAddForm()
   }
 
   function saveDraft() {
-    if (!draft) return;
+    if (!draft) return
     // The draft already carries its id, so the items can be dispatched against
     // it directly — no guessing which list the reducer appended (a realtime
     // reload landing in between could make "the last list" someone else's).
-    dispatch({ type: "addList", id: draft.id, title: draft.title.trim() || "New list" });
+    dispatch({ type: 'addList', id: draft.id, title: draft.title.trim() || 'New list' })
     for (const it of draft.items) {
       dispatch({
-        type: "addListItem",
+        type: 'addListItem',
         listId: draft.id,
         title: it.title,
         personId: it.personId,
         group: it.groupLabel,
         dueOn: it.dueOn,
-      });
+      })
     }
-    setSelectedId(draft.id);
-    setDraft(null);
-    setEditing(false);
-    resetAddForm();
+    setSelectedId(draft.id)
+    setDraft(null)
+    setEditing(false)
+    resetAddForm()
   }
 
   // ---- mutations: write to the draft, or through to the store --------------
 
   function patchTitle(next: string) {
-    if (draft) setDraft({ ...draft, title: next });
-    else if (selected)
-      dispatch({ type: "renameList", id: selected.id, title: next });
+    if (draft) setDraft({ ...draft, title: next })
+    else if (selected) dispatch({ type: 'renameList', id: selected.id, title: next })
   }
 
   function addWorkingItem(e: React.FormEvent) {
-    e.preventDefault();
-    const text = title.trim();
-    if (!working || !text) return;
-    const personId = assignee === "shared" ? null : assignee;
-    const groupLabel = group.trim() || null;
-    const dueOn = due || null;
+    e.preventDefault()
+    const text = title.trim()
+    if (!working || !text) return
+    const personId = assignee === 'shared' ? null : assignee
+    const groupLabel = group.trim() || null
+    const dueOn = due || null
     if (draft) {
       const item: ListItem = {
         id: uid(),
@@ -288,20 +276,20 @@ export function Lists() {
         dueOn,
         sortOrder: draft.items.length,
         createdAt: Date.now(),
-      };
-      setDraft({ ...draft, items: [...draft.items, item] });
+      }
+      setDraft({ ...draft, items: [...draft.items, item] })
     } else if (selected) {
       dispatch({
-        type: "addListItem",
+        type: 'addListItem',
         listId: selected.id,
         title: text,
         personId,
         group: groupLabel,
         dueOn,
-      });
+      })
     }
-    setTitle("");
-    setDue("");
+    setTitle('')
+    setDue('')
     // Keep `group` so consecutive adds land in the same section; a deadline,
     // though, is per-item, so it resets.
   }
@@ -310,72 +298,57 @@ export function Lists() {
     if (draft) {
       setDraft({
         ...draft,
-        items: draft.items.map((i) =>
-          i.id === item.id ? { ...i, ...patch } : i,
-        ),
-      });
-      return;
+        items: draft.items.map((i) => (i.id === item.id ? { ...i, ...patch } : i)),
+      })
+      return
     }
-    if (!selected) return;
-    if ("dueOn" in patch) {
+    if (!selected) return
+    if ('dueOn' in patch) {
       dispatch({
-        type: "setListItemDue",
+        type: 'setListItemDue',
         listId: selected.id,
         itemId: item.id,
         dueOn: patch.dueOn ?? null,
-      });
-      return;
+      })
+      return
     }
-    const merged = { ...item, ...patch };
+    const merged = { ...item, ...patch }
     dispatch({
-      type: "editListItem",
+      type: 'editListItem',
       listId: selected.id,
       itemId: item.id,
       title: merged.title,
       personId: merged.personId,
       group: merged.groupLabel,
-    });
+    })
   }
 
   function removeWorkingItem(itemId: string) {
-    if (draft)
-      setDraft({ ...draft, items: draft.items.filter((i) => i.id !== itemId) });
-    else if (selected)
-      dispatch({ type: "removeListItem", listId: selected.id, itemId });
+    if (draft) setDraft({ ...draft, items: draft.items.filter((i) => i.id !== itemId) })
+    else if (selected) dispatch({ type: 'removeListItem', listId: selected.id, itemId })
   }
 
   function badge(personId: PersonId | null) {
-    if (!personId) return <span className={cx(s.badge, s.shared)}>Shared</span>;
-    const p = state.people[personId];
+    if (!personId) return <span className={cx(s.badge, s.shared)}>Shared</span>
+    const p = state.people[personId]
     // An assignee missing from the local snapshot (mid-reload, or a person a
     // partner just removed) must not crash the whole view.
-    if (!p) return null;
+    if (!p) return null
     return (
-      <span
-        className={s.badge}
-        style={
-          {
-            "--c": colorVar(personColorKey(state, personId)),
-          } as React.CSSProperties
-        }
-      >
+      <span className={s.badge} style={colorStyle(personColorKey(state, personId))}>
         {p.name}
       </span>
-    );
+    )
   }
 
   // Read-only row (view mode): tick it, but nothing else.
   function viewRow(t: ListItem) {
-    if (!working) return null;
+    if (!working) return null
     return (
       <li
         key={t.id}
         id={`list-item-${t.id}`}
-        className={cx(
-          s.task,
-          t.done && s.done,
-          highlightId === t.id && s.highlight,
-        )}
+        className={cx(s.task, t.done && s.done, highlightId === t.id && s.highlight)}
       >
         <div className={s.taskInput}>
           <label>
@@ -384,7 +357,7 @@ export function Lists() {
               checked={t.done}
               onChange={() =>
                 dispatch({
-                  type: "toggleListItem",
+                  type: 'toggleListItem',
                   listId: working.id,
                   itemId: t.id,
                 })
@@ -402,7 +375,7 @@ export function Lists() {
           {badge(t.personId)}
         </div>
       </li>
-    );
+    )
   }
 
   // Editable row (edit mode): change every field, or delete the item.
@@ -421,6 +394,7 @@ export function Lists() {
             onCommit={(next) => patchItem(t, { title: next })}
           />
           <button
+            type="button"
             className={s.taskDel}
             aria-label="Delete item"
             onClick={() => setConfirmItem(t)}
@@ -438,20 +412,17 @@ export function Lists() {
           <input
             type="date"
             className={cx(s.due, isOverdue(t) && s.overdue)}
-            value={t.dueOn ?? ""}
+            value={t.dueOn ?? ''}
             aria-label="Deadline"
-            title={t.dueOn ? `Due ${t.dueOn}` : "Set a deadline"}
+            title={t.dueOn ? `Due ${t.dueOn}` : 'Set a deadline'}
             onChange={(e) => patchItem(t, { dueOn: e.target.value || null })}
           />
           <select
-            value={t.personId ?? "shared"}
+            value={t.personId ?? 'shared'}
             aria-label="Assignee"
             onChange={(e) =>
               patchItem(t, {
-                personId:
-                  e.target.value === "shared"
-                    ? null
-                    : (e.target.value as PersonId),
+                personId: e.target.value === 'shared' ? null : (e.target.value as PersonId),
               })
             }
           >
@@ -464,38 +435,30 @@ export function Lists() {
           </select>
         </div>
       </li>
-    );
+    )
   }
 
-  const open = working ? working.items.filter((t) => !t.done) : [];
-  const done = working ? working.items.filter((t) => t.done) : [];
+  const open = working ? working.items.filter((t) => !t.done) : []
+  const done = working ? working.items.filter((t) => t.done) : []
 
   // Group open items by their header. Ungrouped (key "") renders first with no
   // header; labelled groups follow in first-appearance order.
   const openGroups: [string, ListItem[]][] = (() => {
-    const m = new Map<string, ListItem[]>();
+    const m = new Map<string, ListItem[]>()
     for (const t of open) {
-      const key = t.groupLabel ?? "";
-      if (!m.has(key)) m.set(key, []);
-      m.get(key)!.push(t);
+      const key = t.groupLabel ?? ''
+      if (!m.has(key)) m.set(key, [])
+      m.get(key)!.push(t)
     }
-    return [...m.entries()].sort((a, b) =>
-      a[0] === "" ? -1 : b[0] === "" ? 1 : 0,
-    );
-  })();
+    return [...m.entries()].sort((a, b) => (a[0] === '' ? -1 : b[0] === '' ? 1 : 0))
+  })()
 
   // Distinct existing headers in this list, for the add/edit forms' suggestions.
   const groupOptions = working
-    ? [
-        ...new Set(
-          working.items
-            .map((i) => i.groupLabel)
-            .filter((g): g is string => !!g),
-        ),
-      ]
-    : [];
+    ? [...new Set(working.items.map((i) => i.groupLabel).filter((g): g is string => !!g))]
+    : []
 
-  const row = isEditing ? editRow : viewRow;
+  const row = isEditing ? editRow : viewRow
 
   return (
     <section className={shared.view}>
@@ -506,6 +469,7 @@ export function Lists() {
             {working &&
               (isDraft ? (
                 <button
+                  type="button"
                   className={shared.todayBtn}
                   onClick={cancelDraft}
                   aria-label="Cancel new list"
@@ -514,20 +478,22 @@ export function Lists() {
                 </button>
               ) : (
                 <button
+                  type="button"
                   className={shared.todayBtn}
                   onClick={editing ? () => setEditing(false) : backToIndex}
-                  aria-label={editing ? "Stop editing" : "Back to lists"}
+                  aria-label={editing ? 'Stop editing' : 'Back to lists'}
                 >
                   <ChevronLeft size={22} />
                 </button>
               ))}
           </div>
           <div className={shared.weekNav}>
-            <strong>{working ? working.title || "New list" : "Lists"}</strong>
+            <strong>{working ? working.title || 'New list' : 'Lists'}</strong>
           </div>
           <div className={shared.headSide}>
             {!working && (
               <button
+                type="button"
                 className={shared.todayBtn}
                 onClick={startDraft}
                 aria-label="New list"
@@ -538,6 +504,7 @@ export function Lists() {
             {working &&
               (isEditing ? (
                 <button
+                  type="button"
                   className={shared.primary}
                   onClick={isDraft ? saveDraft : () => setEditing(false)}
                 >
@@ -545,6 +512,7 @@ export function Lists() {
                 </button>
               ) : (
                 <button
+                  type="button"
                   className={shared.todayBtn}
                   onClick={() => setEditing(true)}
                   aria-label="Edit list"
@@ -564,24 +532,17 @@ export function Lists() {
           ) : (
             <ul className={s.listIndex}>
               {state.lists.map((l) => {
-                const remaining = l.items.filter((i) => !i.done).length;
+                const remaining = l.items.filter((i) => !i.done).length
                 return (
                   <li key={l.id}>
-                    <button
-                      className={s.listIndexRow}
-                      onClick={() => openList(l.id)}
-                    >
+                    <button type="button" className={s.listIndexRow} onClick={() => openList(l.id)}>
                       <span className={s.listIndexName}>{l.title}</span>
                       <span className={s.listIndexCount}>
-                        {remaining
-                          ? `${remaining} to do`
-                          : l.items.length
-                            ? "All done"
-                            : "Empty"}
+                        {remaining ? `${remaining} to do` : l.items.length ? 'All done' : 'Empty'}
                       </span>
                     </button>
                   </li>
-                );
+                )
               })}
             </ul>
           ))}
@@ -604,12 +565,12 @@ export function Lists() {
 
             {working.items.length === 0 && (
               <p className={shared.empty}>
-                {isEditing ? "Add the first item above." : "This list is empty."}
+                {isEditing ? 'Add the first item above.' : 'This list is empty.'}
               </p>
             )}
 
             {openGroups.map(([label, items]) => (
-              <div key={label || "__ungrouped"}>
+              <div key={label || '__ungrouped'}>
                 {label && <h3 className={s.groupHead}>{label}</h3>}
                 <ul className={s.taskList}>{items.map(row)}</ul>
               </div>
@@ -625,6 +586,7 @@ export function Lists() {
             {/* Existing lists can be deleted; a draft is just discarded (X). */}
             {editing && !isDraft && (
               <button
+                type="button"
                 className={cx(s.smallBtn, s.deleteList)}
                 aria-label="Delete list"
                 onClick={() => setConfirmDelete(true)}
@@ -651,7 +613,7 @@ export function Lists() {
                 <GroupPicker
                   value={group || null}
                   options={groupOptions}
-                  onChange={(g) => setGroup(g ?? "")}
+                  onChange={(g) => setGroup(g ?? '')}
                 />
                 <div className={s.taskAddDueContainer}>
                   <input
@@ -683,13 +645,9 @@ export function Lists() {
                 <button
                   type="button"
                   className={shared.todayBtn}
-                  aria-label={addExpanded ? "Fewer options" : "More options"}
+                  aria-label={addExpanded ? 'Fewer options' : 'More options'}
                 >
-                  {addExpanded ? (
-                    <ChevronDown size={22} />
-                  ) : (
-                    <ChevronUp size={22} />
-                  )}
+                  {addExpanded ? <ChevronDown size={22} /> : <ChevronUp size={22} />}
                 </button>
               </Collapsible.Trigger>
               <input
@@ -721,8 +679,8 @@ export function Lists() {
           confirmLabel="Delete"
           destructive
           onConfirm={() => {
-            dispatch({ type: "removeList", id: selected.id });
-            backToIndex();
+            dispatch({ type: 'removeList', id: selected.id })
+            backToIndex()
           }}
         />
       )}
@@ -730,17 +688,15 @@ export function Lists() {
       <ConfirmDialog
         open={confirmItem !== null}
         onOpenChange={(open) => {
-          if (!open) setConfirmItem(null);
+          if (!open) setConfirmItem(null)
         }}
         title="Delete this item?"
-        message={
-          confirmItem ? `“${confirmItem.title}” will be removed.` : undefined
-        }
+        message={confirmItem ? `“${confirmItem.title}” will be removed.` : undefined}
         confirmLabel="Delete"
         destructive
         onConfirm={() => {
-          if (confirmItem) removeWorkingItem(confirmItem.id);
-          setConfirmItem(null);
+          if (confirmItem) removeWorkingItem(confirmItem.id)
+          setConfirmItem(null)
         }}
       />
 
@@ -754,5 +710,5 @@ export function Lists() {
         onConfirm={discardDraft}
       />
     </section>
-  );
+  )
 }

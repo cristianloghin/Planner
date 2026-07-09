@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from 'react'
 
 /**
  * A controlled-from-the-store text input that keeps keystrokes local and
@@ -12,20 +12,20 @@ export function CommitTextInput({
   delay = 400,
   ...rest
 }: {
-  value: string;
-  onCommit: (next: string) => void;
-  delay?: number;
-} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "onBlur">) {
-  const [local, setLocal] = useState(value);
-  const ref = useRef<HTMLInputElement>(null);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+  value: string
+  onCommit: (next: string) => void
+  delay?: number
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'onBlur'>) {
+  const [local, setLocal] = useState(value)
+  const ref = useRef<HTMLInputElement>(null)
+  const timer = useRef<ReturnType<typeof setTimeout>>()
 
   // Adopt external updates (partner edits, reloads) only while not focused, so
   // they can't clobber what's being typed.
   useEffect(() => {
-    if (document.activeElement !== ref.current) setLocal(value);
-  }, [value]);
-  useEffect(() => () => clearTimeout(timer.current), []);
+    if (document.activeElement !== ref.current) setLocal(value)
+  }, [value])
+  useEffect(() => () => clearTimeout(timer.current), [])
 
   return (
     <input
@@ -33,15 +33,15 @@ export function CommitTextInput({
       ref={ref}
       value={local}
       onChange={(e) => {
-        const next = e.target.value;
-        setLocal(next);
-        clearTimeout(timer.current);
-        timer.current = setTimeout(() => onCommit(next), delay);
+        const next = e.target.value
+        setLocal(next)
+        clearTimeout(timer.current)
+        timer.current = setTimeout(() => onCommit(next), delay)
       }}
       onBlur={() => {
-        clearTimeout(timer.current);
-        if (local !== value) onCommit(local);
+        clearTimeout(timer.current)
+        if (local !== value) onCommit(local)
       }}
     />
-  );
+  )
 }

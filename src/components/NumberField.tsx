@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react'
 
 /**
  * Clamp `n` into the inclusive `[min, max]` range (either bound optional).
  * Pure + exported so the coercion rule is unit-testable.
  */
 export function clampNumber(n: number, min?: number, max?: number): number {
-  if (min != null) n = Math.max(min, n);
-  if (max != null) n = Math.min(max, n);
-  return n;
+  if (min != null) n = Math.max(min, n)
+  if (max != null) n = Math.min(max, n)
+  return n
 }
 
 /**
@@ -19,21 +19,21 @@ export function normalizeNumber(
   text: string,
   { min, max, fallback }: { min?: number; max?: number; fallback?: number },
 ): number {
-  const n = Number(text);
-  const base = text.trim() === "" || !Number.isFinite(n) ? fallback ?? min ?? 0 : n;
-  return clampNumber(base, min, max);
+  const n = Number(text)
+  const base = text.trim() === '' || !Number.isFinite(n) ? (fallback ?? min ?? 0) : n
+  return clampNumber(base, min, max)
 }
 
 type Props = {
-  value: number;
-  onChange: (n: number) => void;
-  min?: number;
-  max?: number;
-  step?: number;
+  value: number
+  onChange: (n: number) => void
+  min?: number
+  max?: number
+  step?: number
   /** Value used when the field is left empty/invalid; defaults to `min` (or 0). */
-  fallback?: number;
-  className?: string;
-};
+  fallback?: number
+  className?: string
+}
 
 /**
  * A controlled numeric input that you can actually clear and retype.
@@ -48,14 +48,14 @@ type Props = {
  * in the blur handler, not the native constraints.
  */
 export function NumberField({ value, onChange, min, max, step, fallback, className }: Props) {
-  const [text, setText] = useState(String(value));
-  const [focused, setFocused] = useState(false);
+  const [text, setText] = useState(String(value))
+  const [focused, setFocused] = useState(false)
 
   // Reflect external changes (e.g. switching all-day on/off resets duration)
   // unless the user is actively editing the field.
   useEffect(() => {
-    if (!focused) setText(String(value));
-  }, [value, focused]);
+    if (!focused) setText(String(value))
+  }, [value, focused])
 
   return (
     <input
@@ -67,25 +67,25 @@ export function NumberField({ value, onChange, min, max, step, fallback, classNa
       step={step}
       value={text}
       onFocus={() => {
-        setFocused(true);
-        setText(String(value));
+        setFocused(true)
+        setText(String(value))
       }}
       onChange={(e) => {
-        const t = e.target.value;
-        setText(t);
+        const t = e.target.value
+        setText(t)
         // Emit only a genuinely-typed number, capped at max so you can't exceed
         // it; the min is enforced on blur so you can still clear and retype.
-        const n = Number(t);
-        if (t.trim() !== "" && Number.isFinite(n)) {
-          onChange(max != null ? Math.min(max, n) : n);
+        const n = Number(t)
+        if (t.trim() !== '' && Number.isFinite(n)) {
+          onChange(max != null ? Math.min(max, n) : n)
         }
       }}
       onBlur={() => {
-        setFocused(false);
-        const normalized = normalizeNumber(text, { min, max, fallback });
-        setText(String(normalized));
-        onChange(normalized);
+        setFocused(false)
+        const normalized = normalizeNumber(text, { min, max, fallback })
+        setText(String(normalized))
+        onChange(normalized)
       }}
     />
-  );
+  )
 }

@@ -1,12 +1,12 @@
-import { useCallback, useState } from "react";
-import { Search as SearchIcon } from "lucide-react";
-import { useAuth } from "../auth";
-import { cx } from "../lib/cx";
-import { isoLabel, toISODate } from "../lib/dates";
-import { searchEvents } from "../lib/search";
-import { useSearch } from "../lib/useSearch";
-import s from "./Search.module.css";
-import { SearchOverlay } from "./SearchOverlay";
+import { Search as SearchIcon } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { useAuth } from '../auth'
+import { cx } from '../lib/cx'
+import { isoLabel, toISODate } from '../lib/dates'
+import { searchEvents } from '../lib/search'
+import { useSearch } from '../lib/useSearch'
+import s from './Search.module.css'
+import { SearchOverlay } from './SearchOverlay'
 
 /**
  * Event search in the shared view header (Day / Week / Month). Hits the
@@ -14,27 +14,28 @@ import { SearchOverlay } from "./SearchOverlay";
  * its series id back to the view, which navigates to and opens it.
  */
 export function EventSearch({ onPick }: { onPick: (seriesId: string) => void }) {
-  const { accountId } = useAuth();
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const { accountId } = useAuth()
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
 
   const run = useCallback(
     (q: string) => (accountId ? searchEvents(accountId, q) : Promise.resolve([])),
     [accountId],
-  );
-  const { results, loading, error } = useSearch(query, run);
+  )
+  const { results, loading, error } = useSearch(query, run)
 
   function close() {
-    setOpen(false);
+    setOpen(false)
   }
 
   return (
     <>
       <button
+        type="button"
         className={s.trigger}
         onClick={() => {
-          setQuery("");
-          setOpen(true);
+          setQuery('')
+          setOpen(true)
         }}
         aria-label="Search events"
       >
@@ -55,14 +56,15 @@ export function EventSearch({ onPick }: { onPick: (seriesId: string) => void }) 
           )}
           {results.map((r) => (
             <button
+              type="button"
               key={r.seriesId}
               className={s.row}
               onClick={() => {
-                onPick(r.seriesId);
-                close();
+                onPick(r.seriesId)
+                close()
               }}
             >
-              <span className={s.rowTitle}>{r.title || "Untitled"}</span>
+              <span className={s.rowTitle}>{r.title || 'Untitled'}</span>
               <span className={s.rowMeta}>
                 {r.dtstart && <span>{isoLabel(toISODate(new Date(r.dtstart)))}</span>}
                 {r.rrule && <span>· repeats</span>}
@@ -73,5 +75,5 @@ export function EventSearch({ onPick }: { onPick: (seriesId: string) => void }) 
         </SearchOverlay>
       )}
     </>
-  );
+  )
 }

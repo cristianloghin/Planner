@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { cx } from "../lib/cx";
-import { uid } from "../lib/id";
-import { REMINDER_OFFSETS, offsetLabel } from "../lib/notifications";
-import shared from "../styles/shared.module.css";
-import type { Attachment, ChecklistEntry } from "../types";
-import s from "./AttachmentsEditor.module.css";
+import { useState } from 'react'
+import { cx } from '../lib/cx'
+import { uid } from '../lib/id'
+import { REMINDER_OFFSETS, offsetLabel } from '../lib/notifications'
+import shared from '../styles/shared.module.css'
+import type { Attachment, ChecklistEntry } from '../types'
+import s from './AttachmentsEditor.module.css'
 
 /**
  * Shared editor for the attachments an event or template carries: reminder
@@ -16,40 +16,32 @@ export function AttachmentsEditor({
   attachments,
   onChange,
 }: {
-  attachments: Attachment[];
-  onChange: (next: Attachment[]) => void;
+  attachments: Attachment[]
+  onChange: (next: Attachment[]) => void
 }) {
   const reminderSet = new Set(
-    attachments
-      .filter((a) => a.kind === "reminder")
-      .map((a) => (a as { offset: number }).offset),
-  );
+    attachments.filter((a) => a.kind === 'reminder').map((a) => (a as { offset: number }).offset),
+  )
 
   function toggleReminder(offset: number) {
     onChange(
       reminderSet.has(offset)
-        ? attachments.filter(
-            (a) => !(a.kind === "reminder" && a.offset === offset),
-          )
-        : [...attachments, { id: uid(), kind: "reminder", offset }],
-    );
+        ? attachments.filter((a) => !(a.kind === 'reminder' && a.offset === offset))
+        : [...attachments, { id: uid(), kind: 'reminder', offset }],
+    )
   }
 
   function addNote() {
-    onChange([...attachments, { id: uid(), kind: "note", text: "" }]);
+    onChange([...attachments, { id: uid(), kind: 'note', text: '' }])
   }
   function addChecklist() {
-    onChange([...attachments, { id: uid(), kind: "checklist", items: [] }]);
+    onChange([...attachments, { id: uid(), kind: 'checklist', items: [] }])
   }
   function updateAttachment(id: string, patch: Partial<Attachment>) {
-    onChange(
-      attachments.map((a) =>
-        a.id === id ? ({ ...a, ...patch } as Attachment) : a,
-      ),
-    );
+    onChange(attachments.map((a) => (a.id === id ? ({ ...a, ...patch } as Attachment) : a)))
   }
   function removeAttachment(id: string) {
-    onChange(attachments.filter((a) => a.id !== id));
+    onChange(attachments.filter((a) => a.id !== id))
   }
 
   return (
@@ -57,7 +49,7 @@ export function AttachmentsEditor({
       <label className={shared.label}>Remind me</label>
       <div className={shared.chips}>
         {REMINDER_OFFSETS.map((o) => {
-          const on = reminderSet.has(o);
+          const on = reminderSet.has(o)
           return (
             <button
               type="button"
@@ -66,8 +58,8 @@ export function AttachmentsEditor({
               style={
                 on
                   ? {
-                      background: "var(--accent)",
-                      borderColor: "var(--accent)",
+                      background: 'var(--accent)',
+                      borderColor: 'var(--accent)',
                     }
                   : undefined
               }
@@ -75,15 +67,15 @@ export function AttachmentsEditor({
             >
               {offsetLabel(o)}
             </button>
-          );
+          )
         })}
       </div>
 
       <div className={s.attachments}>
         {attachments
-          .filter((a) => a.kind !== "reminder")
+          .filter((a) => a.kind !== 'reminder')
           .map((a) =>
-            a.kind === "note" ? (
+            a.kind === 'note' ? (
               <NoteEditor
                 key={a.id}
                 text={a.text}
@@ -93,7 +85,7 @@ export function AttachmentsEditor({
             ) : (
               <ChecklistEditor
                 key={a.id}
-                title={a.title ?? ""}
+                title={a.title ?? ''}
                 items={a.items}
                 onChange={(patch) => updateAttachment(a.id, patch)}
                 onRemove={() => removeAttachment(a.id)}
@@ -104,17 +96,13 @@ export function AttachmentsEditor({
           <button type="button" className={s.addAttachment} onClick={addNote}>
             + Note
           </button>
-          <button
-            type="button"
-            className={s.addAttachment}
-            onClick={addChecklist}
-          >
+          <button type="button" className={s.addAttachment} onClick={addChecklist}>
             + Checklist
           </button>
         </div>
       </div>
     </>
-  );
+  )
 }
 
 function NoteEditor({
@@ -122,9 +110,9 @@ function NoteEditor({
   onChange,
   onRemove,
 }: {
-  text: string;
-  onChange: (text: string) => void;
-  onRemove: () => void;
+  text: string
+  onChange: (text: string) => void
+  onRemove: () => void
 }) {
   return (
     <div className={s.attachment}>
@@ -147,7 +135,7 @@ function NoteEditor({
         onChange={(e) => onChange(e.target.value)}
       />
     </div>
-  );
+  )
 }
 
 function ChecklistEditor({
@@ -156,17 +144,17 @@ function ChecklistEditor({
   onChange,
   onRemove,
 }: {
-  title: string;
-  items: ChecklistEntry[];
-  onChange: (patch: { title?: string; items?: ChecklistEntry[] }) => void;
-  onRemove: () => void;
+  title: string
+  items: ChecklistEntry[]
+  onChange: (patch: { title?: string; items?: ChecklistEntry[] }) => void
+  onRemove: () => void
 }) {
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState('')
 
   function addEntry() {
-    if (!draft.trim()) return;
-    onChange({ items: [...items, { id: uid(), title: draft.trim() }] });
-    setDraft("");
+    if (!draft.trim()) return
+    onChange({ items: [...items, { id: uid(), title: draft.trim() }] })
+    setDraft('')
   }
 
   return (
@@ -194,9 +182,7 @@ function ChecklistEditor({
             <button
               type="button"
               className={s.attachmentDel}
-              onClick={() =>
-                onChange({ items: items.filter((x) => x.id !== it.id) })
-              }
+              onClick={() => onChange({ items: items.filter((x) => x.id !== it.id) })}
               aria-label="Remove item"
             >
               ×
@@ -210,9 +196,9 @@ function ChecklistEditor({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              addEntry();
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              addEntry()
             }
           }}
         />
@@ -221,5 +207,5 @@ function ChecklistEditor({
         </button>
       </div>
     </div>
-  );
+  )
 }

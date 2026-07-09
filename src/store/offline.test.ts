@@ -65,10 +65,7 @@ describe('enrichForQueue', () => {
 
   it('keeps a caller-minted id', () => {
     const next = state({ events: [ev('a')] })
-    const queued = enrichForQueue(
-      { type: 'addEvent', event: {} as never, id: 'mine' },
-      next,
-    )
+    const queued = enrichForQueue({ type: 'addEvent', event: {} as never, id: 'mine' }, next)
     expect(queued).toMatchObject({ id: 'mine' })
   })
 
@@ -80,8 +77,26 @@ describe('enrichForQueue', () => {
           title: 'L',
           sortOrder: 0,
           items: [
-            { id: 'i1', title: 'a', done: false, personId: null, groupLabel: null, dueOn: null, sortOrder: 0, createdAt: 0 },
-            { id: 'i2', title: 'b', done: false, personId: null, groupLabel: null, dueOn: null, sortOrder: 1, createdAt: 0 },
+            {
+              id: 'i1',
+              title: 'a',
+              done: false,
+              personId: null,
+              groupLabel: null,
+              dueOn: null,
+              sortOrder: 0,
+              createdAt: 0,
+            },
+            {
+              id: 'i2',
+              title: 'b',
+              done: false,
+              personId: null,
+              groupLabel: null,
+              dueOn: null,
+              sortOrder: 1,
+              createdAt: 0,
+            },
           ],
         },
       ],
@@ -116,7 +131,9 @@ describe('isNetworkError', () => {
   })
 
   it('treats server rejections as non-network', () => {
-    expect(isNetworkError({ message: 'duplicate key value violates unique constraint' })).toBe(false)
+    expect(isNetworkError({ message: 'duplicate key value violates unique constraint' })).toBe(
+      false,
+    )
     expect(isNetworkError({ message: 'new row violates row-level security policy' })).toBe(false)
   })
 })

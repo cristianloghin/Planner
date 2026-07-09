@@ -43,7 +43,7 @@ select {
   padding: 8px 10px;
 }
 
-input[type='color'] {
+input[type="color"] {
   padding: 2px;
   width: 44px;
   height: 38px;

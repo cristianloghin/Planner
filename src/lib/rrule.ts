@@ -1,4 +1,4 @@
-import { RRule, Frequency } from 'rrule'
+import { type Frequency, RRule } from 'rrule'
 import type { Recurrence, RecurrenceFreq } from '../types'
 import { addDays } from './dates'
 

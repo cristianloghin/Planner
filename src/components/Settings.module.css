@@ -15,7 +15,7 @@
   gap: 10px;
 }
 
-.personRow input[type='text'] {
+.personRow input[type="text"] {
   flex: 1;
 }
 

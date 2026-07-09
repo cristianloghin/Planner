@@ -1,29 +1,33 @@
 import { useMemo, useState } from 'react'
-import { useApp } from '../state'
 import {
   useClearOccurrenceOverride,
   useCompletionsForRange,
   useSetChecklistEntry,
   useSetOccurrenceStatus,
 } from '../data/completions'
-import type { CalendarEvent, CompletionsMap, OccurrenceStatusCode } from '../types'
-import { addDays, isoLabel, minutesToTime } from '../lib/dates'
-import { eventStartMinutes, eventSpanDays, MINS_PER_DAY } from '../lib/timing'
-import { attendeeLabel } from '../lib/people'
 import { checklists, notes, reminderOffsets } from '../lib/attachments'
+import { cx } from '../lib/cx'
+import { addDays, isoLabel, minutesToTime } from '../lib/dates'
+import { findListItem, isOverdue } from '../lib/lists'
+import { offsetLabel } from '../lib/notifications'
 import {
   blockingPrerequisites,
   isOccurrenceDone,
   occKey,
   occurrenceEffectiveStatus,
 } from '../lib/occurrences'
-import { offsetLabel } from '../lib/notifications'
-import { effectiveOccurrence, recurrenceLabel, seriesOccurrenceDatesInRange } from '../lib/recurrence'
-import { findListItem, isOverdue } from '../lib/lists'
-import { cx } from '../lib/cx'
-import { PageLoader } from './Spinner'
+import { attendeeLabel } from '../lib/people'
+import {
+  effectiveOccurrence,
+  recurrenceLabel,
+  seriesOccurrenceDatesInRange,
+} from '../lib/recurrence'
+import { MINS_PER_DAY, eventSpanDays, eventStartMinutes } from '../lib/timing'
+import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
+import type { CalendarEvent, CompletionsMap, OccurrenceStatusCode } from '../types'
 import s from './OccurrenceSheet.module.css'
+import { PageLoader } from './Spinner'
 
 const STATUSES: OccurrenceStatusCode[] = ['done', 'skipped', 'blocked']
 
@@ -47,9 +51,9 @@ export function OccurrenceSheet({
   // Windowed per-occurrence state: this occurrence's month, plus the dates of
   // any prerequisites it waits on (they may live outside the window).
   const edges = state.dependencies[occKey(event.id, date)] ?? []
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the joined dates so the memo survives `edges` getting a fresh identity with unchanged contents
   const prereqDates = useMemo(
     () => [...new Set(edges.map((e) => e.prerequisiteDate))].sort(),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [edges.map((e) => e.prerequisiteDate).join(',')],
   )
   const { completions, isLoading } = useCompletionsForRange(date, date, prereqDates)
@@ -166,7 +170,12 @@ export function OccurrenceSheet({
                         type="checkbox"
                         checked={!!checked[it.id]}
                         onChange={() =>
-                          setChecklistEntry.mutate({ event, date, entryId: it.id, checked: !checked[it.id] })
+                          setChecklistEntry.mutate({
+                            event,
+                            date,
+                            entryId: it.id,
+                            checked: !checked[it.id],
+                          })
                         }
                       />
                       <span className={cx(checked[it.id] && s.doneTitle)}>{it.title}</span>
@@ -358,13 +367,19 @@ function DependencyEditor({
         <ul className={s.depList}>
           {edges.map((edge) => {
             const dep = state.events.find((e) => e.id === edge.prerequisiteSeriesId)
-            const actual = dep ? occurrenceEffectiveStatus(completions, dep, edge.prerequisiteDate) : null
+            const actual = dep
+              ? occurrenceEffectiveStatus(completions, dep, edge.prerequisiteDate)
+              : null
             const met = actual === edge.requiredStatus
             return (
-              <li key={`${edge.prerequisiteSeriesId}:${edge.prerequisiteDate}`} className={s.depRow}>
+              <li
+                key={`${edge.prerequisiteSeriesId}:${edge.prerequisiteDate}`}
+                className={s.depRow}
+              >
                 <span className={cx(s.depDot, met ? s.depMet : s.depUnmet)} />
                 <span className={s.depText}>
-                  {dep?.title ?? 'Unknown'} · {isoLabel(edge.prerequisiteDate)} · needs {edge.requiredStatus}
+                  {dep?.title ?? 'Unknown'} · {isoLabel(edge.prerequisiteDate)} · needs{' '}
+                  {edge.requiredStatus}
                 </span>
                 <button
                   type="button"

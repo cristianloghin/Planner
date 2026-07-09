@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLatest } from './useLatest'
 
 interface SearchState<T> {
   results: T[]
@@ -26,8 +27,7 @@ export function useSearch<T>(
     error: null,
   })
 
-  const runRef = useRef(run)
-  runRef.current = run
+  const runRef = useLatest(run)
 
   // Key the effect on the trimmed query so trailing-whitespace edits don't
   // cancel and re-issue an identical request.

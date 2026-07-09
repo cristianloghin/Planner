@@ -7,10 +7,9 @@
 // we only track the stable keys ("1".."12") stored in person.color and
 // event_series.color_key, plus helpers to validate them and build the CSS var
 // reference. No color values in JS.
+import type { CSSProperties } from 'react'
 
-export const COLOR_KEYS = [
-  '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12',
-] as const
+export const COLOR_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'] as const
 
 export type ColorKey = (typeof COLOR_KEYS)[number]
 
@@ -33,3 +32,16 @@ export function colorKey(key: string | null | undefined): ColorKey {
 export function colorVar(key: ColorKey): string {
   return `var(--color-${key})`
 }
+
+/** Inline style carrying a palette key as the `--c` custom property — the one
+ *  way a colored element is painted (see colorVar). */
+export function colorStyle(key: ColorKey): CSSProperties {
+  return { '--c': colorVar(key) } as CSSProperties
+}
+
+/** The swatch list for color pickers (event color, person color). */
+export const COLOR_OPTIONS = COLOR_KEYS.map((key, i) => ({
+  value: key,
+  color: colorVar(key),
+  label: `Colour ${i + 1}`,
+}))

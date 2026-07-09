@@ -25,7 +25,12 @@
  */
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import * as webpush from 'jsr:@negrel/webpush@0.5.0'
-import { computeDueReminders, type SenderOverride, type SenderReminder, type SenderSeries } from './logic.ts'
+import {
+  type SenderOverride,
+  type SenderReminder,
+  type SenderSeries,
+  computeDueReminders,
+} from './logic.ts'
 
 // Window: cron fires every 5 minutes; a 15-minute lookback tolerates two
 // missed beats, and notification_log absorbs the overlap.
@@ -42,7 +47,10 @@ function b64uToBytes(s: string): Uint8Array {
 }
 
 function bytesToB64u(b: Uint8Array): string {
-  return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  return btoa(String.fromCharCode(...b))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
 }
 
 /** Import the raw base64url VAPID pair (web-push CLI format) as CryptoKeys. */
@@ -183,11 +191,15 @@ Deno.serve(async (req) => {
   if (logErr) throw logErr
   const seen = new Set(
     (logRows ?? []).map(
-      (l) => `${l.series_id}:${new Date(l.occurrence_start).toISOString()}:${l.user_id}:${l.reminder_id}`,
+      (l) =>
+        `${l.series_id}:${new Date(l.occurrence_start).toISOString()}:${l.user_id}:${l.reminder_id}`,
     ),
   )
   const fresh = due.filter(
-    (d) => !seen.has(`${d.seriesId}:${new Date(d.occurrenceStart).toISOString()}:${d.userId}:${d.reminderId}`),
+    (d) =>
+      !seen.has(
+        `${d.seriesId}:${new Date(d.occurrenceStart).toISOString()}:${d.userId}:${d.reminderId}`,
+      ),
   )
   if (!fresh.length) return Response.json({ sent: 0, reason: 'all already sent' })
 
@@ -219,8 +231,7 @@ Deno.serve(async (req) => {
         delivered = true
         sent += 1
       } catch (e) {
-        const status =
-          e instanceof webpush.PushMessageError ? e.response?.status : undefined
+        const status = e instanceof webpush.PushMessageError ? e.response?.status : undefined
         if (status === 404 || status === 410) {
           dead.push(t.endpoint)
         } else {

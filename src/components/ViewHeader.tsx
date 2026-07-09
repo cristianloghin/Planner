@@ -1,8 +1,8 @@
-import { Calendar } from "lucide-react";
-import type { ReactNode } from "react";
-import { cx } from "../lib/cx";
-import shared from "../styles/shared.module.css";
-import { EventSearch } from "./EventSearch";
+import { Calendar } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { cx } from '../lib/cx'
+import shared from '../styles/shared.module.css'
+import { EventSearch } from './EventSearch'
 
 /**
  * The three-slot header shared by the Day, Week and Month views: event search
@@ -19,12 +19,12 @@ export function ViewHeader({
   rightExtra,
   children,
 }: {
-  nav: ReactNode;
-  onToday: () => void;
-  todayActive: boolean;
-  onPickSearch: (seriesId: string) => void;
-  rightExtra?: ReactNode;
-  children?: ReactNode;
+  nav: ReactNode
+  onToday: () => void
+  todayActive: boolean
+  onPickSearch: (seriesId: string) => void
+  rightExtra?: ReactNode
+  children?: ReactNode
 }) {
   return (
     <div className={shared.viewHead}>
@@ -36,6 +36,7 @@ export function ViewHeader({
         <div className={shared.headSide}>
           {rightExtra}
           <button
+            type="button"
             className={cx(shared.todayBtn, todayActive && shared.todayActive)}
             onClick={onToday}
             aria-label="Go to today"
@@ -46,5 +47,5 @@ export function ViewHeader({
       </div>
       {children}
     </div>
-  );
+  )
 }

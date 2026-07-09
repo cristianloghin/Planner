@@ -1,6 +1,6 @@
-import { AlertDialog } from "radix-ui";
-import { cx } from "../lib/cx";
-import s from "./Dialog.module.css";
+import { AlertDialog } from 'radix-ui'
+import { cx } from '../lib/cx'
+import s from './Dialog.module.css'
 
 /**
  * A styled, accessible confirmation dialog built on Radix AlertDialog. Replaces
@@ -16,19 +16,19 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   message,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
   destructive = false,
   onConfirm,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  message?: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  destructive?: boolean;
-  onConfirm: () => void;
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  message?: string
+  confirmLabel?: string
+  cancelLabel?: string
+  destructive?: boolean
+  onConfirm: () => void
 }) {
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
@@ -37,9 +37,7 @@ export function ConfirmDialog({
         <AlertDialog.Content className={s.content}>
           <AlertDialog.Title className={s.title}>{title}</AlertDialog.Title>
           {message && (
-            <AlertDialog.Description className={s.message}>
-              {message}
-            </AlertDialog.Description>
+            <AlertDialog.Description className={s.message}>{message}</AlertDialog.Description>
           )}
           <div className={s.actions}>
             <AlertDialog.Cancel asChild>
@@ -60,5 +58,5 @@ export function ConfirmDialog({
         </AlertDialog.Content>
       </AlertDialog.Portal>
     </AlertDialog.Root>
-  );
+  )
 }

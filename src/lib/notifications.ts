@@ -1,9 +1,9 @@
 import type { CalendarEvent, OccurrenceState } from '../types'
+import { reminderOffsets } from './attachments'
 import { addDays, diffDays, toISODate } from './dates'
 import { occKey } from './occurrences'
 import { startsOn } from './recurrence'
 import { eventStartMinutes } from './timing'
-import { reminderOffsets } from './attachments'
 
 /** Reminder offsets (minutes before start) offered in the event editor. */
 export const REMINDER_OFFSETS = [0, 15, 30, 60, 120, 1440]
@@ -24,7 +24,7 @@ export function offsetLabel(min: number): string {
 
 /** Local epoch ms for ISO `date` at `minutes` past midnight. */
 function atMs(date: string, minutes: number): number {
-  const d = new Date(date + 'T00:00:00')
+  const d = new Date(`${date}T00:00:00`)
   d.setMinutes(d.getMinutes() + minutes)
   return d.getTime()
 }
