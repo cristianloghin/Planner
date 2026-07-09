@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo } from 'react'
+import { useEffect } from 'react'
 import { useAuth } from '../auth'
 import { uid } from '../lib/id'
 import { supabase } from '../lib/supabase'
-import { SupabaseStore } from '../store/supabaseStore'
+import type { SupabaseStore } from '../store/supabaseStore'
 import type { EventTemplate } from '../types'
+import { useAccountStore } from './useAccountStore'
 
 /**
  * Templates: the first slice migrated off the reducer/AppState onto TanStack
@@ -20,16 +21,6 @@ import type { EventTemplate } from '../types'
 type TemplateInput = Omit<EventTemplate, 'id'>
 
 const templatesKey = (accountId: string | null | undefined) => ['templates', accountId] as const
-
-/** A store bound to the current account/user, or null until authed. */
-function useTemplateStore(): SupabaseStore | null {
-  const { accountId, session } = useAuth()
-  const userId = session?.user.id ?? null
-  return useMemo(
-    () => (accountId && userId ? new SupabaseStore(accountId, userId) : null),
-    [accountId, userId],
-  )
-}
 
 /**
  * Mount once near the app root: bridges Realtime to the templates cache. A
@@ -59,7 +50,7 @@ export function useTemplatesRealtime(): void {
 /** Read the account's templates. */
 export function useTemplates() {
   const { accountId } = useAuth()
-  const store = useTemplateStore()
+  const store = useAccountStore()
   return useQuery({
     queryKey: templatesKey(accountId),
     queryFn: () => store!.listTemplates(),
@@ -79,7 +70,7 @@ function useTemplateMutation<V>(
   optimistic: (current: EventTemplate[], vars: V) => EventTemplate[],
 ) {
   const { accountId } = useAuth()
-  const store = useTemplateStore()
+  const store = useAccountStore()
   const qc = useQueryClient()
   const key = templatesKey(accountId)
 

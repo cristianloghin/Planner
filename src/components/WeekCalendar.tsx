@@ -1,21 +1,13 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useCompletionsForRange } from '../data/completions'
-import {
-  DAY_NAMES,
-  addDays,
-  dayLabel,
-  minutesToTime,
-  mondayOf,
-  toISODate,
-  weekRangeLabel,
-} from '../lib/dates'
-import { colorVar } from '../lib/palette'
-import { defaultAttendees, eventColorKey, personColorKey } from '../lib/people'
-import { nextStartOnOrAfter, occurrencesOnDate, recurrenceLabel } from '../lib/recurrence'
-import { eventDate } from '../lib/timing'
+import { DAY_NAMES, addDays, dayLabel, minutesToTime, mondayOf, weekRangeLabel } from '../lib/dates'
+import { colorStyle } from '../lib/palette'
+import { defaultAttendees, eventColorKey } from '../lib/people'
+import { nextRelevantDate, occurrencesOnDate, recurrenceLabel } from '../lib/recurrence'
 import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
+import { Avatars } from './Avatars'
 import { type EditorTarget, EventEditor } from './EventEditor'
 import { LoadingPill } from './Spinner'
 import { ViewHeader } from './ViewHeader'
@@ -52,7 +44,7 @@ export function WeekCalendar() {
   function openEvent(seriesId: string) {
     const event = state.events.find((e) => e.id === seriesId)
     if (!event) return
-    const date = nextStartOnOrAfter(event, toISODate(new Date())) ?? eventDate(event)
+    const date = nextRelevantDate(event)
     dispatch({ type: 'setWeek', weekStart: mondayOf(new Date(`${date}T00:00:00`)) })
     setTarget({ mode: 'edit', event, occurrenceDate: date })
   }
@@ -99,11 +91,7 @@ export function WeekCalendar() {
                       <div
                         key={`${e.id}:${o.start}`}
                         className={s.event}
-                        style={
-                          {
-                            '--c': colorVar(eventColorKey(state, e.attendees[0], e)),
-                          } as React.CSSProperties
-                        }
+                        style={colorStyle(eventColorKey(state, e.attendees[0], e))}
                       >
                         <div className={s.eventTime}>
                           {e.allDay
@@ -126,26 +114,7 @@ export function WeekCalendar() {
                         >
                           <span className={s.eventTitle}>{e.title}</span>
                           <span className={s.eventMeta}>
-                            <span className={s.avatars}>
-                              {e.attendees.map((id) => {
-                                const p = state.people[id]
-                                if (!p) return null
-                                return (
-                                  <span
-                                    key={id}
-                                    className={s.avatar}
-                                    style={
-                                      {
-                                        '--c': colorVar(personColorKey(state, id)),
-                                      } as React.CSSProperties
-                                    }
-                                    title={p.name}
-                                  >
-                                    {p.name.slice(0, 1).toUpperCase()}
-                                  </span>
-                                )
-                              })}
-                            </span>
+                            <Avatars attendees={e.attendees} />
                             {e.recurrence && recurrenceLabel(e.recurrence).toLowerCase()}
                           </span>
                         </button>

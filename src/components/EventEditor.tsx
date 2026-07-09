@@ -5,7 +5,7 @@ import { useAddTemplate, useTemplates } from '../data/templates'
 import { cloneAttachments } from '../lib/attachments'
 import { cx } from '../lib/cx'
 import { addDays, diffDays, minutesToTime, toDateTimeLocal } from '../lib/dates'
-import { COLOR_KEYS, DEFAULT_COLOR, colorVar } from '../lib/palette'
+import { COLOR_OPTIONS, DEFAULT_COLOR } from '../lib/palette'
 import type { ColorKey } from '../lib/palette'
 import { personColorKey } from '../lib/people'
 import { effectiveOccurrence } from '../lib/recurrence'
@@ -28,12 +28,6 @@ import { NumberField } from './NumberField'
 import { PageLoader } from './Spinner'
 
 const SNAP = 15
-
-const COLOR_OPTIONS = COLOR_KEYS.map((key, i) => ({
-  value: key,
-  color: colorVar(key),
-  label: `Colour ${i + 1}`,
-}))
 
 /** What the editor opens onto: a brand-new event or an existing one. */
 export type EditorTarget =

@@ -11,10 +11,11 @@ import {
 import { useAuth } from './auth'
 import { PageLoader } from './components/Spinner'
 import { completionsPrefix } from './data/completions'
-import { addDays } from './lib/dates'
+import { addDays, mondayOf, weekdayIndex } from './lib/dates'
 import { uid } from './lib/id'
 import { occKey } from './lib/occurrences'
 import { queryClient } from './lib/queryClient'
+import { useLatest } from './lib/useLatest'
 import type { Action } from './store/actions'
 import {
   enrichForQueue,
@@ -289,6 +290,12 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case 'setDay':
       return { ...state, selectedDay: action.day }
+    case 'goToDate':
+      return {
+        ...state,
+        weekStart: mondayOf(new Date(`${action.date}T00:00:00`)),
+        selectedDay: weekdayIndex(action.date),
+      }
     default:
       return state
   }
@@ -340,7 +347,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [pendingCount, setPendingCount] = useState(pendingRef.current.length)
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' && !navigator.onLine)
   const pumpingRef = useRef(false)
-  const pumpRef = useRef<() => void>()
   const retryTimerRef = useRef<ReturnType<typeof setTimeout>>()
 
   const pump = useCallback(async () => {
@@ -369,7 +375,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             // (flaky connections don't always flip navigator.onLine).
             setOffline(true)
             clearTimeout(retryTimerRef.current)
-            retryTimerRef.current = setTimeout(() => pumpRef.current?.(), 15_000)
+            retryTimerRef.current = setTimeout(() => void pumpRef.current(), 15_000)
             return
           }
           console.error('Server rejected a queued change; dropping it:', e)
@@ -386,9 +392,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       pumpingRef.current = false
     }
     // Reconcile once the backlog lands (reload skips while a queue exists).
-    if (drained > 0 || rejected) scheduleReloadRef.current?.()
+    if (drained > 0 || rejected) scheduleReloadRef.current()
   }, [accountId])
-  pumpRef.current = () => void pump()
+  // Latest-pump mirror for the retry timer above, which outlives this render's
+  // closure. (scheduleReloadRef below plays the same role for `pump` itself.)
+  const pumpRef = useLatest(pump)
 
   const dispatch = useCallback(
     (action: Action) => {
@@ -423,7 +431,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // the normal reload path (which waits out the write queue) instead of
       // clobbering the optimistic state.
       if (writeEpochRef.current !== epoch) {
-        scheduleReloadRef.current?.()
+        scheduleReloadRef.current()
         return
       }
       const prev = stateRef.current
@@ -484,7 +492,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const editCountRef = useRef(0)
   const pendingReloadRef = useRef(false)
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout>>()
-  const scheduleReloadRef = useRef<() => void>()
 
   const reloadFromStore = useCallback(async () => {
     try {
@@ -528,7 +535,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     clearTimeout(reloadTimerRef.current)
     reloadTimerRef.current = setTimeout(() => void reloadFromStore(), 300)
   }, [reloadFromStore])
-  scheduleReloadRef.current = scheduleReload
+  // Latest-scheduleReload mirror so `pump` and `bootstrap` (defined above it)
+  // can trigger a reconcile without depending on it.
+  const scheduleReloadRef = useLatest(scheduleReload)
 
   // Tables owned by the TanStack Query completions slice: their changes route
   // to targeted cache invalidation, not a full-state reload. Not deferred by

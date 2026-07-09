@@ -84,4 +84,8 @@ export type Action =
   | { type: 'setWeek'; weekStart: string }
   | { type: 'shiftDay'; delta: number }
   | { type: 'setDay'; day: number }
+  // Navigate both axes at once: the week containing ISO `date`, with that day
+  // selected. What every "jump to this date" path (month cell, search hit,
+  // today button) wants.
+  | { type: 'goToDate'; date: string }
   | { type: 'hydrate'; state: import('../types').AppState }

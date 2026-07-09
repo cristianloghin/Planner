@@ -3,7 +3,7 @@ import { useAuth } from '../auth'
 import { useDeleteTemplate, useTemplates } from '../data/templates'
 import { checklistEntries, notes, reminderOffsets } from '../lib/attachments'
 import { cx } from '../lib/cx'
-import { COLOR_KEYS, colorVar } from '../lib/palette'
+import { COLOR_OPTIONS } from '../lib/palette'
 import { attendeeLabel, personColorKey } from '../lib/people'
 import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
@@ -13,12 +13,6 @@ import { CommitTextInput } from './CommitTextInput'
 import { NotificationSettings } from './NotificationSettings'
 import s from './Settings.module.css'
 import { TemplateEditor } from './TemplateEditor'
-
-const COLOR_OPTIONS = COLOR_KEYS.map((key, i) => ({
-  value: key,
-  color: colorVar(key),
-  label: `Colour ${i + 1}`,
-}))
 
 export function Settings() {
   const { state, dispatch } = useApp()

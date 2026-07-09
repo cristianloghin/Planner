@@ -12,7 +12,6 @@ import { PageLoader } from './components/Spinner'
 import { WeekCalendar } from './components/WeekCalendar'
 import { useTemplatesRealtime } from './data/templates'
 import { cx } from './lib/cx'
-import { mondayOf, weekdayIndex } from './lib/dates'
 import { syncPushSubscription } from './lib/push'
 import { AppProvider, useApp } from './state'
 
@@ -78,11 +77,7 @@ export function App() {
   }, [session])
 
   function openDay(iso: string) {
-    dispatch({
-      type: 'setWeek',
-      weekStart: mondayOf(new Date(`${iso}T00:00:00`)),
-    })
-    dispatch({ type: 'setDay', day: weekdayIndex(iso) })
+    dispatch({ type: 'goToDate', date: iso })
     setTab('day')
   }
 

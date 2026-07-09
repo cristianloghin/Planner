@@ -130,6 +130,12 @@ export function nextStartOnOrAfter(e: CalendarEvent, date: string): string | nul
   return null
 }
 
+/** Where to land when jumping to `e` (e.g. from a search hit): its next
+ *  occurrence on or after today, or the series anchor once the series ended. */
+export function nextRelevantDate(e: CalendarEvent): string {
+  return nextStartOnOrAfter(e, toISODate(new Date())) ?? eventDate(e)
+}
+
 /**
  * Occurrence start dates of `e` within the inclusive ISO range [from, to]. Used
  * to populate the prerequisite-occurrence picker, so the user links to a real

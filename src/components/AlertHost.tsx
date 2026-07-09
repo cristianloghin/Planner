@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCompletionsForRange } from '../data/completions'
 import { addDays, toISODate } from '../lib/dates'
 import { type FiredAlert, dueAlerts } from '../lib/notifications'
+import { useLatest } from '../lib/useLatest'
 import { useApp } from '../state'
 import s from './AlertHost.module.css'
 
@@ -74,8 +75,7 @@ function AlertCard({ alert, onDismiss }: { alert: FiredAlert; onDismiss: () => v
   // Arm the auto-dismiss once per card. `onDismiss` is a fresh closure on every
   // parent render (any app dispatch), so depending on it would restart the timer
   // and keep a banner alive indefinitely while the user is active.
-  const onDismissRef = useRef(onDismiss)
-  onDismissRef.current = onDismiss
+  const onDismissRef = useLatest(onDismiss)
   useEffect(() => {
     const t = window.setTimeout(() => onDismissRef.current(), AUTO_DISMISS_MS)
     return () => window.clearTimeout(t)

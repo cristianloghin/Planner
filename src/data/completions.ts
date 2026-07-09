@@ -7,6 +7,7 @@ import { queryClient } from '../lib/queryClient'
 import { supabase } from '../lib/supabase'
 import { SupabaseStore } from '../store/supabaseStore'
 import type { CalendarEvent, CompletionsMap, OccurrenceState, OccurrenceStatusCode } from '../types'
+import { useAccountStore } from './useAccountStore'
 
 /**
  * Per-occurrence state (statuses, checklist ticks, timing overrides) on
@@ -63,16 +64,6 @@ function monthsFor(from: string, to: string, extraDates: string[]): string[] {
   return [...months].sort()
 }
 
-/** A store bound to the current account/user, or null until authed. */
-function useCompletionsStore(): SupabaseStore | null {
-  const { accountId, session } = useAuth()
-  const userId = session?.user.id ?? null
-  return useMemo(
-    () => (accountId && userId ? new SupabaseStore(accountId, userId) : null),
-    [accountId, userId],
-  )
-}
-
 /** Merge month maps into one object, keeping identity stable while the
  *  underlying query data references are unchanged (so downstream useMemos —
  *  recurrence expansion — don't recompute on every render). */
@@ -101,7 +92,7 @@ export function useCompletionsForRange(
   extraDates: string[] = [],
 ): { completions: CompletionsMap; isLoading: boolean } {
   const { accountId } = useAuth()
-  const store = useCompletionsStore()
+  const store = useAccountStore()
   const qc = useQueryClient()
 
   const extraKey = extraDates.join(',')

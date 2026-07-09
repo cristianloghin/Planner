@@ -11,10 +11,10 @@ import {
   startOfMonth,
   toISODate,
 } from '../lib/dates'
-import { colorVar } from '../lib/palette'
+import { colorStyle } from '../lib/palette'
 import { eventColorKey } from '../lib/people'
-import { nextStartOnOrAfter, occurrencesOnDate } from '../lib/recurrence'
-import { eventDate, eventStartMinutes } from '../lib/timing'
+import { nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
+import { eventStartMinutes } from '../lib/timing'
 import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
 import s from './MonthView.module.css'
@@ -39,17 +39,16 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
 
   // Expanding recurrences over 42 cells is O(events × occurrence state); do it
   // only when the grid or the data actually changes, not on every render.
-  const eventsByDay = useMemo(
+  const occurrencesByDay = useMemo(
     () =>
       new Map(
         days.map((iso) => [
           iso,
-          occurrencesOnDate(state.events, iso, completions)
-            .map((o) => o.event)
-            .sort(
-              (a, b) =>
-                Number(b.allDay) - Number(a.allDay) || eventStartMinutes(a) - eventStartMinutes(b),
-            ),
+          occurrencesOnDate(state.events, iso, completions).sort(
+            (a, b) =>
+              Number(b.event.allDay) - Number(a.event.allDay) ||
+              eventStartMinutes(a.event) - eventStartMinutes(b.event),
+          ),
         ]),
       ),
     [days, state.events, completions],
@@ -60,7 +59,7 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
   function openSearchHit(seriesId: string) {
     const event = state.events.find((e) => e.id === seriesId)
     if (!event) return
-    onOpenDay(nextStartOnOrAfter(event, today) ?? eventDate(event))
+    onOpenDay(nextRelevantDate(event))
   }
 
   return (
@@ -99,7 +98,7 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
           ))}
 
           {days.map((iso) => {
-            const dayEvents = eventsByDay.get(iso) ?? []
+            const dayOccs = occurrencesByDay.get(iso) ?? []
             return (
               <button
                 type="button"
@@ -110,24 +109,20 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
                   iso === today && s.today,
                 )}
                 onClick={() => onOpenDay(iso)}
-                aria-label={`${monthLabel(iso)} ${Number(iso.slice(8, 10))}, ${dayEvents.length} plans`}
+                aria-label={`${monthLabel(iso)} ${Number(iso.slice(8, 10))}, ${dayOccs.length} plans`}
               >
                 <span className={s.monthDate}>{Number(iso.slice(8, 10))}</span>
-                {dayEvents.length > 0 && (
+                {dayOccs.length > 0 && (
                   <span className={s.monthDots}>
-                    {dayEvents.slice(0, MAX_DOTS).map((e, i) => (
+                    {dayOccs.slice(0, MAX_DOTS).map((o) => (
                       <span
-                        key={`${e.id}:${i}`}
+                        key={`${o.event.id}:${o.start}`}
                         className={s.monthDot}
-                        style={
-                          {
-                            '--c': colorVar(eventColorKey(state, e.attendees[0], e)),
-                          } as React.CSSProperties
-                        }
+                        style={colorStyle(eventColorKey(state, o.event.attendees[0], o.event))}
                       />
                     ))}
-                    {dayEvents.length > MAX_DOTS && (
-                      <span className={s.monthMore}>+{dayEvents.length - MAX_DOTS}</span>
+                    {dayOccs.length > MAX_DOTS && (
+                      <span className={s.monthMore}>+{dayOccs.length - MAX_DOTS}</span>
                     )}
                   </span>
                 )}

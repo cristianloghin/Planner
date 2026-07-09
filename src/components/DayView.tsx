@@ -11,20 +11,21 @@ import { useCompletionsForRange } from '../data/completions'
 import { checklistEntries, hasReminders } from '../lib/attachments'
 import { type Busy, type ChildStatus, childStatuses } from '../lib/conflicts'
 import { cx } from '../lib/cx'
-import { addDays, isoLabel, minutesToTime, mondayOf, toISODate, weekdayIndex } from '../lib/dates'
+import { addDays, isoLabel, minutesToTime, toISODate } from '../lib/dates'
 import {
   isOccurrenceDone,
   occKey,
   occurrenceStatus,
   prerequisiteDatesInRange,
 } from '../lib/occurrences'
-import { type ColorKey, colorVar } from '../lib/palette'
+import { colorStyle } from '../lib/palette'
 import { eventColorKey, peopleList, personColorKey } from '../lib/people'
-import { type DayOccurrence, nextStartOnOrAfter, occurrencesOnDate } from '../lib/recurrence'
-import { eventDate } from '../lib/timing'
+import { type DayOccurrence, nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
+import { useLatest } from '../lib/useLatest'
 import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
 import type { CalendarEvent, CompletionsMap, Person, PersonId } from '../types'
+import { Avatars } from './Avatars'
 import s from './DayView.module.css'
 import { type EditorTarget, EventEditor } from './EventEditor'
 import { OccurrenceSheet } from './OccurrenceSheet'
@@ -44,12 +45,6 @@ const ZOOM_KEY = 'planner:hourH'
 // the slide animation that commits the change runs for this many ms.
 const SWIPE_COMMIT = 60
 const SWIPE_SLIDE_MS = 200
-
-// A colored element just carries its palette key as the `--c` custom property;
-// the stylesheet derives the tinted background, border and any solid fills from it.
-function colorOf(key: ColorKey): React.CSSProperties {
-  return { '--c': colorVar(key) } as React.CSSProperties
-}
 
 const clampZoom = (h: number) => Math.min(MAX_HOUR_H, Math.max(MIN_HOUR_H, h))
 
@@ -82,8 +77,7 @@ export function DayView() {
   const pxPerMin = hourH / 60
   // Mirror for the native touch listeners, which bind once and would otherwise
   // close over a stale hour height mid-gesture.
-  const hourHRef = useRef(hourH)
-  hourHRef.current = hourH
+  const hourHRef = useLatest(hourH)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -305,19 +299,13 @@ export function DayView() {
   function openSearchHit(seriesId: string) {
     const event = state.events.find((e) => e.id === seriesId)
     if (!event) return
-    const date = nextStartOnOrAfter(event, toISODate(new Date())) ?? eventDate(event)
-    dispatch({
-      type: 'setWeek',
-      weekStart: mondayOf(new Date(`${date}T00:00:00`)),
-    })
-    dispatch({ type: 'setDay', day: weekdayIndex(date) })
+    const date = nextRelevantDate(event)
+    dispatch({ type: 'goToDate', date })
     setEditor({ mode: 'edit', event, occurrenceDate: date })
   }
 
   function goToday() {
-    const todayISO = toISODate(new Date())
-    dispatch({ type: 'setWeek', weekStart: mondayOf(new Date()) })
-    dispatch({ type: 'setDay', day: weekdayIndex(todayISO) })
+    dispatch({ type: 'goToDate', date: toISODate(new Date()) })
     // Explicit "take me to now" intent, so re-focus the current time.
     const now = new Date().getHours() * 60 + new Date().getMinutes()
     requestAnimationFrame(() => scrollToMinute(now))
@@ -354,7 +342,11 @@ export function DayView() {
           <div />
           <div className={s.laneHeads}>
             {people.map((p) => (
-              <div key={p.id} className={s.laneHead} style={colorOf(personColorKey(state, p.id))}>
+              <div
+                key={p.id}
+                className={s.laneHead}
+                style={colorStyle(personColorKey(state, p.id))}
+              >
                 <div>
                   <span className={s.dot} />
                   {p.name}
@@ -442,30 +434,6 @@ export function DayView() {
   )
 }
 
-/** A row of small round avatars, one per attendee, in each person's main color. */
-function Avatars({ attendees }: { attendees: PersonId[] }) {
-  const { state } = useApp()
-  if (attendees.length === 0) return null
-  return (
-    <span className={s.avatars}>
-      {attendees.map((id) => {
-        const p = state.people[id]
-        if (!p) return null
-        return (
-          <span
-            key={id}
-            className={s.avatar}
-            style={colorOf(personColorKey(state, id))}
-            title={p.name}
-          >
-            {p.name.slice(0, 1).toUpperCase()}
-          </span>
-        )
-      })}
-    </span>
-  )
-}
-
 /** Compact badges shown on a block / chip: reminders, checklist progress, done, kid status. */
 function badges(
   completions: CompletionsMap,
@@ -520,7 +488,7 @@ function AllDayChip({
         status === 'clash' && s.warnClash,
         status === 'needs' && s.warnNeeds,
       )}
-      style={colorOf(eventColorKey(state, personId, event))}
+      style={colorStyle(eventColorKey(state, personId, event))}
       onClick={onClick}
     >
       <span className={s.alldayMeta}>{badges(completions, event, occ.start, status)}</span>
@@ -649,7 +617,7 @@ function Lane({
               height: Math.max((block.end - block.start) * pxPerMin, 16),
               left: `calc(${(100 / cols) * col}% + 2px)`,
               width: `calc(${100 / cols}% - 4px)`,
-              ...colorOf(eventColorKey(state, person.id, ev)),
+              ...colorStyle(eventColorKey(state, person.id, ev)),
             }}
             onClick={() => onOpen(block.occ)}
           >

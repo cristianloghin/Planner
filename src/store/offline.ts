@@ -80,7 +80,7 @@ export function writeQueue(accountId: string, actions: Action[]): void {
 }
 
 /** Pure UI navigation — never persisted, so never queued. */
-const UI_ACTIONS = new Set(['shiftWeek', 'setWeek', 'shiftDay', 'setDay', 'hydrate'])
+const UI_ACTIONS = new Set(['shiftWeek', 'setWeek', 'shiftDay', 'setDay', 'goToDate', 'hydrate'])
 
 export function isPersistedAction(action: Action): boolean {
   return !UI_ACTIONS.has(action.type)

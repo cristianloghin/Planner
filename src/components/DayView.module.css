@@ -222,27 +222,6 @@
   line-height: 1.15;
 }
 
-/* Attendee avatars — small round initials in each person's solid color. */
-.avatars {
-  display: flex;
-  gap: 2px;
-  margin-top: 1px;
-}
-
-.avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  font-size: var(--fs-2xs);
-  font-weight: 700;
-  background: var(--c);
-  color: var(--on-accent);
-  flex: none;
-}
-
 .tlTime {
   font-size: var(--fs-xs);
   opacity: 0.85;

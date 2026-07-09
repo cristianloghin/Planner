@@ -4,7 +4,7 @@ import { cx } from '../lib/cx'
 import { isoLabel } from '../lib/dates'
 import { uid } from '../lib/id'
 import { isOverdue } from '../lib/lists'
-import { colorVar } from '../lib/palette'
+import { colorStyle } from '../lib/palette'
 import { personColorKey } from '../lib/people'
 import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
@@ -335,14 +335,7 @@ export function Lists() {
     // partner just removed) must not crash the whole view.
     if (!p) return null
     return (
-      <span
-        className={s.badge}
-        style={
-          {
-            '--c': colorVar(personColorKey(state, personId)),
-          } as React.CSSProperties
-        }
-      >
+      <span className={s.badge} style={colorStyle(personColorKey(state, personId))}>
         {p.name}
       </span>
     )
