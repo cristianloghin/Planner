@@ -2,6 +2,16 @@
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 5px;
+  align-content: start;
+}
+
+/* The static weekday header row above the sliding month pages; its columns
+   mirror .monthGrid so the labels line up with the cells. */
+.monthWeekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+  margin-bottom: 5px;
 }
 
 .monthWeekday {

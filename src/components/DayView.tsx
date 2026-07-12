@@ -55,12 +55,15 @@ export function DayView() {
   const hourHRef = useLatest(hourH)
 
   const scrollRef = useRef<HTMLDivElement>(null)
-  const gridRef = useRef<HTMLDivElement>(null)
+  const stripRef = useRef<HTMLDivElement>(null)
+
+  const dateISO = addDays(state.weekStart, day)
 
   // Swipe to change day, pinch to zoom (shared with the Week grid).
   const { onClickCapture } = useSwipeGestures({
     scrollRef,
-    gridRef,
+    stripRef,
+    pageKey: dateISO,
     onNavigate: (delta) => dispatch({ type: 'shiftDay', delta }),
     zoom: { hourH, setHourH, key: ZOOM_KEY },
   })
@@ -73,20 +76,22 @@ export function DayView() {
     return () => window.clearInterval(iv)
   }, [])
 
-  const dateISO = addDays(state.weekStart, day)
-  const isToday = dateISO === toISODate(now)
-  const nowMin = isToday ? now.getHours() * 60 + now.getMinutes() : null
+  const nowISO = toISODate(now)
+  const isToday = dateISO === nowISO
+  const nowMin = now.getHours() * 60 + now.getMinutes()
 
-  // Windowed per-occurrence state for this day (plus the dates of any
-  // prerequisites its occurrences wait on, so their met/unmet resolves even
-  // when they live outside the window).
+  // Windowed per-occurrence state for the visible day and its swipe
+  // neighbors (plus the dates of any prerequisites their occurrences wait
+  // on, so their met/unmet resolves even when they live outside the window).
+  const prevISO = addDays(dateISO, -1)
+  const nextISO = addDays(dateISO, 1)
   const prereqDates = useMemo(
-    () => prerequisiteDatesInRange(state.dependencies, dateISO, dateISO),
-    [state.dependencies, dateISO],
+    () => prerequisiteDatesInRange(state.dependencies, prevISO, nextISO),
+    [state.dependencies, prevISO, nextISO],
   )
   const { completions, isLoading: completionsLoading } = useCompletionsForRange(
-    dateISO,
-    dateISO,
+    prevISO,
+    nextISO,
     prereqDates,
   )
 
@@ -100,14 +105,14 @@ export function DayView() {
   // user's scroll position — jumping the timeline on every day change is jarring.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run on mount only
   useEffect(() => {
-    scrollToMinute(nowMin ?? 7 * 60)
+    scrollToMinute(isToday ? nowMin : 7 * 60)
   }, [])
 
-  function addAt(attendees: PersonId[], minute: number) {
+  function addAt(date: string, attendees: PersonId[], minute: number) {
     const start = Math.min(Math.max(0, Math.round(minute / SNAP) * SNAP), DAY_MIN - SNAP)
     setEditor({
       mode: 'new',
-      date: dateISO,
+      date,
       attendees,
       startMin: start,
       endMin: Math.min(start + 60, DAY_MIN),
@@ -118,27 +123,34 @@ export function DayView() {
     setSheet({ event: occ.event, date: occ.start })
   }
 
+  // One entry per swipe-strip page: yesterday, the visible day, tomorrow.
   // None of this depends on zoom or gesture state, and it's the expensive part
   // of a render (recurrence expansion + conflict analysis) — memoize so a
   // pinch-zoom frame or timer tick doesn't recompute it.
-  const { timedBlocks, allDayOccs, statuses, hasWarnings } = useMemo(() => {
-    const occs = occurrencesOnDate(state.events, dateISO, completions)
-    const timedBlocks: TimeBlock[] = occs
-      .filter((o) => !o.event.allDay)
-      .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end }))
-    const allDayOccs = occs.filter((o) => o.event.allDay)
+  const pages = useMemo(
+    () =>
+      [prevISO, dateISO, nextISO].map((iso) => {
+        const occs = occurrencesOnDate(state.events, iso, completions)
+        const timedBlocks: TimeBlock[] = occs
+          .filter((o) => !o.event.allDay)
+          .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end }))
+        const allDayOccs = occs.filter((o) => o.event.allDay)
 
-    // Coverage looks at the whole day: all-day events count as busy 00:00–24:00.
-    const coverage: Busy[] = occs.map((o) => ({
-      id: o.event.id,
-      attendees: o.event.attendees,
-      start: o.event.allDay ? 0 : o.segment.start,
-      end: o.event.allDay ? DAY_MIN : o.segment.end,
-    }))
-    const statuses = childStatuses(coverage, state.people)
-    const hasWarnings = [...statuses.values()].some((s) => s !== 'covered')
-    return { timedBlocks, allDayOccs, statuses, hasWarnings }
-  }, [state.events, completions, state.people, dateISO])
+        // Coverage looks at the whole day: all-day events count as busy 00:00–24:00.
+        const coverage: Busy[] = occs.map((o) => ({
+          id: o.event.id,
+          attendees: o.event.attendees,
+          start: o.event.allDay ? 0 : o.segment.start,
+          end: o.event.allDay ? DAY_MIN : o.segment.end,
+        }))
+        const statuses = childStatuses(coverage, state.people)
+        return { iso, timedBlocks, allDayOccs, statuses }
+      }),
+    [state.events, completions, state.people, prevISO, dateISO, nextISO],
+  )
+  // The header (lane names, all-day chips, warning badge) shows the visible day.
+  const { allDayOccs, statuses } = pages[1]
+  const hasWarnings = [...statuses.values()].some((st) => st !== 'covered')
 
   const fullHeight = DAY_MIN * pxPerMin
 
@@ -227,7 +239,6 @@ export function DayView() {
       >
         <div
           className={s.plannerGrid}
-          ref={gridRef}
           style={
             {
               '--hour-h': `${hourH}px`,
@@ -236,20 +247,27 @@ export function DayView() {
           }
         >
           <TimeGutter hourH={hourH} />
-          <div className={s.lanes} style={{ height: fullHeight }}>
-            {people.map((p) => (
-              <Lane
-                key={p.id}
-                person={p}
-                blocks={timedBlocks}
-                statuses={statuses}
-                completions={completions}
-                nowMin={nowMin}
-                pxPerMin={pxPerMin}
-                onAddAt={(min) => addAt([p.id], min)}
-                onOpen={openSheet}
-              />
-            ))}
+          {/* The gutter stays put; only the day pages slide during a swipe. */}
+          <div className={shared.swipeClip}>
+            <div className={shared.swipeStrip} ref={stripRef}>
+              {pages.map((page) => (
+                <div key={page.iso} className={s.lanes} style={{ height: fullHeight }}>
+                  {people.map((p) => (
+                    <Lane
+                      key={p.id}
+                      person={p}
+                      blocks={page.timedBlocks}
+                      statuses={page.statuses}
+                      completions={completions}
+                      nowMin={page.iso === nowISO ? nowMin : null}
+                      pxPerMin={pxPerMin}
+                      onAddAt={(min) => addAt(page.iso, [p.id], min)}
+                      onOpen={openSheet}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

@@ -9,6 +9,7 @@ import { DAY_MIN, layoutBlocks } from '../lib/timelineLayout'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import { loadZoom, useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
+import shared from '../styles/shared.module.css'
 import type { CompletionsMap } from '../types'
 import { TimeGutter } from './TimeGutter'
 import s from './WeekTimeline.module.css'
@@ -89,12 +90,13 @@ export function WeekTimelineHead({
  * render as colored bars; titles appear once the zoom leaves room for them.
  */
 export function WeekTimelineBody({
-  weekDays,
+  weeks,
   completions,
   onOpen,
   onAddAt,
 }: {
-  weekDays: WeekDay[]
+  /** Strip pages: [previous week, visible week, next week], seven days each. */
+  weeks: WeekDay[][]
   completions: CompletionsMap
   onOpen: (occ: DayOccurrence) => void
   /** Tap on empty grid: create an event on `dateISO` around `minute`. */
@@ -105,11 +107,12 @@ export function WeekTimelineBody({
   const pxPerMin = hourH / 60
 
   const scrollRef = useRef<HTMLDivElement>(null)
-  const gridRef = useRef<HTMLDivElement>(null)
+  const stripRef = useRef<HTMLDivElement>(null)
 
   const { onClickCapture } = useSwipeGestures({
     scrollRef,
-    gridRef,
+    stripRef,
+    pageKey: weeks[1][0].dateISO,
     onNavigate: (delta) => dispatch({ type: 'shiftWeek', delta }),
     zoom: { hourH, setHourH, key: ZOOM_KEY },
   })
@@ -130,25 +133,28 @@ export function WeekTimelineBody({
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    const focus = weekDays.some((d) => d.dateISO === todayISO) ? nowMin : 7 * 60
+    const focus = weeks[1].some((d) => d.dateISO === todayISO) ? nowMin : 7 * 60
     el.scrollTop = Math.max(0, focus * pxPerMin - 80)
   }, [])
 
   const narrow = useMediaQuery('(max-width: 720px)')
   const showTitles = !narrow || hourH >= TITLE_HOUR_H
 
-  // Overlap-pack each day's timed occurrences (all attendees share the column).
-  const days = useMemo(
+  // Overlap-pack each day's timed occurrences (all attendees share the column),
+  // for all three strip pages.
+  const pages = useMemo(
     () =>
-      weekDays.map(({ dateISO, occs }) => ({
-        dateISO,
-        laid: layoutBlocks(
-          occs
-            .filter((o) => !o.event.allDay)
-            .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end })),
-        ),
-      })),
-    [weekDays],
+      weeks.map((weekDays) =>
+        weekDays.map(({ dateISO, occs }) => ({
+          dateISO,
+          laid: layoutBlocks(
+            occs
+              .filter((o) => !o.event.allDay)
+              .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end })),
+          ),
+        })),
+      ),
+    [weeks],
   )
 
   return (
@@ -161,7 +167,6 @@ export function WeekTimelineBody({
     >
       <div
         className={s.grid}
-        ref={gridRef}
         style={
           {
             '--hour-h': `${hourH}px`,
@@ -170,51 +175,58 @@ export function WeekTimelineBody({
         }
       >
         <TimeGutter hourH={hourH} />
-        <div className={s.days} style={{ height: DAY_MIN * pxPerMin }}>
-          {days.map(({ dateISO, laid }) => (
-            // biome-ignore lint/a11y/useKeyWithClickEvents: tap-on-empty-space is a pointer affordance to prefill the editor; the keyboard path is the header's + button
-            <div
-              key={dateISO}
-              className={cx(s.dayCol, dateISO === todayISO && s.todayCol)}
-              onClick={(e) => {
-                if ((e.target as HTMLElement).closest(`.${s.bar}`)) return
-                const rect = e.currentTarget.getBoundingClientRect()
-                onAddAt(dateISO, (e.clientY - rect.top) / pxPerMin)
-              }}
-            >
-              {dateISO === todayISO && (
-                <div className={s.nowLine} style={{ top: nowMin * pxPerMin }}>
-                  <span className={s.nowDot} />
-                </div>
-              )}
-              {laid.map(({ block, col, cols }) => {
-                const ev = block.occ.event
-                const height = Math.max((block.end - block.start) * pxPerMin, 12)
-                const done = isOccurrenceDone(completions, ev, block.occ.start)
-                return (
-                  <button
-                    type="button"
-                    key={`${ev.id}:${block.occ.start}`}
-                    className={cx(s.bar, done && s.done)}
-                    style={{
-                      top: block.start * pxPerMin,
-                      height,
-                      left: `calc(${(100 / cols) * col}% + 1px)`,
-                      width: `calc(${100 / cols}% - 2px)`,
-                      ...colorStyle(eventColorKey(state, ev.attendees[0], ev)),
+        {/* The gutter stays put; only the week pages slide during a swipe. */}
+        <div className={shared.swipeClip}>
+          <div className={shared.swipeStrip} ref={stripRef}>
+            {pages.map((days) => (
+              <div className={s.days} key={days[0].dateISO} style={{ height: DAY_MIN * pxPerMin }}>
+                {days.map(({ dateISO, laid }) => (
+                  // biome-ignore lint/a11y/useKeyWithClickEvents: tap-on-empty-space is a pointer affordance to prefill the editor; the keyboard path is the header's + button
+                  <div
+                    key={dateISO}
+                    className={cx(s.dayCol, dateISO === todayISO && s.todayCol)}
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest(`.${s.bar}`)) return
+                      const rect = e.currentTarget.getBoundingClientRect()
+                      onAddAt(dateISO, (e.clientY - rect.top) / pxPerMin)
                     }}
-                    onClick={() => onOpen(block.occ)}
-                    title={ev.title}
-                    aria-label={`${ev.title}, ${minutesToTime(block.start)}–${minutesToTime(block.end)}`}
                   >
-                    {showTitles && height >= TITLE_MIN_PX && (
-                      <span className={s.barTitle}>{ev.title}</span>
+                    {dateISO === todayISO && (
+                      <div className={s.nowLine} style={{ top: nowMin * pxPerMin }}>
+                        <span className={s.nowDot} />
+                      </div>
                     )}
-                  </button>
-                )
-              })}
-            </div>
-          ))}
+                    {laid.map(({ block, col, cols }) => {
+                      const ev = block.occ.event
+                      const height = Math.max((block.end - block.start) * pxPerMin, 12)
+                      const done = isOccurrenceDone(completions, ev, block.occ.start)
+                      return (
+                        <button
+                          type="button"
+                          key={`${ev.id}:${block.occ.start}`}
+                          className={cx(s.bar, done && s.done)}
+                          style={{
+                            top: block.start * pxPerMin,
+                            height,
+                            left: `calc(${(100 / cols) * col}% + 1px)`,
+                            width: `calc(${100 / cols}% - 2px)`,
+                            ...colorStyle(eventColorKey(state, ev.attendees[0], ev)),
+                          }}
+                          onClick={() => onOpen(block.occ)}
+                          title={ev.title}
+                          aria-label={`${ev.title}, ${minutesToTime(block.start)}–${minutesToTime(block.end)}`}
+                        >
+                          {showTitles && height >= TITLE_MIN_PX && (
+                            <span className={s.barTitle}>{ev.title}</span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

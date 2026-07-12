@@ -5,7 +5,7 @@ import { cx } from '../lib/cx'
 import {
   DAY_NAMES,
   addDays,
-  dayLabel,
+  isoLabel,
   minutesToTime,
   mondayOf,
   toISODate,
@@ -40,25 +40,28 @@ export function WeekCalendar() {
   const [sheet, setSheet] = useState<{ event: CalendarEvent; date: string } | null>(null)
   const timeline = (state.preferences.weekLayout ?? 'list') === 'timeline'
 
-  // Windowed per-occurrence state covering the visible week.
-  const weekEnd = addDays(state.weekStart, 6)
+  // Windowed per-occurrence state covering the visible week and its swipe
+  // neighbors (the strip renders the previous and next week too).
   const { completions, isLoading: completionsLoading } = useCompletionsForRange(
-    state.weekStart,
-    weekEnd,
+    addDays(state.weekStart, -7),
+    addDays(state.weekStart, 13),
   )
 
-  // Expand the week's occurrences once per data/week change, not per render.
-  const weekDays = useMemo(
+  // Expand the three strip pages' occurrences once per data/week change, not
+  // per render: [previous week, visible week, next week], seven days each.
+  const weeks = useMemo(
     () =>
-      DAY_NAMES.map((_, dayIdx) => {
-        const dateISO = addDays(state.weekStart, dayIdx)
-        // All-day items first, then timed by start.
-        const occs = occurrencesOnDate(state.events, dateISO, completions).sort((a, b) => {
-          if (a.event.allDay !== b.event.allDay) return a.event.allDay ? -1 : 1
-          return a.segment.start - b.segment.start
-        })
-        return { dateISO, occs }
-      }),
+      [-7, 0, 7].map((weekOffset) =>
+        DAY_NAMES.map((_, dayIdx) => {
+          const dateISO = addDays(state.weekStart, weekOffset + dayIdx)
+          // All-day items first, then timed by start.
+          const occs = occurrencesOnDate(state.events, dateISO, completions).sort((a, b) => {
+            if (a.event.allDay !== b.event.allDay) return a.event.allDay ? -1 : 1
+            return a.segment.start - b.segment.start
+          })
+          return { dateISO, occs }
+        }),
+      ),
     [state.weekStart, state.events, completions],
   )
 
@@ -116,20 +119,20 @@ export function WeekCalendar() {
         }
       >
         {timeline && (
-          <WeekTimelineHead weekDays={weekDays} completions={completions} onOpen={openSheet} />
+          <WeekTimelineHead weekDays={weeks[1]} completions={completions} onOpen={openSheet} />
         )}
       </ViewHeader>
 
       {timeline ? (
         <WeekTimelineBody
-          weekDays={weekDays}
+          weeks={weeks}
           completions={completions}
           onOpen={openSheet}
           onAddAt={addAt}
         />
       ) : (
         <WeekListBody
-          weekDays={weekDays}
+          weeks={weeks}
           onEdit={(o) => setTarget({ mode: 'edit', event: o.event, occurrenceDate: o.start })}
           onAdd={(dateISO) =>
             setTarget({ mode: 'new', date: dateISO, attendees: defaultAttendees(state) })
@@ -161,11 +164,12 @@ export function WeekCalendar() {
  * accent ring and the list starts scrolled to it.
  */
 function WeekListBody({
-  weekDays,
+  weeks,
   onEdit,
   onAdd,
 }: {
-  weekDays: { dateISO: string; occs: DayOccurrence[] }[]
+  /** Strip pages: [previous week, visible week, next week], seven days each. */
+  weeks: { dateISO: string; occs: DayOccurrence[] }[][]
   onEdit: (occ: DayOccurrence) => void
   onAdd: (dateISO: string) => void
 }) {
@@ -173,11 +177,12 @@ function WeekListBody({
   const todayISO = toISODate(new Date())
 
   const scrollRef = useRef<HTMLDivElement>(null)
-  const gridRef = useRef<HTMLDivElement>(null)
+  const stripRef = useRef<HTMLDivElement>(null)
   const todayRef = useRef<HTMLDivElement>(null)
   const { onClickCapture } = useSwipeGestures({
     scrollRef,
-    gridRef,
+    stripRef,
+    pageKey: state.weekStart,
     onNavigate: (delta) => dispatch({ type: 'shiftWeek', delta }),
   })
 
@@ -197,53 +202,59 @@ function WeekListBody({
       style={{ touchAction: 'pan-y' }}
       onClickCapture={onClickCapture}
     >
-      <div className={s.days} ref={gridRef}>
-        {weekDays.map(({ dateISO, occs }, dayIdx) => {
-          const isToday = dateISO === todayISO
-          return (
-            <div
-              className={cx(s.dayCol, isToday && s.today)}
-              key={dateISO}
-              ref={isToday ? todayRef : undefined}
-            >
-              <div className={s.dayHead}>{dayLabel(state.weekStart, dayIdx)}</div>
+      <div className={shared.swipeStrip} ref={stripRef}>
+        {weeks.map((weekDays) => (
+          <div className={s.days} key={weekDays[0].dateISO}>
+            {weekDays.map(({ dateISO, occs }) => {
+              // Only the visible (middle) week can contain today, so the
+              // anchor ref never lands on an off-screen page.
+              const isToday = dateISO === todayISO
+              return (
+                <div
+                  className={cx(s.dayCol, isToday && s.today)}
+                  key={dateISO}
+                  ref={isToday ? todayRef : undefined}
+                >
+                  <div className={s.dayHead}>{isoLabel(dateISO)}</div>
 
-              <div className={s.eventList}>
-                {occs.length === 0 && <p className={shared.empty}>No plans</p>}
-                {occs.map((o) => {
-                  const e = o.event
-                  return (
-                    <div
-                      key={`${e.id}:${o.start}`}
-                      className={s.event}
-                      style={colorStyle(eventColorKey(state, e.attendees[0], e))}
-                    >
-                      <div className={s.eventTime}>
-                        {e.allDay
-                          ? o.span > 1
-                            ? `All day · ${o.offset + 1}/${o.span}`
-                            : 'All day'
-                          : `${minutesToTime(o.segment.start)}–${minutesToTime(o.segment.end)}`}
-                        {o.moved && ' · ↔ moved'}
-                      </div>
-                      <button type="button" className={s.eventBody} onClick={() => onEdit(o)}>
-                        <span className={s.eventTitle}>{e.title}</span>
-                        <span className={s.eventMeta}>
-                          <Avatars attendees={e.attendees} />
-                          {e.recurrence && recurrenceLabel(e.recurrence).toLowerCase()}
-                        </span>
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
+                  <div className={s.eventList}>
+                    {occs.length === 0 && <p className={shared.empty}>No plans</p>}
+                    {occs.map((o) => {
+                      const e = o.event
+                      return (
+                        <div
+                          key={`${e.id}:${o.start}`}
+                          className={s.event}
+                          style={colorStyle(eventColorKey(state, e.attendees[0], e))}
+                        >
+                          <div className={s.eventTime}>
+                            {e.allDay
+                              ? o.span > 1
+                                ? `All day · ${o.offset + 1}/${o.span}`
+                                : 'All day'
+                              : `${minutesToTime(o.segment.start)}–${minutesToTime(o.segment.end)}`}
+                            {o.moved && ' · ↔ moved'}
+                          </div>
+                          <button type="button" className={s.eventBody} onClick={() => onEdit(o)}>
+                            <span className={s.eventTitle}>{e.title}</span>
+                            <span className={s.eventMeta}>
+                              <Avatars attendees={e.attendees} />
+                              {e.recurrence && recurrenceLabel(e.recurrence).toLowerCase()}
+                            </span>
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
 
-              <button type="button" className={s.addLink} onClick={() => onAdd(dateISO)}>
-                + Add
-              </button>
-            </div>
-          )
-        })}
+                  <button type="button" className={s.addLink} onClick={() => onAdd(dateISO)}>
+                    + Add
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        ))}
       </div>
     </div>
   )

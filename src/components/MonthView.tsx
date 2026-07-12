@@ -18,6 +18,7 @@ import { eventStartMinutes } from '../lib/timing'
 import { useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
+import type { CompletionsMap } from '../types'
 import s from './MonthView.module.css'
 import { LoadingPill } from './Spinner'
 import { ViewHeader } from './ViewHeader'
@@ -29,39 +30,26 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
   const { state } = useApp()
   const [cursor, setCursor] = useState(() => startOfMonth(toISODate(new Date())))
   const today = toISODate(new Date())
-  const days = useMemo(() => monthGridDays(cursor), [cursor])
+  // Strip pages: [previous month, visible month, next month].
+  const months = useMemo(() => [-1, 0, 1].map((d) => addMonths(cursor, d)), [cursor])
 
   // Swipe left/right to change month, like the Day and Week views.
   const scrollRef = useRef<HTMLDivElement>(null)
-  const gridRef = useRef<HTMLDivElement>(null)
+  const stripRef = useRef<HTMLDivElement>(null)
   const { onClickCapture } = useSwipeGestures({
     scrollRef,
-    gridRef,
+    stripRef,
+    pageKey: cursor,
     onNavigate: (delta) => setCursor((c) => addMonths(c, delta)),
   })
 
-  // Windowed per-occurrence state covering the whole visible grid (the grid
+  // Windowed per-occurrence state covering all three pages' grids (each grid
   // pads to full weeks, so it can straddle two months).
+  const prevGrid = monthGridDays(months[0])
+  const nextGrid = monthGridDays(months[2])
   const { completions, isLoading: completionsLoading } = useCompletionsForRange(
-    days[0],
-    days[days.length - 1],
-  )
-
-  // Expanding recurrences over 42 cells is O(events × occurrence state); do it
-  // only when the grid or the data actually changes, not on every render.
-  const occurrencesByDay = useMemo(
-    () =>
-      new Map(
-        days.map((iso) => [
-          iso,
-          occurrencesOnDate(state.events, iso, completions).sort(
-            (a, b) =>
-              Number(b.event.allDay) - Number(a.event.allDay) ||
-              eventStartMinutes(a.event) - eventStartMinutes(b.event),
-          ),
-        ]),
-      ),
-    [days, state.events, completions],
+    prevGrid[0],
+    nextGrid[nextGrid.length - 1],
   )
 
   // Open a search hit: jump to the event's next upcoming occurrence (falling
@@ -106,49 +94,94 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
         style={{ touchAction: 'pan-y' }}
         onClickCapture={onClickCapture}
       >
-        <div className={s.monthGrid} ref={gridRef}>
+        {/* The weekday labels stay put; only the month pages slide. */}
+        <div className={s.monthWeekdays}>
           {DAY_NAMES.map((name) => (
             <div key={name} className={s.monthWeekday}>
               {name}
             </div>
           ))}
-
-          {days.map((iso) => {
-            const dayOccs = occurrencesByDay.get(iso) ?? []
-            return (
-              <button
-                type="button"
-                key={iso}
-                className={cx(
-                  s.monthCell,
-                  !isSameMonth(iso, cursor) && s.dim,
-                  iso === today && s.today,
-                )}
-                onClick={() => onOpenDay(iso)}
-                aria-label={`${monthLabel(iso)} ${Number(iso.slice(8, 10))}, ${dayOccs.length} plans`}
-              >
-                <span className={s.monthDate}>{Number(iso.slice(8, 10))}</span>
-                {dayOccs.length > 0 && (
-                  <span className={s.monthDots}>
-                    {dayOccs.slice(0, MAX_DOTS).map((o) => (
-                      <span
-                        key={`${o.event.id}:${o.start}`}
-                        className={s.monthDot}
-                        style={colorStyle(eventColorKey(state, o.event.attendees[0], o.event))}
-                      />
-                    ))}
-                    {dayOccs.length > MAX_DOTS && (
-                      <span className={s.monthMore}>+{dayOccs.length - MAX_DOTS}</span>
-                    )}
-                  </span>
-                )}
-              </button>
-            )
-          })}
+        </div>
+        <div className={shared.swipeStrip} ref={stripRef}>
+          {months.map((month) => (
+            <MonthPage
+              key={month}
+              month={month}
+              today={today}
+              completions={completions}
+              onOpenDay={onOpenDay}
+            />
+          ))}
         </div>
       </div>
 
       {completionsLoading && <LoadingPill />}
     </section>
+  )
+}
+
+/** One month's 6×7 cell grid — a page of the Month view's swipe strip. */
+function MonthPage({
+  month,
+  today,
+  completions,
+  onOpenDay,
+}: {
+  month: string
+  today: string
+  completions: CompletionsMap
+  onOpenDay: (iso: string) => void
+}) {
+  const { state } = useApp()
+  const days = useMemo(() => monthGridDays(month), [month])
+
+  // Expanding recurrences over 42 cells is O(events × occurrence state); do it
+  // only when the grid or the data actually changes, not on every render.
+  const occurrencesByDay = useMemo(
+    () =>
+      new Map(
+        days.map((iso) => [
+          iso,
+          occurrencesOnDate(state.events, iso, completions).sort(
+            (a, b) =>
+              Number(b.event.allDay) - Number(a.event.allDay) ||
+              eventStartMinutes(a.event) - eventStartMinutes(b.event),
+          ),
+        ]),
+      ),
+    [days, state.events, completions],
+  )
+
+  return (
+    <div className={s.monthGrid}>
+      {days.map((iso) => {
+        const dayOccs = occurrencesByDay.get(iso) ?? []
+        return (
+          <button
+            type="button"
+            key={iso}
+            className={cx(s.monthCell, !isSameMonth(iso, month) && s.dim, iso === today && s.today)}
+            onClick={() => onOpenDay(iso)}
+            aria-label={`${monthLabel(iso)} ${Number(iso.slice(8, 10))}, ${dayOccs.length} plans`}
+          >
+            <span className={s.monthDate}>{Number(iso.slice(8, 10))}</span>
+            {dayOccs.length > 0 && (
+              <span className={s.monthDots}>
+                {dayOccs.slice(0, MAX_DOTS).map((o) => (
+                  <span
+                    key={`${o.event.id}:${o.start}`}
+                    className={s.monthDot}
+                    style={colorStyle(eventColorKey(state, o.event.attendees[0], o.event))}
+                  />
+                ))}
+                {dayOccs.length > MAX_DOTS && (
+                  <span className={s.monthMore}>+{dayOccs.length - MAX_DOTS}</span>
+                )}
+              </span>
+            )}
+          </button>
+        )
+      })}
+    </div>
   )
 }

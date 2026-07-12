@@ -41,22 +41,30 @@ export interface SwipeZoom {
  * wire up `zoom` — pinch to zoom the hour height. The browser keeps vertical
  * panning (callers set `touch-action: pan-y` on the scroller).
  *
- * `scrollRef` is the vertical scroll container the listeners bind to;
- * `gridRef` is the element slid sideways during a swipe. `onNavigate` fires
- * when a swipe commits (+1 = forward, -1 = back) — the caller re-renders the
- * grid with the new period's content mid-slide, a one-rendered-page carousel.
+ * `scrollRef` is the vertical scroll container the listeners bind to.
+ * `stripRef` is a three-page strip (previous | current | next, one
+ * container-width each — the shared `swipeStrip` class) that a drag slides
+ * sideways, so the neighbor's real content follows the finger. When a swipe
+ * commits, the strip animates one page over, `onNavigate` fires (+1 =
+ * forward, -1 = back), and once the caller has re-rendered — detected by
+ * `pageKey` changing — a layout effect recenters the strip before paint. The
+ * recentered middle page renders exactly what the slide revealed, so the swap
+ * is invisible.
  *
  * Returns a capture-phase click handler for the scroll container that eats the
  * synthetic click after a drag, so a swipe never doubles as a tap.
  */
 export function useSwipeGestures({
   scrollRef,
-  gridRef,
+  stripRef,
+  pageKey,
   onNavigate,
   zoom,
 }: {
   scrollRef: RefObject<HTMLDivElement>
-  gridRef: RefObject<HTMLDivElement>
+  stripRef: RefObject<HTMLDivElement>
+  /** Identifies the current page (ISO date, week start, month cursor). */
+  pageKey: string
   onNavigate: (delta: 1 | -1) => void
   zoom?: SwipeZoom
 }) {
@@ -81,6 +89,21 @@ export function useSwipeGestures({
   const suppressClick = useRef(false)
   // Pinch focal point, consumed by the layout effect that re-pins scroll below.
   const pinchAnchor = useRef<{ focalMin: number; focalOff: number } | null>(null)
+  // A committed swipe has fired onNavigate; recenter once the new page lands.
+  const pendingRecenter = useRef(false)
+
+  // After a committed swipe, the strip sits one page over showing the
+  // neighbor. The re-render triggered by onNavigate makes the *middle* page
+  // that same content; snap the strip back before the browser paints it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reruns when the caller lands on a new page; the refs are stable
+  useLayoutEffect(() => {
+    if (!pendingRecenter.current) return
+    pendingRecenter.current = false
+    const strip = stripRef.current
+    if (!strip) return
+    strip.style.transition = 'none'
+    strip.style.transform = 'translateX(0)'
+  }, [pageKey])
 
   // Keep the focal point fixed while a pinch changes the timeline height. Runs
   // after the DOM has the new heights, so the math uses the post-zoom scale.
@@ -95,7 +118,7 @@ export function useSwipeGestures({
   // biome-ignore lint/correctness/useExhaustiveDependencies: the listeners bind once and read live values through refs (hourHRef, onNavigateRef, g)
   useEffect(() => {
     const el = scrollRef.current
-    const grid = gridRef.current
+    const grid = stripRef.current
     if (!el || !grid) return
 
     const dist = (t: TouchList) =>
@@ -166,21 +189,18 @@ export function useSwipeGestures({
       }
       if (st.mode === 'swipe') {
         if (st.moved) suppressClick.current = true
-        const w = el.clientWidth
+        // One page = a third of the strip (the strip may be narrower than the
+        // scroll container — e.g. the Day view's grid sits beside the gutter).
+        const w = grid.clientWidth / 3
         if (Math.abs(st.dx) > SWIPE_COMMIT) {
-          // Slide the current page out the way it was dragged, swap, then slide
-          // the new one in from the opposite edge — a one-rendered-page carousel.
+          // Finish sliding the neighbor into place, then navigate; the layout
+          // effect above recenters the strip once the new page has rendered.
           const dir = st.dx < 0 ? -1 : 1
           grid.style.transition = `transform ${SWIPE_SLIDE_MS}ms ease`
           grid.style.transform = `translateX(${dir * w}px)`
           window.setTimeout(() => {
+            pendingRecenter.current = true
             onNavigateRef.current(-dir as 1 | -1)
-            grid.style.transition = 'none'
-            grid.style.transform = `translateX(${-dir * w}px)`
-            requestAnimationFrame(() => {
-              grid.style.transition = `transform ${SWIPE_SLIDE_MS}ms ease`
-              grid.style.transform = 'translateX(0)'
-            })
           }, SWIPE_SLIDE_MS)
         } else {
           grid.style.transition = `transform ${SWIPE_SLIDE_MS}ms ease`
