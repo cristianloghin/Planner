@@ -7,7 +7,7 @@ import { eventColorKey } from '../lib/people'
 import type { DayOccurrence } from '../lib/recurrence'
 import { DAY_MIN, layoutBlocks } from '../lib/timelineLayout'
 import { useMediaQuery } from '../lib/useMediaQuery'
-import { loadZoom, useTimelineGestures } from '../lib/useTimelineGestures'
+import { loadZoom, useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
 import type { CompletionsMap } from '../types'
 import { TimeGutter } from './TimeGutter'
@@ -107,13 +107,11 @@ export function WeekTimelineBody({
   const scrollRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
 
-  const { onClickCapture } = useTimelineGestures({
+  const { onClickCapture } = useSwipeGestures({
     scrollRef,
     gridRef,
-    hourH,
-    setHourH,
-    zoomKey: ZOOM_KEY,
     onNavigate: (delta) => dispatch({ type: 'shiftWeek', delta }),
+    zoom: { hourH, setHourH, key: ZOOM_KEY },
   })
 
   // Tick once a minute so the "now" line moves and today-detection rolls over

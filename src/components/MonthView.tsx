@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useCompletionsForRange } from '../data/completions'
 import { cx } from '../lib/cx'
 import {
@@ -15,6 +15,7 @@ import { colorStyle } from '../lib/palette'
 import { eventColorKey } from '../lib/people'
 import { nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
 import { eventStartMinutes } from '../lib/timing'
+import { useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
 import s from './MonthView.module.css'
@@ -29,6 +30,15 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
   const [cursor, setCursor] = useState(() => startOfMonth(toISODate(new Date())))
   const today = toISODate(new Date())
   const days = useMemo(() => monthGridDays(cursor), [cursor])
+
+  // Swipe left/right to change month, like the Day and Week views.
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const { onClickCapture } = useSwipeGestures({
+    scrollRef,
+    gridRef,
+    onNavigate: (delta) => setCursor((c) => addMonths(c, delta)),
+  })
 
   // Windowed per-occurrence state covering the whole visible grid (the grid
   // pads to full weeks, so it can straddle two months).
@@ -89,8 +99,14 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
         }
       />
 
-      <div className={shared.viewBody}>
-        <div className={s.monthGrid}>
+      <div
+        className={cx(shared.viewBody, shared.swipeBody)}
+        ref={scrollRef}
+        // Browser owns vertical panning; we own the horizontal swipe.
+        style={{ touchAction: 'pan-y' }}
+        onClickCapture={onClickCapture}
+      >
+        <div className={s.monthGrid} ref={gridRef}>
           {DAY_NAMES.map((name) => (
             <div key={name} className={s.monthWeekday}>
               {name}

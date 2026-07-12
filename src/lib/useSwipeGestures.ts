@@ -27,10 +27,19 @@ export function loadZoom(key: string): number {
   return raw ? clampZoom(raw) : DEFAULT_HOUR_H
 }
 
+/** Pinch-to-zoom wiring for a timeline's user-zoomable hour height. */
+export interface SwipeZoom {
+  hourH: number
+  setHourH: (h: number) => void
+  /** localStorage key the zoom level persists under. */
+  key: string
+}
+
 /**
- * The touch-gesture machinery shared by the timeline views (Day, Week grid):
- * swipe horizontally to navigate, pinch to zoom the hour height. The browser
- * keeps vertical panning (callers set `touch-action: pan-y` on the scroller).
+ * The touch-gesture machinery shared by the swipeable views (Day, Week,
+ * Month): swipe horizontally to navigate, and — for the timeline views that
+ * wire up `zoom` — pinch to zoom the hour height. The browser keeps vertical
+ * panning (callers set `touch-action: pan-y` on the scroller).
  *
  * `scrollRef` is the vertical scroll container the listeners bind to;
  * `gridRef` is the element slid sideways during a swipe. `onNavigate` fires
@@ -38,26 +47,22 @@ export function loadZoom(key: string): number {
  * grid with the new period's content mid-slide, a one-rendered-page carousel.
  *
  * Returns a capture-phase click handler for the scroll container that eats the
- * synthetic click after a drag, so a swipe never doubles as a tap-to-add.
+ * synthetic click after a drag, so a swipe never doubles as a tap.
  */
-export function useTimelineGestures({
+export function useSwipeGestures({
   scrollRef,
   gridRef,
-  hourH,
-  setHourH,
-  zoomKey,
   onNavigate,
+  zoom,
 }: {
   scrollRef: RefObject<HTMLDivElement>
   gridRef: RefObject<HTMLDivElement>
-  hourH: number
-  setHourH: (h: number) => void
-  zoomKey: string
   onNavigate: (delta: 1 | -1) => void
+  zoom?: SwipeZoom
 }) {
   // Mirrors for the native touch listeners, which bind once and would
   // otherwise close over stale values mid-gesture.
-  const hourHRef = useLatest(hourH)
+  const zoomRef = useLatest(zoom)
   const onNavigateRef = useLatest(onNavigate)
 
   const g = useRef({
@@ -83,9 +88,9 @@ export function useTimelineGestures({
   useLayoutEffect(() => {
     const a = pinchAnchor.current
     const el = scrollRef.current
-    if (!a || !el) return
-    el.scrollTop = a.focalMin * (hourH / 60) - a.focalOff
-  }, [hourH])
+    if (!a || !el || !zoom) return
+    el.scrollTop = a.focalMin * (zoom.hourH / 60) - a.focalOff
+  }, [zoom?.hourH])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the listeners bind once and read live values through refs (hourHRef, onNavigateRef, g)
   useEffect(() => {
@@ -103,13 +108,15 @@ export function useTimelineGestures({
       // stale flag eat this new tap's click.
       suppressClick.current = false
       if (e.touches.length === 2) {
+        const z = zoomRef.current
+        if (!z) return // no zoom wired (list/month views): ignore multi-touch
         const rect = el.getBoundingClientRect()
         const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2
         st.mode = 'pinch'
         st.dist0 = dist(e.touches)
-        st.hour0 = hourHRef.current
+        st.hour0 = z.hourH
         st.focalOff = midY - rect.top
-        st.focalMin = (el.scrollTop + st.focalOff) / (hourHRef.current / 60)
+        st.focalMin = (el.scrollTop + st.focalOff) / (z.hourH / 60)
         grid.style.transition = 'none'
         grid.style.transform = ''
       } else if (e.touches.length === 1) {
@@ -123,11 +130,12 @@ export function useTimelineGestures({
 
     const onMove = (e: TouchEvent) => {
       const st = g.current
-      if (st.mode === 'pinch' && e.touches.length === 2) {
+      const z = zoomRef.current
+      if (st.mode === 'pinch' && e.touches.length === 2 && z) {
         e.preventDefault()
         const next = clampZoom((st.hour0 * dist(e.touches)) / st.dist0)
         pinchAnchor.current = { focalMin: st.focalMin, focalOff: st.focalOff }
-        setHourH(next)
+        z.setHourH(next)
         return
       }
       if (st.mode === 'decide') {
@@ -151,7 +159,8 @@ export function useTimelineGestures({
       const st = g.current
       if (st.mode === 'pinch') {
         pinchAnchor.current = null
-        localStorage.setItem(zoomKey, String(hourHRef.current))
+        const z = zoomRef.current
+        if (z) localStorage.setItem(z.key, String(z.hourH))
         st.mode = 'none'
         return
       }

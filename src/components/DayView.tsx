@@ -23,7 +23,7 @@ import { eventColorKey, peopleList, personColorKey } from '../lib/people'
 import { type DayOccurrence, nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
 import { DAY_MIN, type TimeBlock, layoutBlocks } from '../lib/timelineLayout'
 import { useLatest } from '../lib/useLatest'
-import { loadZoom, useTimelineGestures } from '../lib/useTimelineGestures'
+import { loadZoom, useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
 import type { CalendarEvent, CompletionsMap, Person, PersonId } from '../types'
@@ -58,13 +58,11 @@ export function DayView() {
   const gridRef = useRef<HTMLDivElement>(null)
 
   // Swipe to change day, pinch to zoom (shared with the Week grid).
-  const { onClickCapture } = useTimelineGestures({
+  const { onClickCapture } = useSwipeGestures({
     scrollRef,
     gridRef,
-    hourH,
-    setHourH,
-    zoomKey: ZOOM_KEY,
     onNavigate: (delta) => dispatch({ type: 'shiftDay', delta }),
+    zoom: { hourH, setHourH, key: ZOOM_KEY },
   })
 
   // Tick once a minute so the "now" line moves and today-detection rolls over

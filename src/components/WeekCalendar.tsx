@@ -1,7 +1,16 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCompletionsForRange } from '../data/completions'
-import { DAY_NAMES, addDays, dayLabel, minutesToTime, mondayOf, weekRangeLabel } from '../lib/dates'
+import { cx } from '../lib/cx'
+import {
+  DAY_NAMES,
+  addDays,
+  dayLabel,
+  minutesToTime,
+  mondayOf,
+  toISODate,
+  weekRangeLabel,
+} from '../lib/dates'
 import { colorStyle } from '../lib/palette'
 import { defaultAttendees, eventColorKey } from '../lib/people'
 import {
@@ -11,6 +20,7 @@ import {
   recurrenceLabel,
 } from '../lib/recurrence'
 import { DAY_MIN } from '../lib/timelineLayout'
+import { useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
 import type { CalendarEvent } from '../types'
@@ -118,71 +128,13 @@ export function WeekCalendar() {
           onAddAt={addAt}
         />
       ) : (
-        <div className={shared.viewBody}>
-          <div className={s.days}>
-            {weekDays.map(({ dateISO, occs }, dayIdx) => {
-              return (
-                <div className={s.dayCol} key={dateISO}>
-                  <div className={s.dayHead}>{dayLabel(state.weekStart, dayIdx)}</div>
-
-                  <div className={s.eventList}>
-                    {occs.length === 0 && <p className={shared.empty}>No plans</p>}
-                    {occs.map((o) => {
-                      const e = o.event
-                      return (
-                        <div
-                          key={`${e.id}:${o.start}`}
-                          className={s.event}
-                          style={colorStyle(eventColorKey(state, e.attendees[0], e))}
-                        >
-                          <div className={s.eventTime}>
-                            {e.allDay
-                              ? o.span > 1
-                                ? `All day · ${o.offset + 1}/${o.span}`
-                                : 'All day'
-                              : `${minutesToTime(o.segment.start)}–${minutesToTime(o.segment.end)}`}
-                            {o.moved && ' · ↔ moved'}
-                          </div>
-                          <button
-                            type="button"
-                            className={s.eventBody}
-                            onClick={() =>
-                              setTarget({
-                                mode: 'edit',
-                                event: e,
-                                occurrenceDate: o.start,
-                              })
-                            }
-                          >
-                            <span className={s.eventTitle}>{e.title}</span>
-                            <span className={s.eventMeta}>
-                              <Avatars attendees={e.attendees} />
-                              {e.recurrence && recurrenceLabel(e.recurrence).toLowerCase()}
-                            </span>
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  <button
-                    type="button"
-                    className={s.addLink}
-                    onClick={() =>
-                      setTarget({
-                        mode: 'new',
-                        date: dateISO,
-                        attendees: defaultAttendees(state),
-                      })
-                    }
-                  >
-                    + Add
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        </div>
+        <WeekListBody
+          weekDays={weekDays}
+          onEdit={(o) => setTarget({ mode: 'edit', event: o.event, occurrenceDate: o.start })}
+          onAdd={(dateISO) =>
+            setTarget({ mode: 'new', date: dateISO, attendees: defaultAttendees(state) })
+          }
+        />
       )}
 
       {completionsLoading && <LoadingPill />}
@@ -200,5 +152,99 @@ export function WeekCalendar() {
         />
       )}
     </section>
+  )
+}
+
+/**
+ * The original "cards per day" week layout, now swipeable like the other
+ * views. On narrow screens the seven days stack vertically, so today gets an
+ * accent ring and the list starts scrolled to it.
+ */
+function WeekListBody({
+  weekDays,
+  onEdit,
+  onAdd,
+}: {
+  weekDays: { dateISO: string; occs: DayOccurrence[] }[]
+  onEdit: (occ: DayOccurrence) => void
+  onAdd: (dateISO: string) => void
+}) {
+  const { state, dispatch } = useApp()
+  const todayISO = toISODate(new Date())
+
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const todayRef = useRef<HTMLDivElement>(null)
+  const { onClickCapture } = useSwipeGestures({
+    scrollRef,
+    gridRef,
+    onNavigate: (delta) => dispatch({ type: 'shiftWeek', delta }),
+  })
+
+  // Start with today at the top whenever the visible week contains it — on
+  // phones the days stack vertically, so mid-week "today" sits below the fold.
+  // Other weeks have no anchor (todayRef unset) and keep their scroll position.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reruns when the visible week changes; the ref is stable
+  useEffect(() => {
+    todayRef.current?.scrollIntoView({ block: 'start', inline: 'nearest' })
+  }, [state.weekStart])
+
+  return (
+    <div
+      className={cx(shared.viewBody, shared.swipeBody)}
+      ref={scrollRef}
+      // Browser owns vertical panning; we own the horizontal swipe.
+      style={{ touchAction: 'pan-y' }}
+      onClickCapture={onClickCapture}
+    >
+      <div className={s.days} ref={gridRef}>
+        {weekDays.map(({ dateISO, occs }, dayIdx) => {
+          const isToday = dateISO === todayISO
+          return (
+            <div
+              className={cx(s.dayCol, isToday && s.today)}
+              key={dateISO}
+              ref={isToday ? todayRef : undefined}
+            >
+              <div className={s.dayHead}>{dayLabel(state.weekStart, dayIdx)}</div>
+
+              <div className={s.eventList}>
+                {occs.length === 0 && <p className={shared.empty}>No plans</p>}
+                {occs.map((o) => {
+                  const e = o.event
+                  return (
+                    <div
+                      key={`${e.id}:${o.start}`}
+                      className={s.event}
+                      style={colorStyle(eventColorKey(state, e.attendees[0], e))}
+                    >
+                      <div className={s.eventTime}>
+                        {e.allDay
+                          ? o.span > 1
+                            ? `All day · ${o.offset + 1}/${o.span}`
+                            : 'All day'
+                          : `${minutesToTime(o.segment.start)}–${minutesToTime(o.segment.end)}`}
+                        {o.moved && ' · ↔ moved'}
+                      </div>
+                      <button type="button" className={s.eventBody} onClick={() => onEdit(o)}>
+                        <span className={s.eventTitle}>{e.title}</span>
+                        <span className={s.eventMeta}>
+                          <Avatars attendees={e.attendees} />
+                          {e.recurrence && recurrenceLabel(e.recurrence).toLowerCase()}
+                        </span>
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <button type="button" className={s.addLink} onClick={() => onAdd(dateISO)}>
+                + Add
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
