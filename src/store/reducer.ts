@@ -252,6 +252,8 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case 'setTimezone':
       return { ...state, preferences: { ...state.preferences, timezone: action.timezone } }
+    case 'setWeekLayout':
+      return { ...state, preferences: { ...state.preferences, weekLayout: action.layout } }
     case 'shiftWeek':
       return { ...state, weekStart: addDays(state.weekStart, action.delta * 7) }
     case 'setWeek':

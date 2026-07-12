@@ -1,5 +1,5 @@
 import type { ColorKey } from '../lib/palette'
-import type { CalendarEvent, OccurrenceStatusCode, PersonId } from '../types'
+import type { CalendarEvent, OccurrenceStatusCode, PersonId, WeekLayout } from '../types'
 
 /**
  * Every state change flows through one of these. The reducer applies it to
@@ -80,6 +80,8 @@ export type Action =
   // Stamp the device's IANA timezone into the per-user preferences, for the
   // server-side reminder sender. Dispatched automatically on startup.
   | { type: 'setTimezone'; timezone: string }
+  // Per-user choice of Week tab layout (day-card list vs hourly timeline grid).
+  | { type: 'setWeekLayout'; layout: WeekLayout }
   | { type: 'shiftWeek'; delta: number }
   | { type: 'setWeek'; weekStart: string }
   | { type: 'shiftDay'; delta: number }

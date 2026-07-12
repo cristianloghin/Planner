@@ -1,0 +1,12 @@
+.timeGutter {
+  position: relative;
+}
+
+.gutterLabel {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  white-space: nowrap;
+}

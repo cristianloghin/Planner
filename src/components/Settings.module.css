@@ -45,6 +45,47 @@
   margin-top: 20px;
 }
 
+.weekLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.weekLayout .hint.small {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.segmented {
+  display: flex;
+  align-self: flex-start;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.segment {
+  padding: 8px 18px;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.segment + .segment {
+  border-left: 1px solid var(--border);
+}
+
+.segmentOn {
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
 .templates {
   display: flex;
   flex-direction: column;

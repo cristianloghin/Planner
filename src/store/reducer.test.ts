@@ -243,3 +243,15 @@ describe('navigation', () => {
     expect(next.selectedDay).toBe(3)
   })
 })
+
+describe('preferences', () => {
+  it('setWeekLayout stores the choice without touching other preferences', () => {
+    const state = baseState({
+      preferences: { personColors: { kid: '3' }, timezone: 'Europe/Bucharest' },
+    })
+    const next = reducer(state, { type: 'setWeekLayout', layout: 'timeline' })
+    expect(next.preferences.weekLayout).toBe('timeline')
+    expect(next.preferences.personColors).toEqual({ kid: '3' })
+    expect(next.preferences.timezone).toBe('Europe/Bucharest')
+  })
+})

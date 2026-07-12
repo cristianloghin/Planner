@@ -1,0 +1,191 @@
+/* ---- Header row: day labels + all-day chips over the grid columns ---- */
+.head {
+  display: grid;
+  grid-template-columns: var(--gutter-w) 1fr;
+}
+
+.headDays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-right: 1px solid var(--border);
+}
+
+.headDay {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 1px solid var(--border);
+  padding-bottom: 2px;
+}
+
+.headLabel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding-top: 4px;
+  color: var(--muted);
+}
+
+.headName {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.headNum {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.today .headName {
+  color: var(--accent);
+}
+
+.today .headNum {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.headAllday {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 2px;
+}
+
+.alldayChip {
+  height: 15px;
+  border: none;
+  border-left: 3px solid var(--c);
+  border-radius: 4px;
+  padding: 0 3px;
+  /* Stronger tint than the day view's blocks — at bar size the usual 15%
+     wash is barely visible. Text stays --text for contrast in both themes. */
+  background: color-mix(in oklab, var(--c) 45%, var(--surface));
+  color: var(--text);
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Scrolling timed grid ---- */
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* Clip the week-swipe slide so off-screen content can't scroll sideways. */
+  overflow-x: hidden;
+  /* WebKit/iOS: promote to its own compositing layer so the scrollable region
+     is established on first paint (see .plannerBody in DayView). */
+  transform: translateZ(0);
+  background: var(--surface);
+  padding: 0 max(16px, env(safe-area-inset-left));
+}
+
+.grid {
+  padding-top: 16px;
+  display: grid;
+  grid-template-columns: var(--gutter-w) 1fr;
+}
+
+.days {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-right: 1px solid var(--border);
+}
+
+.dayCol {
+  position: relative;
+  min-width: 0;
+  border-left: 1px solid var(--border);
+  cursor: copy;
+  /* Faint 15-min lines + stronger hour lines. */
+  background-image: repeating-linear-gradient(
+      to bottom,
+      var(--grid-line) 0,
+      var(--grid-line) 1px,
+      transparent 1px,
+      transparent var(--quarter-h)
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--grid-line-strong) 0,
+      var(--grid-line-strong) 1px,
+      transparent 1px,
+      transparent var(--hour-h)
+    );
+}
+
+.todayCol {
+  background-color: color-mix(in oklab, var(--accent) 5%, transparent);
+}
+
+/* ---- Event bars ---- */
+.bar {
+  position: absolute;
+  border: none;
+  border-left: 3px solid var(--c);
+  border-radius: 4px;
+  padding: 1px 3px;
+  background: color-mix(in oklab, var(--c) 45%, var(--surface));
+  color: var(--text);
+  text-align: left;
+  overflow: hidden;
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+.barTitle {
+  display: block;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+@media (max-width: 720px) {
+  .barTitle {
+    font-size: var(--fs-2xs);
+  }
+}
+
+.bar.done,
+.alldayChip.done {
+  opacity: 0.5;
+}
+
+.bar.done .barTitle {
+  text-decoration: line-through;
+}
+
+/* ---- Current time ---- */
+.nowLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px solid var(--now);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.nowDot {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--now);
+}

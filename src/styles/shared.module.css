@@ -74,6 +74,28 @@
   transform: translateZ(0);
 }
 
+/* A .viewBody whose content slides sideways during a swipe: clip the slide
+   so the off-screen half can't open a horizontal scrollbar. */
+.swipeBody {
+  overflow-x: hidden;
+}
+
+/* Three-page swipe strip: previous | current | next, one container-width
+   each, pulled left one page so the middle shows. useSwipeGestures drags it
+   sideways, so the neighbor's real content follows the finger. */
+.swipeStrip {
+  width: 300%;
+  margin-left: -100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* Wrapper that clips the strip to its own column, so sliding pages can't
+   paint over a neighboring fixed column (the timeline views' hour gutter). */
+.swipeClip {
+  overflow: hidden;
+}
+
 /* ---- Prev / next header (Day, Week, Month) ---- */
 .weekNav {
   display: flex;
