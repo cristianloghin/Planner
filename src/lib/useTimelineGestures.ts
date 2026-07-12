@@ -98,6 +98,10 @@ export function useTimelineGestures({
 
     const onStart = (e: TouchEvent) => {
       const st = g.current
+      // A pending suppression is only meant for the synthetic click of the
+      // *previous* gesture; if the browser never fired one, don't let the
+      // stale flag eat this new tap's click.
+      suppressClick.current = false
       if (e.touches.length === 2) {
         const rect = el.getBoundingClientRect()
         const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2
