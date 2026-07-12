@@ -37,10 +37,17 @@ function secrets.
 supabase secrets set --project-ref <project-ref> \
   VAPID_PUBLIC_KEY='<public key>' \
   VAPID_PRIVATE_KEY='<private key>' \
-  VAPID_SUBJECT='mailto:you@example.com'
+  VAPID_SUBJECT='mailto:you@example.com' \
+  CRON_SECRET="$(openssl rand -base64 32)"
 ```
 
 (`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically.)
+
+`CRON_SECRET` is how the scheduler authenticates to the function — keep the
+generated value; you'll pass the same string to `schedule_reminder_sender`
+below. (The function deliberately does NOT use Supabase API keys for this:
+comparing bearers against the runtime-injected service key proved brittle
+across the legacy-JWT and `sb_secret_...` key systems and 403'd spuriously.)
 
 ### 4. Deploy and schedule
 
@@ -51,17 +58,31 @@ manually:
 supabase functions deploy send-reminders --project-ref <project-ref>
 ```
 
-Then schedule it once, from the SQL editor (migration 0019 ships the helper;
-the bearer must be the **service-role key** — the function rejects anything
-else):
+The function does its own auth (the `x-cron-secret` header against
+`CRON_SECRET`), and its platform "Verify JWT" check is disabled declaratively
+(`supabase/config.toml`, applied on every CLI deploy) — Supabase's own
+recommendation for scheduled functions. If the function was deployed before
+that config existed, flip "Verify JWT with legacy secret" OFF once in
+Dashboard → Edge Functions → send-reminders → Details, or just redeploy.
+
+Then schedule it once, from the SQL editor (migration 0020 ships the helper);
+the second argument is the `CRON_SECRET` value from step 3:
 
 ```sql
 select schedule_reminder_sender(
   'https://<project-ref>.supabase.co/functions/v1/send-reminders',
-  '<service-role key>');
+  '<CRON_SECRET value>');
 ```
 
 To pause delivery: `select unschedule_reminder_sender();`
+
+You can exercise the function directly, without waiting for a beat:
+
+```bash
+curl -s -X POST https://<project-ref>.supabase.co/functions/v1/send-reminders \
+  -H "x-cron-secret: <CRON_SECRET value>"
+# → {"sent":0,"reason":"nothing due"} on a healthy, quiet system
+```
 
 ## Verifying
 
@@ -71,8 +92,20 @@ To pause delivery: `select unschedule_reminder_sender();`
 2. Create an event a few minutes out with an "At start" reminder; close the
    app. Within a cron beat of the fire time, the phone should show the push.
 3. `select * from cron.job_run_details order by start_time desc limit 5;`
-   shows the cron beats; the function's logs (Dashboard → Edge Functions)
-   show each run's `{ sent, due, deadSubscriptions }` summary.
+   shows the cron beats firing; each run also logs a
+   `send-reminders: { sent, due, deadSubscriptions }` summary line
+   (Dashboard → Edge Functions → Logs).
+4. The definitive per-beat record is what the function RETURNED to pg_net:
+
+   ```sql
+   select status_code, content::text, created
+   from net._http_response order by id desc limit 5;
+   ```
+
+   `200` + a summary body is healthy; `403 {"error":"forbidden"}` means the
+   scheduled `x-cron-secret` doesn't match the function's `CRON_SECRET`
+   (re-run `schedule_reminder_sender` with the right value); `500
+   CRON_SECRET not configured` means step 3 was skipped.
 
 ## How delivery decides what to send
 

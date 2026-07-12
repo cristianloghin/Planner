@@ -14,14 +14,19 @@
  *
  * All date/recurrence/timezone math lives in ./logic.ts, which is pure and
  * covered by the vitest suite. This file is the Deno glue: env, queries,
- * VAPID crypto, delivery. Runs with the service role (bypasses RLS) and only
- * accepts requests bearing the service-role key — verify_jwt alone would let
- * ANY signed-in user trigger a send sweep.
+ * VAPID crypto, delivery. It runs with the service role (bypasses RLS);
+ * callers must present the CRON_SECRET in an `x-cron-secret` header —
+ * verify_jwt alone would let ANY signed-in user trigger a send sweep, and
+ * comparing the Authorization bearer against the runtime-injected
+ * SUPABASE_SERVICE_ROLE_KEY proved brittle (legacy-JWT vs new sb_secret key
+ * systems disagree about which form that env holds).
  *
  * Required secrets (supabase secrets set):
  *   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY — base64url pair from
  *     `npx web-push generate-vapid-keys` (public half = VITE_VAPID_PUBLIC_KEY)
  *   VAPID_SUBJECT — mailto: contact, e.g. mailto:you@example.com
+ *   CRON_SECRET — any long random string (e.g. `openssl rand -base64 32`);
+ *     the same value goes to schedule_reminder_sender (migration 0020)
  */
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import * as webpush from 'jsr:@negrel/webpush@0.5.0'
@@ -83,12 +88,24 @@ async function importVapidPair(publicB64u: string, privateB64u: string): Promise
   return { publicKey, privateKey }
 }
 
+/** Log the run's outcome (the response body isn't captured by the function
+ *  log stream, so without this a healthy run looks like silence). */
+function done(summary: Record<string, unknown>): Response {
+  console.log('send-reminders:', JSON.stringify(summary))
+  return Response.json(summary)
+}
+
 Deno.serve(async (req) => {
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  if (req.headers.get('Authorization') !== `Bearer ${serviceKey}`) {
+  const cronSecret = Deno.env.get('CRON_SECRET')
+  if (!cronSecret) {
+    console.error('send-reminders: CRON_SECRET is not configured')
+    return new Response(JSON.stringify({ error: 'CRON_SECRET not configured' }), { status: 500 })
+  }
+  if (req.headers.get('x-cron-secret') !== cronSecret) {
     return new Response(JSON.stringify({ error: 'forbidden' }), { status: 403 })
   }
 
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const db = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey, {
     auth: { persistSession: false },
   })
@@ -98,7 +115,7 @@ Deno.serve(async (req) => {
     .from('push_subscription')
     .select('endpoint, user_id, p256dh, auth')
   if (subErr) throw subErr
-  if (!subs?.length) return Response.json({ sent: 0, reason: 'no subscriptions' })
+  if (!subs?.length) return done({ sent: 0, reason: 'no subscriptions' })
 
   const subsByUser = new Map<string, typeof subs>()
   for (const s of subs) {
@@ -129,7 +146,7 @@ Deno.serve(async (req) => {
   }
 
   const accountIds = [...new Set((members ?? []).map((m) => m.account_id))]
-  if (!accountIds.length) return Response.json({ sent: 0, reason: 'no accounts' })
+  if (!accountIds.length) return done({ sent: 0, reason: 'no accounts' })
 
   const nowMs = Date.now()
   const overrideFrom = new Date(nowMs - OVERRIDE_RANGE_MS).toISOString()
@@ -144,7 +161,7 @@ Deno.serve(async (req) => {
   if (serErr) throw serErr
   const series = (seriesRows ?? []) as (SenderSeries & { account_id: string })[]
   const seriesIds = series.map((s) => s.id)
-  if (!seriesIds.length) return Response.json({ sent: 0, reason: 'no series' })
+  if (!seriesIds.length) return done({ sent: 0, reason: 'no series' })
 
   const [{ data: remRows, error: remErr }, { data: ovrRows, error: ovrErr }] = await Promise.all([
     db
@@ -164,7 +181,7 @@ Deno.serve(async (req) => {
   if (ovrErr) throw ovrErr
   const reminders = (remRows ?? []) as SenderReminder[]
   const overrides = (ovrRows ?? []) as SenderOverride[]
-  if (!reminders.length) return Response.json({ sent: 0, reason: 'no reminders' })
+  if (!reminders.length) return done({ sent: 0, reason: 'no reminders' })
 
   // 3. Compute due notifications per user, in that user's own timezone.
   const windowStartMs = nowMs - LOOKBACK_MS
@@ -180,7 +197,7 @@ Deno.serve(async (req) => {
       windowEndMs: nowMs,
     })
   })
-  if (!due.length) return Response.json({ sent: 0, reason: 'nothing due' })
+  if (!due.length) return done({ sent: 0, reason: 'nothing due' })
 
   // 4. Dedup against notification_log.
   const { data: logRows, error: logErr } = await db
@@ -201,7 +218,7 @@ Deno.serve(async (req) => {
         `${d.seriesId}:${new Date(d.occurrenceStart).toISOString()}:${d.userId}:${d.reminderId}`,
       ),
   )
-  if (!fresh.length) return Response.json({ sent: 0, reason: 'all already sent' })
+  if (!fresh.length) return done({ sent: 0, reason: 'all already sent' })
 
   // 5. Deliver.
   const vapidKeys = await importVapidPair(
@@ -257,5 +274,5 @@ Deno.serve(async (req) => {
     if (delErr) console.error('pruning dead subscriptions:', delErr)
   }
 
-  return Response.json({ sent, due: fresh.length, deadSubscriptions: dead.length })
+  return done({ sent, due: fresh.length, deadSubscriptions: dead.length })
 })
