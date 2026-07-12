@@ -23,7 +23,7 @@ import { eventColorKey, peopleList, personColorKey } from '../lib/people'
 import { type DayOccurrence, nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
 import { DAY_MIN, type TimeBlock, layoutBlocks } from '../lib/timelineLayout'
 import { useLatest } from '../lib/useLatest'
-import { loadZoom, useSwipeGestures } from '../lib/useSwipeGestures'
+import { loadZoom, pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
 import type { CalendarEvent, CompletionsMap, Person, PersonId } from '../types'
@@ -250,8 +250,13 @@ export function DayView() {
           {/* The gutter stays put; only the day pages slide during a swipe. */}
           <div className={shared.swipeClip}>
             <div className={shared.swipeStrip} ref={stripRef}>
-              {pages.map((page) => (
-                <div key={page.iso} className={s.lanes} style={{ height: fullHeight }}>
+              {pages.map((page, pageIdx) => (
+                <div
+                  key={page.iso}
+                  className={s.lanes}
+                  style={{ height: fullHeight }}
+                  {...pageInert(pageIdx === 1)}
+                >
                   {people.map((p) => (
                     <Lane
                       key={p.id}

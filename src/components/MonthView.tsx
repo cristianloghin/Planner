@@ -15,7 +15,7 @@ import { colorStyle } from '../lib/palette'
 import { eventColorKey } from '../lib/people'
 import { nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
 import { eventStartMinutes } from '../lib/timing'
-import { useSwipeGestures } from '../lib/useSwipeGestures'
+import { pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
 import type { CompletionsMap } from '../types'
@@ -102,16 +102,20 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
             </div>
           ))}
         </div>
-        <div className={shared.swipeStrip} ref={stripRef}>
-          {months.map((month) => (
-            <MonthPage
-              key={month}
-              month={month}
-              today={today}
-              completions={completions}
-              onOpenDay={onOpenDay}
-            />
-          ))}
+        {/* Clip the strip so the neighbor months can't peek into the side padding. */}
+        <div className={shared.swipeClip}>
+          <div className={shared.swipeStrip} ref={stripRef}>
+            {months.map((month) => (
+              <MonthPage
+                key={month}
+                month={month}
+                active={month === cursor}
+                today={today}
+                completions={completions}
+                onOpenDay={onOpenDay}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
@@ -123,11 +127,14 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
 /** One month's 6×7 cell grid — a page of the Month view's swipe strip. */
 function MonthPage({
   month,
+  active,
   today,
   completions,
   onOpenDay,
 }: {
   month: string
+  /** Whether this is the visible middle page (the others render inert). */
+  active: boolean
   today: string
   completions: CompletionsMap
   onOpenDay: (iso: string) => void
@@ -153,7 +160,7 @@ function MonthPage({
   )
 
   return (
-    <div className={s.monthGrid}>
+    <div className={s.monthGrid} {...pageInert(active)}>
       {days.map((iso) => {
         const dayOccs = occurrencesByDay.get(iso) ?? []
         return (

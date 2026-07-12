@@ -20,7 +20,7 @@ import {
   recurrenceLabel,
 } from '../lib/recurrence'
 import { DAY_MIN } from '../lib/timelineLayout'
-import { useSwipeGestures } from '../lib/useSwipeGestures'
+import { pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
 import type { CalendarEvent } from '../types'
@@ -202,59 +202,62 @@ function WeekListBody({
       style={{ touchAction: 'pan-y' }}
       onClickCapture={onClickCapture}
     >
-      <div className={shared.swipeStrip} ref={stripRef}>
-        {weeks.map((weekDays) => (
-          <div className={s.days} key={weekDays[0].dateISO}>
-            {weekDays.map(({ dateISO, occs }) => {
-              // Only the visible (middle) week can contain today, so the
-              // anchor ref never lands on an off-screen page.
-              const isToday = dateISO === todayISO
-              return (
-                <div
-                  className={cx(s.dayCol, isToday && s.today)}
-                  key={dateISO}
-                  ref={isToday ? todayRef : undefined}
-                >
-                  <div className={s.dayHead}>{isoLabel(dateISO)}</div>
+      {/* Clip the strip so the neighbor weeks can't peek into the side padding. */}
+      <div className={shared.swipeClip}>
+        <div className={shared.swipeStrip} ref={stripRef}>
+          {weeks.map((weekDays, pageIdx) => (
+            <div className={s.days} key={weekDays[0].dateISO} {...pageInert(pageIdx === 1)}>
+              {weekDays.map(({ dateISO, occs }) => {
+                // Only the visible (middle) week can contain today, so the
+                // anchor ref never lands on an off-screen page.
+                const isToday = dateISO === todayISO
+                return (
+                  <div
+                    className={cx(s.dayCol, isToday && s.today)}
+                    key={dateISO}
+                    ref={isToday ? todayRef : undefined}
+                  >
+                    <div className={s.dayHead}>{isoLabel(dateISO)}</div>
 
-                  <div className={s.eventList}>
-                    {occs.length === 0 && <p className={shared.empty}>No plans</p>}
-                    {occs.map((o) => {
-                      const e = o.event
-                      return (
-                        <div
-                          key={`${e.id}:${o.start}`}
-                          className={s.event}
-                          style={colorStyle(eventColorKey(state, e.attendees[0], e))}
-                        >
-                          <div className={s.eventTime}>
-                            {e.allDay
-                              ? o.span > 1
-                                ? `All day · ${o.offset + 1}/${o.span}`
-                                : 'All day'
-                              : `${minutesToTime(o.segment.start)}–${minutesToTime(o.segment.end)}`}
-                            {o.moved && ' · ↔ moved'}
+                    <div className={s.eventList}>
+                      {occs.length === 0 && <p className={shared.empty}>No plans</p>}
+                      {occs.map((o) => {
+                        const e = o.event
+                        return (
+                          <div
+                            key={`${e.id}:${o.start}`}
+                            className={s.event}
+                            style={colorStyle(eventColorKey(state, e.attendees[0], e))}
+                          >
+                            <div className={s.eventTime}>
+                              {e.allDay
+                                ? o.span > 1
+                                  ? `All day · ${o.offset + 1}/${o.span}`
+                                  : 'All day'
+                                : `${minutesToTime(o.segment.start)}–${minutesToTime(o.segment.end)}`}
+                              {o.moved && ' · ↔ moved'}
+                            </div>
+                            <button type="button" className={s.eventBody} onClick={() => onEdit(o)}>
+                              <span className={s.eventTitle}>{e.title}</span>
+                              <span className={s.eventMeta}>
+                                <Avatars attendees={e.attendees} />
+                                {e.recurrence && recurrenceLabel(e.recurrence).toLowerCase()}
+                              </span>
+                            </button>
                           </div>
-                          <button type="button" className={s.eventBody} onClick={() => onEdit(o)}>
-                            <span className={s.eventTitle}>{e.title}</span>
-                            <span className={s.eventMeta}>
-                              <Avatars attendees={e.attendees} />
-                              {e.recurrence && recurrenceLabel(e.recurrence).toLowerCase()}
-                            </span>
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
+                        )
+                      })}
+                    </div>
 
-                  <button type="button" className={s.addLink} onClick={() => onAdd(dateISO)}>
-                    + Add
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        ))}
+                    <button type="button" className={s.addLink} onClick={() => onAdd(dateISO)}>
+                      + Add
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

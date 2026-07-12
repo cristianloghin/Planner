@@ -1,4 +1,5 @@
 import {
+  type HTMLAttributes,
   type MouseEvent as ReactMouseEvent,
   type RefObject,
   useEffect,
@@ -25,6 +26,20 @@ export function loadZoom(key: string): number {
   if (typeof localStorage === 'undefined') return DEFAULT_HOUR_H
   const raw = Number(localStorage.getItem(key))
   return raw ? clampZoom(raw) : DEFAULT_HOUR_H
+}
+
+/**
+ * Props for a swipe-strip page: the off-screen pages become inert —
+ * unfocusable and hidden from assistive tech — so tabbing (or any
+ * programmatic focus) can't reach a hidden page and scroll it into view,
+ * knocking the strip off center. Duplicated content also stays out of the
+ * accessibility tree.
+ */
+export function pageInert(active: boolean): HTMLAttributes<HTMLElement> {
+  // `inert: ''` sets the boolean attribute through React 18's unknown-attr
+  // passthrough; React 19 types it as a real boolean prop, so this cast (and
+  // the empty-string value) can go once the app upgrades.
+  return active ? {} : ({ inert: '', 'aria-hidden': true } as HTMLAttributes<HTMLElement>)
 }
 
 /** Pinch-to-zoom wiring for a timeline's user-zoomable hour height. */
