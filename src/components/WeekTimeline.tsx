@@ -7,7 +7,7 @@ import { eventColorKey } from '../lib/people'
 import type { DayOccurrence } from '../lib/recurrence'
 import { DAY_MIN, layoutBlocks } from '../lib/timelineLayout'
 import { useMediaQuery } from '../lib/useMediaQuery'
-import { loadZoom, useSwipeGestures } from '../lib/useSwipeGestures'
+import { loadZoom, pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
 import type { CompletionsMap } from '../types'
@@ -178,8 +178,13 @@ export function WeekTimelineBody({
         {/* The gutter stays put; only the week pages slide during a swipe. */}
         <div className={shared.swipeClip}>
           <div className={shared.swipeStrip} ref={stripRef}>
-            {pages.map((days) => (
-              <div className={s.days} key={days[0].dateISO} style={{ height: DAY_MIN * pxPerMin }}>
+            {pages.map((days, pageIdx) => (
+              <div
+                className={s.days}
+                key={days[0].dateISO}
+                style={{ height: DAY_MIN * pxPerMin }}
+                {...pageInert(pageIdx === 1)}
+              >
                 {days.map(({ dateISO, laid }) => (
                   // biome-ignore lint/a11y/useKeyWithClickEvents: tap-on-empty-space is a pointer affordance to prefill the editor; the keyboard path is the header's + button
                   <div
