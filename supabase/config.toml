@@ -412,3 +412,9 @@ enabled = true
 # declarative_schema_path = "./database"
 # JSON string passed through to pg-delta SQL formatting.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":80,\"commaStyle\":\"trailing\"}"
+
+# The reminder sender authenticates callers itself (CRON_SECRET in an
+# x-cron-secret header — see docs/PUSH_NOTIFICATIONS.md), per the platform's
+# own recommendation for scheduled functions. The CLI applies this on deploy.
+[functions.send-reminders]
+verify_jwt = false
