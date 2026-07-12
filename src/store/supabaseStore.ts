@@ -745,7 +745,8 @@ export class SupabaseStore implements ScheduleStore {
       // whole (already-updated) `next.preferences` document for this user.
       case 'setColorPref':
       case 'clearColorPref':
-      case 'setTimezone': {
+      case 'setTimezone':
+      case 'setWeekLayout': {
         const { error } = await supabase.from('user_preference').upsert(
           {
             account_id: this.accountId,

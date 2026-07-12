@@ -14,6 +14,11 @@ import { NotificationSettings } from './NotificationSettings'
 import s from './Settings.module.css'
 import { TemplateEditor } from './TemplateEditor'
 
+const WEEK_LAYOUTS = [
+  { value: 'list', label: 'List' },
+  { value: 'timeline', label: 'Timeline' },
+] as const
+
 export function Settings() {
   const { state, dispatch } = useApp()
   const { session, signOut } = useAuth()
@@ -74,6 +79,8 @@ export function Settings() {
           )
         })}
 
+        <WeekLayoutSection />
+
         <TemplatesSection />
 
         <NotificationSettings />
@@ -89,6 +96,34 @@ export function Settings() {
         )}
       </div>
     </section>
+  )
+}
+
+/** Pick how the Week tab lays out the seven days: day-card list or hourly grid. */
+function WeekLayoutSection() {
+  const { state, dispatch } = useApp()
+  const active = state.preferences.weekLayout ?? 'list'
+  return (
+    <div className={s.weekLayout}>
+      <span className={cx(s.hint, s.small)}>
+        Week view layout — List stacks each day's events as cards; Timeline shows the week on an
+        hourly grid with a time gutter, swipe navigation and pinch-to-zoom.
+      </span>
+      <div className={s.segmented} role="radiogroup" aria-label="Week view layout">
+        {WEEK_LAYOUTS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            role="radio"
+            aria-checked={active === opt.value}
+            className={cx(s.segment, active === opt.value && s.segmentOn)}
+            onClick={() => dispatch({ type: 'setWeekLayout', layout: opt.value })}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
 

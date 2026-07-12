@@ -211,7 +211,15 @@ export interface Preferences {
    * user's wall-clock fire times from it; absent = UTC.
    */
   timezone?: string
+  /**
+   * How the Week tab lays the seven days out: `list` (default) stacks each
+   * day's events as cards; `timeline` is an hourly grid with a time gutter,
+   * swipe week navigation and pinch-to-zoom, like the Day view.
+   */
+  weekLayout?: WeekLayout
 }
+
+export type WeekLayout = 'list' | 'timeline'
 
 export interface AppState {
   people: Record<PersonId, Person>
