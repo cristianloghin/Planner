@@ -6,7 +6,7 @@ import {
   ChevronRight,
   CircleDashed,
 } from 'lucide-react'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCompletionsForRange } from '../data/completions'
 import { checklistEntries, hasReminders } from '../lib/attachments'
 import { type Busy, type ChildStatus, childStatuses } from '../lib/conflicts'
@@ -21,7 +21,9 @@ import {
 import { colorStyle } from '../lib/palette'
 import { eventColorKey, peopleList, personColorKey } from '../lib/people'
 import { type DayOccurrence, nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
+import { DAY_MIN, type TimeBlock, layoutBlocks } from '../lib/timelineLayout'
 import { useLatest } from '../lib/useLatest'
+import { loadZoom, useTimelineGestures } from '../lib/useTimelineGestures'
 import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
 import type { CalendarEvent, CompletionsMap, Person, PersonId } from '../types'
@@ -30,37 +32,11 @@ import s from './DayView.module.css'
 import { type EditorTarget, EventEditor } from './EventEditor'
 import { OccurrenceSheet } from './OccurrenceSheet'
 import { LoadingPill } from './Spinner'
+import { TimeGutter } from './TimeGutter'
 import { ViewHeader } from './ViewHeader'
 
-// Layout scale. The hour height is user-zoomable (pinch); the rest are fixed.
-// The default must match --hour-h in tokens.css for the very first paint.
-const DEFAULT_HOUR_H = 56
-const MIN_HOUR_H = 28
-const MAX_HOUR_H = 160
-const DAY_MIN = 24 * 60
 const SNAP = 15
 const ZOOM_KEY = 'planner:hourH'
-
-// Past this much horizontal travel a touch is a day swipe (not a tap/scroll);
-// the slide animation that commits the change runs for this many ms.
-const SWIPE_COMMIT = 60
-const SWIPE_SLIDE_MS = 200
-
-const clampZoom = (h: number) => Math.min(MAX_HOUR_H, Math.max(MIN_HOUR_H, h))
-
-/** Last zoom level the user pinched to, or the default. */
-function loadZoom(): number {
-  if (typeof localStorage === 'undefined') return DEFAULT_HOUR_H
-  const raw = Number(localStorage.getItem(ZOOM_KEY))
-  return raw ? clampZoom(raw) : DEFAULT_HOUR_H
-}
-
-/** A timed occurrence clamped to the current day, ready to lay out. */
-interface DayBlock {
-  occ: DayOccurrence
-  start: number
-  end: number
-}
 
 export function DayView() {
   const { state, dispatch } = useApp()
@@ -73,14 +49,23 @@ export function DayView() {
   } | null>(null)
 
   // Pixels-per-hour for the timeline; pinch-to-zoom adjusts it (Y axis only).
-  const [hourH, setHourH] = useState(loadZoom)
+  const [hourH, setHourH] = useState(() => loadZoom(ZOOM_KEY))
   const pxPerMin = hourH / 60
-  // Mirror for the native touch listeners, which bind once and would otherwise
-  // close over a stale hour height mid-gesture.
+  // Mirror for scrollToMinute, which mount effects call with a stale closure.
   const hourHRef = useLatest(hourH)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
+
+  // Swipe to change day, pinch to zoom (shared with the Week grid).
+  const { onClickCapture } = useTimelineGestures({
+    scrollRef,
+    gridRef,
+    hourH,
+    setHourH,
+    zoomKey: ZOOM_KEY,
+    onNavigate: (delta) => dispatch({ type: 'shiftDay', delta }),
+  })
 
   // Tick once a minute so the "now" line moves and today-detection rolls over
   // at midnight — without it both freeze at whatever the last interaction saw.
@@ -120,141 +105,6 @@ export function DayView() {
     scrollToMinute(nowMin ?? 7 * 60)
   }, [])
 
-  // ---- touch gestures: swipe to change day, pinch to zoom -----------------
-  const g = useRef({
-    mode: 'none' as 'none' | 'decide' | 'swipe' | 'pinch',
-    x0: 0,
-    y0: 0,
-    dx: 0,
-    moved: false,
-    // pinch
-    dist0: 0,
-    hour0: DEFAULT_HOUR_H,
-    focalMin: 0,
-    focalOff: 0,
-  })
-  // Set after a real swipe/drag so the synthetic click doesn't add an event.
-  const suppressClick = useRef(false)
-  // Pinch focal point, consumed by the layout effect that re-pins scroll below.
-  const pinchAnchor = useRef<{ focalMin: number; focalOff: number } | null>(null)
-
-  // Keep the focal point fixed while a pinch changes the timeline height. Runs
-  // after the DOM has the new heights, so the math uses the post-zoom scale.
-  useLayoutEffect(() => {
-    const a = pinchAnchor.current
-    const el = scrollRef.current
-    if (!a || !el) return
-    el.scrollTop = a.focalMin * (hourH / 60) - a.focalOff
-  }, [hourH])
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the listeners bind once and read live values through refs (hourHRef, g); `dispatch` is stable
-  useEffect(() => {
-    const el = scrollRef.current
-    const grid = gridRef.current
-    if (!el || !grid) return
-
-    const dist = (t: TouchList) =>
-      Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
-
-    const onStart = (e: TouchEvent) => {
-      const st = g.current
-      if (e.touches.length === 2) {
-        const rect = el.getBoundingClientRect()
-        const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2
-        st.mode = 'pinch'
-        st.dist0 = dist(e.touches)
-        st.hour0 = hourHRef.current
-        st.focalOff = midY - rect.top
-        st.focalMin = (el.scrollTop + st.focalOff) / (hourHRef.current / 60)
-        grid.style.transition = 'none'
-        grid.style.transform = ''
-      } else if (e.touches.length === 1) {
-        st.mode = 'decide'
-        st.x0 = e.touches[0].clientX
-        st.y0 = e.touches[0].clientY
-        st.dx = 0
-        st.moved = false
-      }
-    }
-
-    const onMove = (e: TouchEvent) => {
-      const st = g.current
-      if (st.mode === 'pinch' && e.touches.length === 2) {
-        e.preventDefault()
-        const next = clampZoom((st.hour0 * dist(e.touches)) / st.dist0)
-        pinchAnchor.current = { focalMin: st.focalMin, focalOff: st.focalOff }
-        setHourH(next)
-        return
-      }
-      if (st.mode === 'decide') {
-        const dx = e.touches[0].clientX - st.x0
-        const dy = e.touches[0].clientY - st.y0
-        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return
-        // Horizontal intent → swipe; otherwise hand back to native scrolling.
-        st.mode = Math.abs(dx) > Math.abs(dy) ? 'swipe' : 'none'
-        if (st.mode === 'none') return
-      }
-      if (st.mode === 'swipe') {
-        e.preventDefault()
-        st.dx = e.touches[0].clientX - st.x0
-        st.moved = true
-        grid.style.transition = 'none'
-        grid.style.transform = `translateX(${st.dx}px)`
-      }
-    }
-
-    const onEnd = () => {
-      const st = g.current
-      if (st.mode === 'pinch') {
-        pinchAnchor.current = null
-        localStorage.setItem(ZOOM_KEY, String(hourHRef.current))
-        st.mode = 'none'
-        return
-      }
-      if (st.mode === 'swipe') {
-        if (st.moved) suppressClick.current = true
-        const w = el.clientWidth
-        if (Math.abs(st.dx) > SWIPE_COMMIT) {
-          // Slide the current day out the way it was dragged, swap, then slide
-          // the new day in from the opposite edge — a one-rendered-day carousel.
-          const dir = st.dx < 0 ? -1 : 1
-          grid.style.transition = `transform ${SWIPE_SLIDE_MS}ms ease`
-          grid.style.transform = `translateX(${dir * w}px)`
-          window.setTimeout(() => {
-            dispatch({ type: 'shiftDay', delta: -dir })
-            grid.style.transition = 'none'
-            grid.style.transform = `translateX(${-dir * w}px)`
-            requestAnimationFrame(() => {
-              grid.style.transition = `transform ${SWIPE_SLIDE_MS}ms ease`
-              grid.style.transform = 'translateX(0)'
-            })
-          }, SWIPE_SLIDE_MS)
-        } else {
-          grid.style.transition = `transform ${SWIPE_SLIDE_MS}ms ease`
-          grid.style.transform = 'translateX(0)'
-        }
-      }
-      st.mode = 'none'
-    }
-
-    const noGesture = (e: Event) => e.preventDefault()
-
-    // passive:false so the pinch/swipe handlers can preventDefault the browser's
-    // own pinch-zoom and horizontal overscroll.
-    el.addEventListener('touchstart', onStart, { passive: false })
-    el.addEventListener('touchmove', onMove, { passive: false })
-    el.addEventListener('touchend', onEnd)
-    el.addEventListener('touchcancel', onEnd)
-    el.addEventListener('gesturestart', noGesture) // iOS Safari pinch-zoom
-    return () => {
-      el.removeEventListener('touchstart', onStart)
-      el.removeEventListener('touchmove', onMove)
-      el.removeEventListener('touchend', onEnd)
-      el.removeEventListener('touchcancel', onEnd)
-      el.removeEventListener('gesturestart', noGesture)
-    }
-  }, [])
-
   function addAt(attendees: PersonId[], minute: number) {
     const start = Math.min(Math.max(0, Math.round(minute / SNAP) * SNAP), DAY_MIN - SNAP)
     setEditor({
@@ -275,7 +125,7 @@ export function DayView() {
   // pinch-zoom frame or timer tick doesn't recompute it.
   const { timedBlocks, allDayOccs, statuses, hasWarnings } = useMemo(() => {
     const occs = occurrencesOnDate(state.events, dateISO, completions)
-    const timedBlocks: DayBlock[] = occs
+    const timedBlocks: TimeBlock[] = occs
       .filter((o) => !o.event.allDay)
       .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end }))
     const allDayOccs = occs.filter((o) => o.event.allDay)
@@ -375,13 +225,7 @@ export function DayView() {
         ref={scrollRef}
         // Browser owns vertical panning; we own horizontal swipe + pinch.
         style={{ touchAction: 'pan-y' }}
-        onClickCapture={(e) => {
-          if (suppressClick.current) {
-            suppressClick.current = false
-            e.stopPropagation()
-            e.preventDefault()
-          }
-        }}
+        onClickCapture={onClickCapture}
       >
         <div
           className={s.plannerGrid}
@@ -498,63 +342,6 @@ function AllDayChip({
   )
 }
 
-const GUTTER_HOURS = Array.from({ length: 25 }, (_, h) => h)
-
-function TimeGutter({ hourH }: { hourH: number }) {
-  return (
-    <div className={s.timeGutter} style={{ height: DAY_MIN * (hourH / 60) }}>
-      {GUTTER_HOURS.map((h) => (
-        <div key={h} className={s.gutterLabel} style={{ top: h * hourH }}>
-          {String(h).padStart(2, '0')}:00
-        </div>
-      ))}
-    </div>
-  )
-}
-
-interface Laid {
-  block: DayBlock
-  col: number
-  cols: number
-}
-
-/** Greedy column layout so overlapping blocks in one lane sit side by side. */
-function layout(blocks: DayBlock[]): Laid[] {
-  const sorted = [...blocks].sort((a, b) => a.start - b.start || a.end - b.end)
-  const result: Laid[] = []
-  let cluster: DayBlock[] = []
-  let clusterEnd = -1
-
-  const flush = () => {
-    const columns: DayBlock[][] = []
-    for (const b of cluster) {
-      let placed = false
-      for (const c of columns) {
-        if (c[c.length - 1].end <= b.start) {
-          c.push(b)
-          placed = true
-          break
-        }
-      }
-      if (!placed) columns.push([b])
-    }
-    const n = columns.length
-    columns.forEach((c, ci) => c.forEach((block) => result.push({ block, col: ci, cols: n })))
-  }
-
-  for (const b of sorted) {
-    if (cluster.length && b.start >= clusterEnd) {
-      flush()
-      cluster = []
-      clusterEnd = -1
-    }
-    cluster.push(b)
-    clusterEnd = Math.max(clusterEnd, b.end)
-  }
-  if (cluster.length) flush()
-  return result
-}
-
 function Lane({
   person,
   blocks,
@@ -566,7 +353,7 @@ function Lane({
   onOpen,
 }: {
   person: Person
-  blocks: DayBlock[]
+  blocks: TimeBlock[]
   statuses: Map<string, ChildStatus>
   completions: CompletionsMap
   nowMin: number | null
@@ -578,7 +365,7 @@ function Lane({
   // Every block this person is on — shared events simply appear in each
   // attendee's lane, colored by that lane.
   const mine = blocks.filter((b) => b.occ.event.attendees.includes(person.id))
-  const laid = layout(mine)
+  const laid = layoutBlocks(mine)
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
     if ((e.target as HTMLElement).closest(`.${s.tlEvent}`)) return
