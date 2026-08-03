@@ -127,6 +127,30 @@ export async function syncPushSubscription(userId: string): Promise<void> {
   }
 }
 
+/**
+ * Opening the app means the reminders have been seen: drop the icon badge and
+ * close the notifications still sitting in Notification Center.
+ *
+ * Both halves matter. The badge count is DERIVED from those notifications (see
+ * syncBadge in src/sw.ts), so clearing the badge alone would leave the next
+ * push counting reminders the user has already dealt with — the icon would
+ * come back reading 3 when only one is new.
+ *
+ * Badging rides the same iOS gate as push (installed to the Home Screen,
+ * permission granted), so this is a no-op wherever pushes don't work either.
+ */
+export async function clearNotifications(): Promise<void> {
+  try {
+    if ('clearAppBadge' in navigator) await navigator.clearAppBadge()
+    if (!('serviceWorker' in navigator)) return
+    const reg = await navigator.serviceWorker.getRegistration()
+    for (const n of (await reg?.getNotifications()) ?? []) n.close()
+  } catch (e) {
+    // Decoration: never surface this, and never let it break app startup.
+    console.warn('Clearing notifications failed:', e)
+  }
+}
+
 /** Unsubscribe this device and drop its row. */
 export async function disablePush(): Promise<void> {
   const sub = await currentSubscription()

@@ -119,11 +119,15 @@ curl -s -X POST https://<project-ref>.supabase.co/functions/v1/send-reminders \
    `push_subscription`.
 2. Create an event a few minutes out with an "At start" reminder; close the
    app. Within a cron beat of the fire time, the phone should show the push.
-3. `select * from cron.job_run_details order by start_time desc limit 5;`
+3. The Home Screen icon should now carry a red badge counting the reminders
+   waiting in Notification Center. Opening the app clears both the badge and
+   those notifications. (Badging needs nothing configured — same iOS gate as
+   push: installed to the Home Screen, permission granted.)
+4. `select * from cron.job_run_details order by start_time desc limit 5;`
    shows the cron beats firing; each run also logs a
    `send-reminders: { sent, due, deadSubscriptions }` summary line
    (Dashboard → Edge Functions → Logs).
-4. The definitive per-beat record is what the function RETURNED to pg_net:
+5. The definitive per-beat record is what the function RETURNED to pg_net:
 
    ```sql
    select status_code, content::text, created
@@ -133,7 +137,7 @@ curl -s -X POST https://<project-ref>.supabase.co/functions/v1/send-reminders \
    `200` + a summary body is healthy; `403 {"error":"forbidden"}` means the
    scheduled `x-cron-secret` doesn't match the function's `CRON_SECRET`
    (re-run `schedule_reminder_sender` with the right value); `500
-   CRON_SECRET not configured` means step 3 was skipped.
+   CRON_SECRET not configured` means setup step 3 was skipped.
 
 ## Troubleshooting
 
@@ -223,3 +227,9 @@ must toggle notifications off and on again.
   in their own zone (documented tradeoff, same as the calendar itself).
 - iOS shows pushes only while the PWA is installed; removing it from the Home
   Screen silently kills the subscription until re-enabled.
+- The icon badge is separately revocable per device: iOS Settings →
+  Notifications → Planner → **Badges**. Pushes still arrive with it off, so a
+  device that notifies but never badges is this toggle, not a bug. The count
+  is derived from what's in Notification Center, so it reflects undismissed
+  reminders rather than anything the server tracks — there is no server-side
+  notion of "unread".
