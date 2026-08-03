@@ -12,7 +12,7 @@ import { PageLoader } from './components/Spinner'
 import { WeekCalendar } from './components/WeekCalendar'
 import { useTemplatesRealtime } from './data/templates'
 import { cx } from './lib/cx'
-import { syncPushSubscription } from './lib/push'
+import { clearNotifications, syncPushSubscription } from './lib/push'
 import { AppProvider, useApp } from './state'
 
 type Tab = 'day' | 'calendar' | 'month' | 'lists' | 'settings'
@@ -75,6 +75,19 @@ export function App() {
   useEffect(() => {
     if (session) void syncPushSubscription(session.user.id)
   }, [session])
+
+  // The app being in front means the reminders have been seen: clear the icon
+  // badge and the notifications it counts. On mount for a cold launch (tapping
+  // the badged icon), on visibilitychange for a resume from the app switcher —
+  // iOS keeps the PWA alive in the background, so mount alone would miss it.
+  useEffect(() => {
+    const clear = () => {
+      if (!document.hidden) void clearNotifications()
+    }
+    clear()
+    document.addEventListener('visibilitychange', clear)
+    return () => document.removeEventListener('visibilitychange', clear)
+  }, [])
 
   function openDay(iso: string) {
     dispatch({ type: 'goToDate', date: iso })
