@@ -1,5 +1,7 @@
+import { Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import {
+  useCancelOccurrence,
   useClearOccurrenceOverride,
   useCompletionsForRange,
   useSetChecklistEntry,
@@ -22,11 +24,13 @@ import {
   recurrenceLabel,
   seriesOccurrenceDatesInRange,
 } from '../lib/recurrence'
-import { MINS_PER_DAY, eventSpanDays, eventStartMinutes } from '../lib/timing'
+import { MINS_PER_DAY, eventDate, eventSpanDays, eventStartMinutes } from '../lib/timing'
 import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
 import type { CalendarEvent, CompletionsMap, OccurrenceStatusCode } from '../types'
+import { ConfirmDialog } from './ConfirmDialog'
 import s from './OccurrenceSheet.module.css'
+import { type ScopeChoice, ScopeSheet } from './ScopeSheet'
 import { PageLoader } from './Spinner'
 
 const STATUSES: OccurrenceStatusCode[] = ['done', 'skipped', 'blocked']
@@ -47,7 +51,7 @@ export function OccurrenceSheet({
   onEdit: () => void
   onClose: () => void
 }) {
-  const { state } = useApp()
+  const { state, dispatch } = useApp()
   // Windowed per-occurrence state: this occurrence's month, plus the dates of
   // any prerequisites it waits on (they may live outside the window).
   const edges = state.dependencies[occKey(event.id, date)] ?? []
@@ -60,6 +64,14 @@ export function OccurrenceSheet({
   const setOccurrenceStatus = useSetOccurrenceStatus()
   const setChecklistEntry = useSetChecklistEntry()
   const clearOverride = useClearOccurrenceOverride()
+  const cancelOccurrence = useCancelOccurrence()
+
+  // Delete asks two different questions. A one-off just needs confirming; a
+  // series needs to know how far the delete reaches, and that action sheet is
+  // itself the confirmation (so the two are mutually exclusive, never stacked).
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteScope, setDeleteScope] = useState(false)
+  const isRecurring = !!event.recurrence
 
   const cls = checklists(event).filter((c) => c.items.length > 0)
   const hasChecklist = cls.length > 0
@@ -77,6 +89,66 @@ export function OccurrenceSheet({
   function setStatus(next: OccurrenceStatusCode | null) {
     setOccurrenceStatus.mutate({ event, date, status: next })
   }
+
+  // ---- delete (scoped for a series) --------------------------------------
+  // Deleting forward from the series' anchor leaves nothing behind, so on the
+  // first slot "this and future" collapses into "all".
+  const isFirstOccurrence = eventDate(event) === date
+
+  /** Drop the whole series, every occurrence with it. */
+  function deleteAllEvents() {
+    dispatch({ type: 'removeEvent', id: event.id })
+    onClose()
+  }
+  /** Remove just this slot: the rule still produces it, `cancelled` hides it. */
+  function deleteThisEvent() {
+    cancelOccurrence.mutate({ event, date })
+    onClose()
+  }
+  /**
+   * End the series the day before this occurrence — the inclusive `until` cap
+   * `startsOn` already honours, so everything from here on stops being produced
+   * (relocated occurrences included: pass 1 of occurrencesOnDate re-checks
+   * `startsOn` against the origin slot).
+   */
+  function deleteThisAndFuture() {
+    if (isFirstOccurrence) return deleteAllEvents()
+    dispatch({
+      type: 'updateEvent',
+      event: {
+        ...event,
+        recurrence: { ...event.recurrence!, until: addDays(date, -1) },
+      },
+    })
+    onClose()
+  }
+
+  const deleteChoices: ScopeChoice[] = [
+    { label: 'This event only', detail: isoLabel(date), onSelect: deleteThisEvent },
+    // Omitted on the first occurrence, where it would duplicate "All events".
+    ...(isFirstOccurrence
+      ? []
+      : [
+          {
+            label: 'This and future events',
+            detail: `From ${isoLabel(date)}`,
+            onSelect: deleteThisAndFuture,
+          },
+        ]),
+    { label: 'All events', detail: 'The whole series', onSelect: deleteAllEvents },
+  ]
+
+  /** Toolbar delete: actions only — the question itself lives in the sheet. */
+  const deleteButton = (
+    <button
+      type="button"
+      className={cx(shared.iconBtn, shared.iconDanger)}
+      onClick={() => (isRecurring ? setDeleteScope(true) : setConfirmDelete(true))}
+      aria-label="Delete event"
+    >
+      <Trash2 size={20} aria-hidden />
+    </button>
+  )
 
   // Show this occurrence's *effective* timing — a one-off override moves the time
   // and length for this date only, while `event` stays the series for editing.
@@ -103,12 +175,14 @@ export function OccurrenceSheet({
           <button type="button" className={shared.editorCancel} onClick={onClose}>
             Close
           </button>
-          <strong>{event.title}</strong>
-          <button type="button" className={shared.primary} onClick={onEdit}>
-            Edit
-          </button>
+          <div className={shared.editorActions}>
+            <button type="button" className={shared.primary} onClick={onEdit}>
+              Edit
+            </button>
+          </div>
         </header>
         <div className={shared.editorBody}>
+          <h1 className={shared.editorTitle}>{event.title}</h1>
           <PageLoader />
         </div>
       </div>
@@ -121,13 +195,17 @@ export function OccurrenceSheet({
         <button type="button" className={shared.editorCancel} onClick={onClose}>
           Close
         </button>
-        <strong className={cx(done && s.doneTitle)}>{event.title}</strong>
-        <button type="button" className={shared.primary} onClick={onEdit}>
-          Edit
-        </button>
+        <div className={shared.editorActions}>
+          {deleteButton}
+          <button type="button" className={shared.primary} onClick={onEdit}>
+            Edit
+          </button>
+        </div>
       </header>
 
       <div className={shared.editorBody}>
+        <h1 className={cx(shared.editorTitle, done && s.doneTitle)}>{event.title}</h1>
+
         <p className={s.meta}>
           {timeLabel} · {attendeeLabel(state, event.attendees)}
           {event.recurrence && ` · ${recurrenceLabel(event.recurrence).toLowerCase()}`}
@@ -219,6 +297,24 @@ export function OccurrenceSheet({
 
         <DependencyEditor event={event} date={date} completions={completions} />
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete event?"
+        message={`“${event.title || 'Untitled'}” will be removed from your calendar.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={deleteAllEvents}
+      />
+
+      <ScopeSheet
+        open={deleteScope}
+        onOpenChange={setDeleteScope}
+        title="Delete recurring event"
+        choices={deleteChoices}
+        destructive
+      />
     </div>
   )
 }

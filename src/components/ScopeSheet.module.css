@@ -1,0 +1,89 @@
+/*
+ * Action-sheet chrome for the recurring-scope chooser. Radix Dialog portals to
+ * <body> and renders the overlay + content as siblings, so the overlay is just
+ * the backdrop and the card positions itself. z-index sits above the full-page
+ * editor shell (.editorPage is 2000).
+ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: var(--overlay);
+}
+
+.card {
+  position: fixed;
+  z-index: 3001;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(100% - 48px);
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 18px 48px var(--shadow);
+}
+
+.title {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.option {
+  width: 100%;
+  /* iOS minimum touch target — these sit close together and one of them may be
+     destructive, so they must not be mis-tappable. */
+  min-height: 44px;
+  text-align: left;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.option:hover {
+  border-color: var(--accent);
+}
+
+/* Destructive sheets ARE the confirmation (iOS convention: an action sheet with
+   red options doesn't stack a second "are you sure" on top), so the options
+   carry the danger token themselves. */
+.option.danger {
+  color: var(--danger);
+}
+
+.option.danger:hover {
+  border-color: var(--danger);
+}
+
+/* Which occurrences an option actually reaches — the thing "this" is ambiguous
+   about without a date. */
+.detail {
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.cancel {
+  align-self: center;
+  min-height: 44px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 8px 16px;
+  margin-top: 4px;
+  font-size: var(--fs-md);
+}

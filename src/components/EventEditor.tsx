@@ -1,10 +1,8 @@
-import { Dialog } from 'radix-ui'
 import { useEffect, useRef, useState } from 'react'
 import { useCompletionsForRange, useSetOccurrenceOverride } from '../data/completions'
 import { useAddTemplate, useTemplates } from '../data/templates'
 import { cloneAttachments } from '../lib/attachments'
-import { cx } from '../lib/cx'
-import { addDays, diffDays, minutesToTime, toDateTimeLocal } from '../lib/dates'
+import { addDays, diffDays, isoLabel, minutesToTime, toDateTimeLocal } from '../lib/dates'
 import { COLOR_OPTIONS, DEFAULT_COLOR } from '../lib/palette'
 import type { ColorKey } from '../lib/palette'
 import { personColorKey } from '../lib/people'
@@ -25,6 +23,7 @@ import { AttendeeChips } from './AttendeeChips'
 import { ColorPicker } from './ColorPicker'
 import s from './EventEditor.module.css'
 import { NumberField } from './NumberField'
+import { ScopeSheet } from './ScopeSheet'
 import { PageLoader } from './Spinner'
 
 const SNAP = 15
@@ -99,9 +98,20 @@ export function EventEditor({
   const occurrenceDate = target.mode === 'edit' ? (target.occurrenceDate ?? null) : null
   const { completions, isLoading } = useCompletionsForRange(occurrenceDate)
   if (occurrenceDate && isLoading) {
+    // Keep the toolbar: this shell covers the whole screen and the app runs
+    // standalone, so Cancel is the only way out — a bare spinner would trap.
     return (
       <div className={shared.editorPage}>
-        <PageLoader />
+        <header className={shared.editorHead}>
+          <button type="button" className={shared.editorCancel} onClick={onClose}>
+            Cancel
+          </button>
+          <strong>Edit event</strong>
+          <span />
+        </header>
+        <div className={shared.editorBody}>
+          <PageLoader />
+        </div>
       </div>
     )
   }
@@ -486,42 +496,28 @@ function EventEditorForm({
           </button>
         </div>
 
-        {isEdit && (
-          <button
-            type="button"
-            className={cx(shared.danger, shared.editorDelete)}
-            onClick={() => {
-              dispatch({ type: 'removeEvent', id: base!.id })
-              onClose()
-            }}
-          >
-            Delete event
-          </button>
-        )}
+        {/* Delete lives in the OccurrenceSheet toolbar — one tap from the event
+            itself, rather than behind Edit and a full scroll of this form. */}
       </div>
 
-      <Dialog.Root open={showScope} onOpenChange={setShowScope}>
-        <Dialog.Portal>
-          <Dialog.Overlay className={s.scopeOverlay} />
-          <Dialog.Content className={s.scopeCard} aria-describedby={undefined}>
-            <Dialog.Title className={s.scopeTitle}>Save changes to…</Dialog.Title>
-            <button type="button" className={s.scopeOption} onClick={saveThisOccurrence}>
-              This event only
-            </button>
-            <button type="button" className={s.scopeOption} onClick={saveThisAndFollowing}>
-              This and following events
-            </button>
-            <button type="button" className={s.scopeOption} onClick={saveAllEvents}>
-              All events
-            </button>
-            <Dialog.Close asChild>
-              <button type="button" className={s.scopeCancel}>
-                Cancel
-              </button>
-            </Dialog.Close>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+      <ScopeSheet
+        open={showScope}
+        onOpenChange={setShowScope}
+        title="Save changes to…"
+        choices={[
+          {
+            label: 'This event only',
+            detail: occurrenceDate ? isoLabel(occurrenceDate) : undefined,
+            onSelect: saveThisOccurrence,
+          },
+          {
+            label: 'This and following events',
+            detail: occurrenceDate ? `From ${isoLabel(occurrenceDate)}` : undefined,
+            onSelect: saveThisAndFollowing,
+          },
+          { label: 'All events', detail: 'The whole series', onSelect: saveAllEvents },
+        ]}
+      />
     </form>
   )
 }
