@@ -1000,6 +1000,38 @@ export class SupabaseStore implements ScheduleStore {
     if (error) throw error
   }
 
+  /**
+   * Remove a single occurrence from its series. Identity stays the ORIGINAL
+   * slot: the rule still produces it, but the row's `cancelled` flag makes the
+   * render and reminder paths skip it (see occurrencesOnDate / dueAlerts). Any
+   * status/ticks on the row are left alone, so un-cancelling would restore them.
+   */
+  async cancelOccurrence(ev: CalendarEvent, date: string): Promise<void> {
+    const { from, to } = dayRange(date)
+    const { data, error: selErr } = await supabase
+      .from('event_occurrence')
+      .select('occurrence_start')
+      .eq('series_id', ev.id)
+      .gte('occurrence_start', from)
+      .lt('occurrence_start', to)
+      .limit(1)
+    if (selErr) throw selErr
+    const existing = data?.[0]
+    const { error } = existing
+      ? await supabase
+          .from('event_occurrence')
+          .update({ cancelled: true })
+          .eq('series_id', ev.id)
+          .eq('occurrence_start', existing.occurrence_start)
+      : await supabase
+          .from('event_occurrence')
+          .upsert(
+            { series_id: ev.id, occurrence_start: occurrenceTs(ev, date), cancelled: true },
+            { onConflict: 'series_id,occurrence_start' },
+          )
+    if (error) throw error
+  }
+
   /** Null the timing override but keep the row (it may still carry status). */
   async clearOccurrenceOverride(ev: CalendarEvent, date: string): Promise<void> {
     const { from, to } = dayRange(date)

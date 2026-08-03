@@ -153,27 +153,68 @@
   background: var(--bg);
 }
 
+/* A fixed-height toolbar of ACTIONS. It never scrolls away, so nothing
+   variable-length belongs in it — see .editorTitle for where a name goes. */
 .editorHead {
   flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-height: 44px;
   padding: max(env(safe-area-inset-top), 16px) 16px 12px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
 }
 
+/* Toolbar title: only ever a short, static label ("New event"). Clipped rather
+   than wrapped, so no caller can grow the header by passing something long. */
 .editorHead strong {
-  font-size: var(--fs-2xl);
+  font-size: var(--fs-lg);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The primary toolbar action carries the same 44pt target as its neighbours. */
+.editorHead .primary {
+  min-height: 44px;
+}
+
+/* Right-hand action cluster: icon buttons alongside the primary action. */
+.editorActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .editorCancel {
+  display: flex;
+  align-items: center;
   background: transparent;
   border: none;
   color: var(--muted);
   font-size: var(--fs-xl);
   padding: 6px 2px;
+  min-height: 44px;
+}
+
+/* Bare icon button at the iOS 44pt minimum touch target. */
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+.iconBtn.iconDanger {
+  color: var(--danger);
 }
 
 .editorBody {
@@ -193,9 +234,16 @@
   gap: 10px;
 }
 
-.editorDelete {
-  margin-top: 6px;
-  width: 100%;
+/* Large title at the top of a scrolling editor body. The toolbar holds the
+   actions; the name lives here so it can wrap freely and scroll away instead of
+   inflating a header that's pinned for the life of the screen. `anywhere` so a
+   single long unbroken word wraps rather than overflowing sideways. */
+.editorTitle {
+  margin: 0;
+  font-size: var(--fs-2xl);
+  line-height: 1.15;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 /* ---- Editor form primitives ---- */

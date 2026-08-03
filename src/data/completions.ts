@@ -158,6 +158,7 @@ export type OccurrenceWrite =
   | { kind: 'tick'; event: CalendarEvent; date: string; entryId: string; checked: boolean }
   | { kind: 'override'; event: CalendarEvent; date: string; start: string; duration: number }
   | { kind: 'clearOverride'; event: CalendarEvent; date: string }
+  | { kind: 'cancel'; event: CalendarEvent; date: string }
 
 const OCCURRENCE_WRITE_KEY = ['occurrence-write'] as const
 // Bare prefix (no accountId): defaults are registered at module scope, before
@@ -195,6 +196,8 @@ function patchEntry(entry: OccurrenceState | undefined, w: OccurrenceWrite): Occ
       const { start: _s, duration: _d, ...rest } = entry ?? {}
       return rest
     }
+    case 'cancel':
+      return { ...entry, cancelled: true }
   }
 }
 
@@ -210,6 +213,8 @@ queryClient.setMutationDefaults(OCCURRENCE_WRITE_KEY, {
         return store.setOccurrenceOverride(w.event, w.date, w.start, w.duration)
       case 'clearOverride':
         return store.clearOccurrenceOverride(w.event, w.date)
+      case 'cancel':
+        return store.cancelOccurrence(w.event, w.date)
     }
   },
   // Patch the occurrence's entry in EVERY cached month window (they overlap
@@ -281,5 +286,14 @@ export function useClearOccurrenceOverride() {
     ...m,
     mutate: (v: { event: CalendarEvent; date: string }) =>
       m.mutate({ kind: 'clearOverride', ...v }),
+  }
+}
+
+/** Remove one occurrence from its series, leaving the rest of the series alone. */
+export function useCancelOccurrence() {
+  const m = useOccurrenceWrite()
+  return {
+    ...m,
+    mutate: (v: { event: CalendarEvent; date: string }) => m.mutate({ kind: 'cancel', ...v }),
   }
 }
