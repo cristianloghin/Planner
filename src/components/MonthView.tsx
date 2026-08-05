@@ -1,11 +1,12 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { Fragment, useMemo, useRef, useState } from 'react'
 import { useCompletionsForRange } from '../data/completions'
 import { cx } from '../lib/cx'
 import {
   DAY_NAMES,
   addMonths,
   isSameMonth,
+  isoWeekNumber,
   monthGridDays,
   monthLabel,
   startOfMonth,
@@ -96,6 +97,8 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
       >
         {/* The weekday labels stay put; only the month pages slide. */}
         <div className={s.monthWeekdays}>
+          {/* Spacer over the week-number column so the labels stay aligned. */}
+          <div />
           {DAY_NAMES.map((name) => (
             <div key={name} className={s.monthWeekday}>
               {name}
@@ -161,9 +164,9 @@ function MonthPage({
 
   return (
     <div className={s.monthGrid} {...pageInert(active)}>
-      {days.map((iso) => {
+      {days.map((iso, i) => {
         const dayOccs = occurrencesByDay.get(iso) ?? []
-        return (
+        const cell = (
           <button
             type="button"
             key={iso}
@@ -187,6 +190,15 @@ function MonthPage({
               </span>
             )}
           </button>
+        )
+        // Each Monday opens a grid row, prefixed with its ISO week number.
+        return i % 7 === 0 ? (
+          <Fragment key={iso}>
+            <span className={s.weekNum}>{isoWeekNumber(iso)}</span>
+            {cell}
+          </Fragment>
+        ) : (
+          cell
         )
       })}
     </div>

@@ -4,6 +4,15 @@
   grid-template-columns: var(--gutter-w) 1fr;
 }
 
+.headWeek {
+  align-self: start;
+  padding-top: 6px;
+  text-align: center;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--muted);
+}
+
 .headDays {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));

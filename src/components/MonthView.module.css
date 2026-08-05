@@ -1,17 +1,29 @@
-.monthGrid {
+/* Fixed-width leading column for the ISO week numbers, shared by the grid
+   and the weekday header so they stay aligned. */
+.monthGrid,
+.monthWeekdays {
+  --weeknum-w: 16px;
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: var(--weeknum-w) repeat(7, minmax(0, 1fr));
   gap: 5px;
+}
+
+.monthGrid {
   align-content: start;
 }
 
 /* The static weekday header row above the sliding month pages; its columns
    mirror .monthGrid so the labels line up with the cells. */
 .monthWeekdays {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 5px;
   margin-bottom: 5px;
+}
+
+.weekNum {
+  align-self: center;
+  text-align: center;
+  font-size: var(--fs-2xs);
+  font-weight: 600;
+  color: var(--muted);
 }
 
 .monthWeekday {
