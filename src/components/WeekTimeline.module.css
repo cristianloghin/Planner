@@ -17,6 +17,8 @@
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   border-right: 1px solid var(--border);
+  /* Animate maximizing/restoring a day column (no-op where unsupported). */
+  transition: grid-template-columns 0.25s ease;
 }
 
 .headDay {
@@ -28,13 +30,18 @@
   padding-bottom: 2px;
 }
 
+/* A button since tapping it maximizes/restores the day's column. */
 .headLabel {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  padding-top: 4px;
+  padding: 4px 0 0;
+  border: none;
+  background: none;
+  font: inherit;
   color: var(--muted);
+  cursor: pointer;
 }
 
 .headName {
@@ -113,6 +120,8 @@
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   border-right: 1px solid var(--border);
+  /* Keep the grid's column animation in step with the header's. */
+  transition: grid-template-columns 0.25s ease;
 }
 
 .dayCol {

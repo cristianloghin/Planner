@@ -32,6 +32,16 @@ export interface WeekDay {
 }
 
 /**
+ * Column template shared by the head and the grid so they stay aligned: with
+ * a focused day its column takes the space of four, the rest split the rest.
+ * `undefined` falls back to the stylesheet's equal seven-way split.
+ */
+function dayColumns(focusDay: number | null): string | undefined {
+  if (focusDay == null) return undefined
+  return DAY_NAMES.map((_, i) => (i === focusDay ? 'minmax(0, 4fr)' : 'minmax(0, 1fr)')).join(' ')
+}
+
+/**
  * Rendered inside the Week header when the timeline layout is active: the
  * seven day labels (today ringed in accent) with each day's all-day chips,
  * aligned over the grid's columns.
@@ -40,10 +50,16 @@ export function WeekTimelineHead({
   weekDays,
   completions,
   onOpen,
+  focusDay,
+  onToggleDay,
 }: {
   weekDays: WeekDay[]
   completions: CompletionsMap
   onOpen: (occ: DayOccurrence) => void
+  /** Weekday index (0 = Mon) whose column is maximized, if any. */
+  focusDay: number | null
+  /** Tap a day label: maximize that column, or restore if already focused. */
+  onToggleDay: (dayIdx: number) => void
 }) {
   const { state } = useApp()
   const todayISO = toISODate(new Date())
@@ -53,13 +69,23 @@ export function WeekTimelineHead({
       <div className={s.headWeek} aria-label={`Week ${isoWeekNumber(weekDays[0].dateISO)}`}>
         W{isoWeekNumber(weekDays[0].dateISO)}
       </div>
-      <div className={s.headDays}>
+      <div className={s.headDays} style={{ gridTemplateColumns: dayColumns(focusDay) }}>
         {weekDays.map(({ dateISO, occs }, dayIdx) => (
           <div key={dateISO} className={cx(s.headDay, dateISO === todayISO && s.today)}>
-            <div className={s.headLabel}>
+            <button
+              type="button"
+              className={s.headLabel}
+              onClick={() => onToggleDay(dayIdx)}
+              aria-pressed={focusDay === dayIdx}
+              aria-label={
+                focusDay === dayIdx
+                  ? 'Restore equal day columns'
+                  : `Maximize ${DAY_NAMES[dayIdx]}'s column`
+              }
+            >
               <span className={s.headName}>{DAY_NAMES[dayIdx]}</span>
               <span className={s.headNum}>{Number(dateISO.slice(8, 10))}</span>
-            </div>
+            </button>
             <div className={s.headAllday}>
               {occs
                 .filter((o) => o.event.allDay)
@@ -97,6 +123,7 @@ export function WeekTimelineBody({
   completions,
   onOpen,
   onAddAt,
+  focusDay,
 }: {
   /** Strip pages: [previous week, visible week, next week], seven days each. */
   weeks: WeekDay[][]
@@ -104,6 +131,8 @@ export function WeekTimelineBody({
   onOpen: (occ: DayOccurrence) => void
   /** Tap on empty grid: create an event on `dateISO` around `minute`. */
   onAddAt: (dateISO: string, minute: number) => void
+  /** Weekday index (0 = Mon) whose column is maximized, if any. */
+  focusDay: number | null
 }) {
   const { state, dispatch } = useApp()
   const [hourH, setHourH] = useState(() => loadZoom(ZOOM_KEY))
@@ -185,10 +214,10 @@ export function WeekTimelineBody({
               <div
                 className={s.days}
                 key={days[0].dateISO}
-                style={{ height: DAY_MIN * pxPerMin }}
+                style={{ height: DAY_MIN * pxPerMin, gridTemplateColumns: dayColumns(focusDay) }}
                 {...pageInert(pageIdx === 1)}
               >
-                {days.map(({ dateISO, laid }) => (
+                {days.map(({ dateISO, laid }, dayIdx) => (
                   // biome-ignore lint/a11y/useKeyWithClickEvents: tap-on-empty-space is a pointer affordance to prefill the editor; the keyboard path is the header's + button
                   <div
                     key={dateISO}
@@ -224,7 +253,7 @@ export function WeekTimelineBody({
                           title={ev.title}
                           aria-label={`${ev.title}, ${minutesToTime(block.start)}–${minutesToTime(block.end)}`}
                         >
-                          {showTitles && height >= TITLE_MIN_PX && (
+                          {(showTitles || dayIdx === focusDay) && height >= TITLE_MIN_PX && (
                             <span className={s.barTitle}>{ev.title}</span>
                           )}
                         </button>

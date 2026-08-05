@@ -38,6 +38,8 @@ export function WeekCalendar() {
   const { state, dispatch } = useApp()
   const [target, setTarget] = useState<EditorTarget | null>(null)
   const [sheet, setSheet] = useState<{ event: CalendarEvent; date: string } | null>(null)
+  // Timeline-only: weekday index (0 = Mon) whose column is maximized, if any.
+  const [focusDay, setFocusDay] = useState<number | null>(null)
   const timeline = (state.preferences.weekLayout ?? 'list') === 'timeline'
 
   // Windowed per-occurrence state covering the visible week and its swipe
@@ -119,7 +121,13 @@ export function WeekCalendar() {
         }
       >
         {timeline && (
-          <WeekTimelineHead weekDays={weeks[1]} completions={completions} onOpen={openSheet} />
+          <WeekTimelineHead
+            weekDays={weeks[1]}
+            completions={completions}
+            onOpen={openSheet}
+            focusDay={focusDay}
+            onToggleDay={(idx) => setFocusDay((cur) => (cur === idx ? null : idx))}
+          />
         )}
       </ViewHeader>
 
@@ -129,6 +137,7 @@ export function WeekCalendar() {
           completions={completions}
           onOpen={openSheet}
           onAddAt={addAt}
+          focusDay={focusDay}
         />
       ) : (
         <WeekListBody
