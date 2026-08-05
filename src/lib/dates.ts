@@ -57,6 +57,20 @@ export function weekdayIndex(iso: string): number {
   return (new Date(`${iso}T00:00:00`).getDay() + 6) % 7
 }
 
+/**
+ * ISO 8601 week number (1–53) of the week containing `iso` — the numbering
+ * that matches this app's Monday-start weeks: week 1 is the week holding the
+ * year's first Thursday, so the number keys off this week's Thursday.
+ */
+export function isoWeekNumber(iso: string): number {
+  const d = new Date(`${iso}T00:00:00`)
+  d.setDate(d.getDate() + 3 - weekdayIndex(toISODate(d)))
+  // Jan 4 is always in week 1; count whole weeks between the two Thursdays.
+  const week1 = new Date(d.getFullYear(), 0, 4)
+  week1.setDate(week1.getDate() + 3 - ((week1.getDay() + 6) % 7))
+  return 1 + Math.round((d.getTime() - week1.getTime()) / (7 * 86_400_000))
+}
+
 /** ISO date of the first day of the month containing `iso`. */
 export function startOfMonth(iso: string): string {
   const d = new Date(`${iso}T00:00:00`)

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { cx } from '../lib/cx'
-import { DAY_NAMES, minutesToTime, toISODate } from '../lib/dates'
+import { DAY_NAMES, isoWeekNumber, minutesToTime, toISODate } from '../lib/dates'
 import { isOccurrenceDone } from '../lib/occurrences'
 import { colorStyle } from '../lib/palette'
 import { eventColorKey } from '../lib/people'
@@ -49,7 +49,10 @@ export function WeekTimelineHead({
   const todayISO = toISODate(new Date())
   return (
     <div className={s.head}>
-      <div />
+      {/* The gutter corner doubles as the week-number badge. */}
+      <div className={s.headWeek} aria-label={`Week ${isoWeekNumber(weekDays[0].dateISO)}`}>
+        W{isoWeekNumber(weekDays[0].dateISO)}
+      </div>
       <div className={s.headDays}>
         {weekDays.map(({ dateISO, occs }, dayIdx) => (
           <div key={dateISO} className={cx(s.headDay, dateISO === todayISO && s.today)}>
