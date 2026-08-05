@@ -80,12 +80,12 @@
 .alldayChip {
   height: 15px;
   border: none;
-  border-left: 3px solid var(--c);
+  border-left: var(--event-accent) solid var(--c);
   border-radius: 4px;
   padding: 0 3px;
-  /* Stronger tint than the day view's blocks — at bar size the usual 15%
-     wash is barely visible. Text stays --text for contrast in both themes. */
-  background: color-mix(in oklab, var(--c) 45%, var(--surface));
+  /* Same tinted-surface treatment as the Day view's chips (see swatches.css);
+     text stays --text for contrast in both themes. */
+  background: color-mix(in oklab, var(--c) var(--tint-strength), var(--surface));
   color: var(--text);
   font-size: var(--fs-2xs);
   font-weight: 600;
@@ -154,10 +154,11 @@
 .bar {
   position: absolute;
   border: none;
-  border-left: 3px solid var(--c);
+  border-left: var(--event-accent) solid var(--c);
   border-radius: 4px;
   padding: 1px 3px;
-  background: color-mix(in oklab, var(--c) 45%, var(--surface));
+  /* Same tinted-surface treatment as the Day view's blocks (see swatches.css). */
+  background: color-mix(in oklab, var(--c) var(--tint-strength), var(--surface));
   color: var(--text);
   text-align: left;
   overflow: hidden;

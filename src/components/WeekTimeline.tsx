@@ -6,7 +6,6 @@ import { colorStyle } from '../lib/palette'
 import { eventColorKey } from '../lib/people'
 import type { DayOccurrence } from '../lib/recurrence'
 import { DAY_MIN, layoutBlocks } from '../lib/timelineLayout'
-import { useMediaQuery } from '../lib/useMediaQuery'
 import { loadZoom, pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
 import shared from '../styles/shared.module.css'
@@ -18,11 +17,8 @@ import s from './WeekTimeline.module.css'
 // day (three lanes) is usually too tall for a seven-day overview.
 const ZOOM_KEY = 'planner:weekHourH'
 
-// Bars stay bare colored strips until there's room for text: on narrow
-// screens the columns are so thin that titles only make sense once the user
-// has pinch-zoomed in; on wide screens they fit at any zoom. A bar also needs
-// this many pixels of height before its title renders at all.
-const TITLE_HOUR_H = 96
+// A bar needs this many pixels of height before its title renders at all —
+// below that the text can't fit a legible line anyway.
 const TITLE_MIN_PX = 18
 
 /** One visible day: its ISO date plus that day's expanded occurrences. */
@@ -116,7 +112,8 @@ export function WeekTimelineHead({
  * The timed seven-column week grid — the Day view's timeline pattern with the
  * per-person lanes swapped for one column per weekday: shared time gutter,
  * swipe left/right to change week, pinch to zoom the hour height. Events
- * render as colored bars; titles appear once the zoom leaves room for them.
+ * render as colored bars with their titles; when a day is maximized the
+ * squeezed columns drop their titles.
  */
 export function WeekTimelineBody({
   weeks,
@@ -168,9 +165,6 @@ export function WeekTimelineBody({
     const focus = weeks[1].some((d) => d.dateISO === todayISO) ? nowMin : 7 * 60
     el.scrollTop = Math.max(0, focus * pxPerMin - 80)
   }, [])
-
-  const narrow = useMediaQuery('(max-width: 720px)')
-  const showTitles = !narrow || hourH >= TITLE_HOUR_H
 
   // Overlap-pack each day's timed occurrences (all attendees share the column),
   // for all three strip pages.
@@ -253,7 +247,9 @@ export function WeekTimelineBody({
                           title={ev.title}
                           aria-label={`${ev.title}, ${minutesToTime(block.start)}–${minutesToTime(block.end)}`}
                         >
-                          {(showTitles || dayIdx === focusDay) && height >= TITLE_MIN_PX && (
+                          {/* With a maximized day, the squeezed columns are too
+                              thin for text — only the focused one keeps titles. */}
+                          {(focusDay == null || dayIdx === focusDay) && height >= TITLE_MIN_PX && (
                             <span className={s.barTitle}>{ev.title}</span>
                           )}
                         </button>
