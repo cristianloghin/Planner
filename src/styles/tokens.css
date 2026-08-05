@@ -22,9 +22,12 @@
   --now: hsl(0 50% 50%); /* current-time line */
 
   /* ---- Typography ---- */
-  /* Source Sans 3 (self-hosted variable font, see main.tsx); system stack is
-     the fallback so text shows instantly while the font loads. */
-  --font: "Source Sans 3 Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Planner Digits is a digits-only face (Roboto Mono, see index.css) so all
+     numbers render monospaced; Source Sans 3 (self-hosted variable font, see
+     main.tsx) carries everything else; system stack is the fallback so text
+     shows instantly while the fonts load. */
+  --font: "Planner Digits", "Source Sans 3 Variable", system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
 
   /* Font-size scale — the single place to tune text sizing. Bumped +1px over
      the original values since Source Sans 3 renders a touch smaller than the
