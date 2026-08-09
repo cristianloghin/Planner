@@ -37,7 +37,6 @@ create table note_row (
   kind             text not null,          -- 'heading' | 'check' | 'para'
   body             text not null default '',
   sort_key         text not null collate "C",   -- fractional key (Decision 6)
-  required         boolean not null default false,
   occurrence_start timestamptz             -- null = every occurrence; set = one-off add
 );
 
