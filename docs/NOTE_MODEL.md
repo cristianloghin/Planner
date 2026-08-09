@@ -24,7 +24,7 @@ create table note (
   account_id      uuid not null references account(id) on delete cascade,
   owner_series_id uuid references event_series(id) on delete cascade,
   title           text not null default '',
-  author_id       uuid references app_user(id),
+  author_id       uuid not null references app_user(id),  -- set at creation, never reassigned
   metadata        jsonb not null default '{}',
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
@@ -87,6 +87,13 @@ just a nullable pointer.
 *Rejected:* mutually exclusive parents (`account_id` **or** `owner_series_id`,
 with a check constraint). It forces every access policy into a union of two
 rules for no gain, since a series belongs to an account anyway.
+
+`author_id` is a third, separate thing: the user who wrote the note. It is not
+access control — everyone in the account sees every note regardless — it is a
+filter, so a standalone note can be sorted into mine and theirs. Because it is
+read as a filter it is `not null`, and it is stamped once at creation: editing
+someone else's note must never reassign it, or one person's view slowly absorbs
+the other's notes.
 
 ### 2. `occurrence_start` is the original slot, and is never an FK
 Every table keyed to an occurrence uses the instant the recurrence rule
