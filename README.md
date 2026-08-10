@@ -29,6 +29,8 @@ reusable event blueprints (`event_series` with `is_template = true`, no schedule
 save from the event editor and start a new event from, an app-side deep copy that
 stamps a real start and fresh attachment rows.
 
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the DRSp pattern: layers, rules, and where new code goes.
+- [`docs/RESTRUCTURE_PLAN.md`](docs/RESTRUCTURE_PLAN.md) — DRSp applied to this codebase (target state, not yet implemented).
 - [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) — the schema and the reasoning behind every decision.
 - [`docs/NEXT_SESSION.md`](docs/NEXT_SESSION.md) — runbook + current status and remaining work.
 - [`supabase/migrations/`](supabase/migrations) — schema, RLS, functions, grants, and the `person` model.
