@@ -62,10 +62,25 @@ generator falls short.
 It exports **plain functions**: no React, no cache library. Those functions are what
 the Domain layer hands to its query and mutation hooks.
 
-The Client also owns the **anti-corruption layer**: translation between wire shapes
-and domain shapes. This is what keeps generated types — which change whenever the
-backend changes — from leaking into components. If a generated type appears above
-`client/`, the boundary has already failed.
+The Client also owns **conversion — where there is any to do.** When a response
+already has the shape the app wants, return it as it comes. Hand-copying a type that
+already matches creates a second version of the truth, and it drifts. Convert when
+the two shapes genuinely differ: dates and amounts as strings, everything marked
+optional because the spec was lax, an envelope around the thing you actually want,
+or several endpoints and tables making up one thing the UI renders. Where the Client
+converts, it declares the type it returns.
+
+Either way, the Client is the **only place generated types are named**. Everything
+above imports from `client/`, under the app's own names — so a symbol the generator
+renames is absorbed in one file, and a conversion can be introduced later without
+touching a single consumer. And conversion happens **once**: the Domain does not
+convert again, and neither does the Route.
+
+How much of this there is depends on the backend, and the range is wide. A
+domain-shaped API generated from a spec needs almost none — `client/` is the
+generated modules under the app's names. A query builder over tables needs a lot,
+because the shaping has to happen somewhere. A legacy or foreign API needs the most,
+and that is where the boundary earns out.
 
 Cross-cutting *transport* concerns live here too: auth headers, network-error
 classification, retry, logging. Anything every request needs.
@@ -297,8 +312,9 @@ or its invalidation. *Fix: call it a domain, or have the route feed it.*
 a type from a domain. One import, and the cycle exists. *Fix: move the shared thing
 down, never reach up.*
 
-**The generated type in a component.** A component's props mention a wire type. Now
-every backend change is a UI change. *Fix: map at the client boundary.*
+**The wire shape in a component.** A component's props carry the transport's shape —
+nullable everything, an envelope wrapper, dates as strings — so every render site
+repeats the same defaulting and parsing. *Fix: convert once at the client boundary.*
 
 **The parallel style system.** Some shared UI is a component, some is a class in a
 shared stylesheet, and there is no rule for which. The stylesheet becomes an
@@ -393,7 +409,7 @@ The layer shape predicts the test shape, which is the main practical dividend:
 
 | Layer | Test |
 |---|---|
-| Client | Mappers, wire-shape edge cases. Pure. |
+| Client | Its conversions, where there are any. Pure. |
 | Domain | Selectors and optimistic patch functions. Pure. |
 | Domain components | Render with literal props. No providers. |
 | Service | Feed input, assert output. Pure, or a store driven directly. |
