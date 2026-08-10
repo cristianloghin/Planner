@@ -1,4 +1,10 @@
+import type { OccurrenceStatusCode } from './client/occurrences'
 import type { ColorKey } from './lib/palette'
+
+// Occurrence state is declared by the client layer, which is where the two
+// backing tables are converted into it (src/client/occurrences.ts). Re-exported
+// here so existing consumers keep one import site while the migration runs.
+export type { CompletionsMap, OccurrenceState, OccurrenceStatusCode } from './client/occurrences'
 
 /** A person's id. Now an opaque string (a backend uuid), not a fixed enum — the
  *  app is generic over however many people exist. */
@@ -139,13 +145,6 @@ export interface EventTemplate {
 }
 
 /**
- * An occurrence's status, matching the DB `occurrence_status` lookup. `done` can
- * also be derived from a checklist (see `isOccurrenceDone`); `skipped`/`blocked`
- * are only ever set explicitly.
- */
-export type OccurrenceStatusCode = 'done' | 'skipped' | 'blocked'
-
-/**
  * One prerequisite edge for an occurrence — a row of `occurrence_dependency`.
  * Stored in `AppState.dependencies` keyed by the *dependent* occurrence, so it
  * names only the prerequisite end: a concrete occurrence of another series and
@@ -157,43 +156,6 @@ export interface OccurrenceDependency {
   prerequisiteDate: string
   requiredStatus: OccurrenceStatusCode
 }
-
-/**
- * Mutable per-occurrence state, keyed `${eventId}:${date}` (see
- * {@link CompletionsMap}), where `date` is the occurrence's start date. This is
- * where everything you *tick* lives, so a recurring event tracks completion
- * per day.
- */
-export interface OccurrenceState {
-  /**
-   * Explicit occurrence status (`event_occurrence.status`). For a checklist-free
-   * event this is how "done" is set manually; it also carries `skipped`/`blocked`.
-   * Absent = compute (e.g. derive `done` from the checklist).
-   */
-  status?: OccurrenceStatusCode
-  /** checklistEntryId → checked. */
-  checked?: Record<string, boolean>
-  /**
-   * One-off timing override for *this* occurrence only (`event_occurrence`'s
-   * `rescheduled_to` / `rescheduled_duration`). Same units as {@link CalendarEvent}:
-   * `start` is `yyyy-mm-ddThh:mm` (timed) or `yyyy-mm-dd` (all-day) on the
-   * occurrence's own date — the day is fixed, only the time of day and length
-   * move; `duration` is minutes (timed) or whole days (all-day). Absent fields
-   * fall back to the series timing.
-   */
-  start?: string
-  duration?: number
-  /** This occurrence has been removed from the series (`event_occurrence.cancelled`). */
-  cancelled?: boolean
-}
-
-/**
- * Per-occurrence state keyed `${eventId}:${date}`. Owned by TanStack Query
- * (src/data/completions.ts), fetched per calendar-month window — this table
- * grows with every tick ever made, so it is never loaded whole. Views fetch
- * the window(s) covering what they render.
- */
-export type CompletionsMap = Record<string, OccurrenceState>
 
 /**
  * Per-user, per-account settings — personal, never shared with a partner. Stored

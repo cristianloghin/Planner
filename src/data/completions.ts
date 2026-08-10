@@ -1,13 +1,13 @@
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef } from 'react'
 import { ensureAccount, useAuth } from '../auth'
+import { type CompletionsMap, fetchOccurrenceWindow } from '../client/occurrences'
+import { supabase } from '../client/supabase'
 import { addDays } from '../lib/dates'
 import { occKey } from '../lib/occurrences'
 import { queryClient } from '../lib/queryClient'
-import { supabase } from '../lib/supabase'
 import { SupabaseStore } from '../store/supabaseStore'
-import type { CalendarEvent, CompletionsMap, OccurrenceState, OccurrenceStatusCode } from '../types'
-import { useAccountStore } from './useAccountStore'
+import type { CalendarEvent, OccurrenceState, OccurrenceStatusCode } from '../types'
 
 /**
  * Per-occurrence state (statuses, checklist ticks, timing overrides) on
@@ -34,7 +34,7 @@ const completionsKey = (accountId: string | null | undefined, month: string) =>
 // STARTING before the month still renders inside it (its override row lives on
 // its start date); forward, so the month-grid's trailing cells are covered.
 // Reschedules from farther away are caught by the rescheduled_to range in
-// loadCompletionsRange, not by these margins.
+// fetchOccurrenceWindow, not by these margins.
 const BACK_MARGIN_DAYS = 31
 const FWD_MARGIN_DAYS = 7
 
@@ -92,7 +92,6 @@ export function useCompletionsForRange(
   extraDates: string[] = [],
 ): { completions: CompletionsMap; isLoading: boolean } {
   const { accountId } = useAuth()
-  const store = useAccountStore()
   const qc = useQueryClient()
 
   const extraKey = extraDates.join(',')
@@ -106,9 +105,9 @@ export function useCompletionsForRange(
       queryKey: completionsKey(accountId, month),
       queryFn: () => {
         const b = fetchBounds(month)
-        return store!.loadCompletionsRange(b.from, b.to)
+        return fetchOccurrenceWindow(accountId!, b.from, b.to)
       },
-      enabled: !!store,
+      enabled: !!accountId,
       staleTime: STALE_MS,
     })),
   })
@@ -118,18 +117,18 @@ export function useCompletionsForRange(
   const monthsKey = months.join(',')
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on monthsKey so a same-months array with fresh identity doesn't re-prefetch
   useEffect(() => {
-    if (!store || !months.length) return
+    if (!accountId || !months.length) return
     for (const m of [shiftMonth(months[0], -1), shiftMonth(months[months.length - 1], 1)]) {
       void qc.prefetchQuery({
         queryKey: completionsKey(accountId, m),
         queryFn: () => {
           const b = fetchBounds(m)
-          return store.loadCompletionsRange(b.from, b.to)
+          return fetchOccurrenceWindow(accountId, b.from, b.to)
         },
         staleTime: STALE_MS,
       })
     }
-  }, [accountId, store, qc, monthsKey])
+  }, [accountId, qc, monthsKey])
 
   const completions = useStableMerge(results.map((r) => r.data))
   return {

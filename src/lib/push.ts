@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { supabase } from '../client/supabase'
 
 /**
  * Web Push subscription plumbing (part 1 of notifications — registering the
