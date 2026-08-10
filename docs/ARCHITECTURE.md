@@ -207,6 +207,35 @@ A single violation is always locally convenient — one import, saving one prop.
 globally corrosive because it converts a tree into a graph, and every guarantee
 above is a property of the tree.
 
+### Types are not edges
+
+The graph above describes **runtime** dependencies: what calls what, and where data
+comes from. A type-only import moves no data, runs no code and survives into no
+bundle — it is erased at compile time. It is not an edge, and the layer rules do not
+apply to it.
+
+**Any layer may import types from any other.** A Service or a Layout may name a type
+the Client declares without becoming a Domain and without a second declaration. A
+pure function computing over a shape has to name that shape; denying it the name only
+forces the fields to be re-declared somewhere the rule happens to permit, which is
+the duplicate source of truth that declaring it once was meant to prevent. Types
+exist to make wrong code fail at compile time — a boundary that pushes work out of
+the type system to satisfy a diagram is working against the thing it is protecting.
+
+Three things this does not license:
+
+- **Generated types stay in the Client.** Invariant 1 is unchanged: the generated
+  module is named in `client/` and nowhere else. What travels freely is what the
+  Client *declares* — including the types it declares to describe what it returns.
+- **Assets stay domain-ignorant.** Invariant 5 holds absolutely, for a different
+  reason: an Asset that names a domain type is not an Asset. That is a definition,
+  not a graph rule.
+- **A type import can still be a signal.** If a Service names a shape because the
+  next thing it wants is to *fetch* it, the type is not the problem — the Service is
+  a Domain. Ask what the module does with the shape. Transforming data it was handed
+  is a Service; going and getting it is a Domain; deriving a narrower view of what is
+  already cached is a selector, which belongs to the Domain that owns the cache.
+
 ---
 
 ## 4. Invariants
@@ -215,7 +244,7 @@ The rules worth enforcing rather than remembering:
 
 1. Only the Client imports the network SDK or generated API types.
 2. Domain components never call domain data functions.
-3. Services never import from Domains or the Client.
+3. Services never import **values** from Domains or the Client. Types are exempt (§3).
 4. Layouts receive no data — only slots and structural props.
 5. Assets import nothing from the app.
 6. Routes are the only orchestrators.
@@ -454,6 +483,13 @@ map of exact module specifiers — no globs, and no scoping by importing file �
 Whatever the tool, the rules to encode are the ten in §4 — and the highest-value
 three are: nothing above `client/` imports the SDK or generated types, `services/`
 imports no domain, and `assets/` imports nothing.
+
+Encode them against **value** imports, and configure the tool to ignore type-only
+edges (§3). That works only if type-only imports are written as `import type`, so
+pair it with `isolatedModules` and a lint rule that enforces the syntax — otherwise
+the two kinds of import are indistinguishable and the check has to be all-or-nothing.
+The one rule that stays absolute in both directions is the generated module: no
+import of it, of either kind, above `client/`.
 
 ---
 

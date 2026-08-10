@@ -258,7 +258,7 @@ install.
 | R1 | Only `client/` imports `@supabase/supabase-js`. |
 | R2 | Only `client/` imports `database.types.ts`. |
 | R3 | Domain components never call domain data functions. They take props. |
-| R4 | Services never import from `domains/` or `client/`. |
+| R4 | Services never import *values* from `domains/` or `client/`. Type-only imports are allowed (see [`ARCHITECTURE.md`](./ARCHITECTURE.md) §3). |
 | R5 | Routes are the only orchestrators. |
 | R6 | Layouts are presentational and slotted. They receive no data functions. |
 | R7 | `assets/` imports nothing from the app. |
@@ -275,6 +275,12 @@ install.
 R8 is the one that erodes first. Without it, "ambient" becomes the loophole that
 swallows the pattern — someone puts a fetch behind an accessor hook and the arrows
 reverse.
+
+R4's exemption matters here in a concrete way. `occurrences`, `recurrence` and
+`notifications` all compute over `OccurrenceState`, which `client/occurrences.ts`
+declares because that is where the two backing tables are converted into it. All
+three are fed their data and fetch nothing, so they are services that name a type —
+not domains. R2 is untouched: `database.types.ts` stays in `client/`.
 
 ---
 
