@@ -35,23 +35,38 @@ export interface Recurrence {
   until?: string
 }
 
-/** One line of a checklist. Whether it is ticked is per-day state, kept elsewhere. */
-export interface ChecklistEntry {
+/**
+ * One line of a checklist, as stored: flat, with the heading it sits under.
+ *
+ * `sortOrder` encodes both which checklist a line belongs to and where it sits
+ * in it — the database has no notion of a checklist as a thing, only lines with
+ * a heading. Grouping them back up is a shape for the screen; see
+ * domains/events/transformers.
+ *
+ * Whether a line is ticked is per-day state and lives in ./occurrences.
+ */
+export interface ChecklistLine {
   id: string
-  title: string
+  label: string
+  /** The heading it sits under; null when ungrouped. */
+  groupLabel: string | null
+  sortOrder: number
+}
+
+/** A note on a series. Its author is kept by the database, not set from here. */
+export interface SeriesNote {
+  id: string
+  body: string
+}
+
+/** A reminder, as minutes before the series starts. */
+export interface SeriesReminder {
+  id: string
+  offset: number
 }
 
 /**
- * Something attached to a series: free text, a checklist, or a reminder a number
- * of minutes before the start.
- */
-export type Attachment =
-  | { id: string; kind: 'note'; text: string }
-  | { id: string; kind: 'checklist'; title?: string; items: ChecklistEntry[] }
-  | { id: string; kind: 'reminder'; offset: number }
-
-/**
- * One series, with its people and attachments.
+ * One series, with its people and everything attached to it.
  *
  * Timing is `start` plus `duration`. When `allDay` is false, `start` is
  * `yyyy-mm-ddThh:mm` and `duration` is minutes; when it is true, `start` is
@@ -69,7 +84,9 @@ export interface Series {
   attendees: PersonId[]
   /** Absent means it takes the colour of the person whose lane it sits in. */
   colorKey?: ColorKey
-  attachments: Attachment[]
+  checklist: ChecklistLine[]
+  notes: SeriesNote[]
+  reminders: SeriesReminder[]
   /** True for a blueprint with no date, false for a real dated series. */
   isTemplate: boolean
 }
@@ -154,7 +171,20 @@ export async function fetchSeries(
     recurrence: rruleToRecurrence(r.rrule),
     attendees: r.event_person.map((ep) => ep.person_id),
     colorKey: isColorKey(r.color_key) ? r.color_key : undefined,
-    attachments: rebuildAttachments(r),
+    // Lines carrying a day belong to that one day, not to the series.
+    checklist: r.checklist_item
+      .filter((c) => c.occurrence_start === null)
+      .map((c) => ({
+        id: c.id,
+        label: c.label,
+        groupLabel: c.group_label,
+        sortOrder: c.sort_order,
+      })),
+    notes: r.note.map((n) => ({ id: n.id, body: n.body })),
+    reminders: r.reminder.map((rem) => ({
+      id: rem.id,
+      offset: Math.round(rem.offset_seconds / 60),
+    })),
     isTemplate,
   }))
 }
@@ -223,14 +253,14 @@ export async function deleteSeries(id: string): Promise<void> {
  * from `old`, so they line up with a real day of that series — a cutover that
  * is not one silently reschedules the event and strands its rows.
  *
- * `edits` deliberately cannot carry attachments. The database already copied
- * the notes, checklists and reminders onto the new series and gave them new
- * ids, so writing the ones the app is holding would write the wrong rows.
+ * `edits` deliberately cannot carry the notes, checklists or reminders. The
+ * database already copied those onto the new series and gave them new ids, so
+ * writing the ones the app is holding would write the wrong rows.
  */
 export async function splitSeries(
   old: SeriesTiming & { recurrence: Recurrence },
   fromDate: string,
-  edits: Omit<Series, 'id' | 'attachments' | 'isTemplate'>,
+  edits: Omit<Series, 'id' | 'checklist' | 'notes' | 'reminders' | 'isTemplate'>,
 ): Promise<string> {
   const { data: newId, error: rpcErr } = await supabase.rpc('split_series', {
     p_series: old.id,
@@ -277,24 +307,18 @@ async function syncAttendees(series: { id: string; attendees: PersonId[] }): Pro
 }
 
 async function syncChecklist(series: Series): Promise<void> {
-  // Update the rows that are still there and delete only the ones that went
+  // Update the lines that are still there and delete only the ones that went
   // away — never delete everything and re-insert, which would take every tick
   // recorded against those lines with it.
-  const desired = series.attachments
-    .filter((a): a is Extract<Attachment, { kind: 'checklist' }> => a.kind === 'checklist')
-    .flatMap((c, ci) =>
-      c.items.map((item, idx) => ({
-        id: item.id,
-        owner_series_id: series.id,
-        label: item.title,
-        group_label: c.title ?? null,
-        // Encodes which checklist a line belongs to and its place in it, so the
-        // grouping can be rebuilt on the way back out.
-        sort_order: ci * 1000 + idx,
-        required: true,
-        occurrence_start: null as string | null,
-      })),
-    )
+  const desired = series.checklist.map((line) => ({
+    id: line.id,
+    owner_series_id: series.id,
+    label: line.label,
+    group_label: line.groupLabel,
+    sort_order: line.sortOrder,
+    required: true,
+    occurrence_start: null as string | null,
+  }))
   if (desired.length) {
     const up = await supabase.from('checklist_item').upsert(desired, { onConflict: 'id' })
     if (up.error) throw up.error
@@ -321,14 +345,12 @@ async function syncNotes(series: Series, userId: string): Promise<void> {
     .eq('owner_series_id', series.id)
   if (exErr) throw exErr
   const authorById = new Map((existing ?? []).map((n) => [n.id, n.author_id]))
-  const desired = series.attachments
-    .filter((a): a is Extract<Attachment, { kind: 'note' }> => a.kind === 'note')
-    .map((n) => ({
-      id: n.id,
-      owner_series_id: series.id,
-      body: n.text,
-      author_id: authorById.get(n.id) ?? userId,
-    }))
+  const desired = series.notes.map((n) => ({
+    id: n.id,
+    owner_series_id: series.id,
+    body: n.body,
+    author_id: authorById.get(n.id) ?? userId,
+  }))
   if (desired.length) {
     const up = await supabase.from('note').upsert(desired, { onConflict: 'id' })
     if (up.error) throw up.error
@@ -341,15 +363,13 @@ async function syncNotes(series: Series, userId: string): Promise<void> {
 }
 
 async function syncReminders(series: Series, userId: string): Promise<void> {
-  const desired = series.attachments
-    .filter((a): a is Extract<Attachment, { kind: 'reminder' }> => a.kind === 'reminder')
-    .map((r) => ({
-      id: r.id,
-      series_id: series.id,
-      user_id: userId,
-      offset_seconds: Math.round(r.offset * 60),
-      method: 'app',
-    }))
+  const desired = series.reminders.map((r) => ({
+    id: r.id,
+    series_id: series.id,
+    user_id: userId,
+    offset_seconds: Math.round(r.offset * 60),
+    method: 'app',
+  }))
   if (desired.length) {
     const up = await supabase.from('reminder').upsert(desired, { onConflict: 'id' })
     if (up.error) throw up.error
@@ -361,44 +381,4 @@ async function syncReminders(series: Series, userId: string): Promise<void> {
   if (keepIds.length) del = del.not('id', 'in', `(${keepIds.join(',')})`)
   const res = await del
   if (res.error) throw res.error
-}
-
-/**
- * Rebuild the attachments from the child rows.
- *
- * The database does not record the order the three kinds were authored in, so
- * they come back grouped — checklists, then notes, then reminders. The contents
- * survive a round trip; interleaving them does not.
- */
-function rebuildAttachments(r: SeriesRow): Attachment[] {
-  const out: Attachment[] = []
-
-  // Sort before grouping: rows arrive in no particular order, and sort_order is
-  // what says which checklist a line belongs to and where it sits, so walking
-  // the sorted rows reproduces the original grouping every time.
-  const lines = r.checklist_item
-    .filter((c) => c.occurrence_start === null)
-    .sort((a, b) => a.sort_order - b.sort_order)
-  const groups = new Map<string, typeof lines>()
-  for (const line of lines) {
-    const key = line.group_label ?? ''
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key)?.push(line)
-  }
-  for (const [groupLabel, items] of groups) {
-    out.push({
-      // Derived from the series and the heading so a checklist keeps the same
-      // identity across reloads.
-      id: `${r.id}:checklist:${groupLabel}`,
-      kind: 'checklist',
-      title: groupLabel || undefined,
-      items: items.map((i) => ({ id: i.id, title: i.label })),
-    })
-  }
-
-  for (const n of r.note) out.push({ id: n.id, kind: 'note', text: n.body })
-  for (const rem of r.reminder)
-    out.push({ id: rem.id, kind: 'reminder', offset: Math.round(rem.offset_seconds / 60) })
-
-  return out
 }

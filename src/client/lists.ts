@@ -29,67 +29,80 @@ export interface ListItem {
   createdAt: number
 }
 
-/** A named list, with its to-dos. */
-export interface TodoList {
+/**
+ * A to-do as it is stored: on its own, carrying the list it belongs to.
+ *
+ * Reading every to-do in the account is one query across all lists, so each row
+ * has to say which list it came from. Putting them back under their lists drops
+ * nothing — a row is a {@link ListItem} with one extra field.
+ */
+export interface ListItemRow extends ListItem {
+  listId: string
+}
+
+/**
+ * A named list, without its to-dos.
+ *
+ * The two are separate rows and are read separately. Putting the items inside
+ * their list is a shape for the screen, not for the database — see
+ * domains/lists/transformers.
+ */
+export interface List {
   id: string
   title: string
   /** List order, ascending. */
   sortOrder: number
-  items: ListItem[]
+}
+
+/** One row tying a to-do to a day of an event. */
+export interface ListLink {
+  listItemId: string
+  seriesId: string
+  /** The day it is pinned to, as `yyyy-mm-dd`. */
+  date: string
+}
+
+/** Every list in the account, in order. Their to-dos are read separately. */
+export async function fetchLists(accountId: string): Promise<List[]> {
+  const { data, error } = await supabase
+    .from('list')
+    .select('id, title, sort_order')
+    .eq('account_id', accountId)
+    .order('sort_order')
+  if (error) throw error
+  return (data ?? []).map((l) => ({ id: l.id, title: l.title, sortOrder: l.sort_order }))
 }
 
 /**
- * Every list in the account, each with its items in order.
+ * Every to-do in the account, across all lists, in order.
  *
- * Items are read in one pass across all lists and then grouped, rather than one
- * query per list. The item query is paged: a single response is capped at 1000
- * rows, so an account with more to-dos than that would silently lose the rest.
+ * Read in one pass rather than one query per list, and paged, since a single
+ * response stops at 1000 rows and a busy account would lose the rest. Each
+ * carries the list it belongs to, for whoever puts them back together.
  */
-export async function fetchLists(accountId: string): Promise<TodoList[]> {
-  const [lists, items] = await Promise.all([
+export async function fetchListItems(accountId: string): Promise<ListItemRow[]> {
+  // Scoped to the account through the parent list.
+  const rows = await fetchAll((from, to) =>
     supabase
-      .from('list')
-      .select('id, title, sort_order')
-      .eq('account_id', accountId)
-      .order('sort_order'),
-    // Scoped to the account through the parent list.
-    fetchAll((from, to) =>
-      supabase
-        .from('list_item')
-        .select(
-          'id, list_id, group_label, title, done, person_id, due_on, sort_order, created_at, list!inner()',
-        )
-        .eq('list.account_id', accountId)
-        .order('sort_order')
-        .order('id')
-        .range(from, to),
-    ),
-  ])
-  if (lists.error) throw lists.error
-
-  const byList = new Map<string, ListItem[]>()
-  for (const it of items) {
-    const arr = byList.get(it.list_id) ?? []
-    arr.push({
-      id: it.id,
-      title: it.title,
-      done: it.done,
-      personId: it.person_id,
-      groupLabel: it.group_label,
-      dueOn: it.due_on,
-      sortOrder: it.sort_order,
-      createdAt: Date.parse(it.created_at),
-    })
-    byList.set(it.list_id, arr)
-  }
-
-  return (lists.data ?? []).map((l) => ({
-    id: l.id,
-    title: l.title,
-    sortOrder: l.sort_order,
-    // The query already orders by sort_order; sort again in case a list's items
-    // arrive interleaved across pages.
-    items: (byList.get(l.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder),
+      .from('list_item')
+      .select(
+        'id, list_id, group_label, title, done, person_id, due_on, sort_order, created_at, list!inner()',
+      )
+      .eq('list.account_id', accountId)
+      .order('sort_order')
+      .order('id')
+      .range(from, to),
+  )
+  return rows.map((it) => ({
+    id: it.id,
+    listId: it.list_id,
+    title: it.title,
+    done: it.done,
+    personId: it.person_id,
+    groupLabel: it.group_label,
+    dueOn: it.due_on,
+    sortOrder: it.sort_order,
+    createdAt: Date.parse(it.created_at),
   }))
 }
 
@@ -97,10 +110,7 @@ export async function fetchLists(accountId: string): Promise<TodoList[]> {
  * Create a list. Items are added separately with {@link createListItem} — this
  * writes the list row only, so `items` is ignored.
  */
-export async function createList(
-  accountId: string,
-  list: Pick<TodoList, 'id' | 'title' | 'sortOrder'>,
-): Promise<void> {
+export async function createList(accountId: string, list: List): Promise<void> {
   const { error } = await supabase.from('list').insert({
     id: list.id,
     account_id: accountId,
@@ -181,17 +191,17 @@ export async function deleteListItem(itemId: string): Promise<void> {
 // ---- to-dos shown on a day of an event -----------------------------------
 
 /**
- * Every to-do pinned to a day of an event, grouped by the day it appears on.
+ * Every to-do pinned to a day of an event.
  *
- * Keys are `${seriesId}:${date}`, the same key per-day occurrence state uses, so
- * both can be looked up together. Values are to-do ids — the to-do itself, and
- * whether it is ticked, lives in its list. A to-do can be pinned to several
- * days, and ticking it anywhere is the same single tick.
+ * Rows, not a lookup: grouping them by the day they appear on is a shape for
+ * the screen (see domains/lists/transformers). A to-do can be pinned to several
+ * days, and ticking it anywhere is the same single tick — the to-do itself
+ * lives in its list.
  *
  * Paged, since one response stops at 1000 rows.
  */
-export async function fetchListLinks(accountId: string): Promise<Record<string, string[]>> {
-  const data = await fetchAll((from, to) =>
+export async function fetchListLinks(accountId: string): Promise<ListLink[]> {
+  const rows = await fetchAll((from, to) =>
     supabase
       .from('list_item_event_link')
       // Scoped to the account through the event, which also stops a user who
@@ -203,13 +213,11 @@ export async function fetchListLinks(accountId: string): Promise<Record<string, 
       .order('occurrence_start')
       .range(from, to),
   )
-  const out: Record<string, string[]> = {}
-  for (const row of data) {
-    const k = `${row.series_id}:${tsToDateKey(row.occurrence_start)}`
-    out[k] ??= []
-    out[k].push(row.list_item_id)
-  }
-  return out
+  return rows.map((r) => ({
+    listItemId: r.list_item_id,
+    seriesId: r.series_id,
+    date: tsToDateKey(r.occurrence_start),
+  }))
 }
 
 /**

@@ -29,110 +29,154 @@ import { supabase } from './supabase'
 export type OccurrenceStatusCode = 'done' | 'skipped' | 'blocked'
 
 /**
- * Mutable per-occurrence state, keyed `${eventId}:${date}` (see
- * {@link CompletionsMap}), where `date` is the occurrence's start date. This is
- * where everything you *tick* lives, so a recurring event tracks completion
- * per day.
+ * One day of a series that has something recorded against it.
+ *
+ * These rows are sparse by design — one exists only where a day differs from
+ * its series — so no row means nothing was ever set, not that it failed to load.
  */
-export interface OccurrenceState {
-  /**
-   * Explicit occurrence status (`event_occurrence.status`). For a checklist-free
-   * event this is how "done" is set manually; it also carries `skipped`/`blocked`.
-   * Absent = compute (e.g. derive `done` from the checklist).
-   */
-  status?: OccurrenceStatusCode
-  /** checklistEntryId → checked. */
-  checked?: Record<string, boolean>
-  /**
-   * One-off timing override for *this* occurrence only (`event_occurrence`'s
-   * `rescheduled_to` / `rescheduled_duration`). Same units as `CalendarEvent`:
-   * `start` is `yyyy-mm-ddThh:mm` (timed) or `yyyy-mm-dd` (all-day) on the
-   * occurrence's own date — the day is fixed, only the time of day and length
-   * move; `duration` is minutes (timed) or whole days (all-day). Absent fields
-   * fall back to the series timing.
-   */
-  start?: string
-  duration?: number
-  /** This occurrence has been removed from the series (`event_occurrence.cancelled`). */
-  cancelled?: boolean
+export interface OccurrenceRow {
+  seriesId: string
+  /** The day it belongs to, as `yyyy-mm-dd`. */
+  date: string
+  /** Set explicitly; null means work it out (a checklist all ticked, say). */
+  status: OccurrenceStatusCode | null
+  /** This day has been taken out of the series. */
+  cancelled: boolean
+  /** Moved to, in the series' own units. Null when it has not been moved. */
+  start: string | null
+  /** Its own length, in the series' own units. Null when unchanged. */
+  duration: number | null
+}
+
+/** One checklist line ticked on one day. */
+export interface ItemStateRow {
+  seriesId: string
+  date: string
+  itemId: string
+  done: boolean
 }
 
 /**
- * Per-occurrence state keyed `${eventId}:${date}`. Fetched per window — these
- * tables grow with every tick ever made, so they are never loaded whole.
+ * Days with something recorded against them, between `fromDate` and `toDate`.
+ *
+ * A day moved INTO the window from further out is included too, so an
+ * occurrence dragged here from a distant week still shows up.
+ *
+ * `accountId` is passed rather than assumed: these rows are reached through
+ * their series, and a user may belong to more than one account.
  */
+export async function fetchOccurrenceRows(
+  accountId: string,
+  fromDate: string,
+  toDate: string,
+): Promise<OccurrenceRow[]> {
+  const fromTs = dayRange(fromDate).from
+  const toTs = dayRange(toDate).from
+  // The parent's all-day flag comes along so the moved-to time and length can
+  // be read back in the same units the series uses. The join also limits the
+  // scan to this account.
+  const rows = await fetchAll((from, to) =>
+    supabase
+      .from('event_occurrence')
+      .select(
+        'series_id, occurrence_start, status, rescheduled_to, rescheduled_duration, cancelled, event_series!inner(all_day, account_id)',
+      )
+      .eq('event_series.account_id', accountId)
+      .or(
+        `and(occurrence_start.gte."${fromTs}",occurrence_start.lt."${toTs}"),and(rescheduled_to.gte."${fromTs}",rescheduled_to.lt."${toTs}")`,
+      )
+      .order('series_id')
+      .order('occurrence_start')
+      .range(from, to),
+  )
+  return rows.map((o) => {
+    const allDay = (o.event_series as { all_day: boolean } | null)?.all_day ?? false
+    return {
+      seriesId: o.series_id,
+      date: tsToDateKey(o.occurrence_start),
+      status: (o.status as OccurrenceStatusCode | null) ?? null,
+      cancelled: o.cancelled,
+      start: o.rescheduled_to ? tsToStart(o.rescheduled_to, allDay) : null,
+      duration: o.rescheduled_duration ? intervalToDuration(o.rescheduled_duration, allDay) : null,
+    }
+  })
+}
+
+/** Checklist lines ticked on days between `fromDate` and `toDate`. */
+export async function fetchItemStateRows(
+  accountId: string,
+  fromDate: string,
+  toDate: string,
+): Promise<ItemStateRow[]> {
+  const fromTs = dayRange(fromDate).from
+  const toTs = dayRange(toDate).from
+  const rows = await fetchAll((from, to) =>
+    supabase
+      .from('occurrence_item_state')
+      .select('series_id, occurrence_start, item_id, status, event_series!inner()')
+      .eq('event_series.account_id', accountId)
+      .gte('occurrence_start', fromTs)
+      .lt('occurrence_start', toTs)
+      .order('series_id')
+      .order('occurrence_start')
+      .order('item_id')
+      .range(from, to),
+  )
+  return rows.map((it) => ({
+    seriesId: it.series_id,
+    date: tsToDateKey(it.occurrence_start),
+    itemId: it.item_id,
+    done: it.status === 'done',
+  }))
+}
+
+// ---- the old shape, still in use ---------------------------------------
+//
+// `data/completions.ts` reads through this and is what runs the app today. It
+// does the merging that now belongs to domains/occurrences/transformers, so the
+// two overlap on purpose until that domain is adopted — at which point
+// everything down to the writes below deletes. Do not build anything new on it.
+
+/** @deprecated Use {@link OccurrenceRow} and domains/occurrences. */
+export interface OccurrenceState {
+  status?: OccurrenceStatusCode
+  checked?: Record<string, boolean>
+  start?: string
+  duration?: number
+  cancelled?: boolean
+}
+
+/** @deprecated Use domains/occurrences. */
 export type CompletionsMap = Record<string, OccurrenceState>
 
-const key = (seriesId: string, ts: string) => `${seriesId}:${tsToDateKey(ts)}`
-
-/**
- * Per-occurrence state whose occurrence date falls in [fromDate, toDate) (local
- * ISO dates). Rows whose `rescheduled_to` lands in the window are included too,
- * so an occurrence moved INTO the window from a distant origin still renders.
- *
- * `accountId` is passed rather than ambient: these tables are scoped through
- * their parent series, and a user may belong to more than one account.
- */
+/** @deprecated Use {@link fetchOccurrenceRows} + {@link fetchItemStateRows}. */
 export async function fetchOccurrenceWindow(
   accountId: string,
   fromDate: string,
   toDate: string,
 ): Promise<CompletionsMap> {
-  const completions: CompletionsMap = {}
-  const fromTs = dayRange(fromDate).from
-  const toTs = dayRange(toDate).from
-
-  const [occData, itemData] = await Promise.all([
-    // Embed the parent's all_day so reschedule columns map back into the same
-    // unit convention as CalendarEvent (timed = minutes, all-day = days). The
-    // inner join also scopes the scan to this account, and both queries page
-    // past the 1000-row response cap.
-    fetchAll((from, to) =>
-      supabase
-        .from('event_occurrence')
-        .select(
-          'series_id, occurrence_start, status, rescheduled_to, rescheduled_duration, cancelled, event_series!inner(all_day, account_id)',
-        )
-        .eq('event_series.account_id', accountId)
-        .or(
-          `and(occurrence_start.gte."${fromTs}",occurrence_start.lt."${toTs}"),and(rescheduled_to.gte."${fromTs}",rescheduled_to.lt."${toTs}")`,
-        )
-        .order('series_id')
-        .order('occurrence_start')
-        .range(from, to),
-    ),
-    fetchAll((from, to) =>
-      supabase
-        .from('occurrence_item_state')
-        .select('series_id, occurrence_start, item_id, status, event_series!inner()')
-        .eq('event_series.account_id', accountId)
-        .gte('occurrence_start', fromTs)
-        .lt('occurrence_start', toTs)
-        .order('series_id')
-        .order('occurrence_start')
-        .order('item_id')
-        .range(from, to),
-    ),
+  const [occ, items] = await Promise.all([
+    fetchOccurrenceRows(accountId, fromDate, toDate),
+    fetchItemStateRows(accountId, fromDate, toDate),
   ])
-
-  for (const o of occData) {
-    // PostgREST returns the to-one parent embed as an object.
-    const allDay = (o.event_series as { all_day: boolean } | null)?.all_day ?? false
-    const entry: OccurrenceState = { ...completions[key(o.series_id, o.occurrence_start)] }
-    if (o.status) entry.status = o.status as OccurrenceStatusCode
+  const completions: CompletionsMap = {}
+  for (const o of occ) {
+    const key = `${o.seriesId}:${o.date}`
+    const entry: OccurrenceState = { ...completions[key] }
+    if (o.status) entry.status = o.status
     if (o.cancelled) entry.cancelled = true
-    if (o.rescheduled_to) entry.start = tsToStart(o.rescheduled_to, allDay)
-    if (o.rescheduled_duration) entry.duration = intervalToDuration(o.rescheduled_duration, allDay)
-    // Skip rows that carry no app-visible state (e.g. a cleared override).
+    if (o.start != null) entry.start = o.start
+    if (o.duration != null) entry.duration = o.duration
     if (entry.status || entry.cancelled || entry.start != null || entry.duration != null) {
-      completions[key(o.series_id, o.occurrence_start)] = entry
+      completions[key] = entry
     }
   }
-  for (const it of itemData) {
-    const k = key(it.series_id, it.occurrence_start)
-    const checked = { ...(completions[k]?.checked ?? {}) }
-    checked[it.item_id] = it.status === 'done'
-    completions[k] = { ...completions[k], checked }
+  for (const it of items) {
+    const key = `${it.seriesId}:${it.date}`
+    completions[key] = {
+      ...completions[key],
+      checked: { ...(completions[key]?.checked ?? {}), [it.itemId]: it.done },
+    }
   }
   return completions
 }
@@ -298,28 +342,28 @@ export async function setChecklistEntry(
 // ---- one day waiting on another ------------------------------------------
 
 /**
- * One thing a day is waiting on: a particular day of another series, and how
- * far along that day has to be before this one is allowed to go ahead.
+ * One day waiting on a day of another series, as stored: both ends named.
+ *
+ * Grouping these by the day doing the waiting is a shape for the screen — see
+ * domains/occurrences/transformers.
  */
-export interface OccurrenceDependency {
+export interface DependencyRow {
+  dependentSeriesId: string
+  /** The waiting day, as `yyyy-mm-dd`. */
+  dependentDate: string
   prerequisiteSeriesId: string
-  /** The day of that series being waited on, as `yyyy-mm-dd`. */
+  /** The day being waited on, as `yyyy-mm-dd`. */
   prerequisiteDate: string
   requiredStatus: OccurrenceStatusCode
 }
 
 /**
- * Everything every day is waiting on, grouped by the day doing the waiting.
- *
- * Keys are `${seriesId}:${date}`, the same as {@link CompletionsMap} and the
- * to-do pins, so a day's state can be looked up across all three at once.
+ * Everything every day is waiting on.
  *
  * Paged, since one response stops at 1000 rows.
  */
-export async function fetchDependencies(
-  accountId: string,
-): Promise<Record<string, OccurrenceDependency[]>> {
-  const data = await fetchAll((from, to) =>
+export async function fetchDependencies(accountId: string): Promise<DependencyRow[]> {
+  const rows = await fetchAll((from, to) =>
     supabase
       .from('occurrence_dependency')
       // Scoped through the waiting series. This table names two series, so the
@@ -334,17 +378,13 @@ export async function fetchDependencies(
       .order('prerequisite_occurrence')
       .range(from, to),
   )
-  const out: Record<string, OccurrenceDependency[]> = {}
-  for (const row of data) {
-    const k = `${row.dependent_series}:${tsToDateKey(row.dependent_occurrence)}`
-    out[k] ??= []
-    out[k].push({
-      prerequisiteSeriesId: row.prerequisite_series,
-      prerequisiteDate: tsToDateKey(row.prerequisite_occurrence),
-      requiredStatus: row.required_status as OccurrenceStatusCode,
-    })
-  }
-  return out
+  return rows.map((row) => ({
+    dependentSeriesId: row.dependent_series,
+    dependentDate: tsToDateKey(row.dependent_occurrence),
+    prerequisiteSeriesId: row.prerequisite_series,
+    prerequisiteDate: tsToDateKey(row.prerequisite_occurrence),
+    requiredStatus: row.required_status as OccurrenceStatusCode,
+  }))
 }
 
 /**
