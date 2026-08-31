@@ -47,26 +47,40 @@ Mid-migration, and worth knowing before adding a slice:
   `src/store/`) with a hand-rolled write queue and a localStorage snapshot.
 - **Templates** and **per-occurrence state** are owned by **TanStack Query**
   (`src/data/`), fetched per window in the occurrence case.
-- A **`client/` layer** exists (`src/client/`) and currently holds the Supabase
-  SDK, the generated types, the pure Postgres↔app conversions, and the occurrence
-  window read. Occurrence *writes* still go through `SupabaseStore`.
+- The **`client/` layer** (`src/client/`) is **complete but not yet adopted.**
+  Every call the app makes to Supabase has a function there — 15 tables, 4 RPCs,
+  the 6 auth methods and the realtime channel — but only the occurrence window
+  read is wired up (`data/completions.ts` calls it). Everything else still runs
+  through `SupabaseStore`, `auth.tsx`, `lib/search.ts` and `lib/push.ts`.
 
 Each slice has exactly one owner. `RESTRUCTURE_PLAN.md` is where this ends up.
 
+**So `client/` duplicates code that is still live.** `client/search.ts` mirrors
+`lib/search.ts`, `client/push.ts` mirrors the row writes in `lib/push.ts`, and
+`client/series.ts`, `client/lists.ts`, `client/people.ts`, `client/preferences.ts`
+and the `client/occurrences.ts` writes mirror `supabaseStore.ts`. That is the cost
+of building the boundary before adopting it, and it is drift risk until the
+domains land: **a fix to one side has to be made on the other.** Adopt a slice
+and delete its old path rather than letting the pair age.
+
 ## Tests
 
-`npm test` — 119 tests, no backend needed. Recurrence expansion and the RRULE
+`npm test` — 123 tests, no backend needed. Recurrence expansion and the RRULE
 round-trip (`src/lib/`), occurrence completion and dependency gating, Lists
 helpers, date math, the reducer's optimistic application, the offline queue, the
 client-layer conversions (`src/client/mappers.test.ts`), and a cross-validation
 of the edge function's recurrence logic against the client's.
 
-The remaining gap is the `SupabaseStore` DB round-trip, which still needs a live
-click-test rather than a unit test.
+The remaining gap is every DB round-trip — `SupabaseStore`'s, and now `client/`'s
+too. Both need a live click-test rather than a unit test, and `client/`'s has not
+had one: it is unexercised code until a slice adopts it. Only the pure parts are
+covered (`mappers.test.ts`, including `occurrenceTs` across both clock changes).
 
 ---
 
-## Gotchas — read before editing `supabaseStore.ts`
+## Gotchas — read before editing `supabaseStore.ts` or `client/`
+
+These are the rules both copies encode. Breaking one is silent.
 
 - PostgREST embeds need FK hints `table!fk_col` or you get `PGRST201` (ambiguous
   — e.g. `checklist_item` also links many-to-many via `occurrence_item_removed`).
@@ -78,7 +92,14 @@ click-test rather than a unit test.
 - Occurrence rows are matched by a **day range**, never an exact timestamp: the
   stored `occurrence_start` carries the time-of-day the series had when the row
   was written, so an exact match silently misses every row written before a
-  series time edit. See `dayRange` in `src/client/mappers.ts`.
+  series time edit. See `dayRange` in `src/client/mappers.ts`. Writing a *new*
+  row is the other half — `occurrenceTs` in the same file — and the two must not
+  be swapped: match by range, insert by timestamp.
+- Notes keep their original `author_id`, and reminder deletes are scoped to
+  `user_id`. Both stop one partner's edit from taking over or removing the
+  other's rows.
+- Events and templates are one table (`event_series`). `client/series.ts` treats
+  them as one; `supabaseStore.ts` still has two write paths for them.
 
 Two rules that are easy to break and live in `DATA_MODEL.md`:
 

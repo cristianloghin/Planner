@@ -4,11 +4,11 @@
 is moving to, and the rules that keep it there. It is not a migration runbook —
 sequencing is deliberately out of scope.
 
-**Landed so far:** `client/` exists — the Supabase SDK and generated types
-(`client/supabase.ts`, `client/database.types.ts`), the paging helper
-(`client/pagination.ts`), the DB↔app conversions (`client/mappers.ts`, unit
-tested), and the occurrence window read (`client/occurrences.ts`), which
-`data/completions.ts` calls directly. Everything else below is still ahead;
+**Landed so far:** `client/` is **complete** — every call the app makes to Supabase
+has a function there: 15 tables, 4 RPCs, the 6 auth methods and the realtime
+channel. Nothing above it has been adopted yet, so `client/` currently duplicates
+`store/supabaseStore.ts`, `auth.tsx`, `lib/search.ts` and `lib/push.ts`, all of
+which still run the app unchanged. Everything else below is still ahead;
 [`STATUS.md`](./STATUS.md) describes the data layer as it actually stands.
 
 The pattern itself — its primitives, rationale, decision heuristics and
@@ -82,6 +82,17 @@ Also owns the **anti-corruption layer**: DB↔domain translation lives here
 RPCs become named exports (`createAccount`, `splitSeries`, `searchEvents`,
 `searchListItems`), so the entire server surface is enumerable in one folder.
 
+**One table, one module.** Events and templates are the same `event_series` row —
+a template is one with no `dtstart`/`rrule` — with the same children and the same
+reconciliation on write. So `client/series.ts` owns both and returns a `Series`;
+`domains/events` and `domains/templates` are the app's split of that one shape,
+not two client modules. The same rule put the to-do↔occurrence links in
+`client/lists.ts` and dependencies in `client/occurrences.ts`, next to the rows
+they hang off.
+
+**Auth and realtime are client too**, which the first draft of this document did
+not say — see the note under §5.
+
 Cross-cutting request concerns belong here too, via the SDK's `global.fetch`
 option: network-error classification and transport retry. Today `isNetworkError`
 lives in `store/offline.ts` and the retry loop lives in `state.tsx` — the state
@@ -146,20 +157,23 @@ src/
 ├── queryClient.ts              client + persister config
 ├── sw.ts                       PWA service worker
 │
-├── client/
-│   ├── supabase.ts             the single SDK import + custom fetch
+├── client/                     ← built
+│   ├── supabase.ts             the single SDK import
 │   ├── database.types.ts       generated; never imported above this folder
-│   ├── mappers.ts              DB ↔ domain translation
+│   ├── mappers.ts              DB ↔ app translation
 │   ├── pagination.ts           fetchAll
-│   ├── events.ts               series/attendee/attachment reads + writes
-│   ├── lists.ts
-│   ├── occurrences.ts          windowed reads, status/tick/override writes
+│   ├── series.ts               one table: events AND templates, + their
+│   │                           people/notes/checklists/reminders, split_series
+│   ├── lists.ts                lists, items, and to-do↔occurrence links
+│   ├── occurrences.ts          windowed reads, status/tick/override writes,
+│   │                           dependencies
 │   ├── people.ts
 │   ├── preferences.ts
-│   ├── templates.ts
 │   ├── account.ts              account_member, create_account
+│   ├── auth.ts                 sign in/up/out, password, session + changes
+│   ├── realtime.ts             the channel; reconnect + which table changed
 │   ├── search.ts               search_events, search_list_items
-│   └── push.ts                 push_subscriptions rows
+│   └── push.ts                 push_subscription rows
 │
 ├── domains/
 │   ├── account/                queries, keys
@@ -279,6 +293,25 @@ install.
 | R15 | Route components are thin shells over props-only view components. |
 | R16 | Every query key begins with its domain name and includes `accountId`. |
 
+**R1 and R4 collide, and R1 wins.** As first drafted this document sent the
+session to `services/session` and the realtime bridge to `services/realtime`,
+which R4 forbids: neither can call `supabase.auth.getSession()` or
+`supabase.channel()` without importing `client/`. It also sent credential
+operations to `domains/auth` while listing no `client/auth.ts` for that domain to
+call, which R1 forbids. The resolution is the one the layer table already implies
+— the Supabase calls are the client's, and the service keeps the part that is an
+app decision:
+
+- `client/auth.ts` holds the six SDK calls; `services/session` holds the session
+  and its non-React accessors *on top of them*, and `domains/auth` exposes sign-in
+  as a mutation.
+- `client/realtime.ts` opens the channel, retries a dead one and reports which
+  table changed; `services/realtime` maps table → query keys to invalidate. Which
+  keys a table maps to is app knowledge, not Supabase's.
+
+Both are built. The general form is worth remembering: a service that needs the
+network is not an exception to R4 — it is a service sitting on a client function.
+
 R8 is the one that erodes first. Without it, "ambient" becomes the loophole that
 swallows the pattern — someone puts a fetch behind an accessor hook and the arrows
 reverse.
@@ -330,9 +363,16 @@ requests by key and is readable outside React, which is exactly what
 
 ### Realtime
 
-One service mapping changed table → invalidated query keys, replacing both current
-paths (`SupabaseStore.subscribe` routed through `state.tsx`, and
-`useTemplatesRealtime`).
+`client/realtime.ts` (built) owns the connection: one channel over every table,
+a 5s rebuild when it drops, and a callback carrying the table that changed — or
+carrying nothing after a reconnect, meaning changes were missed and everything
+should be re-read. That last signal is load-bearing; a dead channel is otherwise
+silent.
+
+`services/realtime` then maps changed table → invalidated query keys, replacing
+both current paths (`SupabaseStore.subscribe` routed through `state.tsx`, and
+`useTemplatesRealtime`). The second collapses into a filter, not a second
+connection.
 
 ### Edit guard
 
@@ -358,10 +398,10 @@ stays in localStorage. Both are *how*, not *what* (R13).
 | File | Becomes |
 |---|---|
 | `App.tsx` | `Root` gate → route guard; tab shell → `layouts/AppShell`; route map → `routes/routes.ts` |
-| `state.tsx` | reducer state → domains; write queue → mutation `scope`; offline → Query persister; realtime routing → `services/realtime`; edit guard → derived from route |
-| `auth.tsx` | session + non-React accessors → `services/session`; credential ops → `domains/auth`; `ensureAccount` → `domains/account`; sign-out cache/snapshot clearing → shell orchestration |
+| `state.tsx` | reducer state → domains; write queue → mutation `scope`; offline → Query persister; realtime channel → ~~`client/realtime.ts`~~ **done**, routing → `services/realtime`; edit guard → derived from route |
+| `auth.tsx` | SDK calls → ~~`client/auth.ts`~~ **done**; session + non-React accessors → `services/session`; credential ops → `domains/auth`; `ensureAccount` → `domains/account` over ~~`client/account.ts`~~ **done**; sign-out cache/snapshot clearing → shell orchestration |
 | `store/store.ts` | deleted (`ScheduleStore`, `LocalStorageStore`, `defaultState`) |
-| `store/supabaseStore.ts` | sliced into `client/*` by domain; mappers to `client/mappers.ts` |
+| `store/supabaseStore.ts` | ~~sliced into `client/*` by table; mappers to `client/mappers.ts`~~ **done** — deletes once the domains adopt them |
 | `store/reducer.ts`, `store/actions.ts` | deleted; optimistic logic → `domains/*/patch.ts` |
 | `store/offline.ts` | deleted |
 | `data/useAccountStore.ts` | deleted (client functions replace it) |
@@ -387,8 +427,8 @@ of coupling that breaks quietly later.
 | `data/templates.ts` | `domains/templates` |
 | `data/completions.ts` | `domains/occurrences` |
 | ~~`lib/{supabase,database.types}.ts`~~ | `client/` — **done** |
-| `lib/search.ts` | `client/search.ts` + `domains/search` |
-| `lib/push.ts` | `client/push.ts` + `services/push` |
+| `lib/search.ts` | ~~`client/search.ts`~~ **done** + `domains/search` |
+| `lib/push.ts` | ~~`client/push.ts`~~ **done** (row writes only) + `services/push` |
 | `lib/{recurrence,rrule,occurrences}.ts` | `services/recurrence` |
 | `lib/timelineLayout.ts` | `services/timeline-layout` |
 | `lib/conflicts.ts` | `services/conflicts` |
@@ -422,23 +462,35 @@ silently delete it. R12 exists to prevent that: each domain exports pure `patch*
 functions — `patchEntry` in `completions.ts` is the existing example — and the tests
 port over nearly as-is.
 
-**`splitSeries` is the riskiest single item.** It is an RPC, plus follow-up row
-writes, plus an optimistic clone that only reconciles via a full reload. As one
-mutation with a multi-step `mutationFn`, its optimistic patch is genuinely awkward.
-Consider letting it reconcile by invalidation rather than patching optimistically.
+**`splitSeries` — the client half is settled, the optimistic half is not.**
+`client/series.ts` does all four steps behind one call (RPC, then the new row, then
+its roster) and returns the new id. It deliberately takes edits that *cannot* carry
+attachments: the RPC already copied the notes/checklists/reminders with fresh ids,
+so writing the ones the app is holding would target the wrong rows — a trap now
+closed by the parameter type rather than by a comment. What remains awkward is
+unchanged: the optimistic clone only reconciles via a full reload, so prefer
+reconciling by invalidation over patching optimistically.
 
 **`load()` decomposition.** The reducer stack reads the entire `AppState` in one
 call. Per-domain queries replace it. Windowing events by date range (as occurrences
 already are) is an opportunity, not a requirement — treat it as separate scope.
 
 **Legacy lists migration.** `supabaseStore.ts` reads `planner.lists.v1` from
-localStorage once to import pre-migration items. Decide explicitly whether to carry
-it forward or drop it.
+localStorage once to import pre-migration items. It is deliberately *not* in
+`client/lists.ts` — it is browser storage, not Supabase, and it wedged a one-shot
+side effect into the middle of a read. It still runs where it always did. Whether
+to carry it forward at all is still open.
 
 **StrictMode.** `main.tsx` runs `StrictMode`, and the codebase already carries scar
 tissue from it — the `inFlight` map in `auth.tsx` exists because double-mount created
 duplicate accounts. Service instances must be created once in a factory the provider
 calls lazily, and `subscribe` must be idempotent under double-invocation.
+
+Note that `client/` does **not** solve this for you. `createAccount` is a plain RPC
+wrapper: calling it twice creates two accounts, and nothing on the database side
+prevents that, so whatever replaces the `inFlight` map still has to. Likewise
+`subscribeToChanges` opens a channel per call, exactly as `SupabaseStore.subscribe`
+did — the idempotence has to live in the service above it.
 
 **Duplication to retire.** `EventSearch` (79 lines) and `ListSearch` (84) are
 structurally identical modulo entity names. `Lists.tsx` (714) is list CRUD, item
@@ -484,4 +536,9 @@ props-only is promoted to a workspace by writing a second thin wrapper.
 - Whether `/search?q=` becomes a route (deep-linkable results) or stays an overlay
   invoked from the shared header.
 - Whether events get windowed reads like occurrences, or stay whole-account.
-- Whether the legacy `planner.lists.v1` import is carried forward.
+- Whether the legacy `planner.lists.v1` import is carried forward (it is out of
+  `client/` either way — see §8).
+- Whether `client/`'s remaining reach into `lib/` is worth closing early. `mappers`
+  uses `lib/dates`, `people`/`preferences`/`series` use `lib/palette`, and `series`
+  uses `lib/rrule`. All three are slated to move under `assets/` or `services/`,
+  at which point two of those edges point the wrong way and the third resolves.
