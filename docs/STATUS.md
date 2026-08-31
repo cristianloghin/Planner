@@ -47,14 +47,20 @@ Mid-migration, and worth knowing before adding a slice:
   `src/store/`) with a hand-rolled write queue and a localStorage snapshot.
 - **Templates** and **per-occurrence state** are owned by **TanStack Query**
   (`src/data/`), fetched per window in the occurrence case.
-- The **`client/` and `domains/` layers** are both **complete but not yet
-  adopted.** Every call the app makes to Supabase has a client function — 15
+- The **`client/`, `domains/` and `services/` layers** are all **complete but not
+  yet adopted.** Every call the app makes to Supabase has a client function — 15
   tables, 4 RPCs, the 6 auth methods, the realtime channel — and eight domains
   sit over them with queries, mutations, transformers, selectors and pure
   optimistic patches. Only the occurrence window read is wired up at all
   (`data/completions.ts` calls the client directly, not the domain). Everything
   else still runs through `SupabaseStore`, `state.tsx`, `auth.tsx`,
   `lib/search.ts` and `lib/push.ts`.
+- **`services/` is different, and better off.** Those were real moves, not
+  parallel copies: `lib/recurrence`, `lib/occurrences`, `lib/timing`,
+  `lib/timelineLayout`, `lib/conflicts`, `lib/notifications`,
+  `lib/useSwipeGestures` and `lib/push` now forward to a service, so there is one
+  implementation and nothing to drift. The app is unchanged; the forwarders
+  delete once routes import the services directly.
 
 Each slice has exactly one owner. `RESTRUCTURE_PLAN.md` is where this ends up.
 
@@ -93,19 +99,27 @@ replays its offline writes.
 
 ## Tests
 
-`npm test` — 218 tests, no backend needed. Recurrence expansion and the RRULE
+`npm test` — 235 tests, no backend needed. Recurrence expansion and the RRULE
 round-trip (`src/lib/`), occurrence completion and dependency gating, Lists
 helpers, date math, the reducer's optimistic application, the offline queue, the
 client-layer conversions (`src/client/mappers.test.ts`), and a cross-validation
 of the edge function's recurrence logic against the client's.
 
-Of those, 99 cover the new layers: the client's conversions
+169 of them now live under `client/`, `domains/` and `services/`, but only 116 are
+*new* — the recurrence and occurrence-status tests moved there with their code.
+The new ones cover: the client's conversions
 (`mappers.test.ts`, including `occurrenceTs` across both clock changes) and each
 domain's transformers, selectors and optimistic patches. The most valuable are the
 checklist round-trip in `domains/events` — grouping flat rows into checklists and
 back, which could not be tested at all while it lived inside a database call — and
 `domains/occurrences`, which pins the rule that a day carrying nothing the app
 shows gets no entry, on both the read and the optimistic update.
+
+The two service stores add 17 more, and are worth knowing about because they
+needed no network at all: both `session` and `realtime` are handed their source
+as an argument, so a stub drives them. That is the practical dividend of "a
+service is fed, not self-serving" — the rule pays for itself in tests before it
+pays for itself in structure.
 
 The remaining gap is every DB round-trip — `SupabaseStore`'s, and now `client/`'s
 too. Both need a live click-test rather than a unit test, and `client/`'s has not

@@ -4,16 +4,20 @@
 is moving to, and the rules that keep it there. It is not a migration runbook —
 sequencing is deliberately out of scope.
 
-**Landed so far:** `client/` and `domains/` are both **complete and unadopted.**
+**Landed so far:** `client/`, `domains/` and `services/` are all **complete and
+unadopted.**
 Every call the app makes to Supabase has a client function (15 tables, 4 RPCs, the
 6 auth methods, the realtime channel), and eight domains sit over them with
 queries, mutations, transformers, selectors and pure optimistic patches.
 
-Nothing above has been wired up, so both layers currently duplicate
-`store/supabaseStore.ts`, `state.tsx`, `auth.tsx`, `data/` and parts of `lib/`,
-all of which still run the app unchanged. `routes/`, `layouts/`, `services/` and
-`assets/` are still ahead; [`STATUS.md`](./STATUS.md) describes the data layer as
-it actually stands.
+Eight services sit beside them — the engines, the behaviour hooks, and the two
+stores.
+
+`client/` and `domains/` duplicate `store/supabaseStore.ts`, `state.tsx`,
+`auth.tsx` and `data/`, all of which still run the app unchanged. `services/` is
+different: those were real moves, and `lib/` forwards to them, so there is one
+implementation and nothing to drift. `routes/`, `layouts/` and `assets/` are still
+ahead; [`STATUS.md`](./STATUS.md) describes where things actually stand.
 
 The pattern itself — its primitives, rationale, decision heuristics and
 anti-patterns — is defined in [`ARCHITECTURE.md`](./ARCHITECTURE.md). This document
@@ -145,9 +149,18 @@ the same conversion — flat checklist lines grouped into checklists — so
 would have meant one importing the other's transformers, and there is no layer
 below both to put them in. Same reasoning as `client/series.ts` one level down.
 
-**Push has no domain.** Its row writes are `client/push.ts`; everything else about
-it is the browser. The pairing belongs to `services/push`, fed by a route — see
-the R1/R4 note in §5.
+**Push is in three pieces, and does have a domain.** An earlier draft of this
+document said it did not — wrong, because the layer table forbids a **route from
+importing the client**, so a screen cannot store a push subscription itself.
+`services/push` does the browser side and returns a `DeviceRegistration` with no
+user on it (that side does not know who is signed in), `client/push.ts` writes the
+rows, and `domains/push` pairs them for routes.
+
+Its two mutations are deliberately not durable: a registration only means
+anything alongside a live subscription in *this* browser, and every start-up
+already re-reads what the browser is subscribed as and saves it again — which
+repairs a failed write and an endpoint the push service rotated behind our back
+alike. That is better than a replay.
 
 ### `routes/`
 
@@ -170,10 +183,31 @@ named slots (`nav`, `rightExtra`, `children`), shared by Day/Week/Month.
 Self-contained modules called by routes. A service may be a store, a hook, or a
 pure engine. It never imports from `domains/` or `client/`.
 
-`lib/` already contains three finished engines that only need moving:
-occurrence expansion (`recurrence`/`rrule`/`occurrences`), block layout
-(`timelineLayout`), and supervision checks (`conflicts`). They already take data in
-and return derived data — which is exactly the service contract.
+**All eight are built.** Three pure engines — `recurrence` (occurrence expansion,
+event geometry, and whether a day is done or blocked), `timeline-layout`,
+`conflicts`. Three behaviour hooks — `gestures`, `notifications`, `push`. Two
+stores — `session`, `realtime`.
+
+**Fed, never self-serving — and that is what made them testable.** A service may
+not import the client, so both stores take their source as an argument:
+`session` is given where the session comes from, `realtime` is given where
+changes come from *and* what to do about them (which tables map to which cached
+queries cannot be known without reaching into a domain). The same constraint
+reshaped `blockingPrerequisites`, which used to read the events and dependency
+edges out of `AppState` and is now handed both.
+
+Every one of those signatures is drivable by a stub, which is why the stores
+have 17 tests between them and no network in sight.
+
+**Two things moved *into* a service that the plan had sent elsewhere**, both
+forced by the same rule rather than by preference:
+
+- `lib/timing.ts` (where one event sits in time). The plan made it a domain
+  selector, but `expand.ts` calls `timedSegment` inside a per-day loop — a value,
+  deep in the engine, that no route can feed in.
+- `checklistEntries` and `reminderOffsets` are inlined in the services that need
+  them rather than imported from `domains/events`. Both are one-line reads over a
+  shape the service was handed.
 
 ### `assets/`
 
@@ -236,15 +270,15 @@ src/
 │   ├── CalendarViewLayout.tsx  ← ViewHeader
 │   └── SettingsLayout.tsx
 │
-├── services/
-│   ├── session/                session + non-React accessors
-│   ├── realtime/               table → query-key invalidation bridge
-│   ├── recurrence/             ← recurrence, rrule, occurrences
-│   ├── timeline-layout/        ← timelineLayout
-│   ├── conflicts/              ← conflicts
-│   ├── gestures/               ← useSwipeGestures
-│   ├── notifications/          ← notifications, AlertHost logic
-│   └── push/                   ← push
+├── services/                   ← built
+│   ├── session/                who is signed in; store + non-React accessor
+│   ├── realtime/               folds a burst of table changes into one report
+│   ├── recurrence/             timing · expand · status
+│   ├── timeline-layout/        overlapping blocks into columns
+│   ├── conflicts/              who is watching the children
+│   ├── gestures/               swipe deck + pinch zoom
+│   ├── notifications/          alerts · useDueAlerts (was AlertHost's lifecycle)
+│   └── push/                   the browser side only; rows are domains/push
 │
 └── assets/
     ├── ui/                     Spinner, ConfirmDialog, ScopeSheet, ColorPicker,
@@ -365,7 +399,20 @@ in storage waiting for it. It also turns the client's "refused" result back into
 thrown error, so a form has one place to read a problem from.
 
 Both are built. The general form is worth remembering: a service that needs the
-network is not an exception to R4 — it is a service sitting on a client function.
+network is not an exception to R4 — it is a service sitting on a client function,
+or one the route feeds.
+
+**A route may not import the client either**, which is easy to miss and changed
+the shape of push (see §2). Anything a screen needs from the database goes through
+a domain, without exception — including two rows of push subscription.
+
+**Service → service is not covered by the rules, and happens.**
+`services/notifications` imports `startsOn` from `services/recurrence`; `expand`
+and `status` import each other's helpers within `recurrence`. It is acyclic, and
+the alternative is impractical — `dueAlerts` loops over events and days calling
+`startsOn`, which no route can feed in. Treat a lateral service edge as allowed
+while it stays acyclic, and prefer merging two services over letting them import
+each other in both directions.
 
 R8 is the one that erodes first. Without it, "ambient" becomes the loophole that
 swallows the pattern — someone puts a fetch behind an accessor hook and the arrows
@@ -431,10 +478,17 @@ carrying nothing after a reconnect, meaning changes were missed and everything
 should be re-read. That last signal is load-bearing; a dead channel is otherwise
 silent.
 
-`services/realtime` then maps changed table → invalidated query keys, replacing
-both current paths (`SupabaseStore.subscribe` routed through `state.tsx`, and
-`useTemplatesRealtime`). The second collapses into a filter, not a second
-connection.
+`services/realtime` (built) then folds a burst into one report: a partner's save
+touches several tables in the same moment, so it collects for 200ms — the interval
+the app already settled on — restarting the wait on each change, so a burst
+reports at its end rather than its start. A reconnection arrives as `missedSome`,
+meaning changes went unseen and cannot be asked for.
+
+It is handed both ends: where changes come from, and what to do about them. The
+table → query-key mapping stays with the app, because it cannot be known without
+reaching into a domain. Wiring it replaces both current paths
+(`SupabaseStore.subscribe` routed through `state.tsx`, and `useTemplatesRealtime`);
+the second collapses into a filter, not a second connection.
 
 ### Edit guard
 
@@ -490,13 +544,13 @@ of coupling that breaks quietly later.
 | `data/completions.ts` | ~~`domains/occurrences`~~ **built** — month windows and patches ported |
 | ~~`lib/{supabase,database.types}.ts`~~ | `client/` — **done** |
 | `lib/search.ts` | ~~`client/search.ts`~~ **done** + `domains/search` |
-| `lib/push.ts` | ~~`client/push.ts`~~ **done** (row writes only) + `services/push` |
-| `lib/{recurrence,rrule,occurrences}.ts` | `services/recurrence` |
-| `lib/timelineLayout.ts` | `services/timeline-layout` |
-| `lib/conflicts.ts` | `services/conflicts` |
-| `lib/notifications.ts` | `services/notifications` |
-| `lib/useSwipeGestures.ts` | `services/gestures` |
-| `lib/{people,attachments,lists,timing}.ts` | domain selectors in `domains/{people,events,lists}` — `people` and the `lists` helpers **built**; `attachments`' filters folded into `domains/events/transformers`; `timing` still ahead |
+| `lib/push.ts` | ~~`client/push.ts`~~ (rows) + ~~`services/push`~~ (browser) + ~~`domains/push`~~ (pairing) — **all three built**; `lib/push.ts` is now a 46-line adapter |
+| `lib/{recurrence,occurrences}.ts` | ~~`services/recurrence`~~ **moved**; `lib/rrule.ts` belongs in `client/` instead (only the client imports it) |
+| `lib/timelineLayout.ts` | ~~`services/timeline-layout`~~ **moved** |
+| `lib/conflicts.ts` | ~~`services/conflicts`~~ **moved** |
+| `lib/notifications.ts` | ~~`services/notifications`~~ **moved**, with AlertHost's lifecycle as `useDueAlerts` |
+| `lib/useSwipeGestures.ts` | ~~`services/gestures`~~ **moved** |
+| `lib/{people,attachments,lists}.ts` | domain selectors in `domains/{people,events,lists}` — `people` and the `lists` helpers **built**; `attachments`' filters folded into `domains/events/transformers`. `lib/timing.ts` went to `services/recurrence` instead, not to a domain — see §2 |
 | `lib/{useLatest,useMediaQuery,useSearch}.ts` | `assets/hooks` |
 | `lib/{dates,id,cx}.ts` | `assets/utils` |
 | `lib/palette.ts` | `assets/palette.ts` |
@@ -560,9 +614,16 @@ calls lazily, and `subscribe` must be idempotent under double-invocation.
 
 Note that `client/` does **not** solve this for you. `createAccount` is a plain RPC
 wrapper: calling it twice creates two accounts, and nothing on the database side
-prevents that, so whatever replaces the `inFlight` map still has to. Likewise
+prevents that, so whatever replaces the `inFlight` map still has to. `domains/account`
+is what does: one request per key, however many callers ask at once. Likewise
 `subscribeToChanges` opens a channel per call, exactly as `SupabaseStore.subscribe`
-did — the idempotence has to live in the service above it.
+did — the idempotence has to live above it.
+
+**The pattern that works, from `services/session`:** create the instance in a
+`useState` initializer, but *start* it in an effect whose cleanup stops it. Do not
+start it from the initializer — React calls that twice in development, giving two
+subscriptions and two reads. This was written wrong first and caught; it is the
+same failure that produced the duplicate accounts in the first place.
 
 **Duplication to retire.** `EventSearch` (79 lines) and `ListSearch` (84) are
 structurally identical modulo entity names. `Lists.tsx` (714) is list CRUD, item
@@ -610,6 +671,10 @@ props-only is promoted to a workspace by writing a second thin wrapper.
 - Whether events get windowed reads like occurrences, or stay whole-account.
 - Whether the legacy `planner.lists.v1` import is carried forward (it is out of
   `client/` either way — see §8).
+- Where `occKey` should live. `services/recurrence` and `domains/occurrences` each
+  declare the same one-line key format, because a service may not import a
+  domain's values and there is no `assets/` below both yet. They must agree. This
+  is the first thing that genuinely wants `assets/`.
 - Whether search results should be cached longer than 30s. Nothing cached them
   before, so any window is new; 30s keeps a repeated search instant without
   hiding something just added.
