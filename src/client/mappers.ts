@@ -59,6 +59,26 @@ export function tsToDateKey(ts: string): string {
 }
 
 /**
+ * The timestamp a series' occurrence on local ISO `date` is stored under.
+ *
+ * An occurrence keeps the time of day its series had, on the day asked for. An
+ * all-day series sits at local midnight. A series with no start of its own is
+ * treated as midnight too.
+ *
+ * This computes where a NEW row goes. It is not a way to find an existing row —
+ * a row written before the series' time was edited still carries the old time of
+ * day, so look those up with {@link dayRange} instead.
+ */
+export function occurrenceTs(
+  series: { allDay: boolean; start: string | null },
+  date: string,
+): string {
+  if (series.allDay) return new Date(`${date}T00:00:00`).toISOString()
+  const timeOfDay = series.start?.slice(11) || '00:00'
+  return new Date(`${date}T${timeOfDay}`).toISOString()
+}
+
+/**
  * UTC timestamp bounds of local ISO `date` — the half-open [from, to) window an
  * occurrence-row `occurrence_start` for that date falls in. Occurrence rows are
  * MATCHED by this window rather than by an exact timestamp: the stored value

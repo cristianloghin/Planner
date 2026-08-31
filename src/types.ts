@@ -1,99 +1,34 @@
-import type { OccurrenceStatusCode } from './client/occurrences'
+import type { TodoList } from './client/lists'
+import type { OccurrenceDependency } from './client/occurrences'
+import type { Person, PersonId } from './client/people'
+import type { Preferences } from './client/preferences'
+import type { Attachment, Recurrence } from './client/series'
 import type { ColorKey } from './lib/palette'
 
 // Occurrence state is declared by the client layer, which is where the two
 // backing tables are converted into it (src/client/occurrences.ts). Re-exported
 // here so existing consumers keep one import site while the migration runs.
-export type { CompletionsMap, OccurrenceState, OccurrenceStatusCode } from './client/occurrences'
+export type {
+  CompletionsMap,
+  OccurrenceDependency,
+  OccurrenceState,
+  OccurrenceStatusCode,
+} from './client/occurrences'
 
-/** A person's id. Now an opaque string (a backend uuid), not a fixed enum — the
- *  app is generic over however many people exist. */
-export type PersonId = string
+// Per-user settings are likewise declared by the client layer, which validates
+// the stored JSON document into this shape (src/client/preferences.ts).
+export type { Preferences, WeekLayout } from './client/preferences'
 
-/** Adults hold a full lane and can supervise; children get a narrow lane and
- *  need a free adult on their events. Generalizes the old parent/kid roles. */
-export type PersonKind = 'adult' | 'child'
+// People are declared by the client layer too (src/client/people.ts).
+export type { Person, PersonId, PersonKind } from './client/people'
 
-export interface Person {
-  id: PersonId
-  name: string
-  /** The account-wide default user-color *key* (one of the nine in the palette).
-   *  A per-user override may sit on top in {@link Preferences.personColors}. */
-  color: string
-  kind: PersonKind
-  /** Lane order, ascending. */
-  sortOrder: number
-}
+// Lists and their to-dos, likewise (src/client/lists.ts).
+export type { ListItem, TodoList } from './client/lists'
 
-/**
- * A standalone to-do, living inside a {@link TodoList}. Undated by default,
- * optionally assigned to one person or shared (personId === null). Distinct from
- * an event's checklist — they share no data, only the spirit of "things to tick
- * off". `done` lives on the item itself (single context — it stays checked in
- * place and can be unchecked); see DATA_MODEL Decision 11. A to-do can also be
- * surfaced inside a calendar occurrence via `AppState.listLinks` — the tick stays
- * on this one `done`, so ticking it there or here is the same write.
- */
-export interface ListItem {
-  id: string
-  title: string
-  done: boolean
-  personId: PersonId | null
-  /** In-list section header; null = ungrouped (grouped/sorted like a checklist). */
-  groupLabel: string | null
-  /** Optional deadline as an ISO date ('yyyy-mm-dd'); null = none. */
-  dueOn: string | null
-  /** Position within the list, ascending (checklist-parity ordering). */
-  sortOrder: number
-  createdAt: number
-}
-
-/**
- * A named, account-scoped list of to-dos (DB table `list`). The Lists view shows
- * one list at a time; users can create, rename, and delete lists.
- */
-export interface TodoList {
-  id: string
-  title: string
-  /** List order, ascending. */
-  sortOrder: number
-  items: ListItem[]
-}
-
-/** How often an event repeats. Omit on an event for a one-off. */
-export type RecurrenceFreq = 'daily' | 'weekly' | 'monthly'
-
-export interface Recurrence {
-  freq: RecurrenceFreq
-  /** Repeat every N units (>= 1): every 2 days, every 3 weeks, ... */
-  interval: number
-  /**
-   * Inclusive last day the series may produce an occurrence, as a local ISO date
-   * (`yyyy-mm-dd`). Omitted = repeats forever. Set when a series is capped by a
-   * "this and following" split; round-trips through the stored RRULE's `UNTIL`.
-   */
-  until?: string
-}
-
-/**
- * One line of a checklist attachment. Template only — whether it's *checked* is
- * per-occurrence state and lives in `AppState.completions`, never here.
- */
-export interface ChecklistEntry {
-  id: string
-  title: string
-}
-
-/**
- * Polymorphic content attached to an event, kept in display order:
- *   - note:      free text (repeatable — an event can have several).
- *   - checklist: a titled list of entries; the event is "done" when all are checked.
- *   - reminder:  an in-app notification offset, in minutes before the event start.
- */
-export type Attachment =
-  | { id: string; kind: 'note'; text: string }
-  | { id: string; kind: 'checklist'; title?: string; items: ChecklistEntry[] }
-  | { id: string; kind: 'reminder'; offset: number }
+// A series and the pieces it is built from are declared by the client layer
+// (src/client/series.ts) — one table, one module. CalendarEvent and
+// EventTemplate below are the app's own split of that one shape.
+export type { Attachment, ChecklistEntry, Recurrence, RecurrenceFreq } from './client/series'
 
 /**
  * A calendar event — a pure *template*. Timing is `start` + `duration`:
@@ -143,45 +78,6 @@ export interface EventTemplate {
   /** Notes, checklists and reminders copied onto each event made from this. */
   attachments: Attachment[]
 }
-
-/**
- * One prerequisite edge for an occurrence — a row of `occurrence_dependency`.
- * Stored in `AppState.dependencies` keyed by the *dependent* occurrence, so it
- * names only the prerequisite end: a concrete occurrence of another series and
- * the status that occurrence must reach to clear the gate.
- */
-export interface OccurrenceDependency {
-  prerequisiteSeriesId: string
-  /** ISO date (yyyy-mm-dd) of the specific prerequisite occurrence. */
-  prerequisiteDate: string
-  requiredStatus: OccurrenceStatusCode
-}
-
-/**
- * Per-user, per-account settings — personal, never shared with a partner. Stored
- * as one JSON document (the `user_preference` table) so new settings are just new
- * fields here, no schema change. The first one is `personColors`: an override for
- * how THIS user sees each person's lane; an unset id falls back to the shared
- * `Person.color`.
- */
-export interface Preferences {
-  /** Per-person user-color override, as a palette key (one of the nine). */
-  personColors: Record<PersonId, ColorKey>
-  /**
-   * IANA timezone of this user's device, stamped automatically on startup.
-   * The reminder sender (supabase/functions/send-reminders) computes each
-   * user's wall-clock fire times from it; absent = UTC.
-   */
-  timezone?: string
-  /**
-   * How the Week tab lays the seven days out: `list` (default) stacks each
-   * day's events as cards; `timeline` is an hourly grid with a time gutter,
-   * swipe week navigation and pinch-to-zoom, like the Day view.
-   */
-  weekLayout?: WeekLayout
-}
-
-export type WeekLayout = 'list' | 'timeline'
 
 export interface AppState {
   people: Record<PersonId, Person>
