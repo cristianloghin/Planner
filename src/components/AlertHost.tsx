@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLatest } from '../assets/hooks/useLatest'
+import { addDays, toISODate } from '../assets/utils/dates'
 import { useCompletionsForRange } from '../data/completions'
-import { addDays, toISODate } from '../lib/dates'
 import { type FiredAlert, dueAlerts } from '../lib/notifications'
-import { useLatest } from '../lib/useLatest'
 import { useApp } from '../state'
 import s from './AlertHost.module.css'
 

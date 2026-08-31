@@ -1,5 +1,5 @@
-import { addDays, mondayOf, weekdayIndex } from '../lib/dates'
-import { uid } from '../lib/id'
+import { addDays, mondayOf, weekdayIndex } from '../assets/utils/dates'
+import { uid } from '../assets/utils/id'
 import { occKey } from '../lib/occurrences'
 import type { AppState, ListItem, TodoList } from '../types'
 import type { Action } from './actions'

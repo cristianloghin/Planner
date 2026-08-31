@@ -1,5 +1,5 @@
+import { diffDays, toISODate } from '../assets/utils/dates'
 import type { AppState, ListItem, TodoList } from '../types'
-import { diffDays, toISODate } from './dates'
 
 /**
  * Locate a to-do by id across every list, returning it with its owning list (so

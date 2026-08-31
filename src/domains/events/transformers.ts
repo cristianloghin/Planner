@@ -1,3 +1,4 @@
+import { toISODate } from '../../assets/utils/dates'
 /**
  * Turning a stored series into an event or a blueprint, and back.
  *
@@ -7,7 +8,6 @@
  * again to save — happens here, where it can be tested without a database.
  */
 import type { Series } from '../../client/series'
-import { toISODate } from '../../lib/dates'
 import type { Attachment, CalendarEvent, EventTemplate } from './types'
 
 /** Lines of one checklist are `${GROUP_STRIDE}` apart, so their order survives. */

@@ -1,5 +1,5 @@
 import { AlertDialog } from 'radix-ui'
-import { cx } from '../lib/cx'
+import { cx } from '../utils/cx'
 import s from './Dialog.module.css'
 
 /**

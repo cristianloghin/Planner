@@ -1,4 +1,4 @@
-import { colorStyle } from '../lib/palette'
+import { colorStyle } from '../assets/palette'
 import { personColorKey } from '../lib/people'
 import { useApp } from '../state'
 import type { PersonId } from '../types'

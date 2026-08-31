@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { toISODate } from '../../assets/utils/dates'
 import type { Series } from '../../client/series'
-import { toISODate } from '../../lib/dates'
 import { patchRemoveEvent, patchRemoveTemplate, patchSaveEvent, patchSaveTemplate } from './patches'
 import {
   fromAttachments,

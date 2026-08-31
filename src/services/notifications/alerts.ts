@@ -1,3 +1,4 @@
+import { addDays, diffDays, toISODate } from '../../assets/utils/dates'
 /**
  * Which reminders have come due.
  *
@@ -7,7 +8,6 @@
  */
 import type { CalendarEvent } from '../../domains/events/types'
 import type { OccurrenceState } from '../../domains/occurrences/types'
-import { addDays, diffDays, toISODate } from '../../lib/dates'
 import { startsOn } from '../recurrence/expand'
 import { occKey } from '../recurrence/status'
 import { eventStartMinutes } from '../recurrence/timing'

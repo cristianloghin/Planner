@@ -1,7 +1,7 @@
 /*
- * Global base only. Design tokens live in styles/tokens.css; component styles
+ * Global base only. Design tokens live in assets/styles/tokens.css; component styles
  * live in co-located *.module.css files; cross-cutting class styles live in
- * styles/shared.module.css.
+ * assets/styles/shared.module.css.
  */
 
 /* Digits only (unicode-range): Roboto Mono layered in front of Source Sans 3

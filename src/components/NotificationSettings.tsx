@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
+import shared from '../assets/styles/shared.module.css'
+import { cx } from '../assets/utils/cx'
 import { useAuth } from '../auth'
-import { cx } from '../lib/cx'
 import {
   currentSubscription,
   disablePush,
@@ -9,7 +10,6 @@ import {
   pushConfigured,
   pushSupport,
 } from '../lib/push'
-import shared from '../styles/shared.module.css'
 import s from './Settings.module.css'
 
 type Status = 'loading' | 'off' | 'on' | 'denied' | 'needs-install' | 'unsupported'

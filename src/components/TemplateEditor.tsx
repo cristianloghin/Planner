@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import shared from '../assets/styles/shared.module.css'
+import { NumberField } from '../assets/ui/NumberField'
 import { useUpdateTemplate } from '../data/templates'
-import shared from '../styles/shared.module.css'
 import type { Attachment, EventTemplate, PersonId } from '../types'
 import { AttachmentsEditor } from './AttachmentsEditor'
 import { AttendeeChips } from './AttendeeChips'
-import { NumberField } from './NumberField'
 
 const SNAP = 15
 

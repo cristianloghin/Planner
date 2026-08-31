@@ -1,5 +1,5 @@
 import { Dialog } from 'radix-ui'
-import { cx } from '../lib/cx'
+import { cx } from '../utils/cx'
 import s from './ScopeSheet.module.css'
 
 /** One reach an operation can have, with the occurrences it covers spelled out. */

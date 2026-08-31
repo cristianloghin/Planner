@@ -10,12 +10,12 @@
  */
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef } from 'react'
+import { addDays } from '../../assets/utils/dates'
 import {
   fetchDependencies,
   fetchItemStateRows,
   fetchOccurrenceRows,
 } from '../../client/occurrences'
-import { addDays } from '../../lib/dates'
 import { dependenciesByOccurrence, toCompletions } from './transformers'
 import type { CompletionsMap, OccurrenceDependency } from './types'
 

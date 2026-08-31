@@ -1,5 +1,11 @@
 import { Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import shared from '../assets/styles/shared.module.css'
+import { ConfirmDialog } from '../assets/ui/ConfirmDialog'
+import { type ScopeChoice, ScopeSheet } from '../assets/ui/ScopeSheet'
+import { PageLoader } from '../assets/ui/Spinner'
+import { cx } from '../assets/utils/cx'
+import { addDays, isoLabel, minutesToTime } from '../assets/utils/dates'
 import {
   useCancelOccurrence,
   useClearOccurrenceOverride,
@@ -8,8 +14,6 @@ import {
   useSetOccurrenceStatus,
 } from '../data/completions'
 import { checklists, notes, reminderOffsets } from '../lib/attachments'
-import { cx } from '../lib/cx'
-import { addDays, isoLabel, minutesToTime } from '../lib/dates'
 import { findListItem, isOverdue } from '../lib/lists'
 import { offsetLabel } from '../lib/notifications'
 import {
@@ -26,12 +30,8 @@ import {
 } from '../lib/recurrence'
 import { MINS_PER_DAY, eventDate, eventSpanDays, eventStartMinutes } from '../lib/timing'
 import { useApp } from '../state'
-import shared from '../styles/shared.module.css'
 import type { CalendarEvent, CompletionsMap, OccurrenceStatusCode } from '../types'
-import { ConfirmDialog } from './ConfirmDialog'
 import s from './OccurrenceSheet.module.css'
-import { type ScopeChoice, ScopeSheet } from './ScopeSheet'
-import { PageLoader } from './Spinner'
 
 const STATUSES: OccurrenceStatusCode[] = ['done', 'skipped', 'blocked']
 

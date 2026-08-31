@@ -4,7 +4,7 @@
  * For call sites to pass into `useLists`. The ones ending in `For` need an
  * argument first and build a function, so hold the result with `useMemo`.
  */
-import { diffDays, toISODate } from '../../lib/dates'
+import { diffDays, toISODate } from '../../assets/utils/dates'
 import type { ListItem, TodoList } from './types'
 
 /** One list, or undefined if it has been deleted. */

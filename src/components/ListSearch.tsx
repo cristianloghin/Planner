@@ -1,12 +1,12 @@
 import { Search as SearchIcon } from 'lucide-react'
 import { useCallback, useState } from 'react'
+import { useSearch } from '../assets/hooks/useSearch'
+import s from '../assets/ui/Search.module.css'
+import { SearchOverlay } from '../assets/ui/SearchOverlay'
+import { cx } from '../assets/utils/cx'
+import { isoLabel } from '../assets/utils/dates'
 import { useAuth } from '../auth'
-import { cx } from '../lib/cx'
-import { isoLabel } from '../lib/dates'
 import { searchListItems } from '../lib/search'
-import { useSearch } from '../lib/useSearch'
-import s from './Search.module.css'
-import { SearchOverlay } from './SearchOverlay'
 
 /**
  * To-do search for the Lists header. Hits the `search_list_items` RPC; picking a

@@ -1,4 +1,4 @@
-import type { ColorKey } from '../lib/palette'
+import type { ColorKey } from '../assets/palette'
 import type { CalendarEvent, OccurrenceStatusCode, PersonId, WeekLayout } from '../types'
 
 /**

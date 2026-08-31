@@ -8,12 +8,12 @@ import {
   useRef,
   useState,
 } from 'react'
+import { useLatest } from './assets/hooks/useLatest'
+import { PageLoader } from './assets/ui/Spinner'
 import { useAuth } from './auth'
-import { PageLoader } from './components/Spinner'
 import { LoadFailedScreen, SyncBanners } from './components/SyncBanners'
 import { completionsPrefix } from './data/completions'
 import { queryClient } from './lib/queryClient'
-import { useLatest } from './lib/useLatest'
 import type { Action } from './store/actions'
 import {
   enrichForQueue,

@@ -6,7 +6,7 @@
  * column, which is why adding a setting is just a new field here and no
  * migration.
  */
-import { type ColorKey, isColorKey } from '../lib/palette'
+import { type ColorKey, isColorKey } from '../assets/palette'
 import type { Json } from './database.types'
 import type { PersonId } from './people'
 import { supabase } from './supabase'

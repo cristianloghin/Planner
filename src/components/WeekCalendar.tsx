@@ -1,7 +1,9 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useCompletionsForRange } from '../data/completions'
-import { cx } from '../lib/cx'
+import { colorStyle } from '../assets/palette'
+import shared from '../assets/styles/shared.module.css'
+import { LoadingPill } from '../assets/ui/Spinner'
+import { cx } from '../assets/utils/cx'
 import {
   DAY_NAMES,
   addDays,
@@ -10,8 +12,8 @@ import {
   mondayOf,
   toISODate,
   weekRangeLabel,
-} from '../lib/dates'
-import { colorStyle } from '../lib/palette'
+} from '../assets/utils/dates'
+import { useCompletionsForRange } from '../data/completions'
 import { defaultAttendees, eventColorKey } from '../lib/people'
 import {
   type DayOccurrence,
@@ -22,12 +24,10 @@ import {
 import { DAY_MIN } from '../lib/timelineLayout'
 import { pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
-import shared from '../styles/shared.module.css'
 import type { CalendarEvent } from '../types'
 import { Avatars } from './Avatars'
 import { type EditorTarget, EventEditor } from './EventEditor'
 import { OccurrenceSheet } from './OccurrenceSheet'
-import { LoadingPill } from './Spinner'
 import { ViewHeader } from './ViewHeader'
 import s from './WeekCalendar.module.css'
 import { WeekTimelineBody, WeekTimelineHead } from './WeekTimeline'

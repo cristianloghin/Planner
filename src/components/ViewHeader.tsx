@@ -1,7 +1,7 @@
 import { Calendar } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { cx } from '../lib/cx'
-import shared from '../styles/shared.module.css'
+import shared from '../assets/styles/shared.module.css'
+import { cx } from '../assets/utils/cx'
 import { EventSearch } from './EventSearch'
 
 /**

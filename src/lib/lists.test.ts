@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { addDays, toISODate } from '../assets/utils/dates'
 import type { AppState, ListItem, TodoList } from '../types'
-import { addDays, toISODate } from './dates'
 import { findListItem, isOverdue } from './lists'
 
 function item(over: Partial<ListItem> = {}): ListItem {

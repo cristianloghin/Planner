@@ -13,8 +13,8 @@
  * resumed.
  */
 import { type QueryClient, useMutation } from '@tanstack/react-query'
+import type { ColorKey } from '../../assets/palette'
 import { recolorPerson, renamePerson } from '../../client/people'
-import type { ColorKey } from '../../lib/palette'
 import { patchRecolor, patchRename } from './patches'
 import { peopleKey } from './queries'
 import type { Person, PersonId } from './types'

@@ -12,7 +12,7 @@
  * The last two take more than the people list and cannot be passed to
  * `usePeople` at all. Call them directly with what they ask for.
  */
-import { type ColorKey, DEFAULT_COLOR, colorKey } from '../../lib/palette'
+import { type ColorKey, DEFAULT_COLOR, colorKey } from '../../assets/palette'
 import type { Person, PersonId } from './types'
 
 /** Everyone, by id — for screens that look people up rather than list them. */

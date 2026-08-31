@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
+import { COLOR_OPTIONS, DEFAULT_COLOR } from '../assets/palette'
+import type { ColorKey } from '../assets/palette'
+import shared from '../assets/styles/shared.module.css'
+import { ColorPicker } from '../assets/ui/ColorPicker'
+import { NumberField } from '../assets/ui/NumberField'
+import { ScopeSheet } from '../assets/ui/ScopeSheet'
+import { PageLoader } from '../assets/ui/Spinner'
+import { addDays, diffDays, isoLabel, minutesToTime, toDateTimeLocal } from '../assets/utils/dates'
 import { useCompletionsForRange, useSetOccurrenceOverride } from '../data/completions'
 import { useAddTemplate, useTemplates } from '../data/templates'
 import { cloneAttachments } from '../lib/attachments'
-import { addDays, diffDays, isoLabel, minutesToTime, toDateTimeLocal } from '../lib/dates'
-import { COLOR_OPTIONS, DEFAULT_COLOR } from '../lib/palette'
-import type { ColorKey } from '../lib/palette'
 import { personColorKey } from '../lib/people'
 import { effectiveOccurrence } from '../lib/recurrence'
 import { eventDate, eventStartMinutes } from '../lib/timing'
 import { useApp } from '../state'
-import shared from '../styles/shared.module.css'
 import type {
   Attachment,
   CalendarEvent,
@@ -20,11 +24,7 @@ import type {
 } from '../types'
 import { AttachmentsEditor } from './AttachmentsEditor'
 import { AttendeeChips } from './AttendeeChips'
-import { ColorPicker } from './ColorPicker'
 import s from './EventEditor.module.css'
-import { NumberField } from './NumberField'
-import { ScopeSheet } from './ScopeSheet'
-import { PageLoader } from './Spinner'
 
 const SNAP = 15
 

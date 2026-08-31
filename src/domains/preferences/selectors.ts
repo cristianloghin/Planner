@@ -4,7 +4,7 @@
  * Each applies the default for a setting that has never been touched, so no
  * screen has to remember what "unset" means.
  */
-import type { ColorKey } from '../../lib/palette'
+import type { ColorKey } from '../../assets/palette'
 import type { PersonId } from '../people/types'
 import type { Preferences, WeekLayout } from './types'
 

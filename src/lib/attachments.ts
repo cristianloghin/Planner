@@ -1,5 +1,5 @@
+import { uid } from '../assets/utils/id'
 import type { Attachment, ChecklistEntry } from '../types'
-import { uid } from './id'
 
 type NoteAttachment = Extract<Attachment, { kind: 'note' }>
 type ChecklistAttachment = Extract<Attachment, { kind: 'checklist' }>

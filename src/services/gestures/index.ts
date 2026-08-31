@@ -13,7 +13,7 @@ import {
   useLayoutEffect,
   useRef,
 } from 'react'
-import { useLatest } from '../../lib/useLatest'
+import { useLatest } from '../../assets/hooks/useLatest'
 
 // Timeline zoom scale. The hour height is user-zoomable (pinch); the default
 // must match --hour-h in tokens.css for the very first paint.

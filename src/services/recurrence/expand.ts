@@ -1,3 +1,4 @@
+import { addDays, diffDays, toISODate } from '../../assets/utils/dates'
 /**
  * Turning a repeating event into the actual days it lands on.
  *
@@ -9,7 +10,6 @@
  */
 import type { CalendarEvent, Recurrence } from '../../domains/events/types'
 import type { OccurrenceState } from '../../domains/occurrences/types'
-import { addDays, diffDays, toISODate } from '../../lib/dates'
 import { occKey } from './status'
 import { eventDate, eventSpanDays, timedSegment } from './timing'
 

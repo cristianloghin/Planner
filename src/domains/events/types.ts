@@ -9,7 +9,7 @@
  * keeps checklist lines flat, each with a heading; the app wants a checklist as
  * a single thing with its lines inside. See ./transformers.
  */
-import type { ColorKey } from '../../lib/palette'
+import type { ColorKey } from '../../assets/palette'
 import type { PersonId } from '../people/types'
 
 export type { Recurrence, RecurrenceFreq } from '../../client/series'

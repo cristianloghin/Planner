@@ -2,7 +2,7 @@
 // person's color and an event's color both reference the same keys. An event with
 // no color of its own inherits the (lane) person's color, Google-Calendar style.
 //
-// The actual color values live in CSS (src/styles/swatches.css) as --color-1..12,
+// The actual color values live in CSS (src/assets/styles/swatches.css) as --color-1..12,
 // so they can be tuned (and kept AA-compatible) without touching TypeScript. Here
 // we only track the stable keys ("1".."12") stored in person.color and
 // event_series.color_key, plus helpers to validate them and build the CSS var

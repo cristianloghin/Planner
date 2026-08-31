@@ -7,31 +7,31 @@ import {
   CircleDashed,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLatest } from '../assets/hooks/useLatest'
+import { colorStyle } from '../assets/palette'
+import shared from '../assets/styles/shared.module.css'
+import { LoadingPill } from '../assets/ui/Spinner'
+import { cx } from '../assets/utils/cx'
+import { addDays, isoLabel, minutesToTime, toISODate } from '../assets/utils/dates'
 import { useCompletionsForRange } from '../data/completions'
 import { checklistEntries, hasReminders } from '../lib/attachments'
 import { type Busy, type ChildStatus, childStatuses } from '../lib/conflicts'
-import { cx } from '../lib/cx'
-import { addDays, isoLabel, minutesToTime, toISODate } from '../lib/dates'
 import {
   isOccurrenceDone,
   occKey,
   occurrenceStatus,
   prerequisiteDatesInRange,
 } from '../lib/occurrences'
-import { colorStyle } from '../lib/palette'
 import { eventColorKey, peopleList, personColorKey } from '../lib/people'
 import { type DayOccurrence, nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
 import { DAY_MIN, type TimeBlock, layoutBlocks } from '../lib/timelineLayout'
-import { useLatest } from '../lib/useLatest'
 import { loadZoom, pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
-import shared from '../styles/shared.module.css'
 import type { CalendarEvent, CompletionsMap, Person, PersonId } from '../types'
 import { Avatars } from './Avatars'
 import s from './DayView.module.css'
 import { type EditorTarget, EventEditor } from './EventEditor'
 import { OccurrenceSheet } from './OccurrenceSheet'
-import { LoadingPill } from './Spinner'
 import { TimeGutter } from './TimeGutter'
 import { ViewHeader } from './ViewHeader'
 

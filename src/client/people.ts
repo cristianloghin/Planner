@@ -5,7 +5,7 @@
  * linked to a signed-in user, which is how a new account's first person is
  * created (migration `0005`). The app is generic over however many there are.
  */
-import type { ColorKey } from '../lib/palette'
+import type { ColorKey } from '../assets/palette'
 import { supabase } from './supabase'
 
 /** A person's id — an opaque string (a database uuid), not a fixed set. */

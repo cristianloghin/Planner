@@ -10,7 +10,7 @@
  * self-sufficient — the values it carries are the document to save, so a write
  * resumed after a restart has everything it needs.
  */
-import type { ColorKey } from '../../lib/palette'
+import type { ColorKey } from '../../assets/palette'
 import type { PersonId } from '../people/types'
 import type { Preferences, WeekLayout } from './types'
 

@@ -9,7 +9,7 @@
  *
  * Everything in this file is pure — no client, no network. See mappers.test.ts.
  */
-import { toDateTimeLocal, toISODate } from '../lib/dates'
+import { toDateTimeLocal, toISODate } from '../assets/utils/dates'
 
 const MINS_PER_DAY = 24 * 60
 

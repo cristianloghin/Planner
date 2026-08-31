@@ -6,8 +6,8 @@ import { AuthProvider } from './auth'
 import { UpdatePrompt } from './components/UpdatePrompt'
 import { queryClient, queryPersistOptions } from './lib/queryClient'
 import '@fontsource-variable/source-sans-3'
-import './styles/tokens.css'
-import './styles/swatches.css'
+import './assets/styles/tokens.css'
+import './assets/styles/swatches.css'
 import './index.css'
 
 createRoot(document.getElementById('root')!).render(

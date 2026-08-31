@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_COLOR } from '../../lib/palette'
+import { DEFAULT_COLOR } from '../../assets/palette'
 import { patchRecolor, patchRename } from './patches'
 import {
   adults,

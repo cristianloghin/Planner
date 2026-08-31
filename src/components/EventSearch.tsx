@@ -1,12 +1,12 @@
 import { Search as SearchIcon } from 'lucide-react'
 import { useCallback, useState } from 'react'
+import { useSearch } from '../assets/hooks/useSearch'
+import s from '../assets/ui/Search.module.css'
+import { SearchOverlay } from '../assets/ui/SearchOverlay'
+import { cx } from '../assets/utils/cx'
+import { isoLabel, toISODate } from '../assets/utils/dates'
 import { useAuth } from '../auth'
-import { cx } from '../lib/cx'
-import { isoLabel, toISODate } from '../lib/dates'
 import { searchEvents } from '../lib/search'
-import { useSearch } from '../lib/useSearch'
-import s from './Search.module.css'
-import { SearchOverlay } from './SearchOverlay'
 
 /**
  * Event search in the shared view header (Day / Week / Month). Hits the

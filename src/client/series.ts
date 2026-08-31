@@ -8,7 +8,7 @@
  * the app calls them, and how it splits them into its own shapes, is the app's
  * business.
  */
-import { type ColorKey, isColorKey } from '../lib/palette'
+import { type ColorKey, isColorKey } from '../assets/palette'
 import { recurrenceToRRule, rruleToRecurrence, truncatedRRule } from '../lib/rrule'
 import {
   durationToInterval,

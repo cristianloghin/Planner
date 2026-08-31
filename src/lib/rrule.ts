@@ -1,6 +1,6 @@
 import { type Frequency, RRule } from 'rrule'
+import { addDays } from '../assets/utils/dates'
 import type { Recurrence, RecurrenceFreq } from '../types'
-import { addDays } from './dates'
 
 /**
  * The bridge between the app's lightweight `Recurrence` ({freq, interval}) and

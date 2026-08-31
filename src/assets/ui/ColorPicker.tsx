@@ -1,7 +1,7 @@
 import { Check } from 'lucide-react'
 import { Popover } from 'radix-ui'
 import { useState } from 'react'
-import { cx } from '../lib/cx'
+import { cx } from '../utils/cx'
 import s from './ColorPicker.module.css'
 
 export interface ColorOption<T extends string> {

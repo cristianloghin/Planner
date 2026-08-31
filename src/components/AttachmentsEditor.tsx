@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { cx } from '../lib/cx'
-import { uid } from '../lib/id'
+import shared from '../assets/styles/shared.module.css'
+import { cx } from '../assets/utils/cx'
+import { uid } from '../assets/utils/id'
 import { REMINDER_OFFSETS, offsetLabel } from '../lib/notifications'
-import shared from '../styles/shared.module.css'
 import type { Attachment, ChecklistEntry } from '../types'
 import s from './AttachmentsEditor.module.css'
 

@@ -1,7 +1,9 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Fragment, useMemo, useRef, useState } from 'react'
-import { useCompletionsForRange } from '../data/completions'
-import { cx } from '../lib/cx'
+import { colorStyle } from '../assets/palette'
+import shared from '../assets/styles/shared.module.css'
+import { LoadingPill } from '../assets/ui/Spinner'
+import { cx } from '../assets/utils/cx'
 import {
   DAY_NAMES,
   addMonths,
@@ -11,17 +13,15 @@ import {
   monthLabel,
   startOfMonth,
   toISODate,
-} from '../lib/dates'
-import { colorStyle } from '../lib/palette'
+} from '../assets/utils/dates'
+import { useCompletionsForRange } from '../data/completions'
 import { eventColorKey } from '../lib/people'
 import { nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
 import { eventStartMinutes } from '../lib/timing'
 import { pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
-import shared from '../styles/shared.module.css'
 import type { CompletionsMap } from '../types'
 import s from './MonthView.module.css'
-import { LoadingPill } from './Spinner'
 import { ViewHeader } from './ViewHeader'
 
 // Up to this many event dots before collapsing the rest into a "+N".

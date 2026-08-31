@@ -1,8 +1,8 @@
-import { cx } from '../lib/cx'
-import { colorVar } from '../lib/palette'
+import { colorVar } from '../assets/palette'
+import shared from '../assets/styles/shared.module.css'
+import { cx } from '../assets/utils/cx'
 import { peopleList, personColorKey } from '../lib/people'
 import { useApp } from '../state'
-import shared from '../styles/shared.module.css'
 import type { PersonId } from '../types'
 
 /** Toggle chips for choosing who's on an event. Always keeps at least one. */

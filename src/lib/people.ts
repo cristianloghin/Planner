@@ -1,5 +1,5 @@
+import { type ColorKey, DEFAULT_COLOR, colorKey } from '../assets/palette'
 import type { AppState, CalendarEvent, Person, PersonId } from '../types'
-import { type ColorKey, DEFAULT_COLOR, colorKey } from './palette'
 
 /** Everyone, in lane order. */
 export function peopleList(state: AppState): Person[] {
