@@ -1,8 +1,15 @@
 # Restructure plan — applying DRSp to Planner
 
-**Status: target state. Not yet implemented.** This document defines the structure
-the app is moving to, and the rules that keep it there. It is not a migration
-runbook — sequencing is deliberately out of scope.
+**Status: target state, in progress.** This document defines the structure the app
+is moving to, and the rules that keep it there. It is not a migration runbook —
+sequencing is deliberately out of scope.
+
+**Landed so far:** `client/` exists — the Supabase SDK and generated types
+(`client/supabase.ts`, `client/database.types.ts`), the paging helper
+(`client/pagination.ts`), the DB↔app conversions (`client/mappers.ts`, unit
+tested), and the occurrence window read (`client/occurrences.ts`), which
+`data/completions.ts` calls directly. Everything else below is still ahead;
+[`STATUS.md`](./STATUS.md) describes the data layer as it actually stands.
 
 The pattern itself — its primitives, rationale, decision heuristics and
 anti-patterns — is defined in [`ARCHITECTURE.md`](./ARCHITECTURE.md). This document
@@ -379,7 +386,7 @@ of coupling that breaks quietly later.
 | `components/{AlertHost,SyncBanners,UpdatePrompt}` | `layouts/AppShell` + backing services |
 | `data/templates.ts` | `domains/templates` |
 | `data/completions.ts` | `domains/occurrences` |
-| `lib/{supabase,database.types}.ts` | `client/` |
+| ~~`lib/{supabase,database.types}.ts`~~ | `client/` — **done** |
 | `lib/search.ts` | `client/search.ts` + `domains/search` |
 | `lib/push.ts` | `client/push.ts` + `services/push` |
 | `lib/{recurrence,rrule,occurrences}.ts` | `services/recurrence` |

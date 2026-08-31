@@ -5,8 +5,10 @@ in‑browser shape in [`src/types.ts`](../src/types.ts). The SQL that implements
 lives in [`supabase/migrations/`](../supabase/migrations); this document explains
 **why** it is shaped this way so a future session can build on it with confidence.
 
-Status: **design frozen.** The open questions from the design discussion have all
-been decided (see [Decisions](#decisions)). The migrations are ready to apply.
+Status: **design frozen, and built.** Every decision below is implemented and
+live except 12 (shares & pins) and 13 (private lists), which are marked in place
+and tracked in [`PLANNED.md`](./PLANNED.md). Migrations `0001`–`0021` are
+applied; see [`STATUS.md`](./STATUS.md) for what that adds up to.
 
 ---
 
@@ -259,8 +261,9 @@ A way to draw attention to a **specific occurrence**. Two faces of one mechanism
 - **Pin / favorite** — a private bookmark a user makes for themselves to jump back to
   an occurrence quickly; no notification, visible only to them.
 
-A pin is just a self‑share, so both live in one table, landing in migration
-`0012_shares.sql` (planned):
+A pin is just a self‑share, so both live in one table. **Not built** — see
+[`PLANNED.md`](./PLANNED.md) §1 (the `0012` number this originally claimed was
+taken by colour work; use the next free one):
 
 ```sql
 create table occurrence_share (
@@ -320,15 +323,16 @@ them into `favorites` (`kind='pin'`), `inbox` (`kind='share'`, to me) and `sent`
 `OccurrenceSheet` (a star to pin, a "Share with…" picker), where dependency‑ and
 to‑do‑linking already live.
 
-**Background push is out of scope here.** A notification when the recipient's app is
-*closed* needs the app's first backend component (a Supabase Edge Function +
-web‑push subscriptions) and would serve reminders too; the in‑app inbox/toast is free.
-See [`NEXT_SESSION.md`](./NEXT_SESSION.md) §6 for the build plan and the two layers.
+**Background push was out of scope when this was designed** — it needed the app's
+first backend component. That component now exists and serves reminders (see
+[`PUSH_NOTIFICATIONS.md`](./PUSH_NOTIFICATIONS.md)), so a share push would reuse
+it rather than build it. Build plan in [`PLANNED.md`](./PLANNED.md) §1.
 
 ### 13. Private lists — per-list visibility scope
 Decision 11 made every list account-wide. This adds an opt-in **private** scope so a user
 can keep a list to themselves, *without* changing how linked items surface on events.
-Lands in migration `0013_list_visibility.sql` (planned).
+**Not built** — see [`PLANNED.md`](./PLANNED.md) §2 (the `0013` number this originally
+claimed was taken by colour work; use the next free one).
 
 Schema delta on `list`:
 - `owner_id uuid not null references app_user(id)` — the creator.
@@ -416,21 +420,20 @@ private lists simply never reach non-owners through RLS.
 | `Person` / `PersonId` (`me`/`partner`/`kid`) | `app_user` + `event_participant` |
 | `ListItem` (standalone to‑dos) | `list` + `list_item` (+ `list_item_event_link`) — see [Decision 11](#11-standalone-lists--list--list_item-single-context-done-linkable-to-occurrences) |
 
-### Deferred (not blocking)
-- **Standalone Lists** (`ListItem`): **designed** (see [Decision 11](#11-standalone-lists--list--list_item-single-context-done-linkable-to-occurrences)),
-  not yet built. Two account‑scoped tables (`list` + `list_item`, `done` on the item)
-  plus an occurrence‑grain `list_item_event_link` so a to‑do can be ticked from a linked
-  event. Migration `0009_lists.sql` + the `SupabaseStore` mapping are the remaining work;
-  the app still persists lists to `localStorage` until then.
-- **Participant‑level RLS granularity** (owner vs member write rights): the
-  baseline policies treat any account member as able to read/write the account's
-  series. Tighten with an `account_member.role` check when it matters.
+Everything in this table is **built**. Standalone Lists shipped in `0009` (see
+[Decision 11](#11-standalone-lists--list--list_item-single-context-done-linkable-to-occurrences));
+nothing here still persists to `localStorage`.
+
+The one deferred item from the original design is **participant‑level RLS
+granularity** (owner vs member write rights) — the baseline policies treat any
+account member as able to read/write the account's series. See
+[`PLANNED.md`](./PLANNED.md).
 
 ---
 
 ## Migrations
 
-Apply in order. See [`NEXT_SESSION.md`](./NEXT_SESSION.md) for the full connect‑and‑apply runbook.
+Apply in order. See [`STATUS.md`](./STATUS.md) for the connect‑and‑apply runbook.
 
 | File | Contents |
 |---|---|
@@ -445,6 +448,16 @@ Apply in order. See [`NEXT_SESSION.md`](./NEXT_SESSION.md) for the full connect�
 | `0009_lists.sql` | Standalone Lists: `list` + `list_item` + `list_item_event_link`, RLS, grants, realtime ([Decision 11](#11-standalone-lists--list--list_item-single-context-done-linkable-to-occurrences)) |
 | `0010_occurrence_overrides.sql` | Per‑occurrence `rescheduled_duration` on `event_occurrence`; `split_series` re‑created to copy `event_person` |
 | `0011_realtime_delete_replica_identity.sql` | `REPLICA IDENTITY FULL` on RLS‑gated tables so DELETEs reach the other client over realtime |
-| `0012_shares.sql` *(planned)* | Shares & pins: `occurrence_share` (one table for both), RLS, grants, realtime + `REPLICA IDENTITY FULL` ([Decision 12](#12-shares--pins--one-occurrence-grain-table-occurrence_share)) |
-| `0013_list_visibility.sql` *(planned)* | Per‑list `owner_id` + `visibility` (private/account); `can_access_list` respects privacy; `list_item` SELECT OR‑exposes link‑attached items ([Decision 13](#13-private-lists--per-list-visibility-scope)) |
+| `0012_event_color.sql` | Optional per‑event colour (`event_series.color_key`), so events can be coded by kind independently of the person's lane colour |
+| `0013_user_color.sql` | Person colours move from free‑form hex to a fixed keyed palette |
 | `0014_search.sql` | `search_events` / `search_list_items` account‑scoped FTS RPCs (SECURITY INVOKER, so RLS scopes results); `to_tsvector`/`@@`/`ts_rank` over titles + note/checklist text, ILIKE fallback for partial words |
+| `0015_unified_colors.sql` | Collapses the two palettes into one 12‑colour set keyed `'1'`–`'12'`; the colour *values* move to CSS (`src/styles/swatches.css`) |
+| `0016_realtime_item_state.sql` | `occurrence_item_state` → the realtime publication, so checklist ticks stream |
+| `0017_fixes.sql` | Correctness + privacy fixes from a code review: `split_series` rescues `list_item_event_link` rows and copies `event_person`; `search_*` recreated |
+| `0018_push_subscriptions.sql` | Web Push 1/4: `push_subscription`, one row per (user, device) |
+| `0019_reminder_cron.sql` | Web Push 2/4: pg_cron helpers that schedule the `send-reminders` edge function |
+| `0020_cron_secret.sql` | Web Push 3/4: `CRON_SECRET` header auth, replacing the bearer comparison that 403'd on new‑API‑key projects |
+| `0021_service_role_grants.sql` | Web Push 4/4: base‑table grants to `service_role` (what `0004` did for `authenticated`), so the sender can read what it needs |
+
+Decisions 12 (shares & pins) and 13 (private lists) have **no migration** — they
+are designed but unbuilt. See [`PLANNED.md`](./PLANNED.md).
