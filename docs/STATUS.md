@@ -161,6 +161,60 @@ Two rules that are easy to break and live in `DATA_MODEL.md`:
 
 ---
 
+## Running it locally
+
+The whole backend runs in Docker, from the same images as the hosted project:
+
+```bash
+supabase start
+```
+
+That applies `0001`–`0021` to a fresh database and then `supabase/seed.sql`,
+which creates one account with two adults, a child, a few events (one weekly with
+two checklists), two lists and a blueprint — enough that every screen has
+something on it.
+
+Sign in as **dev@planner.test / password123**. Auth email goes to Inbucket on
+`:54324`, not to a real inbox — that is where the confirmation link lands if you
+sign up through the app instead. Studio is on `:54323`.
+
+Point `.env.local` at what `supabase start` prints (`VITE_SUPABASE_URL` and the
+publishable key). **Clear site data when you switch backends**: the query cache
+lives in localStorage under `planner.queryCache.v1` and the offline snapshot is
+keyed by account id, so the same origin pointed at a different database will
+render the previous account's data before the first fetch lands.
+
+The reminder sender is a separate process:
+
+```bash
+supabase functions serve send-reminders
+```
+
+Two things localhost cannot reproduce: the `pg_cron` beat from `0019` that
+triggers that function on a schedule, and iOS push, which needs the app added to
+the Home Screen. Invoke the function by hand instead.
+
+### Testing what the deployment actually does
+
+`npm run dev` is not a rehearsal. The base path (`/Planner/`), the service worker
+built from `src/sw.ts`, and the generated icons only exist in a real build:
+
+```bash
+npm run build && npm run serve:pages
+```
+
+`serve:pages` serves `dist/` the way GitHub Pages does — and specifically **does
+not** rewrite unknown paths to `index.html`. `vite preview` does, which hides the
+one failure worth catching: Pages serves `404.html` for any path it has no file
+for. `npm run build` copies the built `index.html` to `404.html` so a cold visit
+to a deep link still boots the app. Open one in a fresh tab; the response is a
+404 and the app renders anyway, which is exactly what a real visitor gets.
+
+That matters from the moment `routes/` lands. Until then there are no deep links
+to break.
+
+---
+
 ## Standing up a fresh backend
 
 ```bash
