@@ -47,34 +47,69 @@ Mid-migration, and worth knowing before adding a slice:
   `src/store/`) with a hand-rolled write queue and a localStorage snapshot.
 - **Templates** and **per-occurrence state** are owned by **TanStack Query**
   (`src/data/`), fetched per window in the occurrence case.
-- The **`client/` layer** (`src/client/`) is **complete but not yet adopted.**
-  Every call the app makes to Supabase has a function there — 15 tables, 4 RPCs,
-  the 6 auth methods and the realtime channel — but only the occurrence window
-  read is wired up (`data/completions.ts` calls it). Everything else still runs
-  through `SupabaseStore`, `auth.tsx`, `lib/search.ts` and `lib/push.ts`.
+- The **`client/` and `domains/` layers** are both **complete but not yet
+  adopted.** Every call the app makes to Supabase has a client function — 15
+  tables, 4 RPCs, the 6 auth methods, the realtime channel — and eight domains
+  sit over them with queries, mutations, transformers, selectors and pure
+  optimistic patches. Only the occurrence window read is wired up at all
+  (`data/completions.ts` calls the client directly, not the domain). Everything
+  else still runs through `SupabaseStore`, `state.tsx`, `auth.tsx`,
+  `lib/search.ts` and `lib/push.ts`.
 
 Each slice has exactly one owner. `RESTRUCTURE_PLAN.md` is where this ends up.
 
-**So `client/` duplicates code that is still live.** `client/search.ts` mirrors
+**So both layers duplicate code that is still live.** `client/search.ts` mirrors
 `lib/search.ts`, `client/push.ts` mirrors the row writes in `lib/push.ts`, and
 `client/series.ts`, `client/lists.ts`, `client/people.ts`, `client/preferences.ts`
-and the `client/occurrences.ts` writes mirror `supabaseStore.ts`. That is the cost
-of building the boundary before adopting it, and it is drift risk until the
-domains land: **a fix to one side has to be made on the other.** Adopt a slice
-and delete its old path rather than letting the pair age.
+and the `client/occurrences.ts` writes mirror `supabaseStore.ts`. Above them, the
+domains' `patches.ts` files mirror `store/reducer.ts`, and
+`domains/occurrences/queries.ts` mirrors `data/completions.ts`.
+
+One duplicate is worth singling out: `client/occurrences.ts` still exports a
+deprecated `fetchOccurrenceWindow`, because `data/completions.ts` calls it at
+runtime. The merge it does now also exists, tested, in
+`domains/occurrences/transformers.ts`. That pair is the clearest drift risk in the
+codebase.
+
+**A fix to one side has to be made on the other.** Adopt a slice and delete its
+old path rather than letting the pair age.
+
+### Adopting a slice
+
+Nothing in `client/` or `domains/` has ever talked to the database — only their
+pure parts are tested, so the first slice adopted is also the first real test of
+both layers. Two candidates:
+
+- **`search`** is the cheapest. Two functions, no writes, no cache shaping;
+  `lib/search.ts` deletes when it works.
+- **`occurrences`** is the most valuable. It is already on Query, so adopting it
+  is mostly swapping what `data/completions.ts` calls — and it deletes the
+  duplicated merge above.
+
+Whichever comes first, the app must call every domain's
+`register<Name>Defaults(queryClient, accountId)` once at start-up, before paused
+writes resume. A domain whose register function is never called silently never
+replays its offline writes.
 
 ## Tests
 
-`npm test` — 123 tests, no backend needed. Recurrence expansion and the RRULE
+`npm test` — 218 tests, no backend needed. Recurrence expansion and the RRULE
 round-trip (`src/lib/`), occurrence completion and dependency gating, Lists
 helpers, date math, the reducer's optimistic application, the offline queue, the
 client-layer conversions (`src/client/mappers.test.ts`), and a cross-validation
 of the edge function's recurrence logic against the client's.
 
+Of those, 99 cover the new layers: the client's conversions
+(`mappers.test.ts`, including `occurrenceTs` across both clock changes) and each
+domain's transformers, selectors and optimistic patches. The most valuable are the
+checklist round-trip in `domains/events` — grouping flat rows into checklists and
+back, which could not be tested at all while it lived inside a database call — and
+`domains/occurrences`, which pins the rule that a day carrying nothing the app
+shows gets no entry, on both the read and the optimistic update.
+
 The remaining gap is every DB round-trip — `SupabaseStore`'s, and now `client/`'s
 too. Both need a live click-test rather than a unit test, and `client/`'s has not
-had one: it is unexercised code until a slice adopts it. Only the pure parts are
-covered (`mappers.test.ts`, including `occurrenceTs` across both clock changes).
+had one: it is unexercised code until a slice adopts it.
 
 ---
 

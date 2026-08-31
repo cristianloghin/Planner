@@ -4,12 +4,16 @@
 is moving to, and the rules that keep it there. It is not a migration runbook —
 sequencing is deliberately out of scope.
 
-**Landed so far:** `client/` is **complete** — every call the app makes to Supabase
-has a function there: 15 tables, 4 RPCs, the 6 auth methods and the realtime
-channel. Nothing above it has been adopted yet, so `client/` currently duplicates
-`store/supabaseStore.ts`, `auth.tsx`, `lib/search.ts` and `lib/push.ts`, all of
-which still run the app unchanged. Everything else below is still ahead;
-[`STATUS.md`](./STATUS.md) describes the data layer as it actually stands.
+**Landed so far:** `client/` and `domains/` are both **complete and unadopted.**
+Every call the app makes to Supabase has a client function (15 tables, 4 RPCs, the
+6 auth methods, the realtime channel), and eight domains sit over them with
+queries, mutations, transformers, selectors and pure optimistic patches.
+
+Nothing above has been wired up, so both layers currently duplicate
+`store/supabaseStore.ts`, `state.tsx`, `auth.tsx`, `data/` and parts of `lib/`,
+all of which still run the app unchanged. `routes/`, `layouts/`, `services/` and
+`assets/` are still ahead; [`STATUS.md`](./STATUS.md) describes the data layer as
+it actually stands.
 
 The pattern itself — its primitives, rationale, decision heuristics and
 anti-patterns — is defined in [`ARCHITECTURE.md`](./ARCHITECTURE.md). This document
@@ -109,11 +113,41 @@ optimistic patch functions, its types, and its dumb domain-specific components.
 
 **Selectors run over the cache, never duplicate it.** Query's `select` is the
 mechanism: it is memoized per observer with structural sharing, so a consumer
-re-renders only when its *selected output* changes. `usePersonColor(id)` is a
-`useQuery` with a `select`, not a copy of the roster.
+re-renders only when its *selected output* changes.
 
-Domains: `account`, `auth`, `events`, `lists`, `occurrences`, `people`,
-`preferences`, `search`, `templates`.
+As built, the conventions are:
+
+- **A few generic hooks, not many targeted ones.** `useEvents(accountId, select?)`
+  caches the whole slice and the *call site* narrows it. There is no
+  `useEventsOnDate`. Selectors live in `domains/<name>/selectors.ts`, are used
+  exclusively by routes, and are never called inside the domain.
+- **Two selector shapes**, because `select` takes one argument. Plain ones
+  (`byId`, `adults`) pass straight in. Ones needing an argument are factories
+  suffixed `For` (`attendeeLabelFor(attendees)`) and **must be held with
+  `useMemo`** at the call site, or the work redoes itself every render. A few
+  need more than one slice (colour resolution wants people *and* preferences);
+  those take plain arguments, are not `select` selectors, and say so.
+- **Transformers are the mirror image**: `domains/<name>/transformers.ts`, DB
+  shape → screen shape, used *exclusively inside* the domain and never by a
+  route. This is where reshaping that used to happen inside a fetch now lives,
+  which is what makes it testable without a database.
+- **`accountId` is a parameter, never read ambiently.** R8 requires it: reading it
+  hits the network, so it is a domain and the route supplies it.
+- **One write hook per domain**, taking a union of changes, so every write in a
+  slice shares one identity and one order.
+
+Domains: `account`, `auth`, `events` (incl. templates), `lists`, `occurrences`,
+`people`, `preferences`, `search`.
+
+**Templates are not their own domain.** They are the same row as an event and
+the same conversion — flat checklist lines grouped into checklists — so
+`domains/events` owns both, with two query hooks over two caches. Splitting them
+would have meant one importing the other's transformers, and there is no layer
+below both to put them in. Same reasoning as `client/series.ts` one level down.
+
+**Push has no domain.** Its row writes are `client/push.ts`; everything else about
+it is the browser. The pairing belongs to `services/push`, fed by a route — see
+the R1/R4 note in §5.
 
 ### `routes/`
 
@@ -175,17 +209,18 @@ src/
 │   ├── search.ts               search_events, search_list_items
 │   └── push.ts                 push_subscription rows
 │
-├── domains/
-│   ├── account/                queries, keys
-│   ├── auth/                   signIn/signUp/signOut/updatePassword
-│   ├── events/                 queries, mutations, patches, selectors,
-│   │                           components/ (EventCard, TimeGutter, AttachmentsEditor…)
-│   ├── lists/
-│   ├── occurrences/
-│   ├── people/                 selectors (colour resolution), components/ (Avatars, AttendeeChips)
-│   ├── preferences/
-│   ├── search/
-│   └── templates/
+├── domains/                    ← built (components/ still ahead)
+│   │                           each: queries · mutations · transformers ·
+│   │                           selectors · patches · types
+│   ├── account/                useAccountId — the bootstrap, deduped by the query
+│   ├── auth/                   signIn/signUp/signOut/updatePassword; no cache
+│   ├── events/                 events AND templates; attachment grouping,
+│   │                           splitSeries; components/ (EventCard, TimeGutter…)
+│   ├── lists/                  lists + items + to-do↔occurrence pins
+│   ├── occurrences/            month windows, ticks/status/overrides, waits
+│   ├── people/                 colour resolution; components/ (Avatars, AttendeeChips)
+│   ├── preferences/            whole-document writes
+│   └── search/                 read-only; keyed per search term
 │
 ├── routes/
 │   ├── routes.ts               defineRoutes map
@@ -285,13 +320,28 @@ install.
 | R7 | `assets/` imports nothing from the app. |
 | R8 | Ambient state exposes only already-loaded, synchronously-derivable data. **If reading it can trigger I/O, it is a domain and the route must supply it.** |
 | R9 | Mutation variables are fully serializable and self-sufficient — no closures over state. |
-| R10 | Mutation behaviour is registered as defaults at module scope under a stable key. |
+| R10 | Mutation behaviour is registered as defaults under a stable key, before any paused write is resumed. |
 | R11 | Account-scoped writes carry `scope: { id: accountId }`. |
 | R12 | Optimistic logic is a pure exported function, unit-tested; `onMutate` only calls it. |
 | R13 | URL params carry identity (*what* is viewed), never view state (*how*). |
 | R14 | `useQueryState` uses only `string`, `number`, `boolean`, `string[]`, `number[]`. |
 | R15 | Route components are thin shells over props-only view components. |
 | R16 | Every query key begins with its domain name and includes `accountId`. |
+
+**R10 was reworded: defaults are registered, not imported.** As first drafted it
+said "at module scope", which means the domain imports the app's query client and
+registers on load. That is a domain reaching into the app, which the layer table
+forbids. Each domain instead exports
+`register<Name>Defaults(queryClient, accountId)`, and the app calls them once at
+start-up. What R10 actually protects is unchanged — the behaviour must exist under
+a stable key *before* `resumePausedMutations()` runs, or a write paused offline
+finds no `mutationFn` and is lost.
+
+The cost is a footgun worth naming: **a domain whose register function is never
+called silently never replays its offline writes.** Wire them in one place, and add
+new domains to that place. Five exist — `events`, `lists`, `occurrences`, `people`,
+`preferences`. The other three have none on purpose: `account` and `search` only
+read, and `auth` is explained below.
 
 **R1 and R4 collide, and R1 wins.** As first drafted this document sent the
 session to `services/session` and the realtime bridge to `services/realtime`,
@@ -308,6 +358,11 @@ app decision:
 - `client/realtime.ts` opens the channel, retries a dead one and reports which
   table changed; `services/realtime` maps table → query keys to invalidate. Which
   keys a table maps to is app knowledge, not Supabase's.
+
+`domains/auth` is built and deliberately does **not** register durable defaults:
+replaying a sign-in after a restart is meaningless, and the password should not sit
+in storage waiting for it. It also turns the client's "refused" result back into a
+thrown error, so a form has one place to read a problem from.
 
 Both are built. The general form is worth remembering: a service that needs the
 network is not an exception to R4 — it is a service sitting on a client function.
@@ -340,7 +395,8 @@ so a replay after a cold start preserves the original sequence — `resumePaused
 resolves them via `Promise.all`, but scoped mutations re-serialize through `canRun`.
 
 `scope: { id: accountId }` reproduces today's single ordered pump, so dependent
-writes ("create a list, then add its items") remain safe. Per-domain scopes would
+writes ("create a list, then add its items") remain safe. Built: every domain's
+write hook sets it, which is also why the register function takes `accountId`. Per-domain scopes would
 allow cross-domain parallelism; account-wide is the faithful starting point.
 
 ### Offline durability
@@ -360,6 +416,12 @@ render.
 `accountId` becomes an ordinary query: `queryClient.fetchQuery` dedupes in-flight
 requests by key and is readable outside React, which is exactly what
 `ensureAccount`'s hand-rolled `inFlight` map does today. That map deletes.
+
+Built as `domains/account`. Worth knowing *why* it is a query rather than a bare
+call: `create_account` is not safely repeatable — nothing in the database stops a
+second call making a second account with a second copy of the user in it — and one
+request per key is what prevents that, across simultaneous callers and StrictMode's
+double mount alike.
 
 ### Realtime
 
@@ -424,8 +486,8 @@ of coupling that breaks quietly later.
 | `components/{Spinner,ConfirmDialog,ScopeSheet,ColorPicker,NumberField,CommitTextInput,SearchOverlay}` | `assets/ui` |
 | `components/ViewHeader` | `layouts/CalendarViewLayout` |
 | `components/{AlertHost,SyncBanners,UpdatePrompt}` | `layouts/AppShell` + backing services |
-| `data/templates.ts` | `domains/templates` |
-| `data/completions.ts` | `domains/occurrences` |
+| `data/templates.ts` | ~~`domains/events` (templates share the events domain)~~ **built** |
+| `data/completions.ts` | ~~`domains/occurrences`~~ **built** — month windows and patches ported |
 | ~~`lib/{supabase,database.types}.ts`~~ | `client/` — **done** |
 | `lib/search.ts` | ~~`client/search.ts`~~ **done** + `domains/search` |
 | `lib/push.ts` | ~~`client/push.ts`~~ **done** (row writes only) + `services/push` |
@@ -434,7 +496,7 @@ of coupling that breaks quietly later.
 | `lib/conflicts.ts` | `services/conflicts` |
 | `lib/notifications.ts` | `services/notifications` |
 | `lib/useSwipeGestures.ts` | `services/gestures` |
-| `lib/{people,attachments,lists,timing}.ts` | domain selectors in `domains/{people,events,lists}` |
+| `lib/{people,attachments,lists,timing}.ts` | domain selectors in `domains/{people,events,lists}` — `people` and the `lists` helpers **built**; `attachments`' filters folded into `domains/events/transformers`; `timing` still ahead |
 | `lib/{useLatest,useMediaQuery,useSearch}.ts` | `assets/hooks` |
 | `lib/{dates,id,cx}.ts` | `assets/utils` |
 | `lib/palette.ts` | `assets/palette.ts` |
@@ -449,18 +511,28 @@ handler/logic split is the shape `client/` and `services/` are adopting.
 
 ## 8. Known hard spots
 
-**Mutation variables must become self-sufficient.** This is the bulk of the work.
-`apply(action, next)` currently receives the whole next `AppState` and resolves
-entities out of it (`next.events.find(...)`). A dehydrated paused mutation has no
-state to resolve against — only its serialized variables. The existing
-`OccurrenceWrite` union in `data/completions.ts` is the correct template; the rest of
-the action vocabulary must be rewritten to that standard.
+**Mutation variables must become self-sufficient.** ~~This is the bulk of the
+work.~~ **Done.** Every domain's write hook takes a union of changes carrying
+everything the write needs, and nothing resolves entities out of app state. Two
+patterns settled along the way, both worth copying:
+
+- Writes that name a day of a series carry `SeriesTiming` (`{ id, allDay, start }`)
+  rather than the whole event. It is all the write needs to find the row, and a set
+  of values that must survive a restart should be as small as it can be.
+- Preferences are one stored document, so its write carries the **whole next
+  document**. `domains/preferences/patches.ts` builds it at the call site. Trying to
+  carry only the changed field would mean reading the current document inside
+  `mutationFn`, which a resumed write cannot rely on.
 
 **Preserving reducer test coverage.** `store/reducer.test.ts` (257 lines) tests pure
 optimistic application. Moving that logic into inline `onMutate` callbacks would
-silently delete it. R12 exists to prevent that: each domain exports pure `patch*`
-functions — `patchEntry` in `completions.ts` is the existing example — and the tests
-port over nearly as-is.
+silently delete it. R12 exists to prevent that, and the `patch*` functions it
+requires are **built** in every domain, with 99 new tests over them and the
+transformers.
+
+**Still to do:** `store/reducer.test.ts` itself has not been ported — it tests the
+reducer, which still runs the app. Read it against the domain patches before
+deleting it, and move over anything the new tests do not already assert.
 
 **`splitSeries` — the client half is settled, the optimistic half is not.**
 `client/series.ts` does all four steps behind one call (RPC, then the new row, then
@@ -538,6 +610,9 @@ props-only is promoted to a workspace by writing a second thin wrapper.
 - Whether events get windowed reads like occurrences, or stay whole-account.
 - Whether the legacy `planner.lists.v1` import is carried forward (it is out of
   `client/` either way — see §8).
+- Whether search results should be cached longer than 30s. Nothing cached them
+  before, so any window is new; 30s keeps a repeated search instant without
+  hiding something just added.
 - Whether `client/`'s remaining reach into `lib/` is worth closing early. `mappers`
   uses `lib/dates`, `people`/`preferences`/`series` use `lib/palette`, and `series`
   uses `lib/rrule`. All three are slated to move under `assets/` or `services/`,
