@@ -1,10 +1,19 @@
+import type { Json } from '../client/database.types'
+import {
+  dayRange,
+  durationToInterval,
+  intervalToDuration,
+  startToTs,
+  tsToDateKey,
+  tsToStart,
+} from '../client/mappers'
+import { fetchAll } from '../client/pagination'
+import { supabase } from '../client/supabase'
 import { checklists, notes as noteAttachments } from '../lib/attachments'
-import type { Json } from '../lib/database.types'
-import { toDateTimeLocal, toISODate } from '../lib/dates'
+import { toISODate } from '../lib/dates'
 import { uid } from '../lib/id'
 import { isColorKey } from '../lib/palette'
 import { recurrenceToRRule, rruleToRecurrence, truncatedRRule } from '../lib/rrule'
-import { supabase } from '../lib/supabase'
 import type {
   AppState,
   Attachment,
@@ -23,99 +32,16 @@ import type { Action } from './actions'
 import type { ScheduleStore } from './store'
 import { defaultState } from './store'
 
-const MINS_PER_DAY = 24 * 60
-
 // Legacy device-local Lists store (pre-migration 0009). Read once to migrate any
 // existing items into the backend, then marked imported so it never runs again.
 const LEGACY_LISTS_KEY = 'planner.lists.v1'
 const LEGACY_LISTS_IMPORTED_KEY = 'planner.lists.v1.imported'
-
-// ---- Phase-1 <-> Postgres conversions ------------------------------------
-
-/** Phase-1 start string -> timestamptz (UTC ISO). Local naive time in, UTC out. */
-function startToTs(start: string, allDay: boolean): string {
-  const d = allDay ? new Date(`${start}T00:00:00`) : new Date(start)
-  return d.toISOString()
-}
-
-/** timestamptz -> Phase-1 start string ('yyyy-mm-dd' all-day, else 'yyyy-mm-ddThh:mm'). */
-function tsToStart(ts: string, allDay: boolean): string {
-  const d = new Date(ts)
-  return allDay ? toISODate(d) : toDateTimeLocal(d)
-}
-
-/** Phase-1 duration (minutes timed / whole days all-day) -> Postgres interval literal. */
-function durationToInterval(duration: number, allDay: boolean): string {
-  return allDay ? `${Math.max(1, duration)} days` : `${Math.max(0, duration)} minutes`
-}
-
-/** Parse a Postgres or ISO-8601 interval string to total minutes. */
-function intervalToMinutes(iv: string | null): number {
-  if (!iv) return 0
-  const iso = iv.match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/)
-  if (iso) {
-    const [, d, h, m] = iso
-    return Number(d || 0) * MINS_PER_DAY + Number(h || 0) * 60 + Number(m || 0)
-  }
-  let min = 0
-  const dayM = iv.match(/(\d+)\s+days?/)
-  if (dayM) min += Number(dayM[1]) * MINS_PER_DAY
-  // Anchor at the end so a 3+ digit hour count ("100:00:00") parses whole.
-  const timeM = iv.match(/(\d+):(\d{2}):(\d{2})\s*$/)
-  if (timeM) min += Number(timeM[1]) * 60 + Number(timeM[2])
-  return min
-}
-
-function intervalToDuration(iv: string | null, allDay: boolean): number {
-  const min = intervalToMinutes(iv)
-  return allDay ? Math.max(1, Math.round(min / MINS_PER_DAY)) : min
-}
 
 /** The original-slot timestamptz of `event`'s occurrence starting on ISO `date`. */
 function occurrenceTs(event: CalendarEvent, date: string): string {
   if (event.allDay) return new Date(`${date}T00:00:00`).toISOString()
   const timeOfDay = event.start.slice(11) || '00:00'
   return new Date(`${date}T${timeOfDay}`).toISOString()
-}
-
-/** completions key from a stored occurrence_start. */
-function tsToDateKey(ts: string): string {
-  return toISODate(new Date(ts))
-}
-
-/**
- * UTC timestamp bounds of local ISO `date` — the half-open [from, to) window an
- * occurrence-row `occurrence_start` for that date falls in. Occurrence rows are
- * MATCHED by this window rather than by an exact timestamp: the stored value
- * carries the time-of-day the series had when the row was written, so after the
- * series' start time is edited an exact match would silently miss every
- * existing row (orphaning ticks, statuses and overrides), while the app itself
- * only ever keys occurrence state by date (`tsToDateKey`).
- */
-function dayRange(date: string): { from: string; to: string } {
-  const d = new Date(`${date}T00:00:00`)
-  const from = d.toISOString()
-  d.setDate(d.getDate() + 1)
-  return { from, to: d.toISOString() }
-}
-
-/**
- * Drain a query in pages: PostgREST silently caps a response at 1000 rows, so
- * any unpaginated table scan starts dropping data once an account outgrows the
- * cap. `build` must apply a stable `.order(...)` so pages tile correctly.
- */
-const PAGE = 1000
-async function fetchAll<Row>(
-  build: (from: number, to: number) => PromiseLike<{ data: Row[] | null; error: unknown }>,
-): Promise<Row[]> {
-  const out: Row[] = []
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await build(from, from + PAGE - 1)
-    if (error) throw error
-    const rows = data ?? []
-    out.push(...rows)
-    if (rows.length < PAGE) return out
-  }
 }
 
 // ---- Row shapes (kept local; the generated types don't model embeds well) --
@@ -345,81 +271,6 @@ export class SupabaseStore implements ScheduleStore {
       })
     }
     return out
-  }
-
-  /**
-   * Per-occurrence state whose occurrence date falls in [fromDate, toDate)
-   * (local ISO dates), as a `CompletionsMap`. Owned by the TanStack Query layer
-   * (src/data/completions.ts), which fetches per month window — these tables
-   * grow with every tick ever made, so they are never loaded whole. Rows whose
-   * `rescheduled_to` lands in the window are included too, so an occurrence
-   * moved INTO the window from a distant origin still renders.
-   */
-  async loadCompletionsRange(
-    fromDate: string,
-    toDate: string,
-  ): Promise<Record<string, import('../types').OccurrenceState>> {
-    const completions: Record<string, import('../types').OccurrenceState> = {}
-    const key = (seriesId: string, ts: string) => `${seriesId}:${tsToDateKey(ts)}`
-    const fromTs = dayRange(fromDate).from
-    const toTs = dayRange(toDate).from
-
-    const [occData, itemData] = await Promise.all([
-      // Embed the parent's all_day so reschedule columns map back into the same
-      // unit convention as CalendarEvent (timed = minutes, all-day = days). The
-      // inner join also scopes the scan to this account, and both queries page
-      // past the 1000-row response cap.
-      fetchAll((from, to) =>
-        supabase
-          .from('event_occurrence')
-          .select(
-            'series_id, occurrence_start, status, rescheduled_to, rescheduled_duration, cancelled, event_series!inner(all_day, account_id)',
-          )
-          .eq('event_series.account_id', this.accountId)
-          .or(
-            `and(occurrence_start.gte."${fromTs}",occurrence_start.lt."${toTs}"),and(rescheduled_to.gte."${fromTs}",rescheduled_to.lt."${toTs}")`,
-          )
-          .order('series_id')
-          .order('occurrence_start')
-          .range(from, to),
-      ),
-      fetchAll((from, to) =>
-        supabase
-          .from('occurrence_item_state')
-          .select('series_id, occurrence_start, item_id, status, event_series!inner()')
-          .eq('event_series.account_id', this.accountId)
-          .gte('occurrence_start', fromTs)
-          .lt('occurrence_start', toTs)
-          .order('series_id')
-          .order('occurrence_start')
-          .order('item_id')
-          .range(from, to),
-      ),
-    ])
-
-    for (const o of occData) {
-      // PostgREST returns the to-one parent embed as an object.
-      const allDay = (o.event_series as { all_day: boolean } | null)?.all_day ?? false
-      const entry: import('../types').OccurrenceState = {
-        ...completions[key(o.series_id, o.occurrence_start)],
-      }
-      if (o.status) entry.status = o.status as OccurrenceStatusCode
-      if (o.cancelled) entry.cancelled = true
-      if (o.rescheduled_to) entry.start = tsToStart(o.rescheduled_to, allDay)
-      if (o.rescheduled_duration)
-        entry.duration = intervalToDuration(o.rescheduled_duration, allDay)
-      // Skip rows that carry no app-visible state (e.g. a cleared override).
-      if (entry.status || entry.cancelled || entry.start != null || entry.duration != null) {
-        completions[key(o.series_id, o.occurrence_start)] = entry
-      }
-    }
-    for (const it of itemData) {
-      const k = key(it.series_id, it.occurrence_start)
-      const checked = { ...(completions[k]?.checked ?? {}) }
-      checked[it.item_id] = it.status === 'done'
-      completions[k] = { ...completions[k], checked }
-    }
-    return completions
   }
 
   /**

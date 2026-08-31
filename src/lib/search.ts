@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { supabase } from '../client/supabase'
 
 /**
  * Server-side search. These call the account-scoped FTS RPCs (migration 0014)

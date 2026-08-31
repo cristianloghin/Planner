@@ -6,33 +6,37 @@ calendar, to-do lists, and per-person colours. Installable, works offline.
 **Phase 1:** ran entirely in the browser, persisted to `localStorage` — single
 device, no accounts.
 
-**Phase 2 (in progress):** the app now runs on a real backend (Supabase) with
-accounts, auth, and cross-device sync. Sign-in is required; calendar data
-(people, events, attendees, reminders, completions) is stored per account and
-shared between partners. The whole app talks to storage through the
-`ScheduleStore` interface in [`src/store/store.ts`](src/store/store.ts), now
-backed by `SupabaseStore`.
+**Phase 2 (shipped):** the app runs on a real backend (Supabase) with accounts,
+auth, and cross-device sync. Sign-in is required; calendar data (people, events,
+attendees, reminders, completions) is stored per account and shared between
+partners.
 
 People are **data**: one calendar lane per `person` row (`adult`/`child`,
 optional login link), so the app works for any number of people.
 
-Done so far: backend stood up, auth + account bootstrap, `SupabaseStore` for
-people/events/completions, **realtime sync** (a partner's change appears live,
-deferred while you're mid-edit), **per-user preferences** (personal event-colour
-overrides), **occurrence dependencies** (link an occurrence to a concrete
-occurrence of another event via `occurrence_dependency`), and **standalone Lists**
-(see [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) Decision 11): named, account-scoped
-lists that sync across devices — with in-list headers, optional per-item deadlines,
-and to-dos linkable to a calendar occurrence so ticking the to-do in the event or in
-the Lists view is one and the same write — and **event templates** (Decision 10):
-reusable event blueprints (`event_series` with `is_template = true`, no schedule) you
-save from the event editor and start a new event from, an app-side deep copy that
-stamps a real start and fresh attachment rows.
+Built and live: auth + account bootstrap, **realtime sync** (a partner's change
+appears live, deferred while you're mid-edit), **occurrence dependencies** (link
+an occurrence to a concrete occurrence of another event), **standalone Lists**
+(named account-scoped lists with in-list headers, per-item deadlines, and to-dos
+linkable to an occurrence so ticking in either place is one write), **event
+templates** (reusable series shells you save from the editor and start a new
+event from), a **unified 12-colour palette** shared by people and events with
+per-user overrides, **full-text search** over events and to-dos, and **Web Push
+reminders** that arrive while the app is closed.
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the DRSp pattern: layers, rules, and where new code goes.
-- [`docs/RESTRUCTURE_PLAN.md`](docs/RESTRUCTURE_PLAN.md) — DRSp applied to this codebase (target state, not yet implemented).
+The data layer is mid-migration: most slices still flow through the
+`ScheduleStore` interface in [`src/store/store.ts`](src/store/store.ts), while
+templates and per-occurrence state are owned by TanStack Query, and a `client/`
+layer holds the Supabase SDK and the DB↔app conversions. See
+[`docs/STATUS.md`](docs/STATUS.md).
+
+- [`docs/STATUS.md`](docs/STATUS.md) — what's built, how the data layer stands today, and the gotchas.
 - [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) — the schema and the reasoning behind every decision.
-- [`docs/NEXT_SESSION.md`](docs/NEXT_SESSION.md) — runbook + current status and remaining work.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the DRSp pattern: layers, rules, and where new code goes.
+- [`docs/RESTRUCTURE_PLAN.md`](docs/RESTRUCTURE_PLAN.md) — DRSp applied to this codebase (target state, in progress).
+- [`docs/PLANNED.md`](docs/PLANNED.md) — designed but not built: shares & pins, private lists, the note model.
+- [`docs/PUSH_NOTIFICATIONS.md`](docs/PUSH_NOTIFICATIONS.md) — Web Push setup, verification, and failure modes.
+- [`docs/NOTE_MODEL.md`](docs/NOTE_MODEL.md) — a richer note/document model (design only).
 - [`supabase/migrations/`](supabase/migrations) — schema, RLS, functions, grants, and the `person` model.
 
 ## Tech
@@ -66,10 +70,13 @@ npm run test:watch
 ```
 
 `npm test` covers the pure, backend-free logic — recurrence expansion
-(`src/lib/recurrence.ts`), the RRULE round-trip (`src/lib/rrule.ts`),
-occurrence completion/dependency gating (`src/lib/occurrences.ts`), and the
-Lists helpers (`src/lib/lists.ts`). These run without Supabase, so they guard
-the trickiest hand-rolled date math on every change.
+(`src/lib/recurrence.ts`), the RRULE round-trip (`src/lib/rrule.ts`), occurrence
+completion/dependency gating (`src/lib/occurrences.ts`), the Lists helpers
+(`src/lib/lists.ts`), date math, the reducer's optimistic application, the
+offline write queue, the DB↔app conversions (`src/client/mappers.ts`), and a
+cross-validation of the reminder sender's recurrence logic against the client's.
+These run without Supabase, so they guard the trickiest hand-rolled date math on
+every change.
 
 ## Deploy
 
