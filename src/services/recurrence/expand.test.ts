@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { CalendarEvent, Recurrence } from '../types'
+import type { CalendarEvent, Recurrence } from '../../domains/events/types'
 import {
   latestStartOnOrBefore,
   nextStartOnOrAfter,
@@ -7,7 +7,7 @@ import {
   recurrenceLabel,
   seriesOccurrenceDatesInRange,
   startsOn,
-} from './recurrence'
+} from './expand'
 
 /** Minimal all-day event factory; the recurrence math only reads start/recurrence. */
 function ev(

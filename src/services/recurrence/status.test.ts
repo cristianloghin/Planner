@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
+import type { Attachment, CalendarEvent } from '../../domains/events/types'
 import type {
-  AppState,
-  Attachment,
-  CalendarEvent,
   CompletionsMap,
   OccurrenceDependency,
   OccurrenceState,
-} from '../types'
+} from '../../domains/occurrences/types'
+
+type Dependencies = Record<string, OccurrenceDependency[]>
 import {
   blockingPrerequisites,
   isOccurrenceDone,
@@ -14,7 +14,7 @@ import {
   occurrenceEffectiveStatus,
   occurrenceStatus,
   prerequisiteDatesInRange,
-} from './occurrences'
+} from './status'
 
 function ev(id: string, attachments: Attachment[] = []): CalendarEvent {
   return {
@@ -33,20 +33,6 @@ const checklist = (id: string, ...entryIds: string[]): Attachment => ({
   kind: 'checklist',
   items: entryIds.map((e) => ({ id: e, title: e })),
 })
-
-function state(over: Partial<AppState> = {}): AppState {
-  return {
-    people: {},
-    lists: [],
-    events: [],
-    dependencies: {},
-    listLinks: {},
-    preferences: { personColors: {} },
-    weekStart: '2026-06-15',
-    selectedDay: 0,
-    ...over,
-  }
-}
 
 describe('isOccurrenceDone', () => {
   const date = '2026-06-15'
@@ -95,7 +81,8 @@ describe('blockingPrerequisites / occurrenceStatus', () => {
   const date = '2026-06-15'
 
   function withEdge(prereqDone: boolean): {
-    s: AppState
+    dependencies: Dependencies
+    events: CalendarEvent[]
     completions: CompletionsMap
     dependent: CalendarEvent
   } {
@@ -112,23 +99,25 @@ describe('blockingPrerequisites / occurrenceStatus', () => {
     return {
       dependent,
       completions,
-      s: state({
-        events: [prereq, dependent],
-        dependencies: { [occKey('dependent', date)]: [edge] },
-      }),
+      events: [prereq, dependent],
+      dependencies: { [occKey('dependent', date)]: [edge] },
     }
   }
 
   it('lists an unmet prerequisite and marks the occurrence blocked', () => {
-    const { s, completions, dependent } = withEdge(false)
-    expect(blockingPrerequisites(s, completions, dependent, date)).toHaveLength(1)
-    expect(occurrenceStatus(s, completions, dependent, date)).toBe('blocked')
+    const { dependencies, events, completions, dependent } = withEdge(false)
+    expect(blockingPrerequisites(dependencies, events, completions, dependent, date)).toHaveLength(
+      1,
+    )
+    expect(occurrenceStatus(dependencies, events, completions, dependent, date)).toBe('blocked')
   })
 
   it('clears once the prerequisite reaches its required status', () => {
-    const { s, completions, dependent } = withEdge(true)
-    expect(blockingPrerequisites(s, completions, dependent, date)).toHaveLength(0)
-    expect(occurrenceStatus(s, completions, dependent, date)).toBe('ready')
+    const { dependencies, events, completions, dependent } = withEdge(true)
+    expect(blockingPrerequisites(dependencies, events, completions, dependent, date)).toHaveLength(
+      0,
+    )
+    expect(occurrenceStatus(dependencies, events, completions, dependent, date)).toBe('ready')
   })
 
   it('drops an edge whose prerequisite event no longer exists', () => {
@@ -138,14 +127,14 @@ describe('blockingPrerequisites / occurrenceStatus', () => {
       prerequisiteDate: depDate,
       requiredStatus: 'done',
     }
-    const s = state({ events: [dependent], dependencies: { [occKey('dependent', date)]: [edge] } })
-    expect(blockingPrerequisites(s, {}, dependent, date)).toHaveLength(0)
+    const dependencies = { [occKey('dependent', date)]: [edge] }
+    expect(blockingPrerequisites(dependencies, [dependent], {}, dependent, date)).toHaveLength(0)
   })
 })
 
 describe('prerequisiteDatesInRange', () => {
   it('collects prerequisite dates for dependents inside the range only', () => {
-    const dependencies: AppState['dependencies'] = {
+    const dependencies: Dependencies = {
       [occKey('a', '2026-06-15')]: [
         { prerequisiteSeriesId: 'p', prerequisiteDate: '2026-04-01', requiredStatus: 'done' },
       ],
