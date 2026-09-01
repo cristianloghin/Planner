@@ -4,29 +4,36 @@
 is moving to, and the rules that keep it there. It is not a migration runbook —
 sequencing is deliberately out of scope.
 
-**Landed so far:** `client/`, `domains/` and `services/` are all **complete and
-unadopted.**
-Every call the app makes to Supabase has a client function (15 tables, 4 RPCs, the
-6 auth methods, the realtime channel), and eight domains sit over them with
-queries, mutations, transformers, selectors and pure optimistic patches.
+**Landed so far:** `client/`, `domains/`, `services/` and `assets/` are built,
+and **one domain is adopted**. Every call the app makes to Supabase has a client
+function (15 tables, 4 RPCs, the 6 auth methods, the realtime channel), and
+eight domains sit over them with queries, mutations, transformers, selectors and
+pure optimistic patches. Eight services sit beside them — the engines, the
+behaviour hooks, and the two stores.
 
-Eight services sit beside them — the engines, the behaviour hooks, and the two
-stores.
+`occurrences` runs the app: reads and writes both go through the domain and the
+client, and `data/completions.ts` is deleted. The rest of `client/` and
+`domains/` still duplicates `store/supabaseStore.ts`, `state.tsx`, `auth.tsx`
+and `data/templates.ts`, which run the app unchanged. `services/` is different:
+those were real moves, and `lib/` forwards to them, so there is one
+implementation and nothing to drift.
 
-`client/` and `domains/` duplicate `store/supabaseStore.ts`, `state.tsx`,
-`auth.tsx` and `data/`, all of which still run the app unchanged. `services/` is
-different: those were real moves, and `lib/` forwards to them, so there is one
-implementation and nothing to drift. `routes/`, `layouts/` and `assets/` are still
-ahead; [`STATUS.md`](./STATUS.md) describes where things actually stand.
+`routes/` exists but holds only the route map — the five tab routes over the
+existing screens. `layouts/` is still ahead, and so is splitting the screens
+into orchestrators over props-only views. [`STATUS.md`](./STATUS.md) describes
+where things actually stand.
 
 The pattern itself — its primitives, rationale, decision heuristics and
 anti-patterns — is defined in [`ARCHITECTURE.md`](./ARCHITECTURE.md). This document
 is the Planner-specific application of it: what goes where in *this* codebase, and
 which mechanisms implement each rule.
 
-**Assumed prerequisite:** `@mikrostack/router` gains base-path support (the app is
-served from `https://<user>.github.io/Planner/`). Tracked separately; this document
-assumes it is done.
+**Prerequisite, now met:** `@mikrostack/router` gained base-path support in
+0.8.0, and 0.9.0 added the rest of what this app needs — guards evaluated on the
+initial match and on browser back/forward, `usePrompt` honoured on popstate, a
+history cursor rather than a one-way stack, and read-time (thunk) defaults for
+`useQueryState`, which is what makes a `?date=` defaulting to *today*
+expressible at all.
 
 ---
 
@@ -62,13 +69,16 @@ should be treated as load-bearing.
 What is missing:
 
 - **Two parallel data stacks.** A reducer + `ScheduleStore` + hand-rolled write
-  queue for most slices, TanStack Query for templates and occurrence state. Two
-  caches, two offline mechanisms, two realtime paths.
+  queue for most slices, TanStack Query for the rest. Two caches, two offline
+  mechanisms, two realtime paths. (Occurrences have since moved onto Query
+  through the domain; templates are the last slice on the old Query path.)
 - **No horizontal separation.** `components/` is flat and mixes screens, feature
   pieces, primitives and app chrome. `lib/` mixes pure domain logic, React hooks,
   infrastructure and data access.
 - **No routes.** Navigation is `useState<Tab>` in `App.tsx`. No URLs, no code
-  splitting, no error boundaries.
+  splitting, no error boundaries. (Since fixed for the five tabs; the editors
+  and the occurrence sheet are still local state, and nothing is split or
+  lazy-loaded yet.)
 - **Identity-bearing providers.** `<AppProvider key={accountId}>` remounts the
   entire data layer when the account resolves, because the provider holds mutable
   identity.
@@ -365,16 +375,28 @@ install.
 **R10 was reworded: defaults are registered, not imported.** As first drafted it
 said "at module scope", which means the domain imports the app's query client and
 registers on load. That is a domain reaching into the app, which the layer table
-forbids. Each domain instead exports
-`register<Name>Defaults(queryClient, accountId)`, and the app calls them once at
-start-up. What R10 actually protects is unchanged — the behaviour must exist under
-a stable key *before* `resumePausedMutations()` runs, or a write paused offline
-finds no `mutationFn` and is lost.
+forbids. Each domain instead exports `register<Name>Defaults(queryClient)`, and
+the app calls them once at start-up. What R10 actually protects is unchanged —
+the behaviour must exist under a stable key *before* `resumePausedMutations()`
+runs, or a write paused offline finds no `mutationFn` and is lost.
+
+**They take only the query client, and that is load-bearing.** As first built
+they also took `accountId`, which meant they could not run until the session had
+resolved — and `main.tsx` resumes paused writes from the persister's `onSuccess`,
+which fires as soon as the saved cache is read out of localStorage. Registration
+lost that race every time, and a write that loses it does not wait: query-core
+rejects it with `No mutationFn found`, `resumePausedMutations` swallows the
+rejection, and it leaves the queue in `error`. Taking nothing from the session
+means there is no race to lose. The account rides in the write's values instead,
+which R9 asked for anyway.
 
 The cost is a footgun worth naming: **a domain whose register function is never
-called silently never replays its offline writes.** Wire them in one place, and add
-new domains to that place. Five exist — `events`, `lists`, `occurrences`, `people`,
-`preferences`. The other three have none on purpose: `account` and `search` only
+called silently never replays its offline writes.** They are wired in one place —
+`registerDomainDefaults` in `domains/index.ts`, called from `main.tsx` before
+`createRoot` — and a new domain with writes gets a line there. Five exist —
+`events`, `lists`, `occurrences`, `people`, `preferences`. The other four have
+none on purpose: `push`'s two writes are deliberately not durable (see §2),
+`account` and `search` only
 read, and `auth` is explained below.
 
 **R1 and R4 collide, and R1 wins.** As first drafted this document sent the
@@ -513,14 +535,14 @@ stays in localStorage. Both are *how*, not *what* (R13).
 
 | File | Becomes |
 |---|---|
-| `App.tsx` | `Root` gate → route guard; tab shell → `layouts/AppShell`; route map → `routes/routes.ts` |
+| `App.tsx` | `Root` gate → route guard (**still imperative**: a guard needs a non-React `isAuthenticated()`, so it waits on `services/session`); tab shell → `layouts/AppShell` (**still in `App.tsx`**); route map → ~~`routes/routes.ts`~~ **done** |
 | `state.tsx` | reducer state → domains; write queue → mutation `scope`; offline → Query persister; realtime channel → ~~`client/realtime.ts`~~ **done**, routing → `services/realtime`; edit guard → derived from route |
 | `auth.tsx` | SDK calls → ~~`client/auth.ts`~~ **done**; session + non-React accessors → `services/session`; credential ops → `domains/auth`; `ensureAccount` → `domains/account` over ~~`client/account.ts`~~ **done**; sign-out cache/snapshot clearing → shell orchestration |
 | `store/store.ts` | deleted (`ScheduleStore`, `LocalStorageStore`, `defaultState`) |
 | `store/supabaseStore.ts` | ~~sliced into `client/*` by table; mappers to `client/mappers.ts`~~ **done** — deletes once the domains adopt them |
 | `store/reducer.ts`, `store/actions.ts` | deleted; optimistic logic → `domains/*/patch.ts` |
 | `store/offline.ts` | deleted |
-| `data/useAccountStore.ts` | deleted (client functions replace it) |
+| `data/useAccountStore.ts` | deleted (client functions replace it) — last caller is `data/templates.ts` |
 | `types.ts` | split into `domains/*/types.ts` |
 
 Sign-out clearing is worth calling out as more than filing: `auth.tsx` currently
@@ -541,7 +563,7 @@ of coupling that breaks quietly later.
 | `components/ViewHeader` | `layouts/CalendarViewLayout` |
 | `components/{AlertHost,SyncBanners,UpdatePrompt}` | `layouts/AppShell` + backing services |
 | `data/templates.ts` | ~~`domains/events` (templates share the events domain)~~ **built** |
-| `data/completions.ts` | ~~`domains/occurrences`~~ **built** — month windows and patches ported |
+| ~~`data/completions.ts`~~ | `domains/occurrences` — **done and deleted**; reads and writes both adopted |
 | ~~`lib/{supabase,database.types}.ts`~~ | `client/` — **done** |
 | `lib/search.ts` | ~~`client/search.ts`~~ **done** + `domains/search` |
 | `lib/push.ts` | ~~`client/push.ts`~~ (rows) + ~~`services/push`~~ (browser) + ~~`domains/push`~~ (pairing) — **all three built**; `lib/push.ts` is now a 46-line adapter |
@@ -671,10 +693,12 @@ props-only is promoted to a workspace by writing a second thin wrapper.
 - Whether events get windowed reads like occurrences, or stay whole-account.
 - Whether the legacy `planner.lists.v1` import is carried forward (it is out of
   `client/` either way — see §8).
-- Where `occKey` should live. `services/recurrence` and `domains/occurrences` each
-  declare the same one-line key format, because a service may not import a
-  domain's values and there is no `assets/` below both yet. They must agree. This
-  is the first thing that genuinely wants `assets/`.
+- Where `occKey` should live. `services/recurrence` and `domains/occurrences`
+  each declare the same one-line key format, because a service may not import a
+  domain's values. They must agree, and still do. `assets/` now exists and has
+  taken two things that wanted exactly this — `APP_SCOPE` (the shared mutation
+  scope id, which no single domain can own) and `rollback` (the shared
+  optimistic-undo helper) — so the place to put it is no longer the blocker.
 - Whether search results should be cached longer than 30s. Nothing cached them
   before, so any window is new; 30s keeps a repeated search instant without
   hiding something just added.

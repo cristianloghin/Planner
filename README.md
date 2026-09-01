@@ -24,12 +24,15 @@ event from), a **unified 12-colour palette** shared by people and events with
 per-user overrides, **full-text search** over events and to-dos, and **Web Push
 reminders** that arrive while the app is closed.
 
-The codebase is mid-restructure. The app still runs through the `ScheduleStore`
-interface in [`src/store/store.ts`](src/store/store.ts), with templates and
-per-occurrence state on TanStack Query. Alongside it, four new layers are built
-but **not yet adopted** — `client/` (every Supabase call), `domains/` (queries,
-mutations and the pure logic around them), `services/` (the engines, hooks and
-stores) and `assets/`. `routes/` and `layouts/` are still ahead. See
+The codebase is mid-restructure. Most of the app still runs through the
+`ScheduleStore` interface in [`src/store/store.ts`](src/store/store.ts), with
+templates on TanStack Query. Alongside it sit `client/` (every Supabase call),
+`domains/` (queries, mutations and the pure logic around them), `services/` (the
+engines, hooks and stores) and `assets/` — all built, and **one of them
+adopted**: per-occurrence state now reads and writes through
+`domains/occurrences`, which was the first time any of this touched the database.
+The five tabs are real routes; `layouts/` is still ahead, as is splitting the
+screens into orchestrators over props-only views. See
 [`docs/STATUS.md`](docs/STATUS.md) for what that means in practice, and
 [`docs/RESTRUCTURE_PLAN.md`](docs/RESTRUCTURE_PLAN.md) for where it lands.
 
@@ -161,7 +164,7 @@ npm run typecheck
 npm run lint
 ```
 
-`npm test` is 235 tests and needs no backend. It covers the pure, hand-rolled
+`npm test` is 238 tests and needs no backend. It covers the pure, hand-rolled
 logic that is easiest to get quietly wrong: recurrence expansion and occurrence
 status (`src/services/recurrence/`), the RRULE round-trip (`src/lib/rrule.ts`),
 date math (`src/assets/utils/dates.ts`), the DB↔app conversions
@@ -172,7 +175,8 @@ the offline write queue (`src/store/`), and a cross-validation of the reminder
 sender's recurrence logic against the app's.
 
 What it does **not** cover is any round trip to the database. That still needs a
-click-test — which is what the local backend above is for.
+click-test — which is what the local backend above is for. The occurrence reads
+and writes have had one; nothing else in `client/` has.
 
 ## Deploy
 

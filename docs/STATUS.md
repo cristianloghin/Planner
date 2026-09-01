@@ -38,6 +38,12 @@ sync. Migrations `0001`–`0021` are applied.
   closed, via the `send-reminders` edge function on a pg_cron beat. Setup,
   verification and field-tested failure modes are in
   [`PUSH_NOTIFICATIONS.md`](./PUSH_NOTIFICATIONS.md).
+- **Routes** — the five tabs are real URLs (`/day`, `/week`, `/month`, `/lists`,
+  `/settings`) over `@mikrostack/router`, with `/` guarded to redirect to
+  `/day`. The screens themselves are unchanged: the editors and the occurrence
+  sheet are still their own local state, and the auth gate is still imperative
+  rather than a route guard, because a guard needs a non-React
+  `isAuthenticated()` and that means adopting `services/session`.
 
 ## The data layer, as it stands
 
@@ -45,16 +51,18 @@ Mid-migration, and worth knowing before adding a slice:
 
 - Most slices flow through the **reducer + `ScheduleStore`** (`src/state.tsx`,
   `src/store/`) with a hand-rolled write queue and a localStorage snapshot.
-- **Templates** and **per-occurrence state** are owned by **TanStack Query**
-  (`src/data/`), fetched per window in the occurrence case.
-- The **`client/`, `domains/` and `services/` layers** are all **complete but not
-  yet adopted.** Every call the app makes to Supabase has a client function — 15
-  tables, 4 RPCs, the 6 auth methods, the realtime channel — and eight domains
-  sit over them with queries, mutations, transformers, selectors and pure
-  optimistic patches. Only the occurrence window read is wired up at all
-  (`data/completions.ts` calls the client directly, not the domain). Everything
-  else still runs through `SupabaseStore`, `state.tsx`, `auth.tsx`,
-  `lib/search.ts` and `lib/push.ts`.
+- **`occurrences` is adopted** — the first slice to run through `client/` and
+  `domains/` for real. Reads and writes both go through the domain, and
+  `data/completions.ts` is gone. Six screens call `useCompletionsForRange` from
+  `domains/occurrences/queries`, passing `accountId`; the sheet and the editor
+  write through one `useOccurrencesWrite`.
+- **Templates** are still owned by **TanStack Query** in `src/data/templates.ts`,
+  the last of the original pilot. `domains/events` covers the same ground.
+- The rest of **`client/` and `domains/`** is built and **not yet adopted**.
+  Every call the app makes to Supabase has a client function — 15 tables, 4
+  RPCs, the 6 auth methods, the realtime channel — and eight domains sit over
+  them. Everything outside occurrences still runs through `SupabaseStore`,
+  `state.tsx`, `auth.tsx`, `lib/search.ts` and `lib/push.ts`.
 - **`services/` is different, and better off.** Those were real moves, not
   parallel copies: `lib/recurrence`, `lib/occurrences`, `lib/timing`,
   `lib/timelineLayout`, `lib/conflicts`, `lib/notifications`,
@@ -64,42 +72,75 @@ Mid-migration, and worth knowing before adding a slice:
 
 Each slice has exactly one owner. `RESTRUCTURE_PLAN.md` is where this ends up.
 
-**So both layers duplicate code that is still live.** `client/search.ts` mirrors
-`lib/search.ts`, `client/push.ts` mirrors the row writes in `lib/push.ts`, and
-`client/series.ts`, `client/lists.ts`, `client/people.ts`, `client/preferences.ts`
-and the `client/occurrences.ts` writes mirror `supabaseStore.ts`. Above them, the
-domains' `patches.ts` files mirror `store/reducer.ts`, and
-`domains/occurrences/queries.ts` mirrors `data/completions.ts`.
-
-One duplicate is worth singling out: `client/occurrences.ts` still exports a
-deprecated `fetchOccurrenceWindow`, because `data/completions.ts` calls it at
-runtime. The merge it does now also exists, tested, in
-`domains/occurrences/transformers.ts`. That pair is the clearest drift risk in the
-codebase.
+**So the unadopted parts duplicate code that is still live.** `client/search.ts`
+mirrors `lib/search.ts`, `client/push.ts` mirrors the row writes in
+`lib/push.ts`, and `client/series.ts`, `client/lists.ts`, `client/people.ts` and
+`client/preferences.ts` mirror `supabaseStore.ts`. Above them, the domains'
+`patches.ts` files mirror `store/reducer.ts`.
 
 **A fix to one side has to be made on the other.** Adopt a slice and delete its
 old path rather than letting the pair age.
 
+`SupabaseStore`'s five per-occurrence write methods are the current example of
+what "delete the old path" leaves behind: they have no callers now, and stay
+only until the reducer path around them goes.
+
 ### Adopting a slice
 
-Nothing in `client/` or `domains/` has ever talked to the database — only their
-pure parts are tested, so the first slice adopted is also the first real test of
-both layers. Two candidates:
+`occurrences` went first and is done, so `client/` and `domains/` are no longer
+untried against a real database. What that took, for the next one:
 
-- **`search`** is the cheapest. Two functions, no writes, no cache shaping;
-  `lib/search.ts` deletes when it works.
-- **`occurrences`** is the most valuable. It is already on Query, so adopting it
-  is mostly swapping what `data/completions.ts` calls — and it deletes the
-  duplicated merge above.
+- **The cache key does not change.** Same key, same windows, so it is a swap
+  rather than a migration — and `src/types.ts` already re-exports the domain
+  types, so screens are typed against the new shapes before they call them.
+- **`accountId` becomes an argument.** Domains take it rather than reading it
+  ambiently (R8). Until a slice's screens are routes, they read it from
+  `useAuth` themselves; the route supplies it later.
+- **The mutation key changes, and queued writes do not survive that.** A write
+  paused offline is stored under its key; if nothing is registered for that key
+  when it resumes, query-core rejects it, `resumePausedMutations` swallows the
+  rejection, and it is gone without a word. Bump `CACHE_BUSTER` in
+  `lib/queryClient.ts` in the same change — the write is lost either way, but
+  visibly and once.
+- **Verify against the local stack, not the type checker.** The useful check is
+  that a cold cache fetches and a warm one does not, which is what proves the
+  domain reads the key the old path wrote.
 
-Whichever comes first, the app must call every domain's
-`register<Name>Defaults(queryClient, accountId)` once at start-up, before paused
-writes resume. A domain whose register function is never called silently never
-replays its offline writes.
+Registration itself is settled: `registerDomainDefaults(queryClient)` in
+`domains/index.ts` is called once in `main.tsx` before `createRoot`, and a new
+domain with writes gets a line there. It asks nothing of the session, because
+the account rides in each write's values rather than being handed to the
+register function — see [Decision: the account is a value, not a
+closure](#the-account-is-a-value-not-a-closure) below.
+
+Still to adopt, cheapest first:
+
+- **`search`** — two functions, no writes, no cache shaping; `lib/search.ts`
+  deletes when it works.
+- **`templates`** — `data/templates.ts` and `data/useAccountStore.ts` both go.
+  Needs a home for the realtime bridge, which has no domain equivalent (it
+  invalidates by key, so it keeps working meanwhile).
+- **The reducer slices** — events, lists, people, preferences. Bigger: people
+  and preferences are read in ~10 files, and preferences must move in one go
+  because it is written as a whole document, so two writers would clobber each
+  other.
+
+### The account is a value, not a closure
+
+Registration takes only the query client. It used to take `accountId`, which
+meant it could not run until the session had resolved — but `main.tsx` resumes
+paused writes as soon as the saved cache is read out of localStorage, which is
+well before that. Every domain write in the queue was dropped before its
+behaviour existed.
+
+The account was never needed that early. Reads need it, and an insert that sets
+`account_id` needs it, but RLS scopes an update by row id: `renamePerson` does
+not need to know the account. So it rides in the write's values (R9), which is
+also what makes a resumed write self-sufficient.
 
 ## Tests
 
-`npm test` — 235 tests, no backend needed. Recurrence expansion and the RRULE
+`npm test` — 238 tests, no backend needed. Recurrence expansion and the RRULE
 round-trip (`src/lib/`), occurrence completion and dependency gating, Lists
 helpers, date math, the reducer's optimistic application, the offline queue, the
 client-layer conversions (`src/client/mappers.test.ts`), and a cross-validation
@@ -121,9 +162,14 @@ as an argument, so a stub drives them. That is the practical dividend of "a
 service is fed, not self-serving" — the rule pays for itself in tests before it
 pays for itself in structure.
 
-The remaining gap is every DB round-trip — `SupabaseStore`'s, and now `client/`'s
-too. Both need a live click-test rather than a unit test, and `client/`'s has not
-had one: it is unexercised code until a slice adopts it.
+`domains/occurrences` gained three more with the occurrences adoption, pinning
+what happens when two rows land on the same day — see the gotcha below. Only one
+of the three fails without the fix; the other two guard the neighbouring cases.
+
+The remaining gap is every DB round-trip, which needs a click-test rather than a
+unit test. `client/`'s occurrence functions have now had one — reads and writes
+both, against the local stack — but the rest of `client/` and all of
+`SupabaseStore` have not.
 
 ---
 
@@ -134,6 +180,12 @@ These are the rules both copies encode. Breaking one is silent.
 - PostgREST embeds need FK hints `table!fk_col` or you get `PGRST201` (ambiguous
   — e.g. `checklist_item` also links many-to-many via `occurrence_item_removed`).
 - Occurrence rows stay sparse: done → upsert, undone → delete.
+- Two occurrence rows can land on the same **day**, because a row is stored at
+  the time of day the series had when it was written and a later time edit does
+  not move it. `toCompletions` layers them rather than letting the last win, or
+  a day marked done by one row and moved by another comes back missing the tick.
+  Writes avoid making a second row (see `dayRange`), but a pair written before
+  that rule existed reads back as two forever.
 - Children sync is upsert + delete-missing, **not** delete-all — otherwise the
   cascade wipes `occurrence_item_state` ticks on every edit.
 - Attachment display order is lossy on round-trip (the DB has no polymorphic
@@ -180,7 +232,8 @@ sign up through the app instead. Studio is on `:54323`.
 
 Point `.env.local` at what `supabase start` prints (`VITE_SUPABASE_URL` and the
 publishable key). **Clear site data when you switch backends**: the query cache
-lives in localStorage under `planner.queryCache.v1` and the offline snapshot is
+lives in localStorage under `planner.queryCache.v1` (the `v2` buster discards
+its contents, not the key) and the offline snapshot is
 keyed by account id, so the same origin pointed at a different database will
 render the previous account's data before the first fetch lands.
 
@@ -210,8 +263,11 @@ for. `npm run build` copies the built `index.html` to `404.html` so a cold visit
 to a deep link still boots the app. Open one in a fresh tab; the response is a
 404 and the app renders anyway, which is exactly what a real visitor gets.
 
-That matters from the moment `routes/` lands. Until then there are no deep links
-to break.
+Routes have landed, so this is live rather than theoretical. All three paths
+were checked once against the built app: the dev server under the base, a cold
+visit through `404.html` (a 404 response with the app rendering), and the
+service worker's own navigation fallback serving from cache. None of them had
+ever run before, because until routes there were no deep links.
 
 ---
 
