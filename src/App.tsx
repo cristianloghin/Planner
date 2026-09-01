@@ -1,35 +1,34 @@
+import { Link, type RoutePath, AppProvider as RouterProvider, RouterView } from '@mikrostack/router'
 import { ListChecks, type LucideIcon, Settings as SettingsIcon } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import s from './App.module.css'
 import { PageLoader } from './assets/ui/Spinner'
-import { cx } from './assets/utils/cx'
 import { useAuth } from './auth'
 import { AlertHost } from './components/AlertHost'
-import { DayView } from './components/DayView'
-import { Lists } from './components/Lists'
 import { Login } from './components/Login'
-import { MonthView } from './components/MonthView'
-import { Settings } from './components/Settings'
-import { WeekCalendar } from './components/WeekCalendar'
 import { useTemplatesRealtime } from './data/templates'
 import { clearNotifications, syncPushSubscription } from './lib/push'
-import { AppProvider, useApp } from './state'
+import { routes } from './routes/routes'
+import { AppProvider } from './state'
 
-type Tab = 'day' | 'calendar' | 'month' | 'lists' | 'settings'
-
-const TABS: { id: Tab; label: string; icon?: LucideIcon }[] = [
-  { id: 'lists', label: 'Lists', icon: ListChecks },
-  { id: 'day', label: 'Day' },
-  { id: 'calendar', label: 'Week' },
-  { id: 'month', label: 'Month' },
-  { id: 'settings', label: 'Settings', icon: SettingsIcon },
+const TABS: { path: RoutePath; label: string; icon?: LucideIcon }[] = [
+  { path: '/lists', label: 'Lists', icon: ListChecks },
+  { path: '/day', label: 'Day' },
+  { path: '/week', label: 'Week' },
+  { path: '/month', label: 'Month' },
+  { path: '/settings', label: 'Settings', icon: SettingsIcon },
 ]
 
 /**
  * Auth gate. Decides what to mount: a spinner while the session resolves, the
- * login screen when signed out, and the data layer + app only once signed in.
- * The data store (AppProvider) is mounted *inside* the authed branch so it never
- * loads for a signed-out user.
+ * login screen when signed out, and the router + data layer + app only once
+ * signed in.
+ *
+ * The gate stays imperative rather than becoming a route guard: a guard needs
+ * a non-React `isAuthenticated()`, which means adopting `services/session`.
+ * Mounting the router only inside the authed branch makes every route
+ * authenticated by construction — a deep link visited while signed out shows
+ * the login screen and still renders its route once the session lands.
  */
 export function Root() {
   const { session, accountId, loading } = useAuth()
@@ -53,18 +52,25 @@ export function Root() {
   }
 
   return (
-    // Key the data layer by account: the store captures accountId at mount, so
-    // if it ever changes (account switch, delayed bootstrap race) the provider
-    // must remount with a fresh store rather than keep writing to the old one.
-    <AppProvider key={accountId}>
-      <App />
-    </AppProvider>
+    // The router sits *above* the data layer: AppProvider is keyed by account
+    // and remounts if that identity changes, and the URL should outlive that.
+    // basePath comes from Vite's `base` so the two cannot drift.
+    <RouterProvider
+      routes={routes}
+      config={{ basePath: import.meta.env.BASE_URL, defaultLoading: <PageLoader /> }}
+    >
+      {/* Key the data layer by account: the store captures accountId at mount, so
+          if it ever changes (account switch, delayed bootstrap race) the provider
+          must remount with a fresh store rather than keep writing to the old one. */}
+      <AppProvider key={accountId}>
+        <AppShell />
+      </AppProvider>
+    </RouterProvider>
   )
 }
 
-export function App() {
-  const [tab, setTab] = useState<Tab>('day')
-  const { dispatch } = useApp()
+/** The app chrome around whichever route is showing: alerts and the tab bar. */
+function AppShell() {
   const { session } = useAuth()
 
   // Keep the (Query-owned) templates cache fresh on a partner's change.
@@ -89,36 +95,39 @@ export function App() {
     return () => document.removeEventListener('visibilitychange', clear)
   }, [])
 
-  function openDay(iso: string) {
-    dispatch({ type: 'goToDate', date: iso })
-    setTab('day')
-  }
-
   return (
     <div className={s.app}>
       <AlertHost />
 
       <main className={s.appMain}>
-        {tab === 'day' && <DayView />}
-        {tab === 'calendar' && <WeekCalendar />}
-        {tab === 'month' && <MonthView onOpenDay={openDay} />}
-        {tab === 'lists' && <Lists />}
-        {tab === 'settings' && <Settings />}
+        <RouterView fallback={NotFound} />
       </main>
 
       <nav className={s.tabbar}>
         {TABS.map((t) => (
-          <button
-            type="button"
-            key={t.id}
-            className={cx(s.tab, t.id === tab && s.active)}
-            onClick={() => setTab(t.id)}
+          <Link
+            key={t.path}
+            to={t.path}
+            className={s.tab}
+            activeClassName={s.active}
             aria-label={t.label}
           >
             {t.icon ? <t.icon size={20} /> : t.label}
-          </button>
+          </Link>
         ))}
       </nav>
+    </div>
+  )
+}
+
+/** Shown for a URL no route matches — a mistyped or stale deep link. */
+function NotFound({ path }: { path: string }) {
+  return (
+    <div className={s.notFound}>
+      <p>Nothing at {path}.</p>
+      <Link to="/day" className={s.notFoundLink}>
+        Go to today
+      </Link>
     </div>
   )
 }

@@ -19,6 +19,16 @@
   overflow: hidden;
 }
 
+/* RouterView wraps the matched route in a plain <div> it does not expose a
+   class for, which would otherwise sit between .appMain and the view and break
+   the flex chain every screen relies on. Pass the sizing through it. */
+.appMain > div {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 /* ---- Tab bar ---- */
 .tabbar {
   flex: none;
@@ -42,9 +52,32 @@
   font-size: var(--fs-lg);
   font-weight: 600;
   border-radius: 8px;
+  text-decoration: none;
 }
 
 .tab.active {
   color: var(--on-accent);
   background: var(--accent);
+}
+
+/* ---- Unmatched route ---- */
+.notFound {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--muted);
+  padding: 16px;
+  text-align: center;
+}
+
+.notFoundLink {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: 8px;
+  padding: 8px 14px;
+  text-decoration: none;
+  font-weight: 600;
 }

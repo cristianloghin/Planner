@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "planner-pages",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "serve:pages"],
+      "port": 4173
     }
   ]
 }
