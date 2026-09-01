@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLatest } from '../assets/hooks/useLatest'
 import { addDays, toISODate } from '../assets/utils/dates'
-import { useCompletionsForRange } from '../data/completions'
+import { useAuth } from '../auth'
+import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { type FiredAlert, dueAlerts } from '../lib/notifications'
 import { useApp } from '../state'
 import s from './AlertHost.module.css'
@@ -23,6 +24,7 @@ function loadSeen(): number {
  */
 export function AlertHost() {
   const { state } = useApp()
+  const { accountId } = useAuth()
   const [active, setActive] = useState<FiredAlert[]>([])
   const seenRef = useRef(loadSeen())
 
@@ -31,7 +33,7 @@ export function AlertHost() {
   // dueAlerts' relocation lookaround.
   const today = toISODate(new Date())
   const alertRange = useMemo(() => ({ from: addDays(today, -31), to: addDays(today, 31) }), [today])
-  const { completions } = useCompletionsForRange(alertRange.from, alertRange.to)
+  const { completions } = useCompletionsForRange(accountId, alertRange.from, alertRange.to)
 
   useEffect(() => {
     function check() {

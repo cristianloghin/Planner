@@ -1,144 +1,23 @@
-import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useRef } from 'react'
-import { addDays } from '../assets/utils/dates'
-import { ensureAccount, useAuth } from '../auth'
-import { type CompletionsMap, fetchOccurrenceWindow } from '../client/occurrences'
+import { useMutation } from '@tanstack/react-query'
+import { ensureAccount } from '../auth'
 import { supabase } from '../client/supabase'
 import { occKey } from '../lib/occurrences'
 import { queryClient } from '../lib/queryClient'
 import { SupabaseStore } from '../store/supabaseStore'
-import type { CalendarEvent, OccurrenceState, OccurrenceStatusCode } from '../types'
+import type { CalendarEvent, CompletionsMap, OccurrenceState, OccurrenceStatusCode } from '../types'
 
 /**
- * Per-occurrence state (statuses, checklist ticks, timing overrides) on
- * TanStack Query — the second slice off the reducer, after templates. Unlike
- * templates it is fetched per WINDOW: these tables grow with every tick ever
- * made, so views load only the calendar month(s) they render (plus margins),
- * keeping startup and reload cost constant as the account ages.
+ * Writing per-occurrence state (statuses, checklist ticks, timing overrides).
  *
- * Cache shape: one query per calendar month, keyed ['completions', accountId,
- * 'yyyy-mm'], each holding a CompletionsMap for that month's fetch window.
- * Windows overlap on purpose (margins), so a mutation patches EVERY cached
- * window via setQueriesData. Realtime changes to the two backing tables
- * invalidate the whole prefix (routed in state.tsx).
+ * The reads for this slice have moved to domains/occurrences; these writes are
+ * what is left here, and they patch the cache that domain fills: one query per
+ * calendar month, keyed ['completions', accountId, 'yyyy-mm']. Those windows
+ * overlap on purpose (fetch margins), so a write patches EVERY cached one.
+ *
+ * Registered under ['occurrence-write']; the domain's equivalent writes are
+ * registered under ['occurrences-write'] and take the account in their values.
+ * Both are live until the writes move too — see docs/STATUS.md.
  */
-
-const STALE_MS = 5 * 60_000
-
-export const completionsPrefix = (accountId: string | null | undefined) =>
-  ['completions', accountId] as const
-const completionsKey = (accountId: string | null | undefined, month: string) =>
-  ['completions', accountId, month] as const
-
-// A month window is fetched with margins: back, so a multi-day occurrence
-// STARTING before the month still renders inside it (its override row lives on
-// its start date); forward, so the month-grid's trailing cells are covered.
-// Reschedules from farther away are caught by the rescheduled_to range in
-// fetchOccurrenceWindow, not by these margins.
-const BACK_MARGIN_DAYS = 31
-const FWD_MARGIN_DAYS = 7
-
-const monthOf = (date: string) => date.slice(0, 7)
-const monthStart = (month: string) => `${month}-01`
-
-function shiftMonth(month: string, delta: 1 | -1): string {
-  const [y, m] = month.split('-').map(Number)
-  const n = m + delta
-  if (n === 0) return `${y - 1}-12`
-  if (n === 13) return `${y + 1}-01`
-  return `${y}-${String(n).padStart(2, '0')}`
-}
-
-function fetchBounds(month: string): { from: string; to: string } {
-  return {
-    from: addDays(monthStart(month), -BACK_MARGIN_DAYS),
-    to: addDays(monthStart(shiftMonth(month, 1)), FWD_MARGIN_DAYS),
-  }
-}
-
-/** The months whose windows cover [from, to] plus any extra dates. */
-function monthsFor(from: string, to: string, extraDates: string[]): string[] {
-  const months = new Set<string>()
-  for (let m = monthOf(from); m <= monthOf(to); m = shiftMonth(m, 1)) months.add(m)
-  for (const d of extraDates) months.add(monthOf(d))
-  return [...months].sort()
-}
-
-/** Merge month maps into one object, keeping identity stable while the
- *  underlying query data references are unchanged (so downstream useMemos —
- *  recurrence expansion — don't recompute on every render). */
-function useStableMerge(parts: (CompletionsMap | undefined)[]): CompletionsMap {
-  const ref = useRef<{ parts: (CompletionsMap | undefined)[]; merged: CompletionsMap }>()
-  if (
-    !ref.current ||
-    ref.current.parts.length !== parts.length ||
-    parts.some((p, i) => p !== ref.current!.parts[i])
-  ) {
-    ref.current = { parts, merged: Object.assign({}, ...parts.filter(Boolean)) }
-  }
-  return ref.current.merged
-}
-
-/**
- * Per-occurrence state covering the inclusive [from, to] date range, plus any
- * `extraDates` (e.g. prerequisite occurrence dates referenced from inside the
- * range — see prerequisiteDatesInRange). Pass from = null to fetch nothing.
- * The months adjacent to the range are prefetched, so swiping across a month
- * boundary hits a warm cache.
- */
-export function useCompletionsForRange(
-  from: string | null,
-  to?: string | null,
-  extraDates: string[] = [],
-): { completions: CompletionsMap; isLoading: boolean } {
-  const { accountId } = useAuth()
-  const qc = useQueryClient()
-
-  const extraKey = extraDates.join(',')
-  const months = useMemo(
-    () => (from ? monthsFor(from, to ?? from, extraKey ? extraKey.split(',') : []) : []),
-    [from, to, extraKey],
-  )
-
-  const results = useQueries({
-    queries: months.map((month) => ({
-      queryKey: completionsKey(accountId, month),
-      queryFn: () => {
-        const b = fetchBounds(month)
-        return fetchOccurrenceWindow(accountId!, b.from, b.to)
-      },
-      enabled: !!accountId,
-      staleTime: STALE_MS,
-    })),
-  })
-
-  // Warm the neighbouring months so day/week swipes across a boundary don't
-  // hit a cold cache.
-  const monthsKey = months.join(',')
-  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on monthsKey so a same-months array with fresh identity doesn't re-prefetch
-  useEffect(() => {
-    if (!accountId || !months.length) return
-    for (const m of [shiftMonth(months[0], -1), shiftMonth(months[months.length - 1], 1)]) {
-      void qc.prefetchQuery({
-        queryKey: completionsKey(accountId, m),
-        queryFn: () => {
-          const b = fetchBounds(m)
-          return fetchOccurrenceWindow(accountId, b.from, b.to)
-        },
-        staleTime: STALE_MS,
-      })
-    }
-  }, [accountId, qc, monthsKey])
-
-  const completions = useStableMerge(results.map((r) => r.data))
-  return {
-    completions,
-    // A paused fetch (offline, no cached window) is not "loading" — nothing is
-    // coming until connectivity returns, and the offline banner tells that
-    // story. Holding a loader for it would wedge the UI.
-    isLoading: results.some((r) => r.isPending && r.fetchStatus === 'fetching'),
-  }
-}
 
 // ---- mutations --------------------------------------------------------------
 //

@@ -13,7 +13,8 @@ import shared from '../assets/styles/shared.module.css'
 import { LoadingPill } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
 import { addDays, isoLabel, minutesToTime, toISODate } from '../assets/utils/dates'
-import { useCompletionsForRange } from '../data/completions'
+import { useAuth } from '../auth'
+import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { checklistEntries, hasReminders } from '../lib/attachments'
 import { type Busy, type ChildStatus, childStatuses } from '../lib/conflicts'
 import {
@@ -40,6 +41,7 @@ const ZOOM_KEY = 'planner:hourH'
 
 export function DayView() {
   const { state, dispatch } = useApp()
+  const { accountId } = useAuth()
   const day = state.selectedDay
   const people = peopleList(state)
   const [editor, setEditor] = useState<EditorTarget | null>(null)
@@ -90,6 +92,7 @@ export function DayView() {
     [state.dependencies, prevISO, nextISO],
   )
   const { completions, isLoading: completionsLoading } = useCompletionsForRange(
+    accountId,
     prevISO,
     nextISO,
     prereqDates,

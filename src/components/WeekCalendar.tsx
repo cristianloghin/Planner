@@ -13,7 +13,8 @@ import {
   toISODate,
   weekRangeLabel,
 } from '../assets/utils/dates'
-import { useCompletionsForRange } from '../data/completions'
+import { useAuth } from '../auth'
+import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { defaultAttendees, eventColorKey } from '../lib/people'
 import {
   type DayOccurrence,
@@ -36,6 +37,7 @@ const SNAP = 15
 
 export function WeekCalendar() {
   const { state, dispatch } = useApp()
+  const { accountId } = useAuth()
   const [target, setTarget] = useState<EditorTarget | null>(null)
   const [sheet, setSheet] = useState<{ event: CalendarEvent; date: string } | null>(null)
   // Timeline-only: weekday index (0 = Mon) whose column is maximized, if any.
@@ -45,6 +47,7 @@ export function WeekCalendar() {
   // Windowed per-occurrence state covering the visible week and its swipe
   // neighbors (the strip renders the previous and next week too).
   const { completions, isLoading: completionsLoading } = useCompletionsForRange(
+    accountId,
     addDays(state.weekStart, -7),
     addDays(state.weekStart, 13),
   )

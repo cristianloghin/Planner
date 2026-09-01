@@ -7,8 +7,10 @@ import { NumberField } from '../assets/ui/NumberField'
 import { ScopeSheet } from '../assets/ui/ScopeSheet'
 import { PageLoader } from '../assets/ui/Spinner'
 import { addDays, diffDays, isoLabel, minutesToTime, toDateTimeLocal } from '../assets/utils/dates'
-import { useCompletionsForRange, useSetOccurrenceOverride } from '../data/completions'
+import { useAuth } from '../auth'
+import { useSetOccurrenceOverride } from '../data/completions'
 import { useAddTemplate, useTemplates } from '../data/templates'
+import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { cloneAttachments } from '../lib/attachments'
 import { personColorKey } from '../lib/people'
 import { effectiveOccurrence } from '../lib/recurrence'
@@ -96,7 +98,8 @@ export function EventEditor({
   // the view that opened the editor fetched the same month), otherwise the
   // form's initial state would be built without the override.
   const occurrenceDate = target.mode === 'edit' ? (target.occurrenceDate ?? null) : null
-  const { completions, isLoading } = useCompletionsForRange(occurrenceDate)
+  const { accountId } = useAuth()
+  const { completions, isLoading } = useCompletionsForRange(accountId, occurrenceDate)
   if (occurrenceDate && isLoading) {
     // Keep the toolbar: this shell covers the whole screen and the app runs
     // standalone, so Cancel is the only way out — a bare spinner would trap.

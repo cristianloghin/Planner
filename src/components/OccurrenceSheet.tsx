@@ -6,13 +6,14 @@ import { type ScopeChoice, ScopeSheet } from '../assets/ui/ScopeSheet'
 import { PageLoader } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
 import { addDays, isoLabel, minutesToTime } from '../assets/utils/dates'
+import { useAuth } from '../auth'
 import {
   useCancelOccurrence,
   useClearOccurrenceOverride,
-  useCompletionsForRange,
   useSetChecklistEntry,
   useSetOccurrenceStatus,
 } from '../data/completions'
+import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { checklists, notes, reminderOffsets } from '../lib/attachments'
 import { findListItem, isOverdue } from '../lib/lists'
 import { offsetLabel } from '../lib/notifications'
@@ -52,6 +53,7 @@ export function OccurrenceSheet({
   onClose: () => void
 }) {
   const { state, dispatch } = useApp()
+  const { accountId } = useAuth()
   // Windowed per-occurrence state: this occurrence's month, plus the dates of
   // any prerequisites it waits on (they may live outside the window).
   const edges = state.dependencies[occKey(event.id, date)] ?? []
@@ -60,7 +62,7 @@ export function OccurrenceSheet({
     () => [...new Set(edges.map((e) => e.prerequisiteDate))].sort(),
     [edges.map((e) => e.prerequisiteDate).join(',')],
   )
-  const { completions, isLoading } = useCompletionsForRange(date, date, prereqDates)
+  const { completions, isLoading } = useCompletionsForRange(accountId, date, date, prereqDates)
   const setOccurrenceStatus = useSetOccurrenceStatus()
   const setChecklistEntry = useSetChecklistEntry()
   const clearOverride = useClearOccurrenceOverride()

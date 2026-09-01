@@ -130,57 +130,6 @@ export async function fetchItemStateRows(
   }))
 }
 
-// ---- the old shape, still in use ---------------------------------------
-//
-// `data/completions.ts` reads through this and is what runs the app today. It
-// does the merging that now belongs to domains/occurrences/transformers, so the
-// two overlap on purpose until that domain is adopted — at which point
-// everything down to the writes below deletes. Do not build anything new on it.
-
-/** @deprecated Use {@link OccurrenceRow} and domains/occurrences. */
-export interface OccurrenceState {
-  status?: OccurrenceStatusCode
-  checked?: Record<string, boolean>
-  start?: string
-  duration?: number
-  cancelled?: boolean
-}
-
-/** @deprecated Use domains/occurrences. */
-export type CompletionsMap = Record<string, OccurrenceState>
-
-/** @deprecated Use {@link fetchOccurrenceRows} + {@link fetchItemStateRows}. */
-export async function fetchOccurrenceWindow(
-  accountId: string,
-  fromDate: string,
-  toDate: string,
-): Promise<CompletionsMap> {
-  const [occ, items] = await Promise.all([
-    fetchOccurrenceRows(accountId, fromDate, toDate),
-    fetchItemStateRows(accountId, fromDate, toDate),
-  ])
-  const completions: CompletionsMap = {}
-  for (const o of occ) {
-    const key = `${o.seriesId}:${o.date}`
-    const entry: OccurrenceState = { ...completions[key] }
-    if (o.status) entry.status = o.status
-    if (o.cancelled) entry.cancelled = true
-    if (o.start != null) entry.start = o.start
-    if (o.duration != null) entry.duration = o.duration
-    if (entry.status || entry.cancelled || entry.start != null || entry.duration != null) {
-      completions[key] = entry
-    }
-  }
-  for (const it of items) {
-    const key = `${it.seriesId}:${it.date}`
-    completions[key] = {
-      ...completions[key],
-      checked: { ...(completions[key]?.checked ?? {}), [it.itemId]: it.done },
-    }
-  }
-  return completions
-}
-
 // ---- writes --------------------------------------------------------------
 
 /**

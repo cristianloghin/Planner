@@ -14,7 +14,8 @@ import {
   startOfMonth,
   toISODate,
 } from '../assets/utils/dates'
-import { useCompletionsForRange } from '../data/completions'
+import { useAuth } from '../auth'
+import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { eventColorKey } from '../lib/people'
 import { nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
 import { eventStartMinutes } from '../lib/timing'
@@ -29,6 +30,7 @@ const MAX_DOTS = 4
 
 export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
   const { state } = useApp()
+  const { accountId } = useAuth()
   const [cursor, setCursor] = useState(() => startOfMonth(toISODate(new Date())))
   const today = toISODate(new Date())
   // Strip pages: [previous month, visible month, next month].
@@ -49,6 +51,7 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
   const prevGrid = monthGridDays(months[0])
   const nextGrid = monthGridDays(months[2])
   const { completions, isLoading: completionsLoading } = useCompletionsForRange(
+    accountId,
     prevGrid[0],
     nextGrid[nextGrid.length - 1],
   )

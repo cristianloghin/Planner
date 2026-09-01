@@ -12,7 +12,7 @@ import { useLatest } from './assets/hooks/useLatest'
 import { PageLoader } from './assets/ui/Spinner'
 import { useAuth } from './auth'
 import { LoadFailedScreen, SyncBanners } from './components/SyncBanners'
-import { completionsPrefix } from './data/completions'
+import { completionsPrefix } from './domains/occurrences/queries'
 import { queryClient } from './lib/queryClient'
 import type { Action } from './store/actions'
 import {
