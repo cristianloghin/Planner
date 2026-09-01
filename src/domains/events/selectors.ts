@@ -8,8 +8,21 @@
  * Which DAYS an event lands on is not here. That is worked out from its repeat
  * rule, which is a job of its own — feed these events to it.
  */
+import type { SeriesTiming } from '../../client/series'
 import type { PersonId } from '../people/types'
 import type { CalendarEvent, EventTemplate } from './types'
+
+/**
+ * The little of an event a write about one of its days needs: which series, and
+ * where its days sit in time.
+ *
+ * Writes that name a day carry this rather than the whole event. A set of
+ * values that has to survive a restart should be as small as it can be, and
+ * this is all the write needs to find the row.
+ */
+export function timingOf(event: CalendarEvent): SeriesTiming {
+  return { id: event.id, allDay: event.allDay, start: event.start }
+}
 
 /** One event, or undefined if it has been deleted. */
 export function eventFor(id: string) {

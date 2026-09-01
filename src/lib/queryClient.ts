@@ -5,8 +5,14 @@ import { QueryClient } from '@tanstack/react-query'
  * Bump when a Query-owned slice changes its persisted shape (query key layout
  * or row mapping) — a mismatched buster discards the stored cache instead of
  * hydrating stale-shaped data into the new code.
+ *
+ * v2: occurrence writes moved to domains/occurrences and are registered under a
+ * new mutation key with different values. A write queued offline under the old
+ * key would come back with nothing registered to run it, and query-core drops
+ * such a write silently rather than waiting. Discarding the stored cache loses
+ * it too, but visibly and once, rather than leaving it to fail unnoticed.
  */
-const CACHE_BUSTER = 'v1'
+const CACHE_BUSTER = 'v2'
 export const QUERY_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 // Shared cache for the slices migrated to TanStack Query (templates and

@@ -8,8 +8,9 @@ import { ScopeSheet } from '../assets/ui/ScopeSheet'
 import { PageLoader } from '../assets/ui/Spinner'
 import { addDays, diffDays, isoLabel, minutesToTime, toDateTimeLocal } from '../assets/utils/dates'
 import { useAuth } from '../auth'
-import { useSetOccurrenceOverride } from '../data/completions'
 import { useAddTemplate, useTemplates } from '../data/templates'
+import { timingOf } from '../domains/events/selectors'
+import { useOccurrencesWrite } from '../domains/occurrences/mutations'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { cloneAttachments } from '../lib/attachments'
 import { personColorKey } from '../lib/people'
@@ -131,7 +132,8 @@ function EventEditorForm({
   onClose: () => void
 }) {
   const { state, dispatch, beginEdit, endEdit } = useApp()
-  const setOccurrenceOverride = useSetOccurrenceOverride()
+  const { accountId } = useAuth()
+  const occurrences = useOccurrencesWrite()
   const { data: templates = [] } = useTemplates()
   const addTemplate = useAddTemplate()
   const isEdit = target.mode === 'edit'
@@ -305,11 +307,15 @@ function EventEditorForm({
     // The override's identity stays the original slot (`occurrenceDate`); `start`
     // carries the form's chosen day + time, so changing the day relocates just
     // this occurrence (it stays part of the series, rendered on the new day).
-    setOccurrenceOverride.mutate({
-      event: base!,
-      date: occurrenceDate!,
-      start: allDay ? date : startDT,
-      duration: currentDuration(),
+    occurrences.mutate({
+      accountId: accountId as string,
+      change: {
+        kind: 'override',
+        series: timingOf(base!),
+        date: occurrenceDate!,
+        start: allDay ? date : startDT,
+        duration: currentDuration(),
+      },
     })
     onClose()
   }

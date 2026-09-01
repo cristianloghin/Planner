@@ -38,7 +38,7 @@ export function occKey(eventId: string, date: string): string {
  * checklist when it has one (all entries checked), else the explicit `done`
  * status. The non-empty-entries guard keeps an empty checklist from reading as
  * "done". `completions` is the windowed per-occurrence state covering `date`
- * (src/data/completions.ts).
+ * (src/domains/occurrences).
  */
 export function isOccurrenceDone(
   completions: CompletionsMap,

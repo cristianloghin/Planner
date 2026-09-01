@@ -148,7 +148,7 @@ export function reducer(state: AppState, action: Action): AppState {
       // Drop the event and every dependency edge that touches it — whether
       // it's the dependent occurrence (key prefix) or a prerequisite of someone
       // else's occurrence (DB cascades both ends). Its per-occurrence state is
-      // Query-owned (src/data/completions.ts); realtime invalidation prunes it.
+      // Query-owned (src/domains/occurrences); realtime invalidation prunes it.
       const events = state.events.filter((e) => e.id !== action.id)
       const prefix = `${action.id}:`
       const dependencies: typeof state.dependencies = {}

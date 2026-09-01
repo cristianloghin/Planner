@@ -82,7 +82,7 @@ export class SupabaseStore implements ScheduleStore {
     const base = defaultState()
 
     // Not loaded here: templates and per-occurrence state (completions) are
-    // owned by TanStack Query (src/data/templates.ts, src/data/completions.ts)
+    // owned by TanStack Query (src/data/templates.ts, src/domains/occurrences)
     // and fetched per window — completions grow with every tick ever made, so
     // hydrating them whole would scale startup with account age. The mappings
     // still live in this class and are reused via the public methods.
@@ -749,7 +749,9 @@ export class SupabaseStore implements ScheduleStore {
     }
   }
 
-  // ---- PER-OCCURRENCE STATE (owned by TanStack Query, src/data/completions.ts)
+  // ---- PER-OCCURRENCE STATE (owned by TanStack Query, src/domains/occurrences)
+  // These five are no longer called: the writes moved to that domain. They stay
+  // only until the reducer path around them goes too.
   // Direct write methods rather than apply() actions: this slice left the
   // reducer, so mutations carry the event object instead of reading it back
   // out of AppState. All row matching is by day range (see dayRange).

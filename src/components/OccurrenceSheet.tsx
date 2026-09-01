@@ -7,12 +7,8 @@ import { PageLoader } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
 import { addDays, isoLabel, minutesToTime } from '../assets/utils/dates'
 import { useAuth } from '../auth'
-import {
-  useCancelOccurrence,
-  useClearOccurrenceOverride,
-  useSetChecklistEntry,
-  useSetOccurrenceStatus,
-} from '../data/completions'
+import { timingOf } from '../domains/events/selectors'
+import { useOccurrencesWrite } from '../domains/occurrences/mutations'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { checklists, notes, reminderOffsets } from '../lib/attachments'
 import { findListItem, isOverdue } from '../lib/lists'
@@ -63,10 +59,7 @@ export function OccurrenceSheet({
     [edges.map((e) => e.prerequisiteDate).join(',')],
   )
   const { completions, isLoading } = useCompletionsForRange(accountId, date, date, prereqDates)
-  const setOccurrenceStatus = useSetOccurrenceStatus()
-  const setChecklistEntry = useSetChecklistEntry()
-  const clearOverride = useClearOccurrenceOverride()
-  const cancelOccurrence = useCancelOccurrence()
+  const occurrences = useOccurrencesWrite()
 
   // Delete asks two different questions. A one-off just needs confirming; a
   // series needs to know how far the delete reaches, and that action sheet is
@@ -89,7 +82,10 @@ export function OccurrenceSheet({
   const movedFromOrigin = occState?.start != null && occState.start.slice(0, 10) !== date
 
   function setStatus(next: OccurrenceStatusCode | null) {
-    setOccurrenceStatus.mutate({ event, date, status: next })
+    occurrences.mutate({
+      accountId: accountId as string,
+      change: { kind: 'status', series: timingOf(event), date, status: next },
+    })
   }
 
   // ---- delete (scoped for a series) --------------------------------------
@@ -104,7 +100,10 @@ export function OccurrenceSheet({
   }
   /** Remove just this slot: the rule still produces it, `cancelled` hides it. */
   function deleteThisEvent() {
-    cancelOccurrence.mutate({ event, date })
+    occurrences.mutate({
+      accountId: accountId as string,
+      change: { kind: 'cancel', series: timingOf(event), date },
+    })
     onClose()
   }
   /**
@@ -222,7 +221,12 @@ export function OccurrenceSheet({
             <button
               type="button"
               className={s.resetOverride}
-              onClick={() => clearOverride.mutate({ event, date })}
+              onClick={() =>
+                occurrences.mutate({
+                  accountId: accountId as string,
+                  change: { kind: 'clearOverride', series: timingOf(event), date },
+                })
+              }
             >
               Reset to series time
             </button>
@@ -250,11 +254,15 @@ export function OccurrenceSheet({
                         type="checkbox"
                         checked={!!checked[it.id]}
                         onChange={() =>
-                          setChecklistEntry.mutate({
-                            event,
-                            date,
-                            entryId: it.id,
-                            checked: !checked[it.id],
+                          occurrences.mutate({
+                            accountId: accountId as string,
+                            change: {
+                              kind: 'tick',
+                              series: timingOf(event),
+                              date,
+                              entryId: it.id,
+                              checked: !checked[it.id],
+                            },
                           })
                         }
                       />

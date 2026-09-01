@@ -33,7 +33,7 @@ export interface AppState {
   lists: TodoList[]
   events: CalendarEvent[]
   // Not here: event templates (src/data/templates.ts) and per-occurrence state
-  // (src/data/completions.ts) are owned by TanStack Query, not this state tree.
+  // (src/domains/occurrences) are owned by TanStack Query, not this state tree.
   /**
    * Prerequisite edges keyed by the dependent occurrence (`${eventId}:${date}`),
    * mirroring `occurrence_dependency`. Each value lists the concrete prerequisite

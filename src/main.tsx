@@ -23,8 +23,7 @@ createRoot(document.getElementById('root')!).render(
         completions windows) from localStorage before first render, so an
         offline or slow launch shows last-known data instantly. Paused offline
         mutations are dehydrated too; once the restore lands, resume them —
-        their behaviour is looked up from the defaults registered above and in
-        src/data/completions.ts. */}
+        their behaviour is looked up from the defaults registered above. */}
     <PersistQueryClientProvider
       client={queryClient}
       persistOptions={queryPersistOptions}
