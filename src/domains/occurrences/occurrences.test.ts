@@ -62,6 +62,34 @@ describe('toCompletions', () => {
     })
   })
 
+  it('layers two rows that land on the same day', () => {
+    // A day's row is stored at the time of day the series had when it was
+    // written, so an edit to the series time can leave one row at the old time
+    // and one at the new — both on the same day, which is all this is keyed by.
+    // Taking the last one alone would drop whatever the first recorded.
+    expect(
+      toCompletions(
+        [row({ status: 'done' }), row({ start: '2026-04-07T18:00', duration: 90 })],
+        [],
+      ),
+    ).toEqual({
+      'S:2026-04-07': { status: 'done', start: '2026-04-07T18:00', duration: 90 },
+    })
+  })
+
+  it('lets a later row on the same day win a field they both set', () => {
+    expect(toCompletions([row({ status: 'done' }), row({ status: 'skipped' })], [])).toEqual({
+      'S:2026-04-07': { status: 'skipped' },
+    })
+  })
+
+  it('keeps a day whose second row carries nothing', () => {
+    // The empty one must not erase what the first row recorded.
+    expect(toCompletions([row({ status: 'done' }), row()], [])).toEqual({
+      'S:2026-04-07': { status: 'done' },
+    })
+  })
+
   it('keeps different events and days apart', () => {
     const out = toCompletions(
       [row({ status: 'done' }), row({ seriesId: 'T', status: 'skipped' })],
