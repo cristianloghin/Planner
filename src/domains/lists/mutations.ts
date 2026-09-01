@@ -5,10 +5,13 @@
  * other — create a list, then add to-dos to it — go out in the order they were
  * made, even after a spell offline.
  *
- * Call `registerListsDefaults` once at start-up, after the account is known and
- * before any paused writes are resumed.
+ * Registering asks nothing of the session — the account rides in each write's
+ * values — so `registerListsDefaults` can run at start-up before anything is
+ * read back out of storage.
  */
 import { type QueryClient, useMutation } from '@tanstack/react-query'
+import { APP_SCOPE } from '../../assets/constants'
+import { type Rollback, rollback } from '../../assets/rollback'
 import {
   createList,
   createListItem,
@@ -44,7 +47,7 @@ import type { ListItem, TodoList } from './types'
  * a second change to the same thing before the first has landed still names
  * something real.
  */
-export type ListsWrite =
+export type ListsChange =
   | { kind: 'addList'; list: TodoList }
   | { kind: 'renameList'; listId: string; title: string }
   | { kind: 'removeList'; listId: string }
@@ -60,17 +63,17 @@ export type ListsWrite =
   | { kind: 'link'; itemId: string; series: SeriesTiming; date: string }
   | { kind: 'unlink'; itemId: string; series: SeriesTiming; date: string }
 
+/** What `mutate()` takes: the change, and the account it belongs to. */
+export type ListsWrite = { accountId: string; change: ListsChange }
+
 const LISTS_WRITE_KEY = ['lists-write'] as const
 
-const isPin = (w: ListsWrite) => w.kind === 'link' || w.kind === 'unlink'
+const isPin = (w: ListsChange) => w.kind === 'link' || w.kind === 'unlink'
 
-export function registerListsDefaults(queryClient: QueryClient, accountId: string): void {
-  const lists = listsKey(accountId)
-  const links = listLinksKey(accountId)
-
+export function registerListsDefaults(queryClient: QueryClient): void {
   queryClient.setMutationDefaults(LISTS_WRITE_KEY, {
-    scope: { id: accountId },
-    mutationFn: (w: ListsWrite) => {
+    scope: { id: APP_SCOPE },
+    mutationFn: ({ accountId, change: w }: ListsWrite) => {
       switch (w.kind) {
         case 'addList':
           return createList(accountId, w.list)
@@ -95,7 +98,9 @@ export function registerListsDefaults(queryClient: QueryClient, accountId: strin
       }
     },
 
-    onMutate: async (w: ListsWrite) => {
+    onMutate: async ({ accountId, change: w }: ListsWrite): Promise<Rollback> => {
+      const lists = listsKey(accountId)
+      const links = listLinksKey(accountId)
       // Pinning touches where to-dos appear, not the lists themselves.
       const key = isPin(w) ? links : lists
       await queryClient.cancelQueries({ queryKey: key })
@@ -111,27 +116,24 @@ export function registerListsDefaults(queryClient: QueryClient, accountId: strin
               : patchUnlink(previous, at, w.itemId),
           )
         }
-        return { key: links, previous }
+        return { entries: previous ? [[links, previous]] : [] }
       }
 
       const previous = queryClient.getQueryData<TodoList[]>(lists)
       if (previous) queryClient.setQueryData<TodoList[]>(lists, applyToLists(previous, w))
-      return { key: lists, previous }
+      return { entries: previous ? [[lists, previous]] : [] }
     },
-    onError: (_err, _w, ctx) => {
-      const restore = ctx as { key?: readonly unknown[]; previous?: unknown } | undefined
-      if (restore?.key && restore.previous !== undefined) {
-        queryClient.setQueryData(restore.key, restore.previous)
-      }
-    },
-    onSettled: (_data, _err, w: ListsWrite) => {
-      void queryClient.invalidateQueries({ queryKey: isPin(w) ? links : lists })
+    onError: (_err, _vars, ctx) => rollback(queryClient, ctx),
+    onSettled: (_data, _err, { accountId, change: w }: ListsWrite) => {
+      void queryClient.invalidateQueries({
+        queryKey: isPin(w) ? listLinksKey(accountId) : listsKey(accountId),
+      })
     },
   })
 }
 
 /** The lists as they look with `w` applied. Pinning is handled separately. */
-function applyToLists(lists: TodoList[], w: ListsWrite): TodoList[] {
+function applyToLists(lists: TodoList[], w: ListsChange): TodoList[] {
   switch (w.kind) {
     case 'addList':
       return patchAddList(lists, w.list)
@@ -157,7 +159,7 @@ function applyToLists(lists: TodoList[], w: ListsWrite): TodoList[] {
 /**
  * Make a change to the lists.
  *
- * `mutate({ kind: 'setItemDone', itemId, done: true })`
+ * `mutate({ accountId, change: { kind: 'setItemDone', itemId, done: true } })`
  */
 export function useListsWrite() {
   return useMutation<void, Error, ListsWrite>({ mutationKey: [...LISTS_WRITE_KEY] })

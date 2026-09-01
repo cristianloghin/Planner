@@ -5,66 +5,63 @@
  * inside the hook. That is what makes a write survive being offline: a paused
  * write is saved with only its key and its values, and after a restart the
  * runtime finds how to run it by looking the key up here. So the values have to
- * carry everything the write needs — no reaching back into anything that was
- * only around when the button was pressed.
+ * carry everything the write needs — the account included, which is why it
+ * rides in the values rather than being handed to the register function.
  *
- * Nothing imports the app's query client. Call `registerPeopleDefaults` once at
- * start-up, after the account is known and before any paused writes are
- * resumed.
+ * Nothing imports the app's query client, and registering asks nothing of the
+ * session, so `registerPeopleDefaults` can run at start-up before anything is
+ * read back out of storage.
  */
 import { type QueryClient, useMutation } from '@tanstack/react-query'
+import { APP_SCOPE } from '../../assets/constants'
 import type { ColorKey } from '../../assets/palette'
+import { type Rollback, rollback } from '../../assets/rollback'
 import { recolorPerson, renamePerson } from '../../client/people'
 import { patchRecolor, patchRename } from './patches'
 import { peopleKey } from './queries'
 import type { Person, PersonId } from './types'
 
 /** Every change to a person, as one set of values that can be written down. */
-export type PeopleWrite =
+export type PeopleChange =
   | { kind: 'rename'; id: PersonId; name: string }
   | { kind: 'recolor'; id: PersonId; color: ColorKey }
+
+/** What `mutate()` takes: the change, and the account it belongs to. */
+export type PeopleWrite = { accountId: string; change: PeopleChange }
 
 const PEOPLE_WRITE_KEY = ['people-write'] as const
 
 /**
  * Teach the query client how to run people writes.
  *
- * `accountId` fixes which cached list gets patched, and groups these writes
- * with the account's others so they go out in the order they were made — a
- * rename landing before the recolour that followed it, even after a spell
- * offline.
+ * Every write in the app shares one scope, so they go out in the order they
+ * were made — a rename landing before the recolour that followed it, even
+ * after a spell offline.
  */
-export function registerPeopleDefaults(queryClient: QueryClient, accountId: string): void {
-  const key = peopleKey(accountId)
-
+export function registerPeopleDefaults(queryClient: QueryClient): void {
   queryClient.setMutationDefaults(PEOPLE_WRITE_KEY, {
-    scope: { id: accountId },
-    mutationFn: (w: PeopleWrite) =>
-      w.kind === 'rename' ? renamePerson(w.id, w.name) : recolorPerson(w.id, w.color),
+    scope: { id: APP_SCOPE },
+    mutationFn: ({ change: c }: PeopleWrite) =>
+      c.kind === 'rename' ? renamePerson(c.id, c.name) : recolorPerson(c.id, c.color),
 
-    // Show the change straight away and keep the old list to fall back on. A
-    // write resumed after a restart has nothing to fall back to, and needs
-    // none: the saved cache already shows the change, and the refresh on
-    // settle is what makes it true.
-    onMutate: async (w: PeopleWrite) => {
+    // Show the change straight away and keep the old list to fall back on.
+    onMutate: async ({ accountId, change: c }: PeopleWrite): Promise<Rollback> => {
+      const key = peopleKey(accountId)
       await queryClient.cancelQueries({ queryKey: key })
       const previous = queryClient.getQueryData<Person[]>(key)
       if (previous) {
         queryClient.setQueryData<Person[]>(
           key,
-          w.kind === 'rename'
-            ? patchRename(previous, w.id, w.name)
-            : patchRecolor(previous, w.id, w.color),
+          c.kind === 'rename'
+            ? patchRename(previous, c.id, c.name)
+            : patchRecolor(previous, c.id, c.color),
         )
       }
-      return { previous }
+      return { entries: previous ? [[key, previous]] : [] }
     },
-    onError: (_err, _w, ctx) => {
-      const previous = (ctx as { previous?: Person[] } | undefined)?.previous
-      if (previous) queryClient.setQueryData(key, previous)
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: key })
+    onError: (_err, _vars, ctx) => rollback(queryClient, ctx),
+    onSettled: (_data, _err, { accountId }: PeopleWrite) => {
+      void queryClient.invalidateQueries({ queryKey: peopleKey(accountId) })
     },
   })
 }
@@ -74,7 +71,7 @@ export function registerPeopleDefaults(queryClient: QueryClient, accountId: stri
  *
  * One hook for both changes rather than one each, so every people write shares
  * an identity and an order. Which change it is rides in the values:
- * `mutate({ kind: 'rename', id, name })`.
+ * `mutate({ accountId, change: { kind: 'rename', id, name } })`.
  */
 export function usePeopleWrite() {
   return useMutation<void, Error, PeopleWrite>({ mutationKey: [...PEOPLE_WRITE_KEY] })

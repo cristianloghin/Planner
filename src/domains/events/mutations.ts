@@ -4,10 +4,13 @@
  * All of them share one identity and one order, so writes that depend on each
  * other go out in the order they were made, even after a spell offline.
  *
- * Call `registerEventsDefaults` once at start-up, after the account and user
- * are known and before any paused writes are resumed.
+ * Registering asks nothing of the session — the account and the user ride in
+ * each write's values — so `registerEventsDefaults` can run at start-up before
+ * anything is read back out of storage.
  */
 import { type QueryClient, useMutation } from '@tanstack/react-query'
+import { APP_SCOPE } from '../../assets/constants'
+import { type Rollback, rollback } from '../../assets/rollback'
 import {
   type Recurrence,
   type SeriesTiming,
@@ -27,8 +30,13 @@ import type { CalendarEvent, EventTemplate } from './types'
  * write, so editing it again before the first write lands still names something
  * real.
  */
-export type EventsWrite =
-  | { kind: 'saveEvent'; event: CalendarEvent; isNew: boolean; fromTemplateId?: string }
+export type EventsChange =
+  | {
+      kind: 'saveEvent'
+      event: CalendarEvent
+      isNew: boolean
+      fromTemplateId?: string
+    }
   | { kind: 'removeEvent'; id: string }
   | { kind: 'saveTemplate'; template: EventTemplate; isNew: boolean }
   | { kind: 'removeTemplate'; id: string }
@@ -42,21 +50,22 @@ export type EventsWrite =
       edits: CalendarEvent
     }
 
+/** What `mutate()` takes: the change, plus the account and user it belongs to. */
+export type EventsWrite = {
+  accountId: string
+  userId: string
+  change: EventsChange
+}
+
 const EVENTS_WRITE_KEY = ['events-write'] as const
 
-const isTemplateWrite = (w: EventsWrite) => w.kind === 'saveTemplate' || w.kind === 'removeTemplate'
+const isTemplateWrite = (w: EventsChange) =>
+  w.kind === 'saveTemplate' || w.kind === 'removeTemplate'
 
-export function registerEventsDefaults(
-  queryClient: QueryClient,
-  accountId: string,
-  userId: string,
-): void {
-  const events = eventsKey(accountId)
-  const templates = templatesKey(accountId)
-
+export function registerEventsDefaults(queryClient: QueryClient): void {
   queryClient.setMutationDefaults(EVENTS_WRITE_KEY, {
-    scope: { id: accountId },
-    mutationFn: (w: EventsWrite) => {
+    scope: { id: APP_SCOPE },
+    mutationFn: async ({ accountId, userId, change: w }: EventsWrite) => {
       switch (w.kind) {
         case 'saveEvent':
           return saveSeries(accountId, userId, fromEvent(w.event), {
@@ -66,7 +75,9 @@ export function registerEventsDefaults(
         case 'removeEvent':
           return deleteSeries(w.id)
         case 'saveTemplate':
-          return saveSeries(accountId, userId, fromTemplate(w.template), { isNew: w.isNew })
+          return saveSeries(accountId, userId, fromTemplate(w.template), {
+            isNew: w.isNew,
+          })
         case 'removeTemplate':
           return deleteSeries(w.id)
         case 'split': {
@@ -81,15 +92,18 @@ export function registerEventsDefaults(
             id: _i,
             ...edits
           } = fromEvent(w.edits)
-          return splitSeries(w.from, w.fromDate, edits).then(() => undefined)
+          await splitSeries(w.from, w.fromDate, edits)
+          return undefined
         }
       }
     },
 
-    onMutate: async (w: EventsWrite) => {
+    onMutate: async ({ accountId, change: w }: EventsWrite): Promise<Rollback> => {
+      const events = eventsKey(accountId)
+      const templates = templatesKey(accountId)
       // A split makes a second event on the server that cannot be guessed at
       // here, so it shows nothing and waits for the re-read.
-      if (w.kind === 'split') return { key: undefined, previous: undefined }
+      if (w.kind === 'split') return { entries: [] }
 
       const key = isTemplateWrite(w) ? templates : events
       await queryClient.cancelQueries({ queryKey: key })
@@ -104,7 +118,7 @@ export function registerEventsDefaults(
               : patchRemoveTemplate(previous, w.id),
           )
         }
-        return { key: templates, previous }
+        return { entries: previous ? [[templates, previous]] : [] }
       }
 
       const previous = queryClient.getQueryData<CalendarEvent[]>(events)
@@ -116,15 +130,12 @@ export function registerEventsDefaults(
             : patchRemoveEvent(previous, w.id),
         )
       }
-      return { key: events, previous }
+      return { entries: previous ? [[events, previous]] : [] }
     },
-    onError: (_err, _w, ctx) => {
-      const restore = ctx as { key?: readonly unknown[]; previous?: unknown } | undefined
-      if (restore?.key && restore.previous !== undefined) {
-        queryClient.setQueryData(restore.key, restore.previous)
-      }
-    },
-    onSettled: (_data, _err, w: EventsWrite) => {
+    onError: (_err, _vars, ctx) => rollback(queryClient, ctx),
+    onSettled: (_data, _err, { accountId, change: w }: EventsWrite) => {
+      const events = eventsKey(accountId)
+      const templates = templatesKey(accountId)
       // A split changes both halves and moves rows between them, so both the
       // old event and the new one have to be re-read.
       void queryClient.invalidateQueries({
@@ -137,8 +148,10 @@ export function registerEventsDefaults(
 /**
  * Make a change to an event or a blueprint.
  *
- * `mutate({ kind: 'saveEvent', event, isNew: true })`
+ * `mutate({ accountId, userId, change: { kind: 'saveEvent', event, isNew: true } })`
  */
 export function useEventsWrite() {
-  return useMutation<void, Error, EventsWrite>({ mutationKey: [...EVENTS_WRITE_KEY] })
+  return useMutation<void, Error, EventsWrite>({
+    mutationKey: [...EVENTS_WRITE_KEY],
+  })
 }

@@ -1,10 +1,13 @@
 /**
  * Recording what happened on one day, and what a day is waiting on.
  *
- * Call `registerOccurrencesDefaults` once at start-up, after the account is
- * known and before any paused writes are resumed.
+ * Registering asks nothing of the session — the account rides in each write's
+ * values — so `registerOccurrencesDefaults` can run at start-up before anything
+ * is read back out of storage.
  */
 import { type QueryClient, useMutation } from '@tanstack/react-query'
+import { APP_SCOPE } from '../../assets/constants'
+import { type Rollback, rollback } from '../../assets/rollback'
 import {
   type OccurrenceStatusCode,
   addDependency,
@@ -33,7 +36,7 @@ import type { CompletionsMap, OccurrenceDependency } from './types'
  * all a write needs to find the right day — and because a set of values that
  * has to survive a restart should be as small as it can be.
  */
-export type OccurrencesWrite =
+export type OccurrencesChange =
   | { kind: 'status'; series: SeriesTiming; date: string; status: OccurrenceStatusCode | null }
   | { kind: 'tick'; series: SeriesTiming; date: string; entryId: string; checked: boolean }
   | { kind: 'override'; series: SeriesTiming; date: string; start: string; duration: number }
@@ -55,17 +58,20 @@ export type OccurrencesWrite =
       prerequisiteDate: string
     }
 
+/** What `mutate()` takes: the change, and the account it belongs to. */
+export type OccurrencesWrite = { accountId: string; change: OccurrencesChange }
+
 const OCCURRENCES_WRITE_KEY = ['occurrences-write'] as const
 
 /** A write about what happened on a day. */
 type DayWrite = Extract<
-  OccurrencesWrite,
+  OccurrencesChange,
   { kind: 'status' | 'tick' | 'override' | 'clearOverride' | 'cancel' }
 >
 /** A write about what a day is WAITING on, rather than what happened on it. */
-type WaitWrite = Extract<OccurrencesWrite, { kind: 'addDependency' | 'removeDependency' }>
+type WaitWrite = Extract<OccurrencesChange, { kind: 'addDependency' | 'removeDependency' }>
 
-const isWait = (w: OccurrencesWrite): w is WaitWrite =>
+const isWait = (w: OccurrencesChange): w is WaitWrite =>
   w.kind === 'addDependency' || w.kind === 'removeDependency'
 
 /** The change a day write makes, without the values naming which day. */
@@ -84,13 +90,10 @@ function changeOf(w: DayWrite): OccurrenceChange {
   }
 }
 
-export function registerOccurrencesDefaults(queryClient: QueryClient, accountId: string): void {
-  const months = completionsPrefix(accountId)
-  const waits = dependenciesKey(accountId)
-
+export function registerOccurrencesDefaults(queryClient: QueryClient): void {
   queryClient.setMutationDefaults(OCCURRENCES_WRITE_KEY, {
-    scope: { id: accountId },
-    mutationFn: (w: OccurrencesWrite) => {
+    scope: { id: APP_SCOPE },
+    mutationFn: ({ change: w }: OccurrencesWrite) => {
       switch (w.kind) {
         case 'status':
           return setOccurrenceStatus(w.series, w.date, w.status)
@@ -115,7 +118,10 @@ export function registerOccurrencesDefaults(queryClient: QueryClient, accountId:
       }
     },
 
-    onMutate: async (w: OccurrencesWrite) => {
+    onMutate: async ({ accountId, change: w }: OccurrencesWrite): Promise<Rollback> => {
+      const months = completionsPrefix(accountId)
+      const waits = dependenciesKey(accountId)
+
       if (isWait(w)) {
         await queryClient.cancelQueries({ queryKey: waits })
         const previous = queryClient.getQueryData<Record<string, OccurrenceDependency[]>>(waits)
@@ -141,7 +147,7 @@ export function registerOccurrencesDefaults(queryClient: QueryClient, accountId:
             )
           }
         }
-        return { waits: previous }
+        return { entries: previous ? [[waits, previous]] : [] }
       }
 
       const change = changeOf(w)
@@ -155,23 +161,13 @@ export function registerOccurrencesDefaults(queryClient: QueryClient, accountId:
       queryClient.setQueriesData<CompletionsMap>({ queryKey: months }, (map) =>
         map ? patchCompletions(map, key, change) : map,
       )
-      // A write resumed after a restart has nothing to put back and needs
-      // nothing: the saved cache already shows the change, and the re-read on
-      // settle is what makes it true.
-      return { months: previous }
+      return { entries: previous }
     },
-    onError: (_err, _w, ctx) => {
-      const restore = ctx as
-        | {
-            months?: [readonly unknown[], CompletionsMap | undefined][]
-            waits?: Record<string, OccurrenceDependency[]>
-          }
-        | undefined
-      for (const [key, data] of restore?.months ?? []) queryClient.setQueryData(key, data)
-      if (restore?.waits) queryClient.setQueryData(waits, restore.waits)
-    },
-    onSettled: (_data, _err, w: OccurrencesWrite) => {
-      void queryClient.invalidateQueries({ queryKey: isWait(w) ? waits : months })
+    onError: (_err, _vars, ctx) => rollback(queryClient, ctx),
+    onSettled: (_data, _err, { accountId, change: w }: OccurrencesWrite) => {
+      void queryClient.invalidateQueries({
+        queryKey: isWait(w) ? dependenciesKey(accountId) : completionsPrefix(accountId),
+      })
     },
   })
 }
@@ -179,7 +175,7 @@ export function registerOccurrencesDefaults(queryClient: QueryClient, accountId:
 /**
  * Record something against a day.
  *
- * `mutate({ kind: 'tick', series, date, entryId, checked: true })`
+ * `mutate({ accountId, change: { kind: 'tick', series, date, entryId, checked: true } })`
  */
 export function useOccurrencesWrite() {
   return useMutation<void, Error, OccurrencesWrite>({ mutationKey: [...OCCURRENCES_WRITE_KEY] })
