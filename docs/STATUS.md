@@ -58,9 +58,13 @@ Mid-migration, and worth knowing before adding a slice:
   write through one `useOccurrencesWrite`.
 - **Templates** now read and write through `domains/events` (`useTemplates`
   and the `saveTemplate` / `removeTemplate` changes of `useEventsWrite`).
-  `data/templates.ts` and `data/useAccountStore.ts` are gone; the templates
-  cache is invalidated from the one realtime channel routed through
-  `state.tsx`, not a second subscription.
+  `data/templates.ts` and `data/useAccountStore.ts` are gone.
+- **Realtime** runs through `services/realtime` over `client/realtime.ts`.
+  `state.tsx` hands the service the client's channel and gets one folded
+  report per burst; `queryKeysForTable` in `domains/index.ts` turns each table
+  into the Query keys to invalidate, and the reducer reloads only when one of
+  its own tables changed. A reconnection invalidates the whole Query cache and
+  reloads. `SupabaseStore.subscribe` is now unused and can go.
 - The rest of **`client/` and `domains/`** is built and **not yet adopted**.
   Every call the app makes to Supabase has a client function — 15 tables, 4
   RPCs, the 6 auth methods, the realtime channel — and eight domains sit over

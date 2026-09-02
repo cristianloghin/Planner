@@ -11,10 +11,11 @@ import {
 import { useLatest } from './assets/hooks/useLatest'
 import { PageLoader } from './assets/ui/Spinner'
 import { useAuth } from './auth'
+import { subscribeToChanges } from './client/realtime'
 import { LoadFailedScreen, SyncBanners } from './components/SyncBanners'
-import { templatesKey } from './domains/events/queries'
-import { completionsPrefix } from './domains/occurrences/queries'
+import { queryKeysForTable } from './domains'
 import { queryClient } from './lib/queryClient'
+import { type RealtimeChange, startRealtime } from './services/realtime'
 import type { Action } from './store/actions'
 import {
   enrichForQueue,
@@ -42,8 +43,28 @@ interface Ctx {
 
 const AppContext = createContext<Ctx | null>(null)
 
+/**
+ * The tables the reducer still loads whole on every reload. A change to any of
+ * them means a full reload; everything else is Query-owned and refreshes by
+ * key. Shrinks as domains are adopted, and deletes with the reducer.
+ */
+const REDUCER_TABLES = new Set([
+  'person',
+  'event_series',
+  'event_person',
+  'checklist_item',
+  'note',
+  'reminder',
+  'occurrence_dependency',
+  'user_preference',
+  'list',
+  'list_item',
+  'list_item_event_link',
+])
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const { accountId, session } = useAuth()
+  const userId = session?.user.id ?? null
 
   // The store is created once. Mounted only when authed with an account (the
   // Root gate guarantees this), so it's the Supabase-backed store.
@@ -267,37 +288,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // can trigger a reconcile without depending on it.
   const scheduleReloadRef = useLatest(scheduleReload)
 
-  // Tables owned by the TanStack Query completions slice: their changes route
-  // to targeted cache invalidation, not a full-state reload. Not deferred by
-  // the edit guard — a partner's tick streaming into an open sheet is a
-  // feature, and no form state derives from these rows.
-  const invalidateTimerRef = useRef<ReturnType<typeof setTimeout>>()
-  const invalidateCompletions = useCallback(() => {
-    clearTimeout(invalidateTimerRef.current)
-    invalidateTimerRef.current = setTimeout(() => {
-      void queryClient.invalidateQueries({ queryKey: completionsPrefix(accountId) })
-    }, 200)
-  }, [accountId])
-
+  // One report per burst, already folded by the realtime service. Query-owned
+  // slices refresh by key straight away — not deferred by the edit guard, since
+  // a partner's tick streaming into an open sheet is a feature and no form
+  // state derives from those rows. The reducer reloads whole, and that reload
+  // is what the edit guard defers.
   const onRemoteChange = useCallback(
-    (table?: string) => {
-      if (table === 'event_occurrence' || table === 'occurrence_item_state') {
-        invalidateCompletions()
+    ({ tables, missedSome }: RealtimeChange) => {
+      if (missedSome) {
+        // The connection was down: changes went unseen and cannot be asked
+        // for, so refresh everything Query holds and reload the reducer.
+        void queryClient.invalidateQueries()
+        scheduleReload()
         return
       }
-      // Templates share event_series with events, so a change there refreshes
-      // the Query-owned templates cache as well as the reducer's events below.
-      if (table === 'event_series' || table === undefined) {
-        void queryClient.invalidateQueries({ queryKey: templatesKey(accountId) })
+      const ids = { accountId, userId }
+      let reducerTouched = false
+      for (const table of tables) {
+        for (const queryKey of queryKeysForTable(table, ids)) {
+          void queryClient.invalidateQueries({ queryKey })
+        }
+        if (REDUCER_TABLES.has(table)) reducerTouched = true
       }
-      if (table === undefined) {
-        // Recovery after a dead channel (or an unknown source): anything may
-        // have been missed, so refresh both worlds.
-        invalidateCompletions()
-      }
-      scheduleReload()
+      if (reducerTouched) scheduleReload()
     },
-    [accountId, invalidateCompletions, scheduleReload],
+    [accountId, userId, scheduleReload],
   )
 
   const beginEdit = useCallback(() => {
@@ -313,11 +328,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [reloadFromStore])
 
   useEffect(() => {
-    const unsubscribe = storeRef.current!.subscribe(onRemoteChange)
+    const stop = startRealtime({ subscribe: subscribeToChanges, onChanged: onRemoteChange })
     return () => {
-      unsubscribe()
+      stop()
       clearTimeout(reloadTimerRef.current)
-      clearTimeout(invalidateTimerRef.current)
     }
   }, [onRemoteChange])
 

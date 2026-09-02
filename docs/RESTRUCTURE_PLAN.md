@@ -509,9 +509,12 @@ meaning changes went unseen and cannot be asked for.
 
 It is handed both ends: where changes come from, and what to do about them. The
 table → query-key mapping stays with the app, because it cannot be known without
-reaching into a domain. Wiring it replaces both current paths
-(`SupabaseStore.subscribe` routed through `state.tsx`, and `useTemplatesRealtime`);
-the second collapses into a filter, not a second connection.
+reaching into a domain: `queryKeysForTable` in `domains/index.ts` (built and
+tested) names every domain's keys. **Wired**: `state.tsx` now calls
+`startRealtime` over `client/realtime.ts`, invalidates by key from the map, and
+reloads the reducer only when a reducer-owned table changed. A reconnection
+invalidates the whole Query cache and reloads. `useTemplatesRealtime` is gone;
+`SupabaseStore.subscribe` is now unused and deletes next.
 
 ### Edit guard
 
@@ -537,7 +540,7 @@ stays in localStorage. Both are *how*, not *what* (R13).
 | File | Becomes |
 |---|---|
 | `App.tsx` | `Root` gate → route guard (**still imperative**: a guard needs a non-React `isAuthenticated()`, so it waits on `services/session`); tab shell → `layouts/AppShell` (**still in `App.tsx`**); route map → ~~`routes/routes.ts`~~ **done** |
-| `state.tsx` | reducer state → domains; write queue → mutation `scope`; offline → Query persister; realtime channel → ~~`client/realtime.ts`~~ **done**, routing → `services/realtime`; edit guard → derived from route |
+| `state.tsx` | reducer state → domains; write queue → mutation `scope`; offline → Query persister; realtime channel → ~~`client/realtime.ts`~~ **done**, routing → ~~`services/realtime` + `queryKeysForTable`~~ **done**; edit guard → derived from route |
 | `auth.tsx` | SDK calls → ~~`client/auth.ts`~~ **done**; session + non-React accessors → `services/session`; credential ops → `domains/auth`; `ensureAccount` → `domains/account` over ~~`client/account.ts`~~ **done**; sign-out cache/snapshot clearing → shell orchestration |
 | `store/store.ts` | deleted (`ScheduleStore`, `LocalStorageStore`, `defaultState`) |
 | `store/supabaseStore.ts` | ~~sliced into `client/*` by table; mappers to `client/mappers.ts`~~ **done** — deletes once the domains adopt them |
