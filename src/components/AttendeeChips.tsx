@@ -1,8 +1,11 @@
 import { colorVar } from '../assets/palette'
 import shared from '../assets/styles/shared.module.css'
 import { cx } from '../assets/utils/cx'
-import { peopleList, personColorKey } from '../lib/people'
-import { useApp } from '../state'
+import { useAuth } from '../auth'
+import { usePeople } from '../domains/people/queries'
+import { personColorKey } from '../domains/people/selectors'
+import { usePreferences } from '../domains/preferences/queries'
+import { personColors } from '../domains/preferences/selectors'
 import type { PersonId } from '../types'
 
 /** Toggle chips for choosing who's on an event. Always keeps at least one. */
@@ -13,7 +16,10 @@ export function AttendeeChips({
   value: PersonId[]
   onChange: (next: PersonId[]) => void
 }) {
-  const { state } = useApp()
+  const { accountId, session } = useAuth()
+  // Already in lane order: the client reads people sorted.
+  const { data: people = [] } = usePeople(accountId)
+  const { data: overrides = {} } = usePreferences(accountId, session?.user.id ?? null, personColors)
 
   function toggle(id: PersonId) {
     const has = value.includes(id)
@@ -24,9 +30,9 @@ export function AttendeeChips({
 
   return (
     <div className={shared.chips}>
-      {peopleList(state).map((p) => {
+      {people.map((p) => {
         const on = value.includes(p.id)
-        const c = colorVar(personColorKey(state, p.id))
+        const c = colorVar(personColorKey(people, overrides, p.id))
         return (
           <button
             type="button"
