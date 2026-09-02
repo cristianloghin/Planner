@@ -8,13 +8,17 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLatest } from '../assets/hooks/useLatest'
-import { colorStyle } from '../assets/palette'
+import { type ColorKey, colorStyle } from '../assets/palette'
 import shared from '../assets/styles/shared.module.css'
 import { LoadingPill } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
 import { addDays, isoLabel, minutesToTime, toISODate } from '../assets/utils/dates'
 import { useAuth } from '../auth'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
+import { usePeople } from '../domains/people/queries'
+import { byId, eventColorKey, personColorKey } from '../domains/people/selectors'
+import { usePreferences } from '../domains/preferences/queries'
+import { personColors } from '../domains/preferences/selectors'
 import { checklistEntries, hasReminders } from '../lib/attachments'
 import { type Busy, type ChildStatus, childStatuses } from '../lib/conflicts'
 import {
@@ -23,7 +27,6 @@ import {
   occurrenceStatus,
   prerequisiteDatesInRange,
 } from '../lib/occurrences'
-import { eventColorKey, peopleList, personColorKey } from '../lib/people'
 import { type DayOccurrence, nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
 import { DAY_MIN, type TimeBlock, layoutBlocks } from '../lib/timelineLayout'
 import { loadZoom, pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
@@ -41,9 +44,11 @@ const ZOOM_KEY = 'planner:hourH'
 
 export function DayView() {
   const { state, dispatch } = useApp()
-  const { accountId } = useAuth()
+  const { accountId, session } = useAuth()
   const day = state.selectedDay
-  const people = peopleList(state)
+  const { data: people = [] } = usePeople(accountId)
+  const { data: overrides = {} } = usePreferences(accountId, session?.user.id ?? null, personColors)
+  const peopleById = useMemo(() => byId(people), [people])
   const [editor, setEditor] = useState<EditorTarget | null>(null)
   const [sheet, setSheet] = useState<{
     event: CalendarEvent
@@ -146,10 +151,10 @@ export function DayView() {
           start: o.event.allDay ? 0 : o.segment.start,
           end: o.event.allDay ? DAY_MIN : o.segment.end,
         }))
-        const statuses = childStatuses(coverage, state.people)
+        const statuses = childStatuses(coverage, peopleById)
         return { iso, timedBlocks, allDayOccs, statuses }
       }),
-    [state.events, completions, state.people, prevISO, dateISO, nextISO],
+    [state.events, completions, peopleById, prevISO, dateISO, nextISO],
   )
   // The header (lane names, all-day chips, warning badge) shows the visible day.
   const { allDayOccs, statuses } = pages[1]
@@ -208,7 +213,7 @@ export function DayView() {
               <div
                 key={p.id}
                 className={s.laneHead}
-                style={colorStyle(personColorKey(state, p.id))}
+                style={colorStyle(personColorKey(people, overrides, p.id))}
               >
                 <div>
                   <span className={s.dot} />
@@ -225,6 +230,8 @@ export function DayView() {
                         status={statuses.get(o.event.id)}
                         completions={completions}
                         onClick={() => openSheet(o)}
+                        people={people}
+                        overrides={overrides}
                       />
                     ))}
                 </div>
@@ -271,6 +278,8 @@ export function DayView() {
                       pxPerMin={pxPerMin}
                       onAddAt={(min) => addAt(page.iso, [p.id], min)}
                       onOpen={openSheet}
+                      people={people}
+                      overrides={overrides}
                     />
                   ))}
                 </div>
@@ -337,14 +346,18 @@ function AllDayChip({
   status,
   completions,
   onClick,
+  people,
+  overrides,
 }: {
   occ: DayOccurrence
   personId: PersonId
   status: ChildStatus | undefined
   completions: CompletionsMap
   onClick: () => void
+  /** Everyone in the account, in lane order, and this user's colour overrides. */
+  people: Person[]
+  overrides: Record<PersonId, ColorKey>
 }) {
-  const { state } = useApp()
   const { event } = occ
   const done = isOccurrenceDone(completions, event, occ.start)
   return (
@@ -356,7 +369,7 @@ function AllDayChip({
         status === 'clash' && s.warnClash,
         status === 'needs' && s.warnNeeds,
       )}
-      style={colorStyle(eventColorKey(state, personId, event))}
+      style={colorStyle(eventColorKey(people, overrides, personId, event.colorKey))}
       onClick={onClick}
     >
       <span className={s.alldayMeta}>{badges(completions, event, occ.start, status)}</span>
@@ -375,6 +388,8 @@ function Lane({
   pxPerMin,
   onAddAt,
   onOpen,
+  people,
+  overrides,
 }: {
   person: Person
   blocks: TimeBlock[]
@@ -384,6 +399,9 @@ function Lane({
   pxPerMin: number
   onAddAt: (minute: number) => void
   onOpen: (occ: DayOccurrence) => void
+  /** Everyone in the account, in lane order, and this user's colour overrides. */
+  people: Person[]
+  overrides: Record<PersonId, ColorKey>
 }) {
   const { state } = useApp()
   // Every block this person is on — shared events simply appear in each
@@ -428,7 +446,7 @@ function Lane({
               height: Math.max((block.end - block.start) * pxPerMin, 16),
               left: `calc(${(100 / cols) * col}% + 2px)`,
               width: `calc(${100 / cols}% - 4px)`,
-              ...colorStyle(eventColorKey(state, person.id, ev)),
+              ...colorStyle(eventColorKey(people, overrides, person.id, ev.colorKey)),
             }}
             onClick={() => onOpen(block.occ)}
           >

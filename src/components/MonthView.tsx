@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Fragment, useMemo, useRef, useState } from 'react'
-import { colorStyle } from '../assets/palette'
+import { type ColorKey, colorStyle } from '../assets/palette'
 import shared from '../assets/styles/shared.module.css'
 import { LoadingPill } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
@@ -16,12 +16,15 @@ import {
 } from '../assets/utils/dates'
 import { useAuth } from '../auth'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
-import { eventColorKey } from '../lib/people'
+import { usePeople } from '../domains/people/queries'
+import { eventColorKey } from '../domains/people/selectors'
+import { usePreferences } from '../domains/preferences/queries'
+import { personColors } from '../domains/preferences/selectors'
 import { nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
 import { eventStartMinutes } from '../lib/timing'
 import { pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
-import type { CompletionsMap } from '../types'
+import type { CompletionsMap, Person, PersonId } from '../types'
 import s from './MonthView.module.css'
 import { ViewHeader } from './ViewHeader'
 
@@ -30,7 +33,9 @@ const MAX_DOTS = 4
 
 export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
   const { state } = useApp()
-  const { accountId } = useAuth()
+  const { accountId, session } = useAuth()
+  const { data: people = [] } = usePeople(accountId)
+  const { data: overrides = {} } = usePreferences(accountId, session?.user.id ?? null, personColors)
   const [cursor, setCursor] = useState(() => startOfMonth(toISODate(new Date())))
   const today = toISODate(new Date())
   // Strip pages: [previous month, visible month, next month].
@@ -119,6 +124,8 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
                 today={today}
                 completions={completions}
                 onOpenDay={onOpenDay}
+                people={people}
+                overrides={overrides}
               />
             ))}
           </div>
@@ -137,6 +144,8 @@ function MonthPage({
   today,
   completions,
   onOpenDay,
+  people,
+  overrides,
 }: {
   month: string
   /** Whether this is the visible middle page (the others render inert). */
@@ -144,6 +153,9 @@ function MonthPage({
   today: string
   completions: CompletionsMap
   onOpenDay: (iso: string) => void
+  /** Everyone in the account, in lane order, and this user's colour overrides. */
+  people: Person[]
+  overrides: Record<PersonId, ColorKey>
 }) {
   const { state } = useApp()
   const days = useMemo(() => monthGridDays(month), [month])
@@ -184,7 +196,9 @@ function MonthPage({
                   <span
                     key={`${o.event.id}:${o.start}`}
                     className={s.monthDot}
-                    style={colorStyle(eventColorKey(state, o.event.attendees[0], o.event))}
+                    style={colorStyle(
+                      eventColorKey(people, overrides, o.event.attendees[0], o.event.colorKey),
+                    )}
                   />
                 ))}
                 {dayOccs.length > MAX_DOTS && (

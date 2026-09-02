@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { colorStyle } from '../assets/palette'
+import { type ColorKey, colorStyle } from '../assets/palette'
 import shared from '../assets/styles/shared.module.css'
 import { LoadingPill } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
@@ -15,7 +15,10 @@ import {
 } from '../assets/utils/dates'
 import { useAuth } from '../auth'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
-import { defaultAttendees, eventColorKey } from '../lib/people'
+import { usePeople } from '../domains/people/queries'
+import { defaultAttendees, eventColorKey } from '../domains/people/selectors'
+import { usePreferences } from '../domains/preferences/queries'
+import { personColors, weekLayout } from '../domains/preferences/selectors'
 import {
   type DayOccurrence,
   nextRelevantDate,
@@ -25,7 +28,7 @@ import {
 import { DAY_MIN } from '../lib/timelineLayout'
 import { pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
-import type { CalendarEvent } from '../types'
+import type { CalendarEvent, Person, PersonId } from '../types'
 import { Avatars } from './Avatars'
 import { type EditorTarget, EventEditor } from './EventEditor'
 import { OccurrenceSheet } from './OccurrenceSheet'
@@ -37,12 +40,16 @@ const SNAP = 15
 
 export function WeekCalendar() {
   const { state, dispatch } = useApp()
-  const { accountId } = useAuth()
+  const { accountId, session } = useAuth()
+  const userId = session?.user.id ?? null
+  const { data: people = [] } = usePeople(accountId)
+  const { data: overrides = {} } = usePreferences(accountId, userId, personColors)
+  const { data: layout = 'list' } = usePreferences(accountId, userId, weekLayout)
   const [target, setTarget] = useState<EditorTarget | null>(null)
   const [sheet, setSheet] = useState<{ event: CalendarEvent; date: string } | null>(null)
   // Timeline-only: weekday index (0 = Mon) whose column is maximized, if any.
   const [focusDay, setFocusDay] = useState<number | null>(null)
-  const timeline = (state.preferences.weekLayout ?? 'list') === 'timeline'
+  const timeline = layout === 'timeline'
 
   // Windowed per-occurrence state covering the visible week and its swipe
   // neighbors (the strip renders the previous and next week too).
@@ -91,7 +98,7 @@ export function WeekCalendar() {
     setTarget({
       mode: 'new',
       date: dateISO,
-      attendees: defaultAttendees(state),
+      attendees: defaultAttendees(people),
       startMin: start,
       endMin: Math.min(start + 60, DAY_MIN),
     })
@@ -130,6 +137,8 @@ export function WeekCalendar() {
             onOpen={openSheet}
             focusDay={focusDay}
             onToggleDay={(idx) => setFocusDay((cur) => (cur === idx ? null : idx))}
+            people={people}
+            overrides={overrides}
           />
         )}
       </ViewHeader>
@@ -141,14 +150,18 @@ export function WeekCalendar() {
           onOpen={openSheet}
           onAddAt={addAt}
           focusDay={focusDay}
+          people={people}
+          overrides={overrides}
         />
       ) : (
         <WeekListBody
           weeks={weeks}
           onEdit={(o) => setTarget({ mode: 'edit', event: o.event, occurrenceDate: o.start })}
           onAdd={(dateISO) =>
-            setTarget({ mode: 'new', date: dateISO, attendees: defaultAttendees(state) })
+            setTarget({ mode: 'new', date: dateISO, attendees: defaultAttendees(people) })
           }
+          people={people}
+          overrides={overrides}
         />
       )}
 
@@ -179,11 +192,16 @@ function WeekListBody({
   weeks,
   onEdit,
   onAdd,
+  people,
+  overrides,
 }: {
   /** Strip pages: [previous week, visible week, next week], seven days each. */
   weeks: { dateISO: string; occs: DayOccurrence[] }[][]
   onEdit: (occ: DayOccurrence) => void
   onAdd: (dateISO: string) => void
+  /** Everyone in the account, in lane order, and this user's colour overrides. */
+  people: Person[]
+  overrides: Record<PersonId, ColorKey>
 }) {
   const { state, dispatch } = useApp()
   const todayISO = toISODate(new Date())
@@ -239,7 +257,9 @@ function WeekListBody({
                           <div
                             key={`${e.id}:${o.start}`}
                             className={s.event}
-                            style={colorStyle(eventColorKey(state, e.attendees[0], e))}
+                            style={colorStyle(
+                              eventColorKey(people, overrides, e.attendees[0], e.colorKey),
+                            )}
                           >
                             <div className={s.eventTime}>
                               {e.allDay

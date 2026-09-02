@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { colorStyle } from '../assets/palette'
+import { type ColorKey, colorStyle } from '../assets/palette'
 import shared from '../assets/styles/shared.module.css'
 import { cx } from '../assets/utils/cx'
 import { DAY_NAMES, isoWeekNumber, minutesToTime, toISODate } from '../assets/utils/dates'
+import { eventColorKey } from '../domains/people/selectors'
 import { isOccurrenceDone } from '../lib/occurrences'
-import { eventColorKey } from '../lib/people'
 import type { DayOccurrence } from '../lib/recurrence'
 import { DAY_MIN, layoutBlocks } from '../lib/timelineLayout'
 import { loadZoom, pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
 import { useApp } from '../state'
-import type { CompletionsMap } from '../types'
+import type { CompletionsMap, Person, PersonId } from '../types'
 import { TimeGutter } from './TimeGutter'
 import s from './WeekTimeline.module.css'
 
@@ -48,6 +48,8 @@ export function WeekTimelineHead({
   onOpen,
   focusDay,
   onToggleDay,
+  people,
+  overrides,
 }: {
   weekDays: WeekDay[]
   completions: CompletionsMap
@@ -56,8 +58,10 @@ export function WeekTimelineHead({
   focusDay: number | null
   /** Tap a day label: maximize that column, or restore if already focused. */
   onToggleDay: (dayIdx: number) => void
+  /** Everyone in the account, in lane order, and this user's colour overrides. */
+  people: Person[]
+  overrides: Record<PersonId, ColorKey>
 }) {
-  const { state } = useApp()
   const todayISO = toISODate(new Date())
   return (
     <div className={s.head}>
@@ -93,7 +97,9 @@ export function WeekTimelineHead({
                       s.alldayChip,
                       isOccurrenceDone(completions, o.event, o.start) && s.done,
                     )}
-                    style={colorStyle(eventColorKey(state, o.event.attendees[0], o.event))}
+                    style={colorStyle(
+                      eventColorKey(people, overrides, o.event.attendees[0], o.event.colorKey),
+                    )}
                     onClick={() => onOpen(o)}
                     title={o.event.title}
                   >
@@ -121,6 +127,8 @@ export function WeekTimelineBody({
   onOpen,
   onAddAt,
   focusDay,
+  people,
+  overrides,
 }: {
   /** Strip pages: [previous week, visible week, next week], seven days each. */
   weeks: WeekDay[][]
@@ -130,8 +138,11 @@ export function WeekTimelineBody({
   onAddAt: (dateISO: string, minute: number) => void
   /** Weekday index (0 = Mon) whose column is maximized, if any. */
   focusDay: number | null
+  /** Everyone in the account, in lane order, and this user's colour overrides. */
+  people: Person[]
+  overrides: Record<PersonId, ColorKey>
 }) {
-  const { state, dispatch } = useApp()
+  const { dispatch } = useApp()
   const [hourH, setHourH] = useState(() => loadZoom(ZOOM_KEY))
   const pxPerMin = hourH / 60
 
@@ -241,7 +252,9 @@ export function WeekTimelineBody({
                             height,
                             left: `calc(${(100 / cols) * col}% + 1px)`,
                             width: `calc(${100 / cols}% - 2px)`,
-                            ...colorStyle(eventColorKey(state, ev.attendees[0], ev)),
+                            ...colorStyle(
+                              eventColorKey(people, overrides, ev.attendees[0], ev.colorKey),
+                            ),
                           }}
                           onClick={() => onOpen(block.occ)}
                           title={ev.title}
