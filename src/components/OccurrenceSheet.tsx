@@ -10,6 +10,8 @@ import { useAuth } from '../auth'
 import { timingOf } from '../domains/events/selectors'
 import { useOccurrencesWrite } from '../domains/occurrences/mutations'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
+import { usePeople } from '../domains/people/queries'
+import { attendeeLabelFor } from '../domains/people/selectors'
 import { checklists, notes, reminderOffsets } from '../lib/attachments'
 import { findListItem, isOverdue } from '../lib/lists'
 import { offsetLabel } from '../lib/notifications'
@@ -19,7 +21,6 @@ import {
   occKey,
   occurrenceEffectiveStatus,
 } from '../lib/occurrences'
-import { attendeeLabel } from '../lib/people'
 import {
   effectiveOccurrence,
   recurrenceLabel,
@@ -50,6 +51,7 @@ export function OccurrenceSheet({
 }) {
   const { state, dispatch } = useApp()
   const { accountId } = useAuth()
+  const { data: people = [] } = usePeople(accountId)
   // Windowed per-occurrence state: this occurrence's month, plus the dates of
   // any prerequisites it waits on (they may live outside the window).
   const edges = state.dependencies[occKey(event.id, date)] ?? []
@@ -208,7 +210,7 @@ export function OccurrenceSheet({
         <h1 className={cx(shared.editorTitle, done && s.doneTitle)}>{event.title}</h1>
 
         <p className={s.meta}>
-          {timeLabel} · {attendeeLabel(state, event.attendees)}
+          {timeLabel} · {attendeeLabelFor(event.attendees)(people)}
           {event.recurrence && ` · ${recurrenceLabel(event.recurrence).toLowerCase()}`}
         </p>
 

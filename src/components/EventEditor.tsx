@@ -14,8 +14,11 @@ import { useTemplates } from '../domains/events/queries'
 import { timingOf } from '../domains/events/selectors'
 import { useOccurrencesWrite } from '../domains/occurrences/mutations'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
+import { usePeople } from '../domains/people/queries'
+import { personColorKey } from '../domains/people/selectors'
+import { usePreferences } from '../domains/preferences/queries'
+import { personColors } from '../domains/preferences/selectors'
 import { cloneAttachments } from '../lib/attachments'
-import { personColorKey } from '../lib/people'
 import { effectiveOccurrence } from '../lib/recurrence'
 import { eventDate, eventStartMinutes } from '../lib/timing'
 import { useApp } from '../state'
@@ -133,8 +136,10 @@ function EventEditorForm({
   completions: CompletionsMap
   onClose: () => void
 }) {
-  const { state, dispatch, beginEdit, endEdit } = useApp()
+  const { dispatch, beginEdit, endEdit } = useApp()
   const { accountId, session } = useAuth()
+  const { data: people = [] } = usePeople(accountId)
+  const { data: overrides = {} } = usePreferences(accountId, session?.user.id ?? null, personColors)
   const occurrences = useOccurrencesWrite()
   const { data: templates = [] } = useTemplates(accountId)
   const events = useEventsWrite()
@@ -500,7 +505,9 @@ function EventEditorForm({
         <ColorPicker
           options={COLOR_OPTIONS}
           value={colorKey ?? null}
-          defaultValue={attendees[0] ? personColorKey(state, attendees[0]) : DEFAULT_COLOR}
+          defaultValue={
+            attendees[0] ? personColorKey(people, overrides, attendees[0]) : DEFAULT_COLOR
+          }
           ariaLabel="Event color"
           onChange={setColorKey}
         />
