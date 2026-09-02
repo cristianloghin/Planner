@@ -513,8 +513,8 @@ reaching into a domain: `queryKeysForTable` in `domains/index.ts` (built and
 tested) names every domain's keys. **Wired**: `state.tsx` now calls
 `startRealtime` over `client/realtime.ts`, invalidates by key from the map, and
 reloads the reducer only when a reducer-owned table changed. A reconnection
-invalidates the whole Query cache and reloads. `useTemplatesRealtime` is gone;
-`SupabaseStore.subscribe` is now unused and deletes next.
+invalidates the whole Query cache and reloads. `useTemplatesRealtime` and
+`SupabaseStore.subscribe` are both gone: one channel, one router.
 
 ### Edit guard
 

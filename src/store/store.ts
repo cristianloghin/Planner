@@ -40,16 +40,13 @@ function normalizeLists(raw: unknown): TodoList[] {
  *  - `apply(action, next)` persists a single change. The localStorage store
  *    ignores the action and saves the whole `next` state; the Supabase store
  *    translates the action into targeted row writes.
- *  - `subscribe(onChange)` fires when the backing data changes elsewhere (a
- *    partner's edit) and returns an unsubscribe fn. localStorage has no remote
- *    changes, so it's a no-op. The changed table's name (when known) lets the
- *    caller route Query-owned slices to targeted cache invalidation instead of
- *    a full reload.
+ *
+ * Being told about a partner's change is not the store's job: the realtime
+ * channel lives in `client/realtime.ts` and is routed by `services/realtime`.
  */
 export interface ScheduleStore {
   load(): Promise<AppState>
   apply(action: Action, next: AppState): Promise<void>
-  subscribe(onChange: (table?: string) => void): () => void
 }
 
 export function defaultState(): AppState {
@@ -107,11 +104,6 @@ export class LocalStorageStore implements ScheduleStore {
     } catch {
       // Ignore quota / private-mode write failures for now.
     }
-  }
-
-  // Single-device store: nothing changes it remotely.
-  subscribe(): () => void {
-    return () => {}
   }
 }
 

@@ -418,49 +418,6 @@ export class SupabaseStore implements ScheduleStore {
 
   // ---- SUBSCRIBE ---------------------------------------------------------
 
-  /**
-   * Fire `onChange` whenever any calendar table changes (including our own
-   * writes — the caller debounces and reloads idempotently). RLS scopes the
-   * stream to this user's account, so no per-account filter is needed. Returns
-   * an unsubscribe fn.
-   */
-  subscribe(onChange: (table?: string) => void): () => void {
-    let disposed = false
-    let hadError = false
-    let retryTimer: ReturnType<typeof setTimeout> | undefined
-    let channel: ReturnType<typeof supabase.channel>
-
-    const open = () => {
-      channel = supabase
-        .channel('account-data')
-        // The changed table lets the caller route Query-owned slices (per-
-        // occurrence state) to targeted invalidation instead of a full reload.
-        .on('postgres_changes', { event: '*', schema: 'public' }, (payload) =>
-          onChange(payload.table),
-        )
-        .subscribe((status) => {
-          if (disposed) return
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            // A dead channel means sync silently stops; tear down and retry.
-            hadError = true
-            void supabase.removeChannel(channel)
-            retryTimer = setTimeout(open, 5_000)
-          } else if (status === 'SUBSCRIBED' && hadError) {
-            // Recovered — reload once to pick up anything missed while down.
-            hadError = false
-            onChange()
-          }
-        })
-    }
-    open()
-
-    return () => {
-      disposed = true
-      clearTimeout(retryTimer)
-      void supabase.removeChannel(channel)
-    }
-  }
-
   // ---- WRITE -------------------------------------------------------------
 
   async apply(action: Action, next: AppState): Promise<void> {
