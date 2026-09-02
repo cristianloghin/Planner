@@ -1,11 +1,14 @@
 import { Link, type RoutePath, AppProvider as RouterProvider, RouterView } from '@mikrostack/router'
 import { ListChecks, type LucideIcon, Settings as SettingsIcon } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import s from './App.module.css'
 import { PageLoader } from './assets/ui/Spinner'
 import { useAuth } from './auth'
 import { AlertHost } from './components/AlertHost'
 import { Login } from './components/Login'
+import { usePreferencesWrite } from './domains/preferences/mutations'
+import { withTimezone } from './domains/preferences/patches'
+import { usePreferences } from './domains/preferences/queries'
 import { clearNotifications, syncPushSubscription } from './lib/push'
 import { routes } from './routes/routes'
 import { AppProvider } from './state'
@@ -70,7 +73,23 @@ export function Root() {
 
 /** The app chrome around whichever route is showing: alerts and the tab bar. */
 function AppShell() {
-  const { session } = useAuth()
+  const { accountId, session } = useAuth()
+  const userId = session?.user.id ?? null
+
+  // Keep the per-user timezone stamp current — the server-side reminder sender
+  // computes this user's wall-clock fire times from it. Stamped once per zone
+  // per session: a write that is rejected rolls the document back, and without
+  // the guard that would re-trigger the effect and loop.
+  const { data: prefs } = usePreferences(accountId, userId)
+  const { mutate: savePrefs } = usePreferencesWrite()
+  const stampedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!prefs || !accountId || !userId) return
+    const deviceTz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    if (!deviceTz || prefs.timezone === deviceTz || stampedRef.current === deviceTz) return
+    stampedRef.current = deviceTz
+    savePrefs({ accountId, userId, prefs: withTimezone(prefs, deviceTz) })
+  }, [prefs, accountId, userId, savePrefs])
 
   // Self-heal this device's push registration (the push service can rotate a
   // subscription behind our back; the worker re-subscribes, we re-record it).

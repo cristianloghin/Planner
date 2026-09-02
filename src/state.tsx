@@ -190,12 +190,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       stateRef.current = merged
       setState(merged)
       if (accountId) writeSnapshot(accountId, merged)
-      // Keep the per-user timezone stamp current — the server-side reminder
-      // sender computes this user's wall-clock fire times from it.
-      const deviceTz = Intl.DateTimeFormat().resolvedOptions().timeZone
-      if (deviceTz && merged.preferences.timezone !== deviceTz) {
-        dispatch({ type: 'setTimezone', timezone: deviceTz })
-      }
     } catch (e) {
       console.error('Initial load failed:', e)
       if (isNetworkError(e)) setOffline(true)
@@ -203,7 +197,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // nothing at all, show the retry screen instead of an eternal spinner.
       if (!stateRef.current) setLoadFailed(true)
     }
-  }, [accountId, pump, dispatch])
+  }, [accountId, pump])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: run on mount only — accountId is fixed for this provider's lifetime (Root keys it)
   useEffect(() => {

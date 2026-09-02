@@ -7,12 +7,15 @@ import { cx } from '../assets/utils/cx'
 import { useAuth } from '../auth'
 import { useEventsWrite } from '../domains/events/mutations'
 import { useTemplates } from '../domains/events/queries'
+import { usePeopleWrite } from '../domains/people/mutations'
 import { usePeople } from '../domains/people/queries'
-import { attendeeLabelFor } from '../domains/people/selectors'
+import { attendeeLabelFor, personColorKey } from '../domains/people/selectors'
+import { usePreferencesWrite } from '../domains/preferences/mutations'
+import { withPersonColor, withWeekLayout, withoutPersonColor } from '../domains/preferences/patches'
+import { usePreferences } from '../domains/preferences/queries'
+import { weekLayout } from '../domains/preferences/selectors'
 import { checklistEntries, notes, reminderOffsets } from '../lib/attachments'
-import { personColorKey } from '../lib/people'
-import { useApp } from '../state'
-import type { EventTemplate } from '../types'
+import type { EventTemplate, Preferences } from '../types'
 import { NotificationSettings } from './NotificationSettings'
 import s from './Settings.module.css'
 import { TemplateEditor } from './TemplateEditor'
@@ -23,8 +26,17 @@ const WEEK_LAYOUTS = [
 ] as const
 
 export function Settings() {
-  const { state, dispatch } = useApp()
-  const { session, signOut } = useAuth()
+  const { accountId, session, signOut } = useAuth()
+  const userId = session?.user.id ?? null
+  const { data: people = [] } = usePeople(accountId)
+  const { data: prefs } = usePreferences(accountId, userId)
+  const overrides = prefs?.personColors ?? {}
+  const peopleWrite = usePeopleWrite()
+  const prefsWrite = usePreferencesWrite()
+  // Settings save as one document, so a change is the current document with
+  // that one thing changed. Nothing to save against until the first read lands.
+  const savePrefs = (next: Preferences) =>
+    prefsWrite.mutate({ accountId: accountId as string, userId: userId as string, prefs: next })
 
   return (
     <section className={cx(shared.view, s.settings)}>
@@ -42,9 +54,9 @@ export function Settings() {
           Set up who's who. Names are shared with your partner; colours are yours — pick how each
           person looks on your own calendar.
         </p>
-        {Object.values(state.people).map((p) => {
-          const overridden = state.preferences.personColors[p.id] !== undefined
-          const activeKey = personColorKey(state, p.id)
+        {people.map((p) => {
+          const overridden = overrides[p.id] !== undefined
+          const activeKey = personColorKey(people, overrides, p.id)
           return (
             <div className={s.personRow} key={p.id}>
               <ColorPicker
@@ -52,26 +64,26 @@ export function Settings() {
                 value={activeKey}
                 ariaLabel={`Your colour for ${p.name}`}
                 onChange={(color) =>
-                  color &&
-                  dispatch({
-                    type: 'setColorPref',
-                    personId: p.id,
-                    color,
-                  })
+                  color && prefs && savePrefs(withPersonColor(prefs, p.id, color))
                 }
               />
               <div className={s.personHead}>
                 <CommitTextInput
                   type="text"
                   value={p.name}
-                  onCommit={(name) => dispatch({ type: 'renamePerson', id: p.id, name })}
+                  onCommit={(name) =>
+                    peopleWrite.mutate({
+                      accountId: accountId as string,
+                      change: { kind: 'rename', id: p.id, name },
+                    })
+                  }
                   aria-label="Name"
                 />
                 {overridden && (
                   <button
                     type="button"
                     className={s.resetColor}
-                    onClick={() => dispatch({ type: 'clearColorPref', personId: p.id })}
+                    onClick={() => prefs && savePrefs(withoutPersonColor(prefs, p.id))}
                     title="Reset to the default colour"
                   >
                     Reset
@@ -104,8 +116,11 @@ export function Settings() {
 
 /** Pick how the Week tab lays out the seven days: day-card list or hourly grid. */
 function WeekLayoutSection() {
-  const { state, dispatch } = useApp()
-  const active = state.preferences.weekLayout ?? 'list'
+  const { accountId, session } = useAuth()
+  const userId = session?.user.id ?? null
+  const { data: prefs } = usePreferences(accountId, userId)
+  const prefsWrite = usePreferencesWrite()
+  const active = prefs ? weekLayout(prefs) : 'list'
   return (
     <div className={s.weekLayout}>
       <span className={cx(s.hint, s.small)}>
@@ -120,7 +135,14 @@ function WeekLayoutSection() {
             role="radio"
             aria-checked={active === opt.value}
             className={cx(s.segment, active === opt.value && s.segmentOn)}
-            onClick={() => dispatch({ type: 'setWeekLayout', layout: opt.value })}
+            onClick={() =>
+              prefs &&
+              prefsWrite.mutate({
+                accountId: accountId as string,
+                userId: userId as string,
+                prefs: withWeekLayout(prefs, opt.value),
+              })
+            }
           >
             {opt.label}
           </button>
