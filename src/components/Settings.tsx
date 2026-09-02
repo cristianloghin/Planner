@@ -7,8 +7,10 @@ import { cx } from '../assets/utils/cx'
 import { useAuth } from '../auth'
 import { useEventsWrite } from '../domains/events/mutations'
 import { useTemplates } from '../domains/events/queries'
+import { usePeople } from '../domains/people/queries'
+import { attendeeLabelFor } from '../domains/people/selectors'
 import { checklistEntries, notes, reminderOffsets } from '../lib/attachments'
-import { attendeeLabel, personColorKey } from '../lib/people'
+import { personColorKey } from '../lib/people'
 import { useApp } from '../state'
 import type { EventTemplate } from '../types'
 import { NotificationSettings } from './NotificationSettings'
@@ -134,8 +136,8 @@ function WeekLayoutSection() {
  * them. Clicking a row opens the full-page {@link TemplateEditor}.
  */
 function TemplatesSection() {
-  const { state } = useApp()
   const { accountId, session } = useAuth()
+  const { data: people = [] } = usePeople(accountId)
   const { data: templates = [], isPending } = useTemplates(accountId)
   const events = useEventsWrite()
   const removeTemplate = (id: string) =>
@@ -160,7 +162,7 @@ function TemplatesSection() {
       ) : (
         templates.map((t) => {
           const bits: string[] = []
-          if (t.attendees.length) bits.push(attendeeLabel(state, t.attendees))
+          if (t.attendees.length) bits.push(attendeeLabelFor(t.attendees)(people))
           const checks = checklistEntries(t).length
           if (checks) bits.push(`${checks} checklist item${checks > 1 ? 's' : ''}`)
           const noteCount = notes(t).length

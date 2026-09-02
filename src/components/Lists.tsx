@@ -8,8 +8,12 @@ import d from '../assets/ui/Dialog.module.css'
 import { cx } from '../assets/utils/cx'
 import { isoLabel } from '../assets/utils/dates'
 import { uid } from '../assets/utils/id'
+import { useAuth } from '../auth'
+import { usePeople } from '../domains/people/queries'
+import { personColorKey } from '../domains/people/selectors'
+import { usePreferences } from '../domains/preferences/queries'
+import { personColors } from '../domains/preferences/selectors'
 import { isOverdue } from '../lib/lists'
-import { personColorKey } from '../lib/people'
 import { useApp } from '../state'
 import type { ListItem, PersonId, TodoList } from '../types'
 import { ListSearch } from './ListSearch'
@@ -128,6 +132,9 @@ function GroupPicker({
  */
 export function Lists() {
   const { state, dispatch, beginEdit, endEdit } = useApp()
+  const { accountId, session } = useAuth()
+  const { data: people = [] } = usePeople(accountId)
+  const { data: overrides = {} } = usePreferences(accountId, session?.user.id ?? null, personColors)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   // The unsaved new list, or null when we're not creating one.
@@ -330,12 +337,12 @@ export function Lists() {
 
   function badge(personId: PersonId | null) {
     if (!personId) return <span className={cx(s.badge, s.shared)}>Shared</span>
-    const p = state.people[personId]
-    // An assignee missing from the local snapshot (mid-reload, or a person a
+    const p = people.find((x) => x.id === personId)
+    // An assignee not in the list (first fetch in flight, or a person a
     // partner just removed) must not crash the whole view.
     if (!p) return null
     return (
-      <span className={s.badge} style={colorStyle(personColorKey(state, personId))}>
+      <span className={s.badge} style={colorStyle(personColorKey(people, overrides, personId))}>
         {p.name}
       </span>
     )
@@ -427,7 +434,7 @@ export function Lists() {
             }
           >
             <option value="shared">Shared</option>
-            {Object.values(state.people).map((p) => (
+            {people.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
@@ -630,7 +637,7 @@ export function Lists() {
                     aria-label="Assignee"
                   >
                     <option value="shared">Shared</option>
-                    {Object.values(state.people).map((p) => (
+                    {people.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.name}
                       </option>
