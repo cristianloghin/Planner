@@ -7,8 +7,10 @@ import { NumberField } from '../assets/ui/NumberField'
 import { ScopeSheet } from '../assets/ui/ScopeSheet'
 import { PageLoader } from '../assets/ui/Spinner'
 import { addDays, diffDays, isoLabel, minutesToTime, toDateTimeLocal } from '../assets/utils/dates'
+import { uid } from '../assets/utils/id'
 import { useAuth } from '../auth'
-import { useAddTemplate, useTemplates } from '../data/templates'
+import { useEventsWrite } from '../domains/events/mutations'
+import { useTemplates } from '../domains/events/queries'
 import { timingOf } from '../domains/events/selectors'
 import { useOccurrencesWrite } from '../domains/occurrences/mutations'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
@@ -132,10 +134,10 @@ function EventEditorForm({
   onClose: () => void
 }) {
   const { state, dispatch, beginEdit, endEdit } = useApp()
-  const { accountId } = useAuth()
+  const { accountId, session } = useAuth()
   const occurrences = useOccurrencesWrite()
-  const { data: templates = [] } = useTemplates()
-  const addTemplate = useAddTemplate()
+  const { data: templates = [] } = useTemplates(accountId)
+  const events = useEventsWrite()
   const isEdit = target.mode === 'edit'
   const base = isEdit ? target.event : null
 
@@ -243,12 +245,23 @@ function EventEditorForm({
    *  if any, is untouched). Attachments are copied with fresh ids. */
   function saveAsTemplate() {
     if (!title.trim()) return
-    addTemplate.mutate({
-      title: title.trim(),
-      allDay,
-      duration: currentDuration(),
-      attendees,
-      attachments: cloneAttachments(cleanedAttachments()),
+    events.mutate({
+      accountId: accountId as string,
+      userId: session?.user.id as string,
+      change: {
+        kind: 'saveTemplate',
+        isNew: true,
+        // The id is minted here so editing or deleting the new row before the
+        // write lands targets a real uuid.
+        template: {
+          id: uid(),
+          title: title.trim(),
+          allDay,
+          duration: currentDuration(),
+          attendees,
+          attachments: cloneAttachments(cleanedAttachments()),
+        },
+      },
     })
     setSavedTemplate(true)
     clearTimeout(savedTimer.current)

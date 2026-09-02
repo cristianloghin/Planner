@@ -6,7 +6,6 @@ import { PageLoader } from './assets/ui/Spinner'
 import { useAuth } from './auth'
 import { AlertHost } from './components/AlertHost'
 import { Login } from './components/Login'
-import { useTemplatesRealtime } from './data/templates'
 import { clearNotifications, syncPushSubscription } from './lib/push'
 import { routes } from './routes/routes'
 import { AppProvider } from './state'
@@ -72,9 +71,6 @@ export function Root() {
 /** The app chrome around whichever route is showing: alerts and the tab bar. */
 function AppShell() {
   const { session } = useAuth()
-
-  // Keep the (Query-owned) templates cache fresh on a partner's change.
-  useTemplatesRealtime()
 
   // Self-heal this device's push registration (the push service can rotate a
   // subscription behind our back; the worker re-subscribes, we re-record it).

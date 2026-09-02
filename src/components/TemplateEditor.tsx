@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import shared from '../assets/styles/shared.module.css'
 import { NumberField } from '../assets/ui/NumberField'
-import { useUpdateTemplate } from '../data/templates'
+import { useAuth } from '../auth'
+import { useEventsWrite } from '../domains/events/mutations'
 import type { Attachment, EventTemplate, PersonId } from '../types'
 import { AttachmentsEditor } from './AttachmentsEditor'
 import { AttendeeChips } from './AttendeeChips'
@@ -13,7 +14,8 @@ const SNAP = 15
  * template is a blueprint with no point in time, so unlike {@link EventEditor}
  * there's no start date or recurrence — just the defaults a new event inherits:
  * title, all-day flag, default duration, attendees and attachments. Saving
- * dispatches `updateTemplate`; existing events made from it are untouched.
+ * writes a `saveTemplate` change through the events domain; existing events
+ * made from it are untouched.
  */
 export function TemplateEditor({
   template,
@@ -22,7 +24,8 @@ export function TemplateEditor({
   template: EventTemplate
   onClose: () => void
 }) {
-  const updateTemplate = useUpdateTemplate()
+  const { accountId, session } = useAuth()
+  const events = useEventsWrite()
 
   // No reducer edit-guard here: templates are owned by TanStack Query, and this
   // draft lives in local state, so a background refetch can't disturb it.
@@ -56,13 +59,21 @@ export function TemplateEditor({
   function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
-    updateTemplate.mutate({
-      ...template,
-      title: title.trim(),
-      allDay,
-      duration: currentDuration(),
-      attendees,
-      attachments: cleanedAttachments(),
+    events.mutate({
+      accountId: accountId as string,
+      userId: session?.user.id as string,
+      change: {
+        kind: 'saveTemplate',
+        isNew: false,
+        template: {
+          ...template,
+          title: title.trim(),
+          allDay,
+          duration: currentDuration(),
+          attendees,
+          attachments: cleanedAttachments(),
+        },
+      },
     })
     onClose()
   }

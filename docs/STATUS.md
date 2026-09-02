@@ -56,8 +56,11 @@ Mid-migration, and worth knowing before adding a slice:
   `data/completions.ts` is gone. Six screens call `useCompletionsForRange` from
   `domains/occurrences/queries`, passing `accountId`; the sheet and the editor
   write through one `useOccurrencesWrite`.
-- **Templates** are still owned by **TanStack Query** in `src/data/templates.ts`,
-  the last of the original pilot. `domains/events` covers the same ground.
+- **Templates** now read and write through `domains/events` (`useTemplates`
+  and the `saveTemplate` / `removeTemplate` changes of `useEventsWrite`).
+  `data/templates.ts` and `data/useAccountStore.ts` are gone; the templates
+  cache is invalidated from the one realtime channel routed through
+  `state.tsx`, not a second subscription.
 - The rest of **`client/` and `domains/`** is built and **not yet adopted**.
   Every call the app makes to Supabase has a client function — 15 tables, 4
   RPCs, the 6 auth methods, the realtime channel — and eight domains sit over
@@ -117,9 +120,6 @@ Still to adopt, cheapest first:
 
 - **`search`** — two functions, no writes, no cache shaping; `lib/search.ts`
   deletes when it works.
-- **`templates`** — `data/templates.ts` and `data/useAccountStore.ts` both go.
-  Needs a home for the realtime bridge, which has no domain equivalent (it
-  invalidates by key, so it keeps working meanwhile).
 - **The reducer slices** — events, lists, people, preferences. Bigger: people
   and preferences are read in ~10 files, and preferences must move in one go
   because it is written as a whole document, so two writers would clobber each

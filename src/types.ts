@@ -32,7 +32,7 @@ export interface AppState {
   people: Record<PersonId, Person>
   lists: TodoList[]
   events: CalendarEvent[]
-  // Not here: event templates (src/data/templates.ts) and per-occurrence state
+  // Not here: event templates (src/domains/events) and per-occurrence state
   // (src/domains/occurrences) are owned by TanStack Query, not this state tree.
   /**
    * Prerequisite edges keyed by the dependent occurrence (`${eventId}:${date}`),

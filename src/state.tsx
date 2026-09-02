@@ -12,6 +12,7 @@ import { useLatest } from './assets/hooks/useLatest'
 import { PageLoader } from './assets/ui/Spinner'
 import { useAuth } from './auth'
 import { LoadFailedScreen, SyncBanners } from './components/SyncBanners'
+import { templatesKey } from './domains/events/queries'
 import { completionsPrefix } from './domains/occurrences/queries'
 import { queryClient } from './lib/queryClient'
 import type { Action } from './store/actions'
@@ -284,6 +285,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         invalidateCompletions()
         return
       }
+      // Templates share event_series with events, so a change there refreshes
+      // the Query-owned templates cache as well as the reducer's events below.
+      if (table === 'event_series' || table === undefined) {
+        void queryClient.invalidateQueries({ queryKey: templatesKey(accountId) })
+      }
       if (table === undefined) {
         // Recovery after a dead channel (or an unknown source): anything may
         // have been missed, so refresh both worlds.
@@ -291,7 +297,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       scheduleReload()
     },
-    [invalidateCompletions, scheduleReload],
+    [accountId, invalidateCompletions, scheduleReload],
   )
 
   const beginEdit = useCallback(() => {

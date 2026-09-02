@@ -53,7 +53,7 @@ export type Action =
   | { type: 'splitSeries'; eventId: string; fromDate: string; event: Omit<CalendarEvent, 'id'> }
   // (Not here: templates and per-occurrence state — status, checklist ticks,
   // timing overrides — moved off the reducer to TanStack Query; see
-  // src/data/templates.ts and src/domains/occurrences.)
+  // src/domains/events and src/domains/occurrences.)
   // Occurrence→occurrence prerequisite edges (occurrence_dependency). The
   // dependent end is (eventId, date); the prerequisite end is a concrete slot.
   | {

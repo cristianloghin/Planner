@@ -11,10 +11,11 @@ eight domains sit over them with queries, mutations, transformers, selectors and
 pure optimistic patches. Eight services sit beside them — the engines, the
 behaviour hooks, and the two stores.
 
-`occurrences` runs the app: reads and writes both go through the domain and the
-client, and `data/completions.ts` is deleted. The rest of `client/` and
-`domains/` still duplicates `store/supabaseStore.ts`, `state.tsx`, `auth.tsx`
-and `data/templates.ts`, which run the app unchanged. `services/` is different:
+`occurrences` and the templates half of `events` run the app: reads and writes
+both go through the domain and the client, and `data/completions.ts`,
+`data/templates.ts` and `data/useAccountStore.ts` are deleted. The rest of
+`client/` and `domains/` still duplicates `store/supabaseStore.ts`, `state.tsx`
+and `auth.tsx`, which run the app unchanged. `services/` is different:
 those were real moves, and `lib/` forwards to them, so there is one
 implementation and nothing to drift.
 
@@ -542,7 +543,7 @@ stays in localStorage. Both are *how*, not *what* (R13).
 | `store/supabaseStore.ts` | ~~sliced into `client/*` by table; mappers to `client/mappers.ts`~~ **done** — deletes once the domains adopt them |
 | `store/reducer.ts`, `store/actions.ts` | deleted; optimistic logic → `domains/*/patch.ts` |
 | `store/offline.ts` | deleted |
-| `data/useAccountStore.ts` | deleted (client functions replace it) — last caller is `data/templates.ts` |
+| ~~`data/useAccountStore.ts`~~ | **deleted** with `data/templates.ts` |
 | `types.ts` | split into `domains/*/types.ts` |
 
 Sign-out clearing is worth calling out as more than filing: `auth.tsx` currently
@@ -562,7 +563,7 @@ of coupling that breaks quietly later.
 | `components/{Spinner,ConfirmDialog,ScopeSheet,ColorPicker,NumberField,CommitTextInput,SearchOverlay}` | `assets/ui` |
 | `components/ViewHeader` | `layouts/CalendarViewLayout` |
 | `components/{AlertHost,SyncBanners,UpdatePrompt}` | `layouts/AppShell` + backing services |
-| `data/templates.ts` | ~~`domains/events` (templates share the events domain)~~ **built** |
+| ~~`data/templates.ts`~~ | `domains/events` — **done and deleted**; the three template screens and the realtime bridge repointed |
 | ~~`data/completions.ts`~~ | `domains/occurrences` — **done and deleted**; reads and writes both adopted |
 | ~~`lib/{supabase,database.types}.ts`~~ | `client/` — **done** |
 | `lib/search.ts` | ~~`client/search.ts`~~ **done** + `domains/search` |

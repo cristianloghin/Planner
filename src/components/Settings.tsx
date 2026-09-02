@@ -5,7 +5,8 @@ import { ColorPicker } from '../assets/ui/ColorPicker'
 import { CommitTextInput } from '../assets/ui/CommitTextInput'
 import { cx } from '../assets/utils/cx'
 import { useAuth } from '../auth'
-import { useDeleteTemplate, useTemplates } from '../data/templates'
+import { useEventsWrite } from '../domains/events/mutations'
+import { useTemplates } from '../domains/events/queries'
 import { checklistEntries, notes, reminderOffsets } from '../lib/attachments'
 import { attendeeLabel, personColorKey } from '../lib/people'
 import { useApp } from '../state'
@@ -134,8 +135,15 @@ function WeekLayoutSection() {
  */
 function TemplatesSection() {
   const { state } = useApp()
-  const { data: templates = [], isPending } = useTemplates()
-  const deleteTemplate = useDeleteTemplate()
+  const { accountId, session } = useAuth()
+  const { data: templates = [], isPending } = useTemplates(accountId)
+  const events = useEventsWrite()
+  const removeTemplate = (id: string) =>
+    events.mutate({
+      accountId: accountId as string,
+      userId: session?.user.id as string,
+      change: { kind: 'removeTemplate', id },
+    })
   const [editing, setEditing] = useState<EventTemplate | null>(null)
 
   return (
@@ -173,7 +181,7 @@ function TemplatesSection() {
               <button
                 type="button"
                 className={s.resetColor}
-                onClick={() => deleteTemplate.mutate(t.id)}
+                onClick={() => removeTemplate(t.id)}
                 aria-label={`Delete template ${t.title || 'Untitled'}`}
               >
                 Delete
