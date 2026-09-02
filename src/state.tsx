@@ -49,18 +49,40 @@ const AppContext = createContext<Ctx | null>(null)
  * key. Shrinks as domains are adopted, and deletes with the reducer.
  */
 const REDUCER_TABLES = new Set([
-  'person',
   'event_series',
   'event_person',
   'checklist_item',
   'note',
   'reminder',
   'occurrence_dependency',
-  'user_preference',
   'list',
   'list_item',
   'list_item_event_link',
 ])
+
+/**
+ * Action types the reducer used to handle and no longer does. A queue saved by
+ * an older build can still hold one; replaying it would wedge the pump, so it
+ * is dropped on read. The people and preferences domains own those writes now.
+ */
+const RETIRED_ACTIONS = new Set([
+  'renamePerson',
+  'recolorPerson',
+  'setColorPref',
+  'clearColorPref',
+  'setTimezone',
+  'setWeekLayout',
+])
+
+function readLiveQueue(accountId: string): Action[] {
+  const queued = readQueue(accountId)
+  const live = queued.filter((a) => !RETIRED_ACTIONS.has(a.type))
+  if (live.length !== queued.length) {
+    console.warn(`Dropped ${queued.length - live.length} queued write(s) of a retired kind`)
+    writeQueue(accountId, live)
+  }
+  return live
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const { accountId, session } = useAuth()
@@ -92,7 +114,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // to retry (offline mode), a server rejection drops it and resyncs, and a
   // queue left over from a killed offline session replays on next launch.
   const pendingRef = useRef<Action[]>()
-  if (!pendingRef.current) pendingRef.current = accountId ? readQueue(accountId) : []
+  if (!pendingRef.current) pendingRef.current = accountId ? readLiveQueue(accountId) : []
   const [pendingCount, setPendingCount] = useState(pendingRef.current.length)
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' && !navigator.onLine)
   const pumpingRef = useRef(false)

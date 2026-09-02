@@ -31,12 +31,10 @@ function event(over: Partial<CalendarEvent> = {}): CalendarEvent {
 
 function baseState(over: Partial<AppState> = {}): AppState {
   return {
-    people: {},
     lists: [],
     events: [],
     dependencies: {},
     listLinks: {},
-    preferences: { personColors: {} },
     weekStart: '2026-07-06', // a Monday
     selectedDay: 0,
     ...over,
@@ -241,17 +239,5 @@ describe('navigation', () => {
     const next = reducer(baseState(), { type: 'goToDate', date: '2026-07-23' }) // a Thursday
     expect(next.weekStart).toBe('2026-07-20')
     expect(next.selectedDay).toBe(3)
-  })
-})
-
-describe('preferences', () => {
-  it('setWeekLayout stores the choice without touching other preferences', () => {
-    const state = baseState({
-      preferences: { personColors: { kid: '3' }, timezone: 'Europe/Bucharest' },
-    })
-    const next = reducer(state, { type: 'setWeekLayout', layout: 'timeline' })
-    expect(next.preferences.weekLayout).toBe('timeline')
-    expect(next.preferences.personColors).toEqual({ kid: '3' })
-    expect(next.preferences.timezone).toBe('Europe/Bucharest')
   })
 })

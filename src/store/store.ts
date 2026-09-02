@@ -52,16 +52,10 @@ export interface ScheduleStore {
 export function defaultState(): AppState {
   const today = new Date()
   return {
-    people: {
-      me: { id: 'me', name: 'Me', color: '8', kind: 'adult', sortOrder: 0 },
-      partner: { id: 'partner', name: 'Partner', color: '12', kind: 'adult', sortOrder: 1 },
-      kid: { id: 'kid', name: 'Nora', color: '5', kind: 'child', sortOrder: 2 },
-    },
     lists: [],
     events: [],
     dependencies: {},
     listLinks: {},
-    preferences: { personColors: {} },
     weekStart: mondayOf(today),
     selectedDay: (today.getDay() + 6) % 7, // 0 = Monday
   }
@@ -79,18 +73,14 @@ export class LocalStorageStore implements ScheduleStore {
       if (!raw) return defaultState()
       const parsed = JSON.parse(raw) as Partial<AppState>
       const base = defaultState()
-      // Shallow-merge over defaults so missing/added fields stay valid, but
-      // deep-merge people so newly-added members appear for users whose saved
-      // state predates them, while keeping their custom names/colours.
+      // Shallow-merge over defaults so missing/added fields stay valid.
       return {
         ...base,
         ...parsed,
-        people: { ...base.people, ...(parsed.people ?? {}) },
         lists: normalizeLists(parsed.lists),
         events: parsed.events ?? base.events,
         dependencies: parsed.dependencies ?? base.dependencies,
         listLinks: parsed.listLinks ?? base.listLinks,
-        preferences: { ...base.preferences, ...(parsed.preferences ?? {}) },
       } as AppState
     } catch {
       return defaultState()

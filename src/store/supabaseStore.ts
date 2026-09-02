@@ -1,7 +1,6 @@
 import { isColorKey } from '../assets/palette'
 import { toISODate } from '../assets/utils/dates'
 import { uid } from '../assets/utils/id'
-import type { Json } from '../client/database.types'
 import {
   dayRange,
   durationToInterval,
@@ -23,9 +22,7 @@ import type {
   ListItem,
   OccurrenceDependency,
   OccurrenceStatusCode,
-  Person,
   PersonId,
-  Preferences,
   TodoList,
 } from '../types'
 import type { Action } from './actions'
@@ -81,29 +78,19 @@ export class SupabaseStore implements ScheduleStore {
   async load(): Promise<AppState> {
     const base = defaultState()
 
-    // Not loaded here: templates and per-occurrence state (completions) are
-    // owned by TanStack Query (src/domains/events, src/domains/occurrences)
+    // Not loaded here: people, preferences, templates and per-occurrence state
+    // (completions) are owned by TanStack Query (src/domains/*)
     // and fetched per window — completions grow with every tick ever made, so
     // hydrating them whole would scale startup with account age. The mappings
     // still live in this class and are reused via the public methods.
-    const [people, events, dependencies, preferences, lists, listLinks] = await Promise.all([
-      this.loadPeople(),
+    const [events, dependencies, lists, listLinks] = await Promise.all([
       this.loadEvents(),
       this.loadDependencies(),
-      this.loadPreferences(),
       this.loadLists(),
       this.loadListLinks(),
     ])
 
-    return {
-      ...base,
-      people,
-      events,
-      dependencies,
-      preferences,
-      lists,
-      listLinks,
-    }
+    return { ...base, events, dependencies, lists, listLinks }
   }
 
   // ---- TEMPLATES (owned by TanStack Query, served from the same mapping) ----
@@ -124,53 +111,6 @@ export class SupabaseStore implements ScheduleStore {
     // events made from it is `on delete set null`, so they're untouched.
     const { error } = await supabase.from('event_series').delete().eq('id', id)
     if (error) throw error
-  }
-
-  /**
-   * This user's preference document for this account, defaulted if none yet.
-   * Preferences are non-critical: if the read fails (e.g. migration 0007 not yet
-   * applied) we fall back to defaults rather than breaking the whole hydration.
-   */
-  private async loadPreferences(): Promise<Preferences> {
-    const empty: Preferences = { personColors: {} }
-    const { data, error } = await supabase
-      .from('user_preference')
-      .select('prefs')
-      .eq('account_id', this.accountId)
-      .eq('user_id', this.userId)
-      .maybeSingle()
-    if (error) {
-      console.warn('Could not load preferences; using defaults.', error)
-      return empty
-    }
-    const prefs = (data?.prefs ?? {}) as Partial<Preferences>
-    // Keep only valid palette keys; legacy hex overrides are dropped so the
-    // person falls back to their (migrated) shared color.
-    const personColors: Preferences['personColors'] = {}
-    for (const [id, key] of Object.entries(prefs.personColors ?? {})) {
-      if (isColorKey(key)) personColors[id] = key
-    }
-    return { ...empty, ...prefs, personColors }
-  }
-
-  private async loadPeople(): Promise<Record<string, Person>> {
-    const { data, error } = await supabase
-      .from('person')
-      .select('id, name, color, kind, sort_order')
-      .eq('account_id', this.accountId)
-      .order('sort_order')
-    if (error) throw error
-    const out: Record<string, Person> = {}
-    for (const p of data ?? []) {
-      out[p.id] = {
-        id: p.id,
-        name: p.name,
-        color: p.color,
-        kind: p.kind === 'child' ? 'child' : 'adult',
-        sortOrder: p.sort_order,
-      }
-    }
-    return out
   }
 
   private async loadEvents(): Promise<CalendarEvent[]> {
@@ -530,41 +470,6 @@ export class SupabaseStore implements ScheduleStore {
           .eq('prerequisite_series', prerequisite.id)
           .gte('prerequisite_occurrence', pre.from)
           .lt('prerequisite_occurrence', pre.to)
-        if (error) throw error
-        return
-      }
-      case 'renamePerson': {
-        const { error } = await supabase
-          .from('person')
-          .update({ name: action.name })
-          .eq('id', action.id)
-        if (error) throw error
-        return
-      }
-      case 'recolorPerson': {
-        const { error } = await supabase
-          .from('person')
-          .update({ color: action.color })
-          .eq('id', action.id)
-        if (error) throw error
-        return
-      }
-      // Preferences are a per-user JSON blob: any preference change writes the
-      // whole (already-updated) `next.preferences` document for this user.
-      case 'setColorPref':
-      case 'clearColorPref':
-      case 'setTimezone':
-      case 'setWeekLayout': {
-        const { error } = await supabase.from('user_preference').upsert(
-          {
-            account_id: this.accountId,
-            user_id: this.userId,
-            // Preferences is a structured interface; the column is free-form Json.
-            prefs: next.preferences as unknown as Json,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'account_id,user_id' },
-        )
         if (error) throw error
         return
       }

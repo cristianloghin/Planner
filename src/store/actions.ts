@@ -1,5 +1,4 @@
-import type { ColorKey } from '../assets/palette'
-import type { CalendarEvent, OccurrenceStatusCode, PersonId, WeekLayout } from '../types'
+import type { CalendarEvent, OccurrenceStatusCode, PersonId } from '../types'
 
 /**
  * Every state change flows through one of these. The reducer applies it to
@@ -71,17 +70,6 @@ export type Action =
       prerequisiteSeriesId: string
       prerequisiteDate: string
     }
-  | { type: 'renamePerson'; id: PersonId; name: string }
-  | { type: 'recolorPerson'; id: PersonId; color: ColorKey }
-  // Personal (per-user) colour override for a person's lane — only the current
-  // user sees it. `clearColorPref` reverts to the shared `Person.color`.
-  | { type: 'setColorPref'; personId: PersonId; color: ColorKey }
-  | { type: 'clearColorPref'; personId: PersonId }
-  // Stamp the device's IANA timezone into the per-user preferences, for the
-  // server-side reminder sender. Dispatched automatically on startup.
-  | { type: 'setTimezone'; timezone: string }
-  // Per-user choice of Week tab layout (day-card list vs hourly timeline grid).
-  | { type: 'setWeekLayout'; layout: WeekLayout }
   | { type: 'shiftWeek'; delta: number }
   | { type: 'setWeek'; weekStart: string }
   | { type: 'shiftDay'; delta: number }

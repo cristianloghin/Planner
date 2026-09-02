@@ -224,36 +224,6 @@ export function reducer(state: AppState, action: Action): AppState {
       else delete listLinks[key]
       return { ...state, listLinks }
     }
-    case 'renamePerson':
-      return {
-        ...state,
-        people: { ...state.people, [action.id]: { ...state.people[action.id], name: action.name } },
-      }
-    case 'recolorPerson':
-      return {
-        ...state,
-        people: {
-          ...state.people,
-          [action.id]: { ...state.people[action.id], color: action.color },
-        },
-      }
-    case 'setColorPref':
-      return {
-        ...state,
-        preferences: {
-          ...state.preferences,
-          personColors: { ...state.preferences.personColors, [action.personId]: action.color },
-        },
-      }
-    case 'clearColorPref': {
-      const personColors = { ...state.preferences.personColors }
-      delete personColors[action.personId]
-      return { ...state, preferences: { ...state.preferences, personColors } }
-    }
-    case 'setTimezone':
-      return { ...state, preferences: { ...state.preferences, timezone: action.timezone } }
-    case 'setWeekLayout':
-      return { ...state, preferences: { ...state.preferences, weekLayout: action.layout } }
     case 'shiftWeek':
       return { ...state, weekStart: addDays(state.weekStart, action.delta * 7) }
     case 'setWeek':

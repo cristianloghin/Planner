@@ -15,10 +15,7 @@ const queueKey = (accountId: string) => `planner.pendingWrites.v1.${accountId}`
 
 /** The data fields worth carrying across launches — weekStart/selectedDay are
  *  per-session navigation and re-derive from "today". */
-type Snapshot = Pick<
-  AppState,
-  'people' | 'lists' | 'events' | 'dependencies' | 'listLinks' | 'preferences'
->
+type Snapshot = Pick<AppState, 'lists' | 'events' | 'dependencies' | 'listLinks'>
 
 export function readSnapshot(accountId: string): Snapshot | null {
   try {
@@ -35,12 +32,10 @@ export function readSnapshot(accountId: string): Snapshot | null {
 
 export function writeSnapshot(accountId: string, state: AppState): void {
   const snap: Snapshot = {
-    people: state.people,
     lists: state.lists,
     events: state.events,
     dependencies: state.dependencies,
     listLinks: state.listLinks,
-    preferences: state.preferences,
   }
   try {
     localStorage.setItem(snapshotKey(accountId), JSON.stringify(snap))

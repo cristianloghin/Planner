@@ -543,7 +543,7 @@ stays in localStorage. Both are *how*, not *what* (R13).
 | File | Becomes |
 |---|---|
 | `App.tsx` | `Root` gate → route guard (**still imperative**: a guard needs a non-React `isAuthenticated()`, so it waits on `services/session`); tab shell → `layouts/AppShell` (**still in `App.tsx`**); route map → ~~`routes/routes.ts`~~ **done** |
-| `state.tsx` | reducer state → domains; write queue → mutation `scope`; offline → Query persister; realtime channel → ~~`client/realtime.ts`~~ **done**, routing → ~~`services/realtime` + `queryKeysForTable`~~ **done**; edit guard → derived from route |
+| `state.tsx` | reducer state → domains (**people and preferences done**; events, dependencies, lists, links remain); write queue → mutation `scope`; offline → Query persister; realtime channel → ~~`client/realtime.ts`~~ **done**, routing → ~~`services/realtime` + `queryKeysForTable`~~ **done**; edit guard → derived from route |
 | `auth.tsx` | SDK calls → ~~`client/auth.ts`~~ **done**; session + non-React accessors → `services/session`; credential ops → `domains/auth`; `ensureAccount` → `domains/account` over ~~`client/account.ts`~~ **done**; sign-out cache/snapshot clearing → shell orchestration |
 | `store/store.ts` | deleted (`ScheduleStore`, `LocalStorageStore`, `defaultState`) |
 | `store/supabaseStore.ts` | ~~sliced into `client/*` by table; mappers to `client/mappers.ts`~~ **done** — deletes once the domains adopt them |
@@ -579,7 +579,7 @@ of coupling that breaks quietly later.
 | `lib/conflicts.ts` | ~~`services/conflicts`~~ **moved** |
 | `lib/notifications.ts` | ~~`services/notifications`~~ **moved**, with AlertHost's lifecycle as `useDueAlerts` |
 | `lib/useSwipeGestures.ts` | ~~`services/gestures`~~ **moved** |
-| `lib/{people,attachments,lists}.ts` | domain selectors in `domains/{people,events,lists}` — `people` and the `lists` helpers **built**; `attachments`' filters folded into `domains/events/transformers`. `lib/timing.ts` went to `services/recurrence` instead, not to a domain — see §2 |
+| `lib/{people,attachments,lists}.ts` | domain selectors in `domains/{people,events,lists}` — ~~`lib/people.ts`~~ **adopted and deleted**, the `lists` helpers **built**; `attachments`' filters folded into `domains/events/transformers`. `lib/timing.ts` went to `services/recurrence` instead, not to a domain — see §2 |
 | `lib/{useLatest,useMediaQuery,useSearch}.ts` | `assets/hooks` |
 | `lib/{dates,id,cx}.ts` | `assets/utils` |
 | `lib/palette.ts` | `assets/palette.ts` |

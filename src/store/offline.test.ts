@@ -41,12 +41,10 @@ function ev(id: string): CalendarEvent {
 
 function state(over: Partial<AppState> = {}): AppState {
   return {
-    people: {},
     lists: [],
     events: [],
     dependencies: {},
     listLinks: {},
-    preferences: { personColors: {} },
     weekStart: '2026-06-15',
     selectedDay: 0,
     ...over,

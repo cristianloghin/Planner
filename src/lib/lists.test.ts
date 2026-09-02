@@ -19,12 +19,10 @@ function item(over: Partial<ListItem> = {}): ListItem {
 
 function stateWithLists(lists: TodoList[]): AppState {
   return {
-    people: {},
     lists,
     events: [],
     dependencies: {},
     listLinks: {},
-    preferences: { personColors: {} },
     weekStart: '2026-06-15',
     selectedDay: 0,
   }
