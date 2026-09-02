@@ -413,8 +413,11 @@ app decision:
   and its non-React accessors *on top of them*, and `domains/auth` exposes sign-in
   as a mutation.
 - `client/realtime.ts` opens the channel, retries a dead one and reports which
-  table changed; `services/realtime` maps table → query keys to invalidate. Which
-  keys a table maps to is app knowledge, not Supabase's.
+  table changed; `services/realtime` folds a burst of those reports into one.
+  Which keys a table maps to is app knowledge, not Supabase's — and not the
+  service's either, since R4 also keeps it from importing a domain's keys. So
+  the map is `queryKeysForTable` in `domains/index.ts`, and the caller
+  (`state.tsx` now, the shell later) hands the service both ends.
 
 `domains/auth` is built and deliberately does **not** register durable defaults:
 replaying a sign-in after a restart is meaningless, and the password should not sit
