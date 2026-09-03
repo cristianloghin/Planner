@@ -73,15 +73,15 @@ values (
 )
 on conflict do nothing;
 
--- Two adults and a child, so supervision checks and the "Both" label have
--- something to work with. Colours are palette keys, not hex.
-insert into person (id, account_id, user_id, name, color_key, kind, sort_order) values
+-- Three people. There is no kind of person: a lane each, in sort order.
+-- Colours are palette keys, not hex.
+insert into person (id, account_id, user_id, name, color_key, sort_order) values
   ('33333333-0000-4000-8000-000000000001', '22222222-2222-4222-8222-222222222222',
-   '11111111-1111-4111-8111-111111111111', 'Dev',  '1',  'adult', 0),
+   '11111111-1111-4111-8111-111111111111', 'Dev',  '1', 0),
   ('33333333-0000-4000-8000-000000000002', '22222222-2222-4222-8222-222222222222',
-   null, 'Partner', '5',  'adult', 1),
+   null, 'Partner', '5', 1),
   ('33333333-0000-4000-8000-000000000003', '22222222-2222-4222-8222-222222222222',
-   null, 'Kid',     '9',  'child', 2)
+   null, 'Kid',     '9', 2)
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------

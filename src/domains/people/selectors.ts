@@ -22,56 +22,22 @@ export function byId(people: Person[]): Record<PersonId, Person> {
   return out
 }
 
-/** Adults hold a full lane and can supervise. */
-export function adults(people: Person[]): Person[] {
-  return people.filter((p) => p.kind === 'adult')
-}
-
-/** Children get a narrow lane and need a free adult on their events. */
-export function children(people: Person[]): Person[] {
-  return people.filter((p) => p.kind === 'child')
-}
-
 /** One person, or undefined if they are not in the account. */
 export function personFor(id: PersonId) {
   return (people: Person[]): Person | undefined => people.find((p) => p.id === id)
 }
 
-/** True when any of these people is a child, so the event needs a free adult. */
-export function involvesChildFor(attendees: PersonId[]) {
-  return (people: Person[]): boolean => {
-    const kinds = byId(people)
-    return attendees.some((id) => kinds[id]?.kind === 'child')
-  }
-}
-
-/**
- * True when these are exactly all the adults, and there are at least two of
- * them — the merged block that spans the adult lanes rather than sitting in
- * one.
- */
-export function isAllAdultsFor(attendees: PersonId[]) {
-  return (people: Person[]): boolean => {
-    const adultIds = adults(people).map((p) => p.id)
-    if (adultIds.length < 2 || attendees.length !== adultIds.length) return false
-    const set = new Set(attendees)
-    return adultIds.every((id) => set.has(id))
-  }
-}
-
-/** A short label: "Both", "Everyone", "Cris + Nora", or just "Anna". */
+/** A short label: "Cris + Nora", or just "Anna". */
 export function attendeeLabelFor(attendees: PersonId[]) {
   return (people: Person[]): string => {
-    if (isAllAdultsFor(attendees)(people)) return adults(people).length === 2 ? 'Both' : 'Everyone'
     const named = byId(people)
     return attendees.map((id) => named[id]?.name ?? '?').join(' + ')
   }
 }
 
-/** Who a new event starts with: the first adult, or failing that the first person. */
+/** Who a new event starts with: the first person in lane order. */
 export function defaultAttendees(people: Person[]): PersonId[] {
-  const first = adults(people)[0] ?? people[0]
-  return first ? [first.id] : []
+  return people[0] ? [people[0].id] : []
 }
 
 /**

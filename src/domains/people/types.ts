@@ -6,4 +6,4 @@
  * from them. A domain re-declares a type when it genuinely differs — see
  * domains/events, where a Series becomes something else.
  */
-export type { Person, PersonId, PersonKind } from '../../client/people'
+export type { Person, PersonId } from '../../client/people'

@@ -1,5 +1,5 @@
-import { AlertTriangle, Bell, ChevronLeft, ChevronRight, CircleDashed } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Bell, ChevronLeft, ChevronRight } from 'lucide-react'
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '../account'
 import { useLatest } from '../assets/hooks/useLatest'
 import { type ColorKey, colorStyle } from '../assets/palette'
@@ -11,11 +11,10 @@ import { useEvents } from '../domains/events/queries'
 import { hasReminders } from '../domains/events/selectors'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { usePeople } from '../domains/people/queries'
-import { byId, eventColorKey, personColorKey } from '../domains/people/selectors'
+import { eventColorKey, personColorKey } from '../domains/people/selectors'
 import { usePreferences } from '../domains/preferences/queries'
 import { personColors } from '../domains/preferences/selectors'
 import { useCalendarNavigation } from '../navigation'
-import { type Busy, type ChildStatus, childStatuses } from '../services/conflicts'
 import { loadZoom, pageInert, useSwipeGestures } from '../services/gestures'
 import {
   type DayOccurrence,
@@ -41,7 +40,6 @@ export function DayView() {
   const day = nav.selectedDay
   const { data: people = [] } = usePeople(accountId)
   const { data: overrides = {} } = usePreferences(accountId, userId, personColors)
-  const peopleById = useMemo(() => byId(people), [people])
   const [editor, setEditor] = useState<EditorTarget | null>(null)
   const [sheet, setSheet] = useState<{
     event: CalendarEvent
@@ -130,21 +128,12 @@ export function DayView() {
           .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end }))
         const allDayOccs = occs.filter((o) => o.event.allDay)
 
-        // Coverage looks at the whole day: all-day events count as busy 00:00–24:00.
-        const coverage: Busy[] = occs.map((o) => ({
-          id: o.event.id,
-          attendees: o.event.attendees,
-          start: o.event.allDay ? 0 : o.segment.start,
-          end: o.event.allDay ? DAY_MIN : o.segment.end,
-        }))
-        const statuses = childStatuses(coverage, peopleById)
-        return { iso, timedBlocks, allDayOccs, statuses }
+        return { iso, timedBlocks, allDayOccs }
       }),
-    [events, completions, peopleById, prevISO, dateISO, nextISO],
+    [events, completions, prevISO, dateISO, nextISO],
   )
-  // The header (lane names, all-day chips, warning badge) shows the visible day.
-  const { allDayOccs, statuses } = pages[1]
-  const hasWarnings = [...statuses.values()].some((st) => st !== 'covered')
+  // The header (lane names, all-day chips) shows the visible day.
+  const { allDayOccs } = pages[1]
 
   const fullHeight = DAY_MIN * pxPerMin
 
@@ -171,7 +160,6 @@ export function DayView() {
         onToday={goToday}
         todayActive={isToday}
         onPickSearch={openSearchHit}
-        rightExtra={hasWarnings && <AlertTriangle className={s.alertBadge} />}
         nav={
           <div className={shared.weekNav}>
             <button type="button" onClick={() => nav.shiftDay(-1)} aria-label="Previous day">
@@ -186,7 +174,7 @@ export function DayView() {
       >
         <div className={s.plannerHead}>
           <div />
-          <div className={s.laneHeads}>
+          <div className={s.laneHeads} style={{ '--lanes': people.length } as CSSProperties}>
             {people.map((p) => (
               <div
                 key={p.id}
@@ -205,7 +193,6 @@ export function DayView() {
                         key={`${o.event.id}:${o.start}`}
                         occ={o}
                         personId={p.id}
-                        status={statuses.get(o.event.id)}
                         onClick={() => openSheet(o)}
                         people={people}
                         overrides={overrides}
@@ -241,7 +228,7 @@ export function DayView() {
                 <div
                   key={page.iso}
                   className={s.lanes}
-                  style={{ height: fullHeight }}
+                  style={{ height: fullHeight, '--lanes': people.length } as CSSProperties}
                   {...pageInert(pageIdx === 1)}
                 >
                   {people.map((p) => (
@@ -249,7 +236,6 @@ export function DayView() {
                       key={p.id}
                       person={p}
                       blocks={page.timedBlocks}
-                      statuses={page.statuses}
                       nowMin={page.iso === nowISO ? nowMin : null}
                       pxPerMin={pxPerMin}
                       onAddAt={(min) => addAt(page.iso, [p.id], min)}
@@ -287,13 +273,11 @@ export function DayView() {
   )
 }
 
-/** Compact badges shown on a block / chip: reminders, kid status. */
-function badges(event: CalendarEvent, status: ChildStatus | undefined) {
+/** Compact badges shown on a block / chip. */
+function badges(event: CalendarEvent) {
   return (
     <span className={s.badges}>
       {hasReminders(event) && <Bell className={s.badgeIcon} aria-label="Reminders" />}
-      {status === 'clash' && <AlertTriangle className={s.badgeIcon} aria-label="Clash" />}
-      {status === 'needs' && <CircleDashed className={s.badgeIcon} aria-label="Needs attention" />}
     </span>
   )
 }
@@ -301,14 +285,12 @@ function badges(event: CalendarEvent, status: ChildStatus | undefined) {
 function AllDayChip({
   occ,
   personId,
-  status,
   onClick,
   people,
   overrides,
 }: {
   occ: DayOccurrence
   personId: PersonId
-  status: ChildStatus | undefined
   onClick: () => void
   /** Everyone in the account, in lane order, and this user's colour overrides. */
   people: Person[]
@@ -318,15 +300,11 @@ function AllDayChip({
   return (
     <button
       type="button"
-      className={cx(
-        s.alldayChip,
-        status === 'clash' && s.warnClash,
-        status === 'needs' && s.warnNeeds,
-      )}
+      className={cx(s.alldayChip)}
       style={colorStyle(eventColorKey(people, overrides, personId, event.colorKey))}
       onClick={onClick}
     >
-      <span className={s.alldayMeta}>{badges(event, status)}</span>
+      <span className={s.alldayMeta}>{badges(event)}</span>
       <span className={s.alldayTitle}>{event.title}</span>
       {occ.span > 1 && <span className={s.allDayOffset}>{`${occ.offset + 1}/${occ.span}`}</span>}
     </button>
@@ -336,7 +314,6 @@ function AllDayChip({
 function Lane({
   person,
   blocks,
-  statuses,
   nowMin,
   pxPerMin,
   onAddAt,
@@ -346,7 +323,6 @@ function Lane({
 }: {
   person: Person
   blocks: TimeBlock[]
-  statuses: Map<string, ChildStatus>
   nowMin: number | null
   pxPerMin: number
   onAddAt: (minute: number) => void
@@ -377,17 +353,12 @@ function Lane({
 
       {laid.map(({ block, col, cols }) => {
         const ev = block.occ.event
-        const status = statuses.get(ev.id)
         const joint = ev.attendees.length > 1
         return (
           <button
             type="button"
             key={`${ev.id}:${block.occ.start}`}
-            className={cx(
-              s.tlEvent,
-              status === 'clash' && s.warnClash,
-              status === 'needs' && s.warnNeeds,
-            )}
+            className={cx(s.tlEvent)}
             style={{
               top: block.start * pxPerMin,
               height: Math.max((block.end - block.start) * pxPerMin, 16),
@@ -405,7 +376,7 @@ function Lane({
                   ↔ moved
                 </span>
               )}
-              {badges(ev, status)}
+              {badges(ev)}
             </span>
             <span className={s.tlTitle}>{ev.title}</span>
             {joint && <Avatars attendees={ev.attendees} />}

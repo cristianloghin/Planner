@@ -72,28 +72,6 @@
   font-size: var(--fs-md);
 }
 
-.alldayChip.warnNeeds {
-  outline: 2px dashed var(--warning);
-  outline-offset: -2px;
-}
-
-.alldayChip.warnClash {
-  outline: 2px solid var(--danger);
-  outline-offset: -2px;
-}
-
-.alertBadge {
-  color: var(--danger);
-}
-
-.warnKey.clash {
-  color: var(--danger);
-}
-
-.warnKey.needs {
-  color: var(--warning);
-}
-
 .plannerHead {
   display: grid;
   grid-template-columns: var(--gutter-w) 1fr;
@@ -101,9 +79,10 @@
 
 .laneHeads {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* One equal column per person — set from people.length, so a fourth person
+     does not wrap to a second row and two do not leave an empty third. */
+  grid-template-columns: repeat(var(--lanes, 1), minmax(0, 1fr));
   border-right: 1px solid var(--border);
-  /* grid-template-columns is set inline (data-driven, Nora's lane is narrower). */
 }
 
 .laneHead {
@@ -140,9 +119,10 @@
 
 .lanes {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* One equal column per person — set from people.length, so a fourth person
+     does not wrap to a second row and two do not leave an empty third. */
+  grid-template-columns: repeat(var(--lanes, 1), minmax(0, 1fr));
   border-right: 1px solid var(--border);
-  /* grid-template-columns is set inline (data-driven, Nora's lane is narrower). */
 }
 
 .lanes {
@@ -245,16 +225,4 @@
   height: 8px;
   border-radius: 50%;
   background: var(--now);
-}
-
-/* Conflict markers on Nora's blocks. */
-.tlEvent.warnNeeds {
-  outline: 2px dashed var(--warning);
-  outline-offset: -2px;
-}
-
-.tlEvent.warnClash {
-  outline: 2px solid var(--danger);
-  outline-offset: -2px;
-  box-shadow: 0 0 0 3px var(--danger-glow);
 }

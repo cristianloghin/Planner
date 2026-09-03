@@ -182,6 +182,16 @@ drop table rsvp_status, participant_role;
 
 
 -- ---------------------------------------------------------------------------
+-- §10. Adults and children — there is no kind of person.
+-- ---------------------------------------------------------------------------
+
+-- Nothing follows from who is on an event any more: no supervision check, no
+-- clash or needs-attention badge, no merged block, no narrow lane, no "Both"
+-- label, no first-adult default. The check constraint goes with the column,
+-- and with it the schema's last enumeration of any kind.
+alter table person drop column kind;
+
+-- ---------------------------------------------------------------------------
 -- §6d. `person.color` holds a palette key — name it like event_series.color_key.
 -- ---------------------------------------------------------------------------
 
@@ -204,7 +214,7 @@ begin
 end;
 $$;
 
--- §6c: no `account_member.role`. §6d: `person.color_key`.
+-- §6c: no `account_member.role`. §6d: `person.color_key`. §10: no `kind`.
 -- `create or replace` keeps the grant from 0003.
 create or replace function create_account(p_name text)
 returns uuid
@@ -217,8 +227,8 @@ begin
   end if;
   insert into account (name) values (p_name) returning id into v_id;
   insert into account_member (account_id, user_id) values (v_id, auth.uid());
-  insert into person (account_id, user_id, name, color_key, kind, sort_order)
-  values (v_id, auth.uid(), 'Me', '8', 'adult', 0);
+  insert into person (account_id, user_id, name, color_key, sort_order)
+  values (v_id, auth.uid(), 'Me', '8', 0);
   return v_id;
 end;
 $$;

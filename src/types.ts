@@ -12,5 +12,5 @@ export type {
   RecurrenceFreq,
 } from './domains/events/types'
 export type { CompletionsMap, OccurrenceState } from './domains/occurrences/types'
-export type { Person, PersonId, PersonKind } from './domains/people/types'
+export type { Person, PersonId } from './domains/people/types'
 export type { Preferences, WeekLayout } from './domains/preferences/types'

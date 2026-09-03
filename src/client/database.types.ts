@@ -280,7 +280,6 @@ export type Database = {
           color_key: string
           created_at: string
           id: string
-          kind: string
           name: string
           sort_order: number
           user_id: string | null
@@ -290,7 +289,6 @@ export type Database = {
           color_key?: string
           created_at?: string
           id?: string
-          kind?: string
           name: string
           sort_order?: number
           user_id?: string | null
@@ -300,7 +298,6 @@ export type Database = {
           color_key?: string
           created_at?: string
           id?: string
-          kind?: string
           name?: string
           sort_order?: number
           user_id?: string | null

@@ -2,29 +2,24 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_COLOR } from '../../assets/palette'
 import { patchRecolor, patchRename } from './patches'
 import {
-  adults,
   attendeeLabelFor,
   byId,
-  children,
   defaultAttendees,
   eventColorKey,
-  involvesChildFor,
-  isAllAdultsFor,
   personColorKey,
 } from './selectors'
 import type { Person } from './types'
 
-const person = (id: string, name: string, kind: Person['kind'], sortOrder: number): Person => ({
+const person = (id: string, name: string, sortOrder: number): Person => ({
   id,
   name,
   color: '1',
-  kind,
   sortOrder,
 })
 
-const cris = person('a', 'Cris', 'adult', 0)
-const nora = person('b', 'Nora', 'adult', 1)
-const anna = person('c', 'Anna', 'child', 2)
+const cris = person('a', 'Cris', 0)
+const nora = person('b', 'Nora', 1)
+const anna = person('c', 'Anna', 2)
 const people = [cris, nora, anna]
 
 describe('byId', () => {
@@ -37,45 +32,11 @@ describe('byId', () => {
   })
 })
 
-describe('adults / children', () => {
-  it('splits by kind, keeping lane order', () => {
-    expect(adults(people)).toEqual([cris, nora])
-    expect(children(people)).toEqual([anna])
-  })
-})
-
-describe('involvesChildFor', () => {
-  it('is true when any attendee is a child', () => {
-    expect(involvesChildFor(['a', 'c'])(people)).toBe(true)
-    expect(involvesChildFor(['a', 'b'])(people)).toBe(false)
-  })
-
-  it('ignores ids that are not in the account', () => {
-    expect(involvesChildFor(['nobody'])(people)).toBe(false)
-  })
-})
-
-describe('isAllAdultsFor', () => {
-  it('is true only for exactly all the adults', () => {
-    expect(isAllAdultsFor(['a', 'b'])(people)).toBe(true)
-    expect(isAllAdultsFor(['b', 'a'])(people)).toBe(true)
-    expect(isAllAdultsFor(['a'])(people)).toBe(false)
-    expect(isAllAdultsFor(['a', 'b', 'c'])(people)).toBe(false)
-  })
-
-  it('needs at least two adults, so a lone adult is just themselves', () => {
-    expect(isAllAdultsFor(['a'])([cris, anna])).toBe(false)
-  })
-})
-
 describe('attendeeLabelFor', () => {
-  it('says Both for two adults and Everyone for more', () => {
-    expect(attendeeLabelFor(['a', 'b'])(people)).toBe('Both')
-    const three = [cris, nora, person('d', 'Sam', 'adult', 3)]
-    expect(attendeeLabelFor(['a', 'b', 'd'])(three)).toBe('Everyone')
-  })
-
-  it('names people otherwise, in the order given', () => {
+  it('names people in the order given, however many', () => {
+    // No "Both" and no "Everyone": there is no kind of person to collapse.
+    expect(attendeeLabelFor(['a', 'b'])(people)).toBe('Cris + Nora')
+    expect(attendeeLabelFor(['a', 'b', 'c'])(people)).toBe('Cris + Nora + Anna')
     expect(attendeeLabelFor(['a'])(people)).toBe('Cris')
     expect(attendeeLabelFor(['a', 'c'])(people)).toBe('Cris + Anna')
     expect(attendeeLabelFor(['c', 'a'])(people)).toBe('Anna + Cris')
@@ -87,12 +48,9 @@ describe('attendeeLabelFor', () => {
 })
 
 describe('defaultAttendees', () => {
-  it('starts a new event with the first adult', () => {
+  it('starts a new event with the first person in lane order', () => {
     expect(defaultAttendees(people)).toEqual(['a'])
-  })
-
-  it('falls back to the first person when there are no adults', () => {
-    expect(defaultAttendees([anna])).toEqual(['c'])
+    expect(defaultAttendees([anna, cris])).toEqual(['c'])
   })
 
   it('is empty when there is nobody', () => {

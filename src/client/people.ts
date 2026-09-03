@@ -11,12 +11,6 @@ import { supabase } from './supabase'
 /** A person's id — an opaque string (a database uuid), not a fixed set. */
 export type PersonId = string
 
-/**
- * Adults hold a full lane and can supervise; children get a narrow lane and
- * need a free adult on their events.
- */
-export type PersonKind = 'adult' | 'child'
-
 export interface Person {
   id: PersonId
   name: string
@@ -26,17 +20,12 @@ export interface Person {
    * in ./preferences.
    */
   color: string
-  kind: PersonKind
   /** Lane order, ascending. */
   sortOrder: number
 }
 
 /**
  * Everyone in the account, in lane order.
- *
- * `kind` comes back as free text from the database, so anything that isn't
- * exactly `child` is read as an adult — a lane always renders, whatever is in
- * the column.
  *
  * Returned as a list, in the order the database gave. Looking people up by id
  * is a different shape for a different purpose, and belongs to whoever needs it
@@ -45,7 +34,7 @@ export interface Person {
 export async function fetchPeople(accountId: string): Promise<Person[]> {
   const { data, error } = await supabase
     .from('person')
-    .select('id, name, color_key, kind, sort_order')
+    .select('id, name, color_key, sort_order')
     .eq('account_id', accountId)
     .order('sort_order')
   if (error) throw error
@@ -53,7 +42,6 @@ export async function fetchPeople(accountId: string): Promise<Person[]> {
     id: p.id,
     name: p.name,
     color: p.color_key,
-    kind: p.kind === 'child' ? 'child' : 'adult',
     sortOrder: p.sort_order,
   }))
 }
