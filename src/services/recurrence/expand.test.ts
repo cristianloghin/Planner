@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CalendarEvent, Recurrence } from '../../domains/events/types'
-import {
-  nextStartOnOrAfter,
-  occurrenceIndex,
-  occurrencesOnDate,
-  recurrenceLabel,
-  startsOn,
-} from './expand'
+import { nextStartOnOrAfter, occurrencesOnDate, recurrenceLabel, startsOn } from './expand'
 
 /** Minimal all-day event factory; the recurrence math only reads start/recurrence. */
 function ev(
@@ -106,30 +100,28 @@ describe('nextStartOnOrAfter', () => {
   })
 })
 
-describe('occurrenceIndex', () => {
-  it('numbers daily and weekly slots by plain division', () => {
+describe('slot arithmetic, as the rule library produces it', () => {
+  it('places daily and weekly slots on the interval', () => {
     const daily = ev('2026-06-15', { freq: 'daily', interval: 3 })
-    expect(occurrenceIndex(daily, '2026-06-15')).toBe(0)
-    expect(occurrenceIndex(daily, '2026-06-18')).toBe(1)
-    expect(occurrenceIndex(daily, '2026-06-16')).toBeNull() // off-grid
+    expect(startsOn(daily, '2026-06-18')).toBe(true)
+    expect(startsOn(daily, '2026-06-16')).toBe(false)
     const weekly = ev('2026-06-15', { freq: 'weekly', interval: 2 })
-    expect(occurrenceIndex(weekly, '2026-06-29')).toBe(1)
-    expect(occurrenceIndex(weekly, '2026-06-22')).toBeNull()
+    expect(startsOn(weekly, '2026-06-29')).toBe(true)
+    expect(startsOn(weekly, '2026-06-22')).toBe(false)
   })
 
-  it('is null before the anchor, and 0 on it for a one-off', () => {
-    expect(occurrenceIndex(ev('2026-06-15'), '2026-06-15')).toBe(0)
-    expect(occurrenceIndex(ev('2026-06-15'), '2026-06-14')).toBeNull()
-    expect(occurrenceIndex(ev('2026-06-15'), '2026-06-16')).toBeNull()
-  })
-
-  it('counts only months that produce a slot, so a skipped Feb costs nothing', () => {
-    // Anchored on the 31st: February produces nothing and must not consume one
-    // of a counted series' N, or "12 lessons on the 31st" yields fewer than 12.
-    const e = ev('2026-01-31', { freq: 'monthly', interval: 1 })
-    expect(occurrenceIndex(e, '2026-01-31')).toBe(0)
-    expect(occurrenceIndex(e, '2026-03-31')).toBe(1) // NOT 2 — Feb was skipped
-    expect(occurrenceIndex(e, '2026-05-31')).toBe(2) // April has no 31st either
+  it('a month without the anchor day produces nothing, and costs no slot', () => {
+    // Anchored on the 31st: February and April produce nothing, and for a
+    // counted series those missing months must not consume one of the N, or
+    // "4 lessons on the 31st" would yield fewer than 4.
+    const e = ev('2026-01-31', { freq: 'monthly', interval: 1, count: 4 })
+    expect(startsOn(e, '2026-01-31')).toBe(true)
+    expect(startsOn(e, '2026-02-28')).toBe(false)
+    expect(startsOn(e, '2026-03-31')).toBe(true)
+    expect(startsOn(e, '2026-04-30')).toBe(false)
+    expect(startsOn(e, '2026-05-31')).toBe(true)
+    expect(startsOn(e, '2026-07-31')).toBe(true) // the 4th
+    expect(startsOn(e, '2026-08-31')).toBe(false) // there is no 5th
   })
 })
 
