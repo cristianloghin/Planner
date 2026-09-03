@@ -14,6 +14,7 @@ import {
   weekRangeLabel,
 } from '../assets/utils/dates'
 import { useAuth } from '../auth'
+import { useEvents } from '../domains/events/queries'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { usePeople } from '../domains/people/queries'
 import { defaultAttendees, eventColorKey } from '../domains/people/selectors'
@@ -42,6 +43,7 @@ export function WeekCalendar() {
   const { state, dispatch } = useApp()
   const { accountId, session } = useAuth()
   const userId = session?.user.id ?? null
+  const { data: events = [] } = useEvents(accountId)
   const { data: people = [] } = usePeople(accountId)
   const { data: overrides = {} } = usePreferences(accountId, userId, personColors)
   const { data: layout = 'list' } = usePreferences(accountId, userId, weekLayout)
@@ -67,20 +69,20 @@ export function WeekCalendar() {
         DAY_NAMES.map((_, dayIdx) => {
           const dateISO = addDays(state.weekStart, weekOffset + dayIdx)
           // All-day items first, then timed by start.
-          const occs = occurrencesOnDate(state.events, dateISO, completions).sort((a, b) => {
+          const occs = occurrencesOnDate(events, dateISO, completions).sort((a, b) => {
             if (a.event.allDay !== b.event.allDay) return a.event.allDay ? -1 : 1
             return a.segment.start - b.segment.start
           })
           return { dateISO, occs }
         }),
       ),
-    [state.weekStart, state.events, completions],
+    [state.weekStart, events, completions],
   )
 
   // Open a search hit: jump the week to its next upcoming occurrence (falling
   // back to the series anchor for an ended series) and open the editor there.
   function openEvent(seriesId: string) {
-    const event = state.events.find((e) => e.id === seriesId)
+    const event = events.find((e) => e.id === seriesId)
     if (!event) return
     const date = nextRelevantDate(event)
     dispatch({ type: 'setWeek', weekStart: mondayOf(new Date(`${date}T00:00:00`)) })

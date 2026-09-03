@@ -7,28 +7,29 @@ import { PageLoader } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
 import { addDays, isoLabel, minutesToTime } from '../assets/utils/dates'
 import { useAuth } from '../auth'
+import { useEvents } from '../domains/events/queries'
 import { timingOf } from '../domains/events/selectors'
 import { type ListsChange, useListsWrite } from '../domains/lists/mutations'
 import { useListLinks, useLists } from '../domains/lists/queries'
 import { findItemFor, isOverdue } from '../domains/lists/selectors'
 import { useOccurrencesWrite } from '../domains/occurrences/mutations'
-import { useCompletionsForRange } from '../domains/occurrences/queries'
+import { useCompletionsForRange, useDependencies } from '../domains/occurrences/queries'
 import { usePeople } from '../domains/people/queries'
 import { attendeeLabelFor } from '../domains/people/selectors'
 import { checklists, notes, reminderOffsets } from '../lib/attachments'
 import { offsetLabel } from '../lib/notifications'
-import {
-  blockingPrerequisites,
-  isOccurrenceDone,
-  occKey,
-  occurrenceEffectiveStatus,
-} from '../lib/occurrences'
 import {
   effectiveOccurrence,
   recurrenceLabel,
   seriesOccurrenceDatesInRange,
 } from '../lib/recurrence'
 import { MINS_PER_DAY, eventDate, eventSpanDays, eventStartMinutes } from '../lib/timing'
+import {
+  blockingPrerequisites,
+  isOccurrenceDone,
+  occKey,
+  occurrenceEffectiveStatus,
+} from '../services/recurrence/status'
 import { useApp } from '../state'
 import type { CalendarEvent, CompletionsMap, OccurrenceStatusCode } from '../types'
 import s from './OccurrenceSheet.module.css'
@@ -51,12 +52,14 @@ export function OccurrenceSheet({
   onEdit: () => void
   onClose: () => void
 }) {
-  const { state, dispatch } = useApp()
+  const { dispatch } = useApp()
   const { accountId } = useAuth()
   const { data: people = [] } = usePeople(accountId)
+  const { data: events = [] } = useEvents(accountId)
+  const { data: dependencies = {} } = useDependencies(accountId)
   // Windowed per-occurrence state: this occurrence's month, plus the dates of
   // any prerequisites it waits on (they may live outside the window).
-  const edges = state.dependencies[occKey(event.id, date)] ?? []
+  const edges = dependencies[occKey(event.id, date)] ?? []
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the joined dates so the memo survives `edges` getting a fresh identity with unchanged contents
   const prereqDates = useMemo(
     () => [...new Set(edges.map((e) => e.prerequisiteDate))].sort(),
@@ -78,7 +81,7 @@ export function OccurrenceSheet({
   const occState = completions[occKey(event.id, date)]
   const checked = occState?.checked ?? {}
   const status = occState?.status
-  const blockers = blockingPrerequisites(state, completions, event, date)
+  const blockers = blockingPrerequisites(dependencies, events, completions, event, date)
   // A one-off override on this slot. `date` is the occurrence's identity (the day
   // the series would normally place it); if the override's start lands on another
   // day, it's been moved there.
@@ -443,9 +446,12 @@ function DependencyEditor({
   date: string
   completions: CompletionsMap
 }) {
-  const { state, dispatch } = useApp()
-  const edges = state.dependencies[occKey(event.id, date)] ?? []
-  const others = state.events.filter((e) => e.id !== event.id)
+  const { dispatch } = useApp()
+  const { accountId } = useAuth()
+  const { data: events = [] } = useEvents(accountId)
+  const { data: dependencies = {} } = useDependencies(accountId)
+  const edges = dependencies[occKey(event.id, date)] ?? []
+  const others = events.filter((e) => e.id !== event.id)
 
   const [prereqId, setPrereqId] = useState('')
   const [prereqDate, setPrereqDate] = useState('')
@@ -480,7 +486,7 @@ function DependencyEditor({
       {edges.length > 0 && (
         <ul className={s.depList}>
           {edges.map((edge) => {
-            const dep = state.events.find((e) => e.id === edge.prerequisiteSeriesId)
+            const dep = events.find((e) => e.id === edge.prerequisiteSeriesId)
             const actual = dep
               ? occurrenceEffectiveStatus(completions, dep, edge.prerequisiteDate)
               : null

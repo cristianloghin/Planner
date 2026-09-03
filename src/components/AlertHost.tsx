@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLatest } from '../assets/hooks/useLatest'
 import { addDays, toISODate } from '../assets/utils/dates'
 import { useAuth } from '../auth'
+import { useEvents } from '../domains/events/queries'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { type FiredAlert, dueAlerts } from '../lib/notifications'
-import { useApp } from '../state'
 import s from './AlertHost.module.css'
 
 const SEEN_KEY = 'planner.alertsSeen'
@@ -23,8 +23,8 @@ function loadSeen(): number {
  * Fires only while the app is open (no background/push yet).
  */
 export function AlertHost() {
-  const { state } = useApp()
   const { accountId } = useAuth()
+  const { data: events = [] } = useEvents(accountId)
   const [active, setActive] = useState<FiredAlert[]>([])
   const seenRef = useRef(loadSeen())
 
@@ -39,7 +39,7 @@ export function AlertHost() {
     function check() {
       const now = Date.now()
       const from = Math.max(seenRef.current, now - MAX_LOOKBACK_MS)
-      const due = dueAlerts(state.events, completions, from, now)
+      const due = dueAlerts(events, completions, from, now)
       seenRef.current = now
       localStorage.setItem(SEEN_KEY, String(now))
       if (due.length) {
@@ -57,7 +57,7 @@ export function AlertHost() {
       window.clearInterval(iv)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [state.events, completions])
+  }, [events, completions])
 
   function dismiss(id: string) {
     setActive((prev) => prev.filter((a) => a.id !== id))

@@ -14,22 +14,24 @@ import { LoadingPill } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
 import { addDays, isoLabel, minutesToTime, toISODate } from '../assets/utils/dates'
 import { useAuth } from '../auth'
-import { useCompletionsForRange } from '../domains/occurrences/queries'
+import { useEvents } from '../domains/events/queries'
+import { useCompletionsForRange, useDependencies } from '../domains/occurrences/queries'
+import type { OccurrenceDependency } from '../domains/occurrences/types'
 import { usePeople } from '../domains/people/queries'
 import { byId, eventColorKey, personColorKey } from '../domains/people/selectors'
 import { usePreferences } from '../domains/preferences/queries'
 import { personColors } from '../domains/preferences/selectors'
 import { checklistEntries, hasReminders } from '../lib/attachments'
 import { type Busy, type ChildStatus, childStatuses } from '../lib/conflicts'
+import { type DayOccurrence, nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
+import { DAY_MIN, type TimeBlock, layoutBlocks } from '../lib/timelineLayout'
+import { loadZoom, pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
 import {
   isOccurrenceDone,
   occKey,
   occurrenceStatus,
   prerequisiteDatesInRange,
-} from '../lib/occurrences'
-import { type DayOccurrence, nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
-import { DAY_MIN, type TimeBlock, layoutBlocks } from '../lib/timelineLayout'
-import { loadZoom, pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
+} from '../services/recurrence/status'
 import { useApp } from '../state'
 import type { CalendarEvent, CompletionsMap, Person, PersonId } from '../types'
 import { Avatars } from './Avatars'
@@ -45,6 +47,8 @@ const ZOOM_KEY = 'planner:hourH'
 export function DayView() {
   const { state, dispatch } = useApp()
   const { accountId, session } = useAuth()
+  const { data: events = [] } = useEvents(accountId)
+  const { data: dependencies = {} } = useDependencies(accountId)
   const day = state.selectedDay
   const { data: people = [] } = usePeople(accountId)
   const { data: overrides = {} } = usePreferences(accountId, session?.user.id ?? null, personColors)
@@ -93,8 +97,8 @@ export function DayView() {
   const prevISO = addDays(dateISO, -1)
   const nextISO = addDays(dateISO, 1)
   const prereqDates = useMemo(
-    () => prerequisiteDatesInRange(state.dependencies, prevISO, nextISO),
-    [state.dependencies, prevISO, nextISO],
+    () => prerequisiteDatesInRange(dependencies, prevISO, nextISO),
+    [dependencies, prevISO, nextISO],
   )
   const { completions, isLoading: completionsLoading } = useCompletionsForRange(
     accountId,
@@ -138,7 +142,7 @@ export function DayView() {
   const pages = useMemo(
     () =>
       [prevISO, dateISO, nextISO].map((iso) => {
-        const occs = occurrencesOnDate(state.events, iso, completions)
+        const occs = occurrencesOnDate(events, iso, completions)
         const timedBlocks: TimeBlock[] = occs
           .filter((o) => !o.event.allDay)
           .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end }))
@@ -154,7 +158,7 @@ export function DayView() {
         const statuses = childStatuses(coverage, peopleById)
         return { iso, timedBlocks, allDayOccs, statuses }
       }),
-    [state.events, completions, peopleById, prevISO, dateISO, nextISO],
+    [events, completions, peopleById, prevISO, dateISO, nextISO],
   )
   // The header (lane names, all-day chips, warning badge) shows the visible day.
   const { allDayOccs, statuses } = pages[1]
@@ -165,7 +169,7 @@ export function DayView() {
   // Open a search hit: jump the day to the event's next upcoming occurrence
   // (falling back to the series anchor for an ended series) and open its editor.
   function openSearchHit(seriesId: string) {
-    const event = state.events.find((e) => e.id === seriesId)
+    const event = events.find((e) => e.id === seriesId)
     if (!event) return
     const date = nextRelevantDate(event)
     dispatch({ type: 'goToDate', date })
@@ -280,6 +284,8 @@ export function DayView() {
                       onOpen={openSheet}
                       people={people}
                       overrides={overrides}
+                      events={events}
+                      dependencies={dependencies}
                     />
                   ))}
                 </div>
@@ -390,6 +396,8 @@ function Lane({
   onOpen,
   people,
   overrides,
+  events,
+  dependencies,
 }: {
   person: Person
   blocks: TimeBlock[]
@@ -402,8 +410,10 @@ function Lane({
   /** Everyone in the account, in lane order, and this user's colour overrides. */
   people: Person[]
   overrides: Record<PersonId, ColorKey>
+  /** Every event, and what each day waits on — for the blocked check. */
+  events: CalendarEvent[]
+  dependencies: Record<string, OccurrenceDependency[]>
 }) {
-  const { state } = useApp()
   // Every block this person is on — shared events simply appear in each
   // attendee's lane, colored by that lane.
   const mine = blocks.filter((b) => b.occ.event.attendees.includes(person.id))
@@ -429,7 +439,8 @@ function Lane({
         const status = statuses.get(ev.id)
         const joint = ev.attendees.length > 1
         const done = isOccurrenceDone(completions, ev, block.occ.start)
-        const blocked = occurrenceStatus(state, completions, ev, block.occ.start) === 'blocked'
+        const blocked =
+          occurrenceStatus(dependencies, events, completions, ev, block.occ.start) === 'blocked'
         return (
           <button
             type="button"

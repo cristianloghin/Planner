@@ -15,6 +15,7 @@ import {
   toISODate,
 } from '../assets/utils/dates'
 import { useAuth } from '../auth'
+import { useEvents } from '../domains/events/queries'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { usePeople } from '../domains/people/queries'
 import { eventColorKey } from '../domains/people/selectors'
@@ -23,8 +24,7 @@ import { personColors } from '../domains/preferences/selectors'
 import { nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
 import { eventStartMinutes } from '../lib/timing'
 import { pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
-import { useApp } from '../state'
-import type { CompletionsMap, Person, PersonId } from '../types'
+import type { CalendarEvent, CompletionsMap, Person, PersonId } from '../types'
 import s from './MonthView.module.css'
 import { ViewHeader } from './ViewHeader'
 
@@ -32,8 +32,8 @@ import { ViewHeader } from './ViewHeader'
 const MAX_DOTS = 4
 
 export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
-  const { state } = useApp()
   const { accountId, session } = useAuth()
+  const { data: events = [] } = useEvents(accountId)
   const { data: people = [] } = usePeople(accountId)
   const { data: overrides = {} } = usePreferences(accountId, session?.user.id ?? null, personColors)
   const [cursor, setCursor] = useState(() => startOfMonth(toISODate(new Date())))
@@ -64,7 +64,7 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
   // Open a search hit: jump to the event's next upcoming occurrence (falling
   // back to the series anchor for an ended series) in the Day view.
   function openSearchHit(seriesId: string) {
-    const event = state.events.find((e) => e.id === seriesId)
+    const event = events.find((e) => e.id === seriesId)
     if (!event) return
     onOpenDay(nextRelevantDate(event))
   }
@@ -126,6 +126,7 @@ export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
                 onOpenDay={onOpenDay}
                 people={people}
                 overrides={overrides}
+                events={events}
               />
             ))}
           </div>
@@ -146,6 +147,7 @@ function MonthPage({
   onOpenDay,
   people,
   overrides,
+  events,
 }: {
   month: string
   /** Whether this is the visible middle page (the others render inert). */
@@ -156,8 +158,8 @@ function MonthPage({
   /** Everyone in the account, in lane order, and this user's colour overrides. */
   people: Person[]
   overrides: Record<PersonId, ColorKey>
+  events: CalendarEvent[]
 }) {
-  const { state } = useApp()
   const days = useMemo(() => monthGridDays(month), [month])
 
   // Expanding recurrences over 42 cells is O(events × occurrence state); do it
@@ -167,14 +169,14 @@ function MonthPage({
       new Map(
         days.map((iso) => [
           iso,
-          occurrencesOnDate(state.events, iso, completions).sort(
+          occurrencesOnDate(events, iso, completions).sort(
             (a, b) =>
               Number(b.event.allDay) - Number(a.event.allDay) ||
               eventStartMinutes(a.event) - eventStartMinutes(b.event),
           ),
         ]),
       ),
-    [days, state.events, completions],
+    [days, events, completions],
   )
 
   return (
