@@ -18,19 +18,24 @@ import { useCompletionsForRange, useDependencies } from '../domains/occurrences/
 import { usePeople } from '../domains/people/queries'
 import { attendeeLabelFor } from '../domains/people/selectors'
 import { checklists, notes, reminderOffsets } from '../lib/attachments'
-import { offsetLabel } from '../lib/notifications'
+import { offsetLabel } from '../services/notifications/alerts'
 import {
   effectiveOccurrence,
   recurrenceLabel,
   seriesOccurrenceDatesInRange,
-} from '../lib/recurrence'
-import { MINS_PER_DAY, eventDate, eventSpanDays, eventStartMinutes } from '../lib/timing'
+} from '../services/recurrence/expand'
 import {
   blockingPrerequisites,
   isOccurrenceDone,
   occKey,
   occurrenceEffectiveStatus,
 } from '../services/recurrence/status'
+import {
+  MINS_PER_DAY,
+  eventDate,
+  eventSpanDays,
+  eventStartMinutes,
+} from '../services/recurrence/timing'
 import type { CalendarEvent, CompletionsMap, OccurrenceStatusCode } from '../types'
 import s from './OccurrenceSheet.module.css'
 

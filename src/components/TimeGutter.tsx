@@ -1,4 +1,4 @@
-import { DAY_MIN } from '../lib/timelineLayout'
+import { DAY_MIN } from '../services/timeline-layout'
 import s from './TimeGutter.module.css'
 
 const GUTTER_HOURS = Array.from({ length: 25 }, (_, h) => h)

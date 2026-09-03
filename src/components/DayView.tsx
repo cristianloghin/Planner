@@ -22,17 +22,21 @@ import { byId, eventColorKey, personColorKey } from '../domains/people/selectors
 import { usePreferences } from '../domains/preferences/queries'
 import { personColors } from '../domains/preferences/selectors'
 import { checklistEntries, hasReminders } from '../lib/attachments'
-import { type Busy, type ChildStatus, childStatuses } from '../lib/conflicts'
-import { type DayOccurrence, nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
-import { DAY_MIN, type TimeBlock, layoutBlocks } from '../lib/timelineLayout'
-import { loadZoom, pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
 import { useCalendarNavigation } from '../navigation'
+import { type Busy, type ChildStatus, childStatuses } from '../services/conflicts'
+import { loadZoom, pageInert, useSwipeGestures } from '../services/gestures'
+import {
+  type DayOccurrence,
+  nextRelevantDate,
+  occurrencesOnDate,
+} from '../services/recurrence/expand'
 import {
   isOccurrenceDone,
   occKey,
   occurrenceStatus,
   prerequisiteDatesInRange,
 } from '../services/recurrence/status'
+import { DAY_MIN, type TimeBlock, layoutBlocks } from '../services/timeline-layout'
 import type { CalendarEvent, CompletionsMap, Person, PersonId } from '../types'
 import { Avatars } from './Avatars'
 import s from './DayView.module.css'

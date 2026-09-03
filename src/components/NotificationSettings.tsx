@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react'
 import shared from '../assets/styles/shared.module.css'
 import { cx } from '../assets/utils/cx'
 import { useAuth } from '../auth'
+import { useForgetDevice, useRegisterDevice } from '../domains/push/mutations'
 import {
   currentSubscription,
-  disablePush,
-  enablePush,
   notificationPermission,
   pushConfigured,
   pushSupport,
-} from '../lib/push'
+  subscribeThisDevice,
+  unsubscribeThisDevice,
+} from '../services/push'
 import s from './Settings.module.css'
 
 type Status = 'loading' | 'off' | 'on' | 'denied' | 'needs-install' | 'unsupported'
@@ -22,6 +23,8 @@ type Status = 'loading' | 'off' | 'on' | 'denied' | 'needs-install' | 'unsupport
  */
 export function NotificationSettings() {
   const { session } = useAuth()
+  const registerDevice = useRegisterDevice()
+  const forgetDevice = useForgetDevice()
   const [status, setStatus] = useState<Status>('loading')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -50,10 +53,17 @@ export function NotificationSettings() {
     setError(null)
     try {
       if (next) {
-        const result = await enablePush(session.user.id)
-        setStatus(result === 'subscribed' ? 'on' : 'denied')
+        // The browser subscribes first; the row is only worth writing once it has.
+        const device = await subscribeThisDevice()
+        if (device === 'denied') {
+          setStatus('denied')
+        } else {
+          await registerDevice.mutateAsync({ ...device, userId: session.user.id })
+          setStatus('on')
+        }
       } else {
-        await disablePush()
+        const endpoint = await unsubscribeThisDevice()
+        if (endpoint) await forgetDevice.mutateAsync({ endpoint })
         setStatus('off')
       }
     } catch (e) {

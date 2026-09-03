@@ -99,23 +99,22 @@ Worth knowing before adding a slice:
   wired in the app shell: one folded report per burst, `queryKeysForTable` in
   `domains/index.ts` turns each table into the Query keys to invalidate, and a
   reconnection invalidates the whole cache.
+- **Push** is the three pieces the plan describes: `services/push` does the
+  browser side, `domains/push` stores the row, and the Settings toggle and the
+  shell's start-up re-registration pair them at the call site.
 - **Not yet adopted**: `auth.tsx` still owns the session (so the auth gate is
-  imperative), `lib/search.ts` mirrors `client/search.ts`, and `lib/push.ts`
-  mirrors `client/push.ts`. Everything else in `client/` and `domains/` is
-  live.
-- **`services/` is different, and better off.** Those were real moves, not
-  parallel copies: `lib/recurrence`, `lib/timing`,
-  `lib/timelineLayout`, `lib/conflicts`, `lib/notifications`,
-  `lib/useSwipeGestures` and `lib/push` now forward to a service, so there is one
-  implementation and nothing to drift. The app is unchanged; the forwarders
-  delete once routes import the services directly.
+  imperative), and `lib/search.ts` mirrors `client/search.ts`. Everything else
+  in `client/` and `domains/` is live.
+- **`services/` are imported directly.** The `lib/` forwarders that used to
+  re-export them are deleted; what is left in `lib/` is `attachments.ts` (real
+  helpers over an event's attachments), `rrule.ts` (belongs in `client/`),
+  `search.ts` (pending adoption) and `queryClient.ts`.
 
 Each slice has exactly one owner. `RESTRUCTURE_PLAN.md` is where this ends up.
 
-**Two unadopted parts still duplicate code that is live.** `client/search.ts`
-mirrors `lib/search.ts` and `client/push.ts` mirrors the row writes in
-`lib/push.ts`. A fix to one side has to be made on the other; adopt the slice
-and delete its old path rather than letting the pair age.
+**One unadopted part still duplicates code that is live.** `client/search.ts`
+mirrors `lib/search.ts`. A fix to one side has to be made on the other; adopt
+the slice and delete its old path rather than letting the pair age.
 
 ### Adopting a slice
 
@@ -151,7 +150,6 @@ Still to adopt, cheapest first:
   deletes when it works.
 - **`session`** — `auth.tsx` onto `services/session`, which is what lets the
   auth gate become a route guard.
-- **`push`** — `lib/push.ts` onto `domains/push`.
 
 ### The account is a value, not a closure
 

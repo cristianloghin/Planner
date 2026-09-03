@@ -9,8 +9,8 @@ import {
   wallParts,
   wallToInstantMs,
 } from '../../supabase/functions/send-reminders/logic.ts'
+import { startsOn as clientStartsOn } from '../services/recurrence/expand'
 import type { CalendarEvent, Recurrence } from '../types'
-import { startsOn as clientStartsOn } from './recurrence'
 import { recurrenceToRRule } from './rrule'
 
 /** The sender must expand recurrences EXACTLY like the client, or a partner

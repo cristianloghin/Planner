@@ -573,12 +573,12 @@ of coupling that breaks quietly later.
 | ~~`data/completions.ts`~~ | `domains/occurrences` — **done and deleted**; reads and writes both adopted |
 | ~~`lib/{supabase,database.types}.ts`~~ | `client/` — **done** |
 | `lib/search.ts` | ~~`client/search.ts`~~ **done** + `domains/search` |
-| `lib/push.ts` | ~~`client/push.ts`~~ (rows) + ~~`services/push`~~ (browser) + ~~`domains/push`~~ (pairing) — **all three built**; `lib/push.ts` is now a 46-line adapter |
-| `lib/{recurrence,occurrences}.ts` | ~~`services/recurrence`~~ **moved**; `lib/rrule.ts` belongs in `client/` instead (only the client imports it) |
-| `lib/timelineLayout.ts` | ~~`services/timeline-layout`~~ **moved** |
-| `lib/conflicts.ts` | ~~`services/conflicts`~~ **moved** |
-| `lib/notifications.ts` | ~~`services/notifications`~~ **moved**, with AlertHost's lifecycle as `useDueAlerts` |
-| `lib/useSwipeGestures.ts` | ~~`services/gestures`~~ **moved** |
+| `lib/push.ts` | ~~`client/push.ts`~~ (rows) + ~~`services/push`~~ (browser) + ~~`domains/push`~~ (pairing) — **all three built and adopted**; ~~`lib/push.ts`~~ **deleted** |
+| `lib/{recurrence,occurrences}.ts` | ~~`services/recurrence`~~ **moved**, forwarder **deleted**; `lib/rrule.ts` belongs in `client/` instead (only the client imports it) |
+| `lib/timelineLayout.ts` | ~~`services/timeline-layout`~~ **moved**, forwarder **deleted** |
+| `lib/conflicts.ts` | ~~`services/conflicts`~~ **moved**, forwarder **deleted** |
+| `lib/notifications.ts` | ~~`services/notifications`~~ **moved**, forwarder **deleted**, with AlertHost's lifecycle as `useDueAlerts` |
+| `lib/useSwipeGestures.ts` | ~~`services/gestures`~~ **moved**, forwarder **deleted** |
 | `lib/{people,attachments,lists}.ts` | domain selectors in `domains/{people,events,lists}` — ~~`lib/people.ts`~~ and ~~`lib/lists.ts`~~ **adopted and deleted**; `attachments`' filters folded into `domains/events/transformers`. `lib/timing.ts` went to `services/recurrence` instead, not to a domain — see §2 |
 | `lib/{useLatest,useMediaQuery,useSearch}.ts` | `assets/hooks` |
 | `lib/{dates,id,cx}.ts` | `assets/utils` |

@@ -20,15 +20,15 @@ import { usePeople } from '../domains/people/queries'
 import { defaultAttendees, eventColorKey } from '../domains/people/selectors'
 import { usePreferences } from '../domains/preferences/queries'
 import { personColors, weekLayout } from '../domains/preferences/selectors'
+import { useCalendarNavigation } from '../navigation'
+import { pageInert, useSwipeGestures } from '../services/gestures'
 import {
   type DayOccurrence,
   nextRelevantDate,
   occurrencesOnDate,
   recurrenceLabel,
-} from '../lib/recurrence'
-import { DAY_MIN } from '../lib/timelineLayout'
-import { pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
-import { useCalendarNavigation } from '../navigation'
+} from '../services/recurrence/expand'
+import { DAY_MIN } from '../services/timeline-layout'
 import type { CalendarEvent, Person, PersonId } from '../types'
 import { Avatars } from './Avatars'
 import { type EditorTarget, EventEditor } from './EventEditor'

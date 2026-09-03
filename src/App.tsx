@@ -13,7 +13,7 @@ import { queryKeysForTable } from './domains'
 import { usePreferencesWrite } from './domains/preferences/mutations'
 import { withTimezone } from './domains/preferences/patches'
 import { usePreferences } from './domains/preferences/queries'
-import { clearNotifications, syncPushSubscription } from './lib/push'
+import { useRegisterDevice } from './domains/push/mutations'
 import {
   dismissWriteError,
   getWriteError,
@@ -22,6 +22,7 @@ import {
 } from './lib/queryClient'
 import { NavigationProvider } from './navigation'
 import { routes } from './routes/routes'
+import { clearNotifications, readThisDevice } from './services/push'
 import { startRealtime } from './services/realtime'
 
 const TABS: { path: RoutePath; label: string; icon?: LucideIcon }[] = [
@@ -142,11 +143,18 @@ function AppShell() {
     savePrefs({ accountId, userId, prefs: withTimezone(prefs, deviceTz) })
   }, [prefs, accountId, userId, savePrefs])
 
-  // Self-heal this device's push registration (the push service can rotate a
-  // subscription behind our back; the worker re-subscribes, we re-record it).
+  // Self-heal this device's push registration: the push service can rotate a
+  // subscription behind our back and the worker re-subscribes, so re-read what
+  // the browser is subscribed as and save it again.
+  const { mutate: registerDevice } = useRegisterDevice()
   useEffect(() => {
-    if (session) void syncPushSubscription(session.user.id)
-  }, [session])
+    if (!userId) return
+    readThisDevice()
+      .then((device) => {
+        if (device) registerDevice({ ...device, userId })
+      })
+      .catch((e) => console.warn('Push subscription sync failed:', e))
+  }, [userId, registerDevice])
 
   // The app being in front means the reminders have been seen: clear the icon
   // badge and the notifications it counts. On mount for a cold launch (tapping

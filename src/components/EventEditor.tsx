@@ -19,8 +19,8 @@ import { personColorKey } from '../domains/people/selectors'
 import { usePreferences } from '../domains/preferences/queries'
 import { personColors } from '../domains/preferences/selectors'
 import { cloneAttachments } from '../lib/attachments'
-import { effectiveOccurrence } from '../lib/recurrence'
-import { eventDate, eventStartMinutes } from '../lib/timing'
+import { effectiveOccurrence } from '../services/recurrence/expand'
+import { eventDate, eventStartMinutes } from '../services/recurrence/timing'
 import type {
   Attachment,
   CalendarEvent,

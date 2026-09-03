@@ -4,7 +4,7 @@ import { addDays, toISODate } from '../assets/utils/dates'
 import { useAuth } from '../auth'
 import { useEvents } from '../domains/events/queries'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
-import { type FiredAlert, dueAlerts } from '../lib/notifications'
+import { type FiredAlert, dueAlerts } from '../services/notifications/alerts'
 import s from './AlertHost.module.css'
 
 const SEEN_KEY = 'planner.alertsSeen'
