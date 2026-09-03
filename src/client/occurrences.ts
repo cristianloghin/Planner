@@ -17,6 +17,7 @@ import {
   tsToStart,
 } from './mappers'
 import { fetchAll } from './pagination'
+import type { PersonId } from './people'
 import type { SeriesTiming } from './series'
 import { supabase } from './supabase'
 
@@ -36,6 +37,12 @@ export interface OccurrenceRow {
   start: string | null
   /** Its own length, in the series' own units. Null when unchanged. */
   duration: number | null
+  /**
+   * Exactly these people on this day. Null means "as the series" — the same
+   * shape as `event_series.attendees`, so reading through one to the other is
+   * `occurrence.attendees ?? series.attendees`.
+   */
+  attendees: PersonId[] | null
 }
 
 /**
@@ -61,7 +68,7 @@ export async function fetchOccurrenceRows(
     supabase
       .from('event_occurrence')
       .select(
-        'series_id, occurrence_start, rescheduled_to, rescheduled_duration, cancelled, event_series!inner(all_day, account_id)',
+        'series_id, occurrence_start, rescheduled_to, rescheduled_duration, cancelled, attendees, event_series!inner(all_day, account_id)',
       )
       .eq('event_series.account_id', accountId)
       .or(
@@ -79,6 +86,7 @@ export async function fetchOccurrenceRows(
       cancelled: o.cancelled,
       start: o.rescheduled_to ? tsToStart(o.rescheduled_to, allDay) : null,
       duration: o.rescheduled_duration ? intervalToDuration(o.rescheduled_duration, allDay) : null,
+      attendees: o.attendees,
     }
   })
 }
@@ -148,7 +156,39 @@ export async function setOccurrenceOverride(
   })
 }
 
-/** Put a moved or resized day back to its series' timing, keeping its ticks. */
+/**
+ * Put exactly these people on this one day, leaving the series alone.
+ *
+ * Written through the same partial update as a timing override, so recording
+ * who is on a day never disturbs whether it was moved or taken out.
+ */
+export async function setOccurrenceAttendees(
+  series: SeriesTiming,
+  date: string,
+  attendees: PersonId[],
+): Promise<void> {
+  return writeOccurrenceRow(series, date, { attendees })
+}
+
+/**
+ * Put a day back to the series' people.
+ *
+ * An `update` by day range and never an insert — the same shape as
+ * `clearOccurrenceOverride`, so clearing a day that has no row is a no-op
+ * rather than creating an empty one.
+ */
+export async function clearOccurrenceAttendees(series: SeriesTiming, date: string): Promise<void> {
+  const { from, to } = dayRange(date)
+  const { error } = await supabase
+    .from('event_occurrence')
+    .update({ attendees: null })
+    .eq('series_id', series.id)
+    .gte('occurrence_start', from)
+    .lt('occurrence_start', to)
+  if (error) throw error
+}
+
+/** Put a moved or resized day back to its series' timing, keeping its people. */
 export async function clearOccurrenceOverride(series: SeriesTiming, date: string): Promise<void> {
   const { from, to } = dayRange(date)
   const { error } = await supabase

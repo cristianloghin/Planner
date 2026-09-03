@@ -10,15 +10,22 @@ import { DAY_NAMES, addDays, diffDays, toISODate, weekdayIndex } from '../../ass
  */
 import type { CalendarEvent } from '../../domains/events/types'
 import type { OccurrenceState } from '../../domains/occurrences/types'
+import type { PersonId } from '../../domains/people/types'
 import { occKey } from './timing'
 import { eventDate, eventSpanDays, timedSegment } from './timing'
 
 /**
- * The event as it actually occurs on `date`, with any one-off timing override
- * applied (`OccurrenceState.start`/`duration`). The series `id`, roster and
- * attachments are untouched — only the timing geometry changes — so callers that
- * need the *series* (e.g. to open the editor) must keep the original event.
- * Returns the original reference when there's no override.
+ * The event as it actually occurs on `date`, with any one-off override applied:
+ * its timing (`OccurrenceState.start`/`duration`) and who is on it
+ * (`.attendees`). The series `id` is untouched, so callers that need the
+ * *series* (e.g. to open the editor) must keep the original event. Returns the
+ * original reference when there is no override.
+ *
+ * Note the early return tests `attendees` as well as the timing. It must: a day
+ * that overrides only its people has no `start` and no `duration`, so checking
+ * the timing alone would hand back the series unchanged and the override would
+ * be written to the database and then silently ignored on read — no error, and
+ * nothing on screen to notice.
  */
 export function effectiveOccurrence(
   event: CalendarEvent,
@@ -26,11 +33,12 @@ export function effectiveOccurrence(
   completions: Record<string, OccurrenceState>,
 ): CalendarEvent {
   const ov = completions[occKey(event.id, date)]
-  if (!ov || (ov.start == null && ov.duration == null)) return event
+  if (!ov || (ov.start == null && ov.duration == null && ov.attendees == null)) return event
   return {
     ...event,
     start: ov.start ?? event.start,
     duration: ov.duration ?? event.duration,
+    attendees: ov.attendees ?? event.attendees,
   }
 }
 
@@ -147,6 +155,12 @@ export function nextRelevantDate(e: CalendarEvent): string {
 
 /** One materialised event instance covering a specific date. */
 export interface DayOccurrence {
+  /**
+   * Who is on it ON THIS DAY — the occurrence's own list when it has one, else
+   * the series'. Read this rather than `event.attendees`, which is always the
+   * series' roster.
+   */
+  attendees: PersonId[]
   event: CalendarEvent
   /**
    * ISO date of the occurrence's *identity* — the day the recurrence rule would
@@ -219,6 +233,7 @@ export function occurrencesOnDate(
       if (offset < 0 || offset >= span) continue // this relocated span doesn't cover `date`
       out.push({
         event,
+        attendees: eff.attendees,
         start: origin,
         offset,
         span,
@@ -245,6 +260,7 @@ export function occurrencesOnDate(
       if (back >= span) continue // an override shortened it so it no longer reaches `date`
       out.push({
         event,
+        attendees: eff.attendees,
         start,
         offset: back,
         span,

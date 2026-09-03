@@ -92,7 +92,7 @@ export function WeekTimelineHead({
                     key={`${o.event.id}:${o.start}`}
                     className={s.alldayChip}
                     style={colorStyle(
-                      eventColorKey(people, overrides, o.event.attendees[0], o.event.colorKey),
+                      eventColorKey(people, overrides, o.attendees[0], o.event.colorKey),
                     )}
                     onClick={() => onOpen(o)}
                     title={o.event.title}
@@ -244,7 +244,7 @@ export function WeekTimelineBody({
                             left: `calc(${(100 / cols) * col}% + 1px)`,
                             width: `calc(${100 / cols}% - 2px)`,
                             ...colorStyle(
-                              eventColorKey(people, overrides, ev.attendees[0], ev.colorKey),
+                              eventColorKey(people, overrides, block.occ.attendees[0], ev.colorKey),
                             ),
                           }}
                           onClick={() => onOpen(block.occ)}

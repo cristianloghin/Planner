@@ -1,3 +1,5 @@
+import type { PersonId } from '../people/types'
+
 /**
  * What happened on one day of a repeating event.
  *
@@ -21,6 +23,11 @@ export interface OccurrenceState {
   duration?: number
   /** Taken out of the series. The pattern still produces it; it is not drawn. */
   cancelled?: boolean
+  /**
+   * Exactly these people on this day. Absent means "as the series" — so a day
+   * that has never been overridden reads through to the series' own list.
+   */
+  attendees?: PersonId[]
 }
 
 /**

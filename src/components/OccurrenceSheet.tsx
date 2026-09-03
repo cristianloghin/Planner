@@ -22,6 +22,7 @@ import {
   occKey,
 } from '../services/recurrence/timing'
 import type { CalendarEvent } from '../types'
+import { AttendeeChips } from './AttendeeChips'
 import s from './OccurrenceSheet.module.css'
 
 /**
@@ -63,6 +64,9 @@ export function OccurrenceSheet({
   // the series would normally place it); if the override's start lands on another
   // day, it's been moved there.
   const hasTimingOverride = occState?.start != null || occState?.duration != null
+  // Who is on it today: this day's own list when it has one, else the series'.
+  const attendees = occState?.attendees ?? event.attendees
+  const hasPeopleOverride = occState?.attendees != null
   const movedFromOrigin = occState?.start != null && occState.start.slice(0, 10) !== date
 
   // ---- delete (scoped for a series) --------------------------------------
@@ -153,7 +157,7 @@ export function OccurrenceSheet({
         <h1 className={shared.editorTitle}>{event.title}</h1>
 
         <p className={s.meta}>
-          {timeLabel} · {attendeeLabelFor(event.attendees)(people)}
+          {timeLabel} · {attendeeLabelFor(attendees)(people)}
           {event.recurrence && ` · ${recurrenceLabel(event).toLowerCase()}`}
         </p>
 
@@ -174,6 +178,35 @@ export function OccurrenceSheet({
               }
             >
               Reset to series time
+            </button>
+          </p>
+        )}
+
+        <label className={shared.label}>Who's involved?</label>
+        <AttendeeChips
+          value={attendees}
+          onChange={(next) =>
+            occurrences.mutate({
+              accountId: accountId,
+              change: { kind: 'attendees', series: timingOf(event), date, attendees: next },
+            })
+          }
+        />
+        {hasPeopleOverride && (
+          <p className={s.moved}>
+            Just these people on this day
+            {' · '}
+            <button
+              type="button"
+              className={s.resetOverride}
+              onClick={() =>
+                occurrences.mutate({
+                  accountId: accountId,
+                  change: { kind: 'clearAttendees', series: timingOf(event), date },
+                })
+              }
+            >
+              Reset to series people
             </button>
           </p>
         )}

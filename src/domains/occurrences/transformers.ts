@@ -34,6 +34,7 @@ export function toCompletions(occurrences: OccurrenceRow[]): CompletionsMap {
     if (o.cancelled) entry.cancelled = true
     if (o.start != null) entry.start = o.start
     if (o.duration != null) entry.duration = o.duration
+    if (o.attendees != null) entry.attendees = o.attendees
     if (Object.keys(entry).length) out[key] = entry
   }
 

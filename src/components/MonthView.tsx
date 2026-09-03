@@ -199,7 +199,7 @@ function MonthPage({
                     key={`${o.event.id}:${o.start}`}
                     className={s.monthDot}
                     style={colorStyle(
-                      eventColorKey(people, overrides, o.event.attendees[0], o.event.colorKey),
+                      eventColorKey(people, overrides, o.attendees[0], o.event.colorKey),
                     )}
                   />
                 ))}

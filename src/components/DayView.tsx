@@ -187,7 +187,7 @@ export function DayView() {
                 </div>
                 <div>
                   {allDayOccs
-                    .filter((o) => o.event.attendees.includes(p.id))
+                    .filter((o) => o.attendees.includes(p.id))
                     .map((o) => (
                       <AllDayChip
                         key={`${o.event.id}:${o.start}`}
@@ -333,7 +333,7 @@ function Lane({
 }) {
   // Every block this person is on — shared events simply appear in each
   // attendee's lane, colored by that lane.
-  const mine = blocks.filter((b) => b.occ.event.attendees.includes(person.id))
+  const mine = blocks.filter((b) => b.occ.attendees.includes(person.id))
   const laid = layoutBlocks(mine)
 
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
@@ -353,7 +353,9 @@ function Lane({
 
       {laid.map(({ block, col, cols }) => {
         const ev = block.occ.event
-        const joint = ev.attendees.length > 1
+        // Who is on it THIS day — an override replaces the series' roster.
+        const attendees = block.occ.attendees
+        const joint = attendees.length > 1
         return (
           <button
             type="button"
@@ -379,7 +381,7 @@ function Lane({
               {badges(ev)}
             </span>
             <span className={s.tlTitle}>{ev.title}</span>
-            {joint && <Avatars attendees={ev.attendees} />}
+            {joint && <Avatars attendees={attendees} />}
           </button>
         )
       })}

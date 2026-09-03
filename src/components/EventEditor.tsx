@@ -90,6 +90,11 @@ function isCompleteDT(v: string): boolean {
   return v.length >= 16 && ISO_DATE_RE.test(v.slice(0, 10)) && !Number.isNaN(new Date(v).getTime())
 }
 
+/** The same people, whatever order the chips put them in. */
+function samePeople(a: PersonId[], b: PersonId[]): boolean {
+  return a.length === b.length && new Set(a).size === new Set([...a, ...b]).size
+}
+
 /** Shared full-page editor for the event *series* (timing, attendees, reminders). */
 export function EventEditor({
   target,
@@ -191,8 +196,11 @@ function EventEditorForm({
     return dtLocal(initialDate, initialEndMin)
   })
 
+  // From the SEED, not the series: on a day that already overrides its people,
+  // `base.attendees` is the wrong list, and saving "this event only" from it
+  // would either clear the override or rewrite it from stale input.
   const [attendees, setAttendees] = useState<PersonId[]>(
-    isEdit ? base!.attendees : target.attendees,
+    isEdit ? seed!.attendees : target.attendees,
   )
   const [colorKey, setColorKey] = useState<ColorKey | undefined>(base?.colorKey)
   const [repeat, setRepeat] = useState<RepeatChoice>(base?.recurrence?.freq ?? 'none')
@@ -333,6 +341,15 @@ function EventEditorForm({
         start: allDay ? date : startDT,
         duration: currentDuration(),
       },
+    })
+    // "This event only" means the whole form, not just its timing. Back to the
+    // series' own roster is a CLEAR rather than an array that happens to match,
+    // so the day stops carrying an override at all.
+    occurrences.mutate({
+      accountId: accountId,
+      change: samePeople(attendees, base!.attendees)
+        ? { kind: 'clearAttendees', series: timingOf(base!), date: occurrenceDate! }
+        : { kind: 'attendees', series: timingOf(base!), date: occurrenceDate!, attendees },
     })
     onClose()
   }

@@ -249,7 +249,7 @@ function WeekListBody({
                             key={`${e.id}:${o.start}`}
                             className={s.event}
                             style={colorStyle(
-                              eventColorKey(people, overrides, e.attendees[0], e.colorKey),
+                              eventColorKey(people, overrides, o.attendees[0], e.colorKey),
                             )}
                           >
                             <div className={s.eventTime}>
@@ -263,7 +263,7 @@ function WeekListBody({
                             <button type="button" className={s.eventBody} onClick={() => onEdit(o)}>
                               <span className={s.eventTitle}>{e.title}</span>
                               <span className={s.eventMeta}>
-                                <Avatars attendees={e.attendees} />
+                                <Avatars attendees={o.attendees} />
                                 {e.recurrence && recurrenceLabel(e).toLowerCase()}
                               </span>
                             </button>

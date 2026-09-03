@@ -140,6 +140,16 @@ update event_series set attendees = case id
   when '44444444-0000-4000-8000-000000000006' then array['33333333-0000-4000-8000-000000000002']::uuid[]
   else attendees end;
 
+-- One day of Swimming with a different set of people, so the per-occurrence
+-- override (§10) is visible on a fresh reset. Swimming is Dev + Kid weekly;
+-- next week it is Kid alone. `occurrence_start` must be a day the rule
+-- produces — this is the series' own anchor time, one week on.
+insert into event_occurrence (series_id, occurrence_start, attendees) values
+  ('44444444-0000-4000-8000-000000000001',
+   date_trunc('day', now()) + interval '7 days' + interval '16 hours',
+   array['33333333-0000-4000-8000-000000000003']::uuid[])
+on conflict do nothing;
+
 -- Half an hour before, as the app stores it: seconds, per user.
 insert into reminder (id, series_id, user_id, offset_seconds) values
   ('77777777-0000-4000-8000-000000000001', '44444444-0000-4000-8000-000000000001',

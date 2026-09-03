@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { CalendarEvent, Recurrence } from '../../domains/events/types'
 import {
+  effectiveOccurrence,
   nextStartOnOrAfter,
   occurrenceIndex,
   occurrencesOnDate,
@@ -202,6 +203,29 @@ describe('recurrenceLabel', () => {
     expect(
       recurrenceLabel(ev('2026-06-15', { freq: 'weekly', interval: 1, until: '2026-12-25' })),
     ).toMatch(/^Every week on Mon · until /)
+  })
+})
+
+describe('effectiveOccurrence — people', () => {
+  const e = ev('2026-06-15', { freq: 'weekly', interval: 1 })
+  const base = { ...e, attendees: ['dev', 'kid'] }
+
+  it('applies a people-only override, which the early return must not skip', () => {
+    // The guard short-circuits when a day carries no timing. If it does not ALSO
+    // test `attendees`, this override is written to the database and then
+    // silently ignored on read — no error, nothing on screen to notice.
+    const only = { 'e1:2026-06-15': { attendees: ['kid'] } }
+    expect(effectiveOccurrence(base, '2026-06-15', only).attendees).toEqual(['kid'])
+  })
+
+  it('falls through to the series when the day says nothing about people', () => {
+    const timingOnly = { 'e1:2026-06-15': { start: '2026-06-15', duration: 2 } }
+    expect(effectiveOccurrence(base, '2026-06-15', timingOnly).attendees).toEqual(['dev', 'kid'])
+    expect(effectiveOccurrence(base, '2026-06-15', {}).attendees).toEqual(['dev', 'kid'])
+  })
+
+  it('returns the very same object when there is no override at all', () => {
+    expect(effectiveOccurrence(base, '2026-06-15', {})).toBe(base)
   })
 })
 

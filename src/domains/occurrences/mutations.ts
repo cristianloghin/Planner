@@ -10,10 +10,13 @@ import { APP_SCOPE } from '../../assets/constants'
 import { type Rollback, rollback } from '../../assets/rollback'
 import {
   cancelOccurrence,
+  clearOccurrenceAttendees,
   clearOccurrenceOverride,
+  setOccurrenceAttendees,
   setOccurrenceOverride,
 } from '../../client/occurrences'
 import type { SeriesTiming } from '../../client/series'
+import type { PersonId } from '../people/types'
 import { type OccurrenceChange, patchCompletions } from './patches'
 import { completionsPrefix } from './queries'
 import { occurrenceKey } from './transformers'
@@ -29,6 +32,8 @@ import type { CompletionsMap } from './types'
 export type OccurrencesChange =
   | { kind: 'override'; series: SeriesTiming; date: string; start: string; duration: number }
   | { kind: 'clearOverride'; series: SeriesTiming; date: string }
+  | { kind: 'attendees'; series: SeriesTiming; date: string; attendees: PersonId[] }
+  | { kind: 'clearAttendees'; series: SeriesTiming; date: string }
   | { kind: 'cancel'; series: SeriesTiming; date: string }
 
 /** What `mutate()` takes: the change, and the account it belongs to. */
@@ -43,6 +48,10 @@ function changeOf(w: OccurrencesChange): OccurrenceChange {
       return { kind: 'override', start: w.start, duration: w.duration }
     case 'clearOverride':
       return { kind: 'clearOverride' }
+    case 'attendees':
+      return { kind: 'attendees', attendees: w.attendees }
+    case 'clearAttendees':
+      return { kind: 'clearAttendees' }
     case 'cancel':
       return { kind: 'cancel' }
   }
@@ -57,6 +66,10 @@ export function registerOccurrencesDefaults(queryClient: QueryClient): void {
           return setOccurrenceOverride(w.series, w.date, w.start, w.duration)
         case 'clearOverride':
           return clearOccurrenceOverride(w.series, w.date)
+        case 'attendees':
+          return setOccurrenceAttendees(w.series, w.date, w.attendees)
+        case 'clearAttendees':
+          return clearOccurrenceAttendees(w.series, w.date)
         case 'cancel':
           return cancelOccurrence(w.series, w.date)
       }
