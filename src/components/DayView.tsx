@@ -26,13 +26,13 @@ import { type Busy, type ChildStatus, childStatuses } from '../lib/conflicts'
 import { type DayOccurrence, nextRelevantDate, occurrencesOnDate } from '../lib/recurrence'
 import { DAY_MIN, type TimeBlock, layoutBlocks } from '../lib/timelineLayout'
 import { loadZoom, pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
+import { useCalendarNavigation } from '../navigation'
 import {
   isOccurrenceDone,
   occKey,
   occurrenceStatus,
   prerequisiteDatesInRange,
 } from '../services/recurrence/status'
-import { useApp } from '../state'
 import type { CalendarEvent, CompletionsMap, Person, PersonId } from '../types'
 import { Avatars } from './Avatars'
 import s from './DayView.module.css'
@@ -45,11 +45,11 @@ const SNAP = 15
 const ZOOM_KEY = 'planner:hourH'
 
 export function DayView() {
-  const { state, dispatch } = useApp()
+  const nav = useCalendarNavigation()
   const { accountId, session } = useAuth()
   const { data: events = [] } = useEvents(accountId)
   const { data: dependencies = {} } = useDependencies(accountId)
-  const day = state.selectedDay
+  const day = nav.selectedDay
   const { data: people = [] } = usePeople(accountId)
   const { data: overrides = {} } = usePreferences(accountId, session?.user.id ?? null, personColors)
   const peopleById = useMemo(() => byId(people), [people])
@@ -68,14 +68,14 @@ export function DayView() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
 
-  const dateISO = addDays(state.weekStart, day)
+  const dateISO = addDays(nav.weekStart, day)
 
   // Swipe to change day, pinch to zoom (shared with the Week grid).
   const { onClickCapture } = useSwipeGestures({
     scrollRef,
     stripRef,
     pageKey: dateISO,
-    onNavigate: (delta) => dispatch({ type: 'shiftDay', delta }),
+    onNavigate: (delta) => nav.shiftDay(delta),
     zoom: { hourH, setHourH, key: ZOOM_KEY },
   })
 
@@ -172,12 +172,12 @@ export function DayView() {
     const event = events.find((e) => e.id === seriesId)
     if (!event) return
     const date = nextRelevantDate(event)
-    dispatch({ type: 'goToDate', date })
+    nav.goToDate(date)
     setEditor({ mode: 'edit', event, occurrenceDate: date })
   }
 
   function goToday() {
-    dispatch({ type: 'goToDate', date: toISODate(new Date()) })
+    nav.goToDate(toISODate(new Date()))
     // Explicit "take me to now" intent, so re-focus the current time.
     const now = new Date().getHours() * 60 + new Date().getMinutes()
     requestAnimationFrame(() => scrollToMinute(now))
@@ -192,19 +192,11 @@ export function DayView() {
         rightExtra={hasWarnings && <AlertTriangle className={s.alertBadge} />}
         nav={
           <div className={shared.weekNav}>
-            <button
-              type="button"
-              onClick={() => dispatch({ type: 'shiftDay', delta: -1 })}
-              aria-label="Previous day"
-            >
+            <button type="button" onClick={() => nav.shiftDay(-1)} aria-label="Previous day">
               <ChevronLeft size={20} />
             </button>
             <strong>{isoLabel(dateISO)}</strong>
-            <button
-              type="button"
-              onClick={() => dispatch({ type: 'shiftDay', delta: 1 })}
-              aria-label="Next day"
-            >
+            <button type="button" onClick={() => nav.shiftDay(1)} aria-label="Next day">
               <ChevronRight size={20} />
             </button>
           </div>

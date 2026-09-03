@@ -4,11 +4,11 @@ import shared from '../assets/styles/shared.module.css'
 import { cx } from '../assets/utils/cx'
 import { DAY_NAMES, isoWeekNumber, minutesToTime, toISODate } from '../assets/utils/dates'
 import { eventColorKey } from '../domains/people/selectors'
-import { isOccurrenceDone } from '../lib/occurrences'
 import type { DayOccurrence } from '../lib/recurrence'
 import { DAY_MIN, layoutBlocks } from '../lib/timelineLayout'
 import { loadZoom, pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
-import { useApp } from '../state'
+import { useCalendarNavigation } from '../navigation'
+import { isOccurrenceDone } from '../services/recurrence/status'
 import type { CompletionsMap, Person, PersonId } from '../types'
 import { TimeGutter } from './TimeGutter'
 import s from './WeekTimeline.module.css'
@@ -142,7 +142,7 @@ export function WeekTimelineBody({
   people: Person[]
   overrides: Record<PersonId, ColorKey>
 }) {
-  const { dispatch } = useApp()
+  const nav = useCalendarNavigation()
   const [hourH, setHourH] = useState(() => loadZoom(ZOOM_KEY))
   const pxPerMin = hourH / 60
 
@@ -153,7 +153,7 @@ export function WeekTimelineBody({
     scrollRef,
     stripRef,
     pageKey: weeks[1][0].dateISO,
-    onNavigate: (delta) => dispatch({ type: 'shiftWeek', delta }),
+    onNavigate: (delta) => nav.shiftWeek(delta),
     zoom: { hourH, setHourH, key: ZOOM_KEY },
   })
 

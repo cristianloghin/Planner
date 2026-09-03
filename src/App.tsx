@@ -1,17 +1,28 @@
 import { Link, type RoutePath, AppProvider as RouterProvider, RouterView } from '@mikrostack/router'
+import { onlineManager, useMutationState } from '@tanstack/react-query'
 import { ListChecks, type LucideIcon, Settings as SettingsIcon } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import s from './App.module.css'
 import { PageLoader } from './assets/ui/Spinner'
 import { useAuth } from './auth'
+import { subscribeToChanges } from './client/realtime'
 import { AlertHost } from './components/AlertHost'
 import { Login } from './components/Login'
+import { SyncBanners } from './components/SyncBanners'
+import { queryKeysForTable } from './domains'
 import { usePreferencesWrite } from './domains/preferences/mutations'
 import { withTimezone } from './domains/preferences/patches'
 import { usePreferences } from './domains/preferences/queries'
 import { clearNotifications, syncPushSubscription } from './lib/push'
+import {
+  dismissWriteError,
+  getWriteError,
+  queryClient,
+  subscribeWriteError,
+} from './lib/queryClient'
+import { NavigationProvider } from './navigation'
 import { routes } from './routes/routes'
-import { AppProvider } from './state'
+import { startRealtime } from './services/realtime'
 
 const TABS: { path: RoutePath; label: string; icon?: LucideIcon }[] = [
   { path: '/lists', label: 'Lists', icon: ListChecks },
@@ -35,8 +46,8 @@ const TABS: { path: RoutePath; label: string; icon?: LucideIcon }[] = [
 export function Root() {
   const { session, accountId, loading } = useAuth()
 
-  // Spinner while the session resolves, or while the account bootstraps (the
-  // store is built from accountId, so wait for it before mounting the data layer).
+  // Spinner while the session resolves, or while the account bootstraps (every
+  // query is keyed by accountId, so wait for it before mounting the app).
   if (loading || (session && !accountId)) {
     return (
       <div className={s.app}>
@@ -54,27 +65,67 @@ export function Root() {
   }
 
   return (
-    // The router sits *above* the data layer: AppProvider is keyed by account
-    // and remounts if that identity changes, and the URL should outlive that.
     // basePath comes from Vite's `base` so the two cannot drift.
     <RouterProvider
       routes={routes}
       config={{ basePath: import.meta.env.BASE_URL, defaultLoading: <PageLoader /> }}
     >
-      {/* Key the data layer by account: the store captures accountId at mount, so
-          if it ever changes (account switch, delayed bootstrap race) the provider
-          must remount with a fresh store rather than keep writing to the old one. */}
-      <AppProvider key={accountId}>
+      <NavigationProvider>
         <AppShell />
-      </AppProvider>
+      </NavigationProvider>
     </RouterProvider>
   )
 }
 
-/** The app chrome around whichever route is showing: alerts and the tab bar. */
+/** The app chrome around whichever route is showing: alerts, sync status and the tab bar. */
 function AppShell() {
   const { accountId, session } = useAuth()
   const userId = session?.user.id ?? null
+
+  // ---- realtime: a partner's change refreshes what it touched ---------------
+  // The client says which table changed, the service folds a burst into one
+  // report, and the table map says which cached reads that makes stale. A
+  // reconnection means changes were missed, so everything is refetched.
+  useEffect(() => {
+    if (!accountId) return
+    const ids = { accountId, userId }
+    return startRealtime({
+      subscribe: subscribeToChanges,
+      onChanged: ({ tables, missedSome }) => {
+        if (missedSome) {
+          void queryClient.invalidateQueries()
+          return
+        }
+        for (const table of tables) {
+          for (const queryKey of queryKeysForTable(table, ids)) {
+            void queryClient.invalidateQueries({ queryKey })
+          }
+        }
+      },
+    })
+  }, [accountId, userId])
+
+  // ---- sync status, read straight off the query client -------------------
+  const online = useSyncExternalStore(
+    (onChange) => onlineManager.subscribe(onChange),
+    () => onlineManager.isOnline(),
+  )
+  // Writes paused for lack of network. Nonzero for a moment on every online
+  // write too, so the pill only shows once the count has clearly stalled.
+  const pendingCount = useMutationState({
+    filters: { status: 'pending' },
+    select: (m) => m.state.isPaused,
+  }).filter(Boolean).length
+  const [pendingStalled, setPendingStalled] = useState(false)
+  useEffect(() => {
+    if (pendingCount === 0) {
+      setPendingStalled(false)
+      return
+    }
+    const t = setTimeout(() => setPendingStalled(true), 1500)
+    return () => clearTimeout(t)
+  }, [pendingCount])
+  const syncError = useSyncExternalStore(subscribeWriteError, getWriteError)
 
   // Keep the per-user timezone stamp current — the server-side reminder sender
   // computes this user's wall-clock fire times from it. Stamped once per zone
@@ -117,6 +168,14 @@ function AppShell() {
       <main className={s.appMain}>
         <RouterView fallback={NotFound} />
       </main>
+
+      <SyncBanners
+        offline={!online}
+        pendingCount={pendingCount}
+        pendingStalled={pendingStalled}
+        syncError={syncError}
+        onDismissError={dismissWriteError}
+      />
 
       <nav className={s.tabbar}>
         {TABS.map((t) => (

@@ -28,7 +28,7 @@ import {
 } from '../lib/recurrence'
 import { DAY_MIN } from '../lib/timelineLayout'
 import { pageInert, useSwipeGestures } from '../lib/useSwipeGestures'
-import { useApp } from '../state'
+import { useCalendarNavigation } from '../navigation'
 import type { CalendarEvent, Person, PersonId } from '../types'
 import { Avatars } from './Avatars'
 import { type EditorTarget, EventEditor } from './EventEditor'
@@ -40,7 +40,7 @@ import { WeekTimelineBody, WeekTimelineHead } from './WeekTimeline'
 const SNAP = 15
 
 export function WeekCalendar() {
-  const { state, dispatch } = useApp()
+  const nav = useCalendarNavigation()
   const { accountId, session } = useAuth()
   const userId = session?.user.id ?? null
   const { data: events = [] } = useEvents(accountId)
@@ -57,8 +57,8 @@ export function WeekCalendar() {
   // neighbors (the strip renders the previous and next week too).
   const { completions, isLoading: completionsLoading } = useCompletionsForRange(
     accountId,
-    addDays(state.weekStart, -7),
-    addDays(state.weekStart, 13),
+    addDays(nav.weekStart, -7),
+    addDays(nav.weekStart, 13),
   )
 
   // Expand the three strip pages' occurrences once per data/week change, not
@@ -67,7 +67,7 @@ export function WeekCalendar() {
     () =>
       [-7, 0, 7].map((weekOffset) =>
         DAY_NAMES.map((_, dayIdx) => {
-          const dateISO = addDays(state.weekStart, weekOffset + dayIdx)
+          const dateISO = addDays(nav.weekStart, weekOffset + dayIdx)
           // All-day items first, then timed by start.
           const occs = occurrencesOnDate(events, dateISO, completions).sort((a, b) => {
             if (a.event.allDay !== b.event.allDay) return a.event.allDay ? -1 : 1
@@ -76,7 +76,7 @@ export function WeekCalendar() {
           return { dateISO, occs }
         }),
       ),
-    [state.weekStart, events, completions],
+    [nav.weekStart, events, completions],
   )
 
   // Open a search hit: jump the week to its next upcoming occurrence (falling
@@ -85,7 +85,7 @@ export function WeekCalendar() {
     const event = events.find((e) => e.id === seriesId)
     if (!event) return
     const date = nextRelevantDate(event)
-    dispatch({ type: 'setWeek', weekStart: mondayOf(new Date(`${date}T00:00:00`)) })
+    nav.setWeek(mondayOf(new Date(`${date}T00:00:00`)))
     setTarget({ mode: 'edit', event, occurrenceDate: date })
   }
 
@@ -109,24 +109,16 @@ export function WeekCalendar() {
   return (
     <section className={shared.view}>
       <ViewHeader
-        onToday={() => dispatch({ type: 'setWeek', weekStart: mondayOf(new Date()) })}
-        todayActive={state.weekStart === mondayOf(new Date())}
+        onToday={() => nav.setWeek(mondayOf(new Date()))}
+        todayActive={nav.weekStart === mondayOf(new Date())}
         onPickSearch={openEvent}
         nav={
           <div className={shared.weekNav}>
-            <button
-              type="button"
-              onClick={() => dispatch({ type: 'shiftWeek', delta: -1 })}
-              aria-label="Previous week"
-            >
+            <button type="button" onClick={() => nav.shiftWeek(-1)} aria-label="Previous week">
               <ChevronLeft size={20} />
             </button>
-            <strong>{weekRangeLabel(state.weekStart)}</strong>
-            <button
-              type="button"
-              onClick={() => dispatch({ type: 'shiftWeek', delta: 1 })}
-              aria-label="Next week"
-            >
+            <strong>{weekRangeLabel(nav.weekStart)}</strong>
+            <button type="button" onClick={() => nav.shiftWeek(1)} aria-label="Next week">
               <ChevronRight size={20} />
             </button>
           </div>
@@ -205,7 +197,7 @@ function WeekListBody({
   people: Person[]
   overrides: Record<PersonId, ColorKey>
 }) {
-  const { state, dispatch } = useApp()
+  const nav = useCalendarNavigation()
   const todayISO = toISODate(new Date())
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -214,8 +206,8 @@ function WeekListBody({
   const { onClickCapture } = useSwipeGestures({
     scrollRef,
     stripRef,
-    pageKey: state.weekStart,
-    onNavigate: (delta) => dispatch({ type: 'shiftWeek', delta }),
+    pageKey: nav.weekStart,
+    onNavigate: (delta) => nav.shiftWeek(delta),
   })
 
   // Start with today at the top whenever the visible week contains it — on
@@ -224,7 +216,7 @@ function WeekListBody({
   // biome-ignore lint/correctness/useExhaustiveDependencies: reruns when the visible week changes; the ref is stable
   useEffect(() => {
     todayRef.current?.scrollIntoView({ block: 'start', inline: 'nearest' })
-  }, [state.weekStart])
+  }, [nav.weekStart])
 
   return (
     <div

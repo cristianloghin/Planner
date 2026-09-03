@@ -47,11 +47,24 @@ sync. Migrations `0001`–`0021` are applied.
 
 ## The data layer, as it stands
 
-Mid-migration, and worth knowing before adding a slice:
+**The reducer is gone.** Every slice reads and writes through `client/` and
+`domains/` over TanStack Query. `state.tsx`, `store/` (the reducer, the actions,
+`SupabaseStore`, the write queue and the offline snapshot) and the `AppState`
+type are deleted. What the provider used to do now lives in:
 
-- Events and dependencies still flow through the **reducer + `ScheduleStore`**
-  (`src/state.tsx`, `src/store/`) with a hand-rolled write queue and a
-  localStorage snapshot. That is all the reducer holds now.
+- **`navigation.tsx`** — the visible week and day, a small context with the
+  reducer's exact rules (a day step rolls into the neighbouring week). Not a URL
+  yet; the routes work moves it there.
+- **`App.tsx`'s shell** — the realtime wiring (client channel → service →
+  `queryKeysForTable`), and the sync banners read off the query client:
+  `onlineManager` for offline, paused mutations for "changes pending", and a
+  hook on the mutation cache in `lib/queryClient.ts` for a write the server
+  rejected (the domain has already rolled its optimistic patch back).
+- **Query itself** — ordering (one mutation scope), offline durability (the
+  persister), and the cold-start refetch in `main.tsx`.
+
+Worth knowing before adding a slice:
+
 - **`occurrences` is adopted** — the first slice to run through `client/` and
   `domains/` for real. Reads and writes both go through the domain, and
   `data/completions.ts` is gone. Six screens call `useCompletionsForRange` from
@@ -60,16 +73,12 @@ Mid-migration, and worth knowing before adding a slice:
 - **Templates** now read and write through `domains/events` (`useTemplates`
   and the `saveTemplate` / `removeTemplate` changes of `useEventsWrite`).
   `data/templates.ts` and `data/useAccountStore.ts` are gone.
-- **People and preferences are adopted.** Every screen reads them through
-  `usePeople` / `usePreferences` with the domain selectors; Settings writes
-  through `usePeopleWrite` / `usePreferencesWrite`. The timezone stamp is an
-  effect in the app shell over the preferences query, guarded to fire once per
-  zone per session. Both slices, their six actions, the reducer cases, the
-  store's loads and writes, and `lib/people.ts` are deleted. A queue saved by
-  an older build may still hold one of those actions; `state.tsx` drops it on
-  read with a warning. One thing worth knowing: `user_preference` is **not in
-  the realtime publication**, so another device's change only arrives on a
-  refetch.
+- **People and preferences** read through `usePeople` / `usePreferences` with
+  the domain selectors; Settings writes through `usePeopleWrite` /
+  `usePreferencesWrite`. The timezone stamp is an effect in the app shell over
+  the preferences query, guarded to fire once per zone per session. One thing
+  worth knowing: `user_preference` is **not in the realtime publication**, so
+  another device's change only arrives on a refetch.
 - **Cold starts read fresh.** Every Query slice starts from the persisted
   cache with a five-minute stale time, which alone would let a change made
   while the app was closed sit unseen for up to five minutes. So `main.tsx`
@@ -78,28 +87,24 @@ Mid-migration, and worth knowing before adding a slice:
   cached data still paints instantly; what a screen is showing refetches
   right away and the rest refetch when first read. Offline, the resume waits
   for the network and the refetch waits with it.
-- **Lists are adopted.** The Lists screen and the sheet's linked to-dos read
-  through `useLists` / `useListLinks` and write through `useListsWrite`; the
-  reducer edit guard is gone from Lists because every write patches the cache
-  first. The ten list actions, their reducer cases, the store's two loads, ten
-  write cases and the pre-0009 legacy import, `lib/lists.ts` and the two
-  slices on `AppState` are deleted; `state.tsx` drops a queued list action
-  from an older build on read.
-- **Realtime** runs through `services/realtime` over `client/realtime.ts`.
-  `state.tsx` hands the service the client's channel and gets one folded
-  report per burst; `queryKeysForTable` in `domains/index.ts` turns each table
-  into the Query keys to invalidate, and the reducer reloads only when one of
-  its own tables changed. A reconnection invalidates the whole Query cache and
-  reloads. `SupabaseStore.subscribe` and the store interface's `subscribe`
-  are deleted; the store now only loads and applies.
-- The rest of **`client/` and `domains/`** is built and **not yet adopted**.
-  Every call the app makes to Supabase has a client function — 15 tables, 4
-  RPCs, the 6 auth methods, the realtime channel — and eight domains sit over
-  them. Everything outside occurrences, templates, people, preferences and
-  lists still runs through `SupabaseStore`, `state.tsx`, `auth.tsx`,
-  `lib/search.ts` and `lib/push.ts`.
+- **Lists** read through `useLists` / `useListLinks` and write through
+  `useListsWrite`, from the Lists screen and the sheet's linked to-dos. No edit
+  guard: every write patches the cache first, so a refetch mid-edit shows the
+  user's own latest change.
+- **Events and dependencies** read through `useEvents` / `useDependencies`
+  and write through `useEventsWrite` (save, remove, split) and
+  `useOccurrencesWrite` (dependency edges). The editor holds its own draft, so
+  it needs no guard either.
+- **Realtime** runs through `services/realtime` over `client/realtime.ts`,
+  wired in the app shell: one folded report per burst, `queryKeysForTable` in
+  `domains/index.ts` turns each table into the Query keys to invalidate, and a
+  reconnection invalidates the whole cache.
+- **Not yet adopted**: `auth.tsx` still owns the session (so the auth gate is
+  imperative), `lib/search.ts` mirrors `client/search.ts`, and `lib/push.ts`
+  mirrors `client/push.ts`. Everything else in `client/` and `domains/` is
+  live.
 - **`services/` is different, and better off.** Those were real moves, not
-  parallel copies: `lib/recurrence`, `lib/occurrences`, `lib/timing`,
+  parallel copies: `lib/recurrence`, `lib/timing`,
   `lib/timelineLayout`, `lib/conflicts`, `lib/notifications`,
   `lib/useSwipeGestures` and `lib/push` now forward to a service, so there is one
   implementation and nothing to drift. The app is unchanged; the forwarders
@@ -107,18 +112,10 @@ Mid-migration, and worth knowing before adding a slice:
 
 Each slice has exactly one owner. `RESTRUCTURE_PLAN.md` is where this ends up.
 
-**So the unadopted parts duplicate code that is still live.** `client/search.ts`
-mirrors `lib/search.ts`, `client/push.ts` mirrors the row writes in
-`lib/push.ts`, and `client/series.ts`, `client/lists.ts`, `client/people.ts` and
-`client/preferences.ts` mirror `supabaseStore.ts`. Above them, the domains'
-`patches.ts` files mirror `store/reducer.ts`.
-
-**A fix to one side has to be made on the other.** Adopt a slice and delete its
-old path rather than letting the pair age.
-
-`SupabaseStore`'s five per-occurrence write methods are the current example of
-what "delete the old path" leaves behind: they have no callers now, and stay
-only until the reducer path around them goes.
+**Two unadopted parts still duplicate code that is live.** `client/search.ts`
+mirrors `lib/search.ts` and `client/push.ts` mirrors the row writes in
+`lib/push.ts`. A fix to one side has to be made on the other; adopt the slice
+and delete its old path rather than letting the pair age.
 
 ### Adopting a slice
 
@@ -152,10 +149,9 @@ Still to adopt, cheapest first:
 
 - **`search`** — two functions, no writes, no cache shaping; `lib/search.ts`
   deletes when it works.
-- **The reducer slice** — events with dependencies, the last one. People,
-  preferences and lists set the pattern: readers one screen at a time, then
-  the writers, then delete the old path in one commit. Events carries the edit
-  guard and the split flow, so it is the biggest.
+- **`session`** — `auth.tsx` onto `services/session`, which is what lets the
+  auth gate become a route guard.
+- **`push`** — `lib/push.ts` onto `domains/push`.
 
 ### The account is a value, not a closure
 
@@ -172,11 +168,12 @@ also what makes a resumed write self-sufficient.
 
 ## Tests
 
-`npm test` — 238 tests, no backend needed. Recurrence expansion and the RRULE
-round-trip (`src/lib/`), occurrence completion and dependency gating, Lists
-helpers, date math, the reducer's optimistic application, the offline queue, the
-client-layer conversions (`src/client/mappers.test.ts`), and a cross-validation
-of the edge function's recurrence logic against the client's.
+`npm test` — 219 tests, no backend needed. Recurrence expansion and the RRULE
+round-trip, occurrence completion and dependency gating, date math, the visible
+date's navigation rules, the client-layer conversions
+(`src/client/mappers.test.ts`), each domain's transformers, selectors and
+optimistic patches, the table-to-keys map, and a cross-validation of the edge
+function's recurrence logic against the client's.
 
 169 of them now live under `client/`, `domains/` and `services/`, but only 116 are
 *new* — the recurrence and occurrence-status tests moved there with their code.
@@ -199,15 +196,14 @@ what happens when two rows land on the same day — see the gotcha below. Only o
 of the three fails without the fix; the other two guard the neighbouring cases.
 
 The remaining gap is every DB round-trip, which needs a click-test rather than a
-unit test. `client/`'s occurrence functions have now had one — reads and writes
-both, against the local stack — but the rest of `client/` and all of
-`SupabaseStore` have not.
+unit test. Every adopted slice has had one against the local stack — reads,
+writes and a partner-style change arriving over realtime — as it was adopted.
 
 ---
 
-## Gotchas — read before editing `supabaseStore.ts` or `client/`
+## Gotchas — read before editing `client/`
 
-These are the rules both copies encode. Breaking one is silent.
+These are the rules the client functions encode. Breaking one is silent.
 
 - PostgREST embeds need FK hints `table!fk_col` or you get `PGRST201` (ambiguous
   — e.g. `checklist_item` also links many-to-many via `occurrence_item_removed`).
@@ -232,7 +228,7 @@ These are the rules both copies encode. Breaking one is silent.
   `user_id`. Both stop one partner's edit from taking over or removing the
   other's rows.
 - Events and templates are one table (`event_series`). `client/series.ts` treats
-  them as one; `supabaseStore.ts` still has two write paths for them.
+  them as one.
 
 Two rules that are easy to break and live in `DATA_MODEL.md`:
 

@@ -543,14 +543,14 @@ stays in localStorage. Both are *how*, not *what* (R13).
 | File | Becomes |
 |---|---|
 | `App.tsx` | `Root` gate → route guard (**still imperative**: a guard needs a non-React `isAuthenticated()`, so it waits on `services/session`); tab shell → `layouts/AppShell` (**still in `App.tsx`**); route map → ~~`routes/routes.ts`~~ **done** |
-| `state.tsx` | reducer state → domains (**people, preferences and lists done**; events and dependencies remain); write queue → mutation `scope`; offline → Query persister; realtime channel → ~~`client/realtime.ts`~~ **done**, routing → ~~`services/realtime` + `queryKeysForTable`~~ **done**; edit guard → derived from route |
+| ~~`state.tsx`~~ | **deleted.** Reducer state → domains; write queue → mutation `scope`; offline → Query persister; realtime → `client/realtime.ts` + `services/realtime` + `queryKeysForTable`, wired in the shell; edit guard → gone (every write patches the cache first). The visible date sits in `navigation.tsx` until routes put it in the URL |
 | `auth.tsx` | SDK calls → ~~`client/auth.ts`~~ **done**; session + non-React accessors → `services/session`; credential ops → `domains/auth`; `ensureAccount` → `domains/account` over ~~`client/account.ts`~~ **done**; sign-out cache/snapshot clearing → shell orchestration |
-| `store/store.ts` | deleted (`ScheduleStore`, `LocalStorageStore`, `defaultState`) |
-| `store/supabaseStore.ts` | ~~sliced into `client/*` by table; mappers to `client/mappers.ts`~~ **done** — deletes once the domains adopt them |
-| `store/reducer.ts`, `store/actions.ts` | deleted; optimistic logic → `domains/*/patch.ts` |
-| `store/offline.ts` | deleted |
+| ~~`store/store.ts`~~ | **deleted** |
+| ~~`store/supabaseStore.ts`~~ | **deleted**; every table is served by `client/*` |
+| ~~`store/reducer.ts`, `store/actions.ts`~~ | **deleted**; optimistic logic lives in `domains/*/patches.ts` |
+| ~~`store/offline.ts`~~ | **deleted** |
 | ~~`data/useAccountStore.ts`~~ | **deleted** with `data/templates.ts` |
-| `types.ts` | split into `domains/*/types.ts` |
+| `types.ts` | `AppState` **deleted**; what remains is re-exports of `domains/*/types.ts` |
 
 Sign-out clearing is worth calling out as more than filing: `auth.tsx` currently
 reaches into the query cache and the offline snapshot of every other domain from
