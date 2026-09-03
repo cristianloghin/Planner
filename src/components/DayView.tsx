@@ -1,51 +1,64 @@
 import { Bell, ChevronLeft, ChevronRight } from 'lucide-react'
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react'
-import { useAccount } from '../account'
+import { type CSSProperties, useEffect, useRef, useState } from 'react'
 import { useLatest } from '../assets/hooks/useLatest'
 import { type ColorKey, colorStyle } from '../assets/palette'
 import shared from '../assets/styles/shared.module.css'
 import { LoadingPill } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
-import { addDays, isoLabel, minutesToTime, toISODate } from '../assets/utils/dates'
-import { useEvents } from '../domains/events/queries'
+import { isoLabel, minutesToTime, toISODate } from '../assets/utils/dates'
 import { hasReminders } from '../domains/events/selectors'
-import { useCompletionsForRange } from '../domains/occurrences/queries'
-import { usePeople } from '../domains/people/queries'
 import { eventColorKey, personColorKey } from '../domains/people/selectors'
-import { usePreferences } from '../domains/preferences/queries'
-import { personColors } from '../domains/preferences/selectors'
-import { useCalendarNavigation } from '../navigation'
 import { loadZoom, pageInert, useSwipeGestures } from '../services/gestures'
-import {
-  type DayOccurrence,
-  nextRelevantDate,
-  occurrencesOnDate,
-} from '../services/recurrence/expand'
+import type { DayOccurrence } from '../services/recurrence/expand'
 import { DAY_MIN, type TimeBlock, layoutBlocks } from '../services/timeline-layout'
 import type { CalendarEvent, Person, PersonId } from '../types'
 import { Avatars } from './Avatars'
 import s from './DayView.module.css'
-import { type EditorTarget, EventEditor } from './EventEditor'
-import { OccurrenceSheet } from './OccurrenceSheet'
 import { TimeGutter } from './TimeGutter'
 import { ViewHeader } from './ViewHeader'
 
 const SNAP = 15
 const ZOOM_KEY = 'planner:hourH'
 
-export function DayView() {
-  const nav = useCalendarNavigation()
-  const { accountId, userId } = useAccount()
-  const { data: events = [] } = useEvents(accountId)
-  const day = nav.selectedDay
-  const { data: people = [] } = usePeople(accountId)
-  const { data: overrides = {} } = usePreferences(accountId, userId, personColors)
-  const [editor, setEditor] = useState<EditorTarget | null>(null)
-  const [sheet, setSheet] = useState<{
-    event: CalendarEvent
-    date: string
-  } | null>(null)
+/** One page of the swipe strip: a day, already expanded. */
+export interface DayPage {
+  iso: string
+  timedBlocks: TimeBlock[]
+  allDayOccs: DayOccurrence[]
+}
 
+/**
+ * The Day timeline. Props-only: it is given the days to draw and told what to
+ * call, and it reads no domain and opens no overlay.
+ *
+ * What it does own is how it looks — the pinch zoom, the scroll position and
+ * the swipe gestures, none of which mean anything outside this view — plus a
+ * once-a-minute tick so the "now" line moves and today rolls over at midnight.
+ */
+export function DayView({
+  pages,
+  people,
+  overrides,
+  dateISO,
+  loading,
+  onShiftDay,
+  onGoToday,
+  onPickSearch,
+  onAddAt,
+  onOpenOccurrence,
+}: {
+  /** Yesterday, the visible day, tomorrow — in that order. */
+  pages: DayPage[]
+  people: Person[]
+  overrides: Record<PersonId, ColorKey>
+  dateISO: string
+  loading: boolean
+  onShiftDay: (delta: number) => void
+  onGoToday: () => void
+  onPickSearch: (seriesId: string) => void
+  onAddAt: (date: string, attendees: PersonId[], startMin: number, endMin: number) => void
+  onOpenOccurrence: (occ: DayOccurrence) => void
+}) {
   // Pixels-per-hour for the timeline; pinch-to-zoom adjusts it (Y axis only).
   const [hourH, setHourH] = useState(() => loadZoom(ZOOM_KEY))
   const pxPerMin = hourH / 60
@@ -55,14 +68,12 @@ export function DayView() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const stripRef = useRef<HTMLDivElement>(null)
 
-  const dateISO = addDays(nav.weekStart, day)
-
   // Swipe to change day, pinch to zoom (shared with the Week grid).
   const { onClickCapture } = useSwipeGestures({
     scrollRef,
     stripRef,
     pageKey: dateISO,
-    onNavigate: (delta) => nav.shiftDay(delta),
+    onNavigate: (delta) => onShiftDay(delta),
     zoom: { hourH, setHourH, key: ZOOM_KEY },
   })
 
@@ -77,15 +88,6 @@ export function DayView() {
   const nowISO = toISODate(now)
   const isToday = dateISO === nowISO
   const nowMin = now.getHours() * 60 + now.getMinutes()
-
-  // Windowed per-occurrence state for the visible day and its swipe neighbors.
-  const prevISO = addDays(dateISO, -1)
-  const nextISO = addDays(dateISO, 1)
-  const { completions, isLoading: completionsLoading } = useCompletionsForRange(
-    accountId,
-    prevISO,
-    nextISO,
-  )
 
   // Scroll the timeline so `minute` sits a little below the top edge.
   function scrollToMinute(minute: number) {
@@ -102,71 +104,33 @@ export function DayView() {
 
   function addAt(date: string, attendees: PersonId[], minute: number) {
     const start = Math.min(Math.max(0, Math.round(minute / SNAP) * SNAP), DAY_MIN - SNAP)
-    setEditor({
-      mode: 'new',
-      date,
-      attendees,
-      startMin: start,
-      endMin: Math.min(start + 60, DAY_MIN),
-    })
-  }
-
-  function openSheet(occ: DayOccurrence) {
-    setSheet({ event: occ.event, date: occ.start })
-  }
-
-  // One entry per swipe-strip page: yesterday, the visible day, tomorrow.
-  // None of this depends on zoom or gesture state, and it's the expensive part
-  // of a render (recurrence expansion + conflict analysis) — memoize so a
-  // pinch-zoom frame or timer tick doesn't recompute it.
-  const pages = useMemo(
-    () =>
-      [prevISO, dateISO, nextISO].map((iso) => {
-        const occs = occurrencesOnDate(events, iso, completions)
-        const timedBlocks: TimeBlock[] = occs
-          .filter((o) => !o.event.allDay)
-          .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end }))
-        const allDayOccs = occs.filter((o) => o.event.allDay)
-
-        return { iso, timedBlocks, allDayOccs }
-      }),
-    [events, completions, prevISO, dateISO, nextISO],
-  )
-  // The header (lane names, all-day chips) shows the visible day.
-  const { allDayOccs } = pages[1]
-
-  const fullHeight = DAY_MIN * pxPerMin
-
-  // Open a search hit: jump the day to the event's next upcoming occurrence
-  // (falling back to the series anchor for an ended series) and open its editor.
-  function openSearchHit(seriesId: string) {
-    const event = events.find((e) => e.id === seriesId)
-    if (!event) return
-    const date = nextRelevantDate(event)
-    nav.goToDate(date)
-    setEditor({ mode: 'edit', event, occurrenceDate: date })
+    onAddAt(date, attendees, start, Math.min(start + 60, DAY_MIN))
   }
 
   function goToday() {
-    nav.goToDate(toISODate(new Date()))
+    onGoToday()
     // Explicit "take me to now" intent, so re-focus the current time.
-    const now = new Date().getHours() * 60 + new Date().getMinutes()
-    requestAnimationFrame(() => scrollToMinute(now))
+    const min = new Date().getHours() * 60 + new Date().getMinutes()
+    requestAnimationFrame(() => scrollToMinute(min))
   }
+
+  // The header (lane names, all-day chips) shows the visible day.
+  const { allDayOccs } = pages[1]
+  const fullHeight = DAY_MIN * pxPerMin
 
   return (
     <section className={shared.view}>
       <ViewHeader
         onToday={goToday}
         todayActive={isToday}
-        onPickSearch={openSearchHit}
+        onPickSearch={onPickSearch}
         nav={
           <div className={shared.weekNav}>
-            <button type="button" onClick={() => nav.shiftDay(-1)} aria-label="Previous day">
+            <button type="button" onClick={() => onShiftDay(-1)} aria-label="Previous day">
               <ChevronLeft size={20} />
             </button>
             <strong>{isoLabel(dateISO)}</strong>
-            <button type="button" onClick={() => nav.shiftDay(1)} aria-label="Next day">
+            <button type="button" onClick={() => onShiftDay(1)} aria-label="Next day">
               <ChevronRight size={20} />
             </button>
           </div>
@@ -193,7 +157,7 @@ export function DayView() {
                         key={`${o.event.id}:${o.start}`}
                         occ={o}
                         personId={p.id}
-                        onClick={() => openSheet(o)}
+                        onClick={() => onOpenOccurrence(o)}
                         people={people}
                         overrides={overrides}
                       />
@@ -239,7 +203,7 @@ export function DayView() {
                       nowMin={page.iso === nowISO ? nowMin : null}
                       pxPerMin={pxPerMin}
                       onAddAt={(min) => addAt(page.iso, [p.id], min)}
-                      onOpen={openSheet}
+                      onOpen={onOpenOccurrence}
                       people={people}
                       overrides={overrides}
                     />
@@ -251,24 +215,7 @@ export function DayView() {
         </div>
       </div>
 
-      {completionsLoading && <LoadingPill />}
-
-      {editor && <EventEditor target={editor} onClose={() => setEditor(null)} />}
-      {sheet && (
-        <OccurrenceSheet
-          event={sheet.event}
-          date={sheet.date}
-          onEdit={() => {
-            setEditor({
-              mode: 'edit',
-              event: sheet.event,
-              occurrenceDate: sheet.date,
-            })
-            setSheet(null)
-          }}
-          onClose={() => setSheet(null)}
-        />
-      )}
+      {loading && <LoadingPill />}
     </section>
   )
 }

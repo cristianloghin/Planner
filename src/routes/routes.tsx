@@ -1,9 +1,9 @@
 import { defineRoutes, useNavigation } from '@mikrostack/router'
-import { DayView } from '../components/DayView'
 import { MonthView } from '../components/MonthView'
 import { Settings } from '../components/Settings'
 import { WeekCalendar } from '../components/WeekCalendar'
 import { useCalendarNavigation } from '../navigation'
+import { DayRoute } from './DayRoute'
 
 /**
  * The Month grid opens a day in the Day view. The visible date lives in the
@@ -26,8 +26,15 @@ function MonthRoute() {
 }
 
 /**
- * The four tabs, as routes. Everything a view opens (the event editor, the
- * occurrence sheet) is still its own local state rather than a route.
+ * The four tabs, as routes.
+ *
+ * `/day` is the shape the rest are moving to: a route in `routes/` that reads
+ * the domains and hands a props-only view plain data (see `DayRoute`). The
+ * other three still orchestrate inside the component.
+ *
+ * The event editor and the occurrence sheet are still local state — held by
+ * the route for `/day`, by the component elsewhere — rather than routes of
+ * their own.
  *
  * `/` exists because the PWA's `start_url` is the bare base, so every cold
  * launch lands there. Guards run on the initial match (router >= 0.9), which
@@ -36,7 +43,7 @@ function MonthRoute() {
  */
 export const routes = defineRoutes({
   '/': { component: () => null, guard: () => '/day' },
-  '/day': { component: DayView },
+  '/day': { component: DayRoute },
   '/week': { component: WeekCalendar },
   '/month': { component: MonthRoute },
   '/settings': { component: Settings },
