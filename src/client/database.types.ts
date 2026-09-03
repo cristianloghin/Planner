@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -36,19 +56,16 @@ export type Database = {
         Row: {
           account_id: string
           created_at: string
-          role: string
           user_id: string
         }
         Insert: {
           account_id: string
           created_at?: string
-          role?: string
           user_id: string
         }
         Update: {
           account_id?: string
           created_at?: string
-          role?: string
           user_id?: string
         }
         Relationships: [
@@ -71,17 +88,14 @@ export type Database = {
       app_user: {
         Row: {
           created_at: string
-          display_name: string
           id: string
         }
         Insert: {
           created_at?: string
-          display_name?: string
           id: string
         }
         Update: {
           created_at?: string
-          display_name?: string
           id?: string
         }
         Relationships: []
@@ -527,7 +541,6 @@ export type Database = {
       }
       notification_log: {
         Row: {
-          dismissed_at: string | null
           occurrence_start: string
           reminder_id: string
           sent_at: string
@@ -535,7 +548,6 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          dismissed_at?: string | null
           occurrence_start: string
           reminder_id: string
           sent_at?: string
@@ -543,7 +555,6 @@ export type Database = {
           user_id: string
         }
         Update: {
-          dismissed_at?: string | null
           occurrence_start?: string
           reminder_id?: string
           sent_at?: string
@@ -811,7 +822,7 @@ export type Database = {
       person: {
         Row: {
           account_id: string
-          color: string
+          color_key: string
           created_at: string
           id: string
           kind: string
@@ -821,7 +832,7 @@ export type Database = {
         }
         Insert: {
           account_id: string
-          color?: string
+          color_key?: string
           created_at?: string
           id?: string
           kind?: string
@@ -831,7 +842,7 @@ export type Database = {
         }
         Update: {
           account_id?: string
-          color?: string
+          color_key?: string
           created_at?: string
           id?: string
           kind?: string
@@ -1003,36 +1014,45 @@ export type Database = {
       can_access_series: { Args: { p_series: string }; Returns: boolean }
       create_account: { Args: { p_name: string }; Returns: string }
       is_account_member: { Args: { p_account: string }; Returns: boolean }
+      schedule_reminder_sender: {
+        Args: {
+          p_cron_secret: string
+          p_function_url: string
+          p_schedule?: string
+        }
+        Returns: undefined
+      }
       search_events: {
         Args: { p_account: string; p_query: string }
         Returns: {
-          series_id: string
-          title: string
-          dtstart: string | null
           all_day: boolean
-          rrule: string | null
-          snippet: string | null
+          dtstart: string
           rank: number
+          rrule: string
+          series_id: string
+          snippet: string
+          title: string
         }[]
       }
       search_list_items: {
         Args: { p_account: string; p_query: string }
         Returns: {
+          done: boolean
+          due_on: string
+          group_label: string
           item_id: string
           list_id: string
           list_title: string
-          title: string
-          group_label: string | null
-          done: boolean
-          due_on: string | null
-          person_id: string | null
+          person_id: string
           rank: number
+          title: string
         }[]
       }
       split_series: {
         Args: { p_cutover: string; p_series: string; p_truncated_rrule: string }
         Returns: string
       }
+      unschedule_reminder_sender: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
@@ -1161,7 +1181,11 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
 } as const
+

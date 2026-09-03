@@ -45,14 +45,14 @@ export interface Person {
 export async function fetchPeople(accountId: string): Promise<Person[]> {
   const { data, error } = await supabase
     .from('person')
-    .select('id, name, color, kind, sort_order')
+    .select('id, name, color_key, kind, sort_order')
     .eq('account_id', accountId)
     .order('sort_order')
   if (error) throw error
   return (data ?? []).map((p) => ({
     id: p.id,
     name: p.name,
-    color: p.color,
+    color: p.color_key,
     kind: p.kind === 'child' ? 'child' : 'adult',
     sortOrder: p.sort_order,
   }))
@@ -71,6 +71,6 @@ export async function renamePerson(id: PersonId, name: string): Promise<void> {
  * `savePreferences` in ./preferences instead.
  */
 export async function recolorPerson(id: PersonId, color: ColorKey): Promise<void> {
-  const { error } = await supabase.from('person').update({ color }).eq('id', id)
+  const { error } = await supabase.from('person').update({ color_key: color }).eq('id', id)
   if (error) throw error
 }
