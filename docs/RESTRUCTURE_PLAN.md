@@ -572,15 +572,15 @@ of coupling that breaks quietly later.
 | ~~`data/templates.ts`~~ | `domains/events` — **done and deleted**; the three template screens and the realtime bridge repointed |
 | ~~`data/completions.ts`~~ | `domains/occurrences` — **done and deleted**; reads and writes both adopted |
 | ~~`lib/{supabase,database.types}.ts`~~ | `client/` — **done** |
-| `lib/search.ts` | ~~`client/search.ts`~~ **done** + `domains/search` |
+| ~~`lib/search.ts`~~ | ~~`client/search.ts`~~ + ~~`domains/search`~~ **adopted and deleted** |
 | `lib/push.ts` | ~~`client/push.ts`~~ (rows) + ~~`services/push`~~ (browser) + ~~`domains/push`~~ (pairing) — **all three built and adopted**; ~~`lib/push.ts`~~ **deleted** |
-| `lib/{recurrence,occurrences}.ts` | ~~`services/recurrence`~~ **moved**, forwarder **deleted**; `lib/rrule.ts` belongs in `client/` instead (only the client imports it) |
+| `lib/{recurrence,occurrences}.ts` | ~~`services/recurrence`~~ **moved**, forwarder **deleted**; ~~`lib/rrule.ts`~~ → `client/rrule.ts` **moved** |
 | `lib/timelineLayout.ts` | ~~`services/timeline-layout`~~ **moved**, forwarder **deleted** |
 | `lib/conflicts.ts` | ~~`services/conflicts`~~ **moved**, forwarder **deleted** |
 | `lib/notifications.ts` | ~~`services/notifications`~~ **moved**, forwarder **deleted**, with AlertHost's lifecycle as `useDueAlerts` |
 | `lib/useSwipeGestures.ts` | ~~`services/gestures`~~ **moved**, forwarder **deleted** |
-| `lib/{people,attachments,lists}.ts` | domain selectors in `domains/{people,events,lists}` — ~~`lib/people.ts`~~ and ~~`lib/lists.ts`~~ **adopted and deleted**; `attachments`' filters folded into `domains/events/transformers`. `lib/timing.ts` went to `services/recurrence` instead, not to a domain — see §2 |
-| `lib/{useLatest,useMediaQuery,useSearch}.ts` | `assets/hooks` |
+| `lib/{people,attachments,lists}.ts` | domain selectors in `domains/{people,events,lists}` — ~~`lib/people.ts`~~ and ~~`lib/lists.ts`~~ **adopted and deleted**; `lib/attachments.ts` → ~~`domains/events/attachments.ts`~~ **moved**; `attachments`' filters folded into `domains/events/transformers`. `lib/timing.ts` went to `services/recurrence` instead, not to a domain — see §2 |
+| `lib/{useLatest,useMediaQuery}.ts` | `assets/hooks` — `useSearch` **deleted** with the search adoption (`useDebouncedValue` took its one job) |
 | `lib/{dates,id,cx}.ts` | `assets/utils` |
 | `lib/palette.ts` | `assets/palette.ts` |
 | `styles/` | `assets/styles/` |

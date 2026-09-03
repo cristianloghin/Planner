@@ -1,12 +1,12 @@
 import { Search as SearchIcon } from 'lucide-react'
-import { useCallback, useState } from 'react'
-import { useSearch } from '../assets/hooks/useSearch'
+import { useState } from 'react'
+import { useDebouncedValue } from '../assets/hooks/useDebouncedValue'
 import s from '../assets/ui/Search.module.css'
 import { SearchOverlay } from '../assets/ui/SearchOverlay'
 import { cx } from '../assets/utils/cx'
 import { isoLabel, toISODate } from '../assets/utils/dates'
 import { useAuth } from '../auth'
-import { searchEvents } from '../lib/search'
+import { useEventSearch } from '../domains/search/queries'
 
 /**
  * Event search in the shared view header (Day / Week / Month). Hits the
@@ -18,11 +18,11 @@ export function EventSearch({ onPick }: { onPick: (seriesId: string) => void }) 
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
 
-  const run = useCallback(
-    (q: string) => (accountId ? searchEvents(accountId, q) : Promise.resolve([])),
-    [accountId],
-  )
-  const { results, loading, error } = useSearch(query, run)
+  // The search fires on a settled term, not on every keystroke.
+  const settled = useDebouncedValue(query)
+  const { data: results = [], isFetching, error: searchError } = useEventSearch(accountId, settled)
+  const loading = query.trim() !== '' && (query.trim() !== settled.trim() || isFetching)
+  const error = searchError ? searchError.message : null
 
   function close() {
     setOpen(false)

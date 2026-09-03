@@ -50,7 +50,7 @@ interface PushPayload {
  * the app self-corrects on the next sync, and `tag` collapsing (one per
  * occurrence+offset) can't inflate it on a re-send. The app closes what's
  * outstanding when it opens, which is what keeps the derivation honest — see
- * clearNotifications in src/lib/push.ts.
+ * clearNotifications in src/services/push.
  *
  * Badging rides the same iOS gate as Web Push (installed to the Home Screen,
  * permission granted), so it is never available where pushes aren't. Guarded
@@ -94,8 +94,9 @@ self.addEventListener('push', (event) => {
 /** Fired when the push service rotates this device's subscription. The worker
  *  has no Supabase session, so it can't fix the DB row itself — it re-subscribes
  *  immediately (keeping a deliverable subscription alive) and the app upserts
- *  the row on its next open (syncPushSubscription in src/lib/push.ts). Until
- *  then, sends to the dead endpoint 404 and the sender prunes the old row. */
+ *  the row on its next open (the shell re-registers the device on start-up
+ *  through services/push and domains/push). Until then, sends to the dead
+ *  endpoint 404 and the sender prunes the old row. */
 interface PushSubscriptionChangeEvent extends ExtendableEvent {
   readonly oldSubscription: PushSubscription | null
   readonly newSubscription: PushSubscription | null

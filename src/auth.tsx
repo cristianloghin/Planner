@@ -1,7 +1,7 @@
 import type { Session } from '@supabase/supabase-js'
 import { type ReactNode, createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { supabase } from './client/supabase'
-import { queryClient } from './lib/queryClient'
+import { queryClient } from './queryClient'
 
 interface AuthCtx {
   session: Session | null

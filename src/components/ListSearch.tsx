@@ -1,12 +1,12 @@
 import { Search as SearchIcon } from 'lucide-react'
-import { useCallback, useState } from 'react'
-import { useSearch } from '../assets/hooks/useSearch'
+import { useState } from 'react'
+import { useDebouncedValue } from '../assets/hooks/useDebouncedValue'
 import s from '../assets/ui/Search.module.css'
 import { SearchOverlay } from '../assets/ui/SearchOverlay'
 import { cx } from '../assets/utils/cx'
 import { isoLabel } from '../assets/utils/dates'
 import { useAuth } from '../auth'
-import { searchListItems } from '../lib/search'
+import { useListItemSearch } from '../domains/search/queries'
 
 /**
  * To-do search for the Lists header. Hits the `search_list_items` RPC; picking a
@@ -22,11 +22,15 @@ export function ListSearch({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
 
-  const run = useCallback(
-    (q: string) => (accountId ? searchListItems(accountId, q) : Promise.resolve([])),
-    [accountId],
-  )
-  const { results, loading, error } = useSearch(query, run)
+  // The search fires on a settled term, not on every keystroke.
+  const settled = useDebouncedValue(query)
+  const {
+    data: results = [],
+    isFetching,
+    error: searchError,
+  } = useListItemSearch(accountId, settled)
+  const loading = query.trim() !== '' && (query.trim() !== settled.trim() || isFetching)
+  const error = searchError ? searchError.message : null
 
   function close() {
     setOpen(false)

@@ -1,5 +1,10 @@
-import { uid } from '../assets/utils/id'
-import type { Attachment, ChecklistEntry } from '../types'
+/**
+ * Reading and copying what is attached to an event or a blueprint: the notes,
+ * the checklists and the reminder offsets, and the deep copy a blueprint's
+ * attachments get when they become a real event's.
+ */
+import { uid } from '../../assets/utils/id'
+import type { Attachment, ChecklistEntry } from './types'
 
 type NoteAttachment = Extract<Attachment, { kind: 'note' }>
 type ChecklistAttachment = Extract<Attachment, { kind: 'checklist' }>

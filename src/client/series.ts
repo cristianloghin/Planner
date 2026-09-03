@@ -9,7 +9,6 @@
  * business.
  */
 import { type ColorKey, isColorKey } from '../assets/palette'
-import { recurrenceToRRule, rruleToRecurrence, truncatedRRule } from '../lib/rrule'
 import {
   durationToInterval,
   intervalToDuration,
@@ -19,6 +18,7 @@ import {
 } from './mappers'
 import { fetchAll } from './pagination'
 import type { PersonId } from './people'
+import { recurrenceToRRule, rruleToRecurrence, truncatedRRule } from './rrule'
 import { supabase } from './supabase'
 
 /** How often a series repeats. */

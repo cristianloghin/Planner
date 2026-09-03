@@ -10,7 +10,7 @@ import { AuthProvider } from './auth'
 import { UpdatePrompt } from './components/UpdatePrompt'
 import { registerDomainDefaults } from './domains'
 import './index.css'
-import { queryClient, queryPersistOptions } from './lib/queryClient'
+import { queryClient, queryPersistOptions } from './queryClient'
 
 // Before anything is read back out of storage: a write paused offline is
 // resumed as soon as the saved cache lands, and one whose behaviour is not

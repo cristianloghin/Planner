@@ -58,7 +58,7 @@ type are deleted. What the provider used to do now lives in:
 - **`App.tsx`'s shell** — the realtime wiring (client channel → service →
   `queryKeysForTable`), and the sync banners read off the query client:
   `onlineManager` for offline, paused mutations for "changes pending", and a
-  hook on the mutation cache in `lib/queryClient.ts` for a write the server
+  hook on the mutation cache in `src/queryClient.ts` for a write the server
   rejected (the domain has already rolled its optimistic patch back).
 - **Query itself** — ordering (one mutation scope), offline durability (the
   persister), and the cold-start refetch in `main.tsx`.
@@ -103,18 +103,16 @@ Worth knowing before adding a slice:
   browser side, `domains/push` stores the row, and the Settings toggle and the
   shell's start-up re-registration pair them at the call site.
 - **Not yet adopted**: `auth.tsx` still owns the session (so the auth gate is
-  imperative), and `lib/search.ts` mirrors `client/search.ts`. Everything else
-  in `client/` and `domains/` is live.
-- **`services/` are imported directly.** The `lib/` forwarders that used to
-  re-export them are deleted; what is left in `lib/` is `attachments.ts` (real
-  helpers over an event's attachments), `rrule.ts` (belongs in `client/`),
-  `search.ts` (pending adoption) and `queryClient.ts`.
+  imperative). Everything in `client/` and `domains/` is live.
+- **`lib/` is gone.** The service forwarders are deleted and their consumers
+  import `services/` directly; `rrule` and the reminder-sender cross-check live
+  in `client/`, the attachment helpers in `domains/events/attachments.ts`, the
+  query client next to `main.tsx`, and search runs through `domains/search`.
 
 Each slice has exactly one owner. `RESTRUCTURE_PLAN.md` is where this ends up.
 
-**One unadopted part still duplicates code that is live.** `client/search.ts`
-mirrors `lib/search.ts`. A fix to one side has to be made on the other; adopt
-the slice and delete its old path rather than letting the pair age.
+**Nothing in `client/` or `domains/` duplicates a live path any more.** Every
+slice has one owner.
 
 ### Adopting a slice
 
@@ -131,7 +129,7 @@ untried against a real database. What that took, for the next one:
   paused offline is stored under its key; if nothing is registered for that key
   when it resumes, query-core rejects it, `resumePausedMutations` swallows the
   rejection, and it is gone without a word. Bump `CACHE_BUSTER` in
-  `lib/queryClient.ts` in the same change — the write is lost either way, but
+  `src/queryClient.ts` in the same change — the write is lost either way, but
   visibly and once.
 - **Verify against the local stack, not the type checker.** The useful check is
   that a cold cache fetches and a warm one does not, which is what proves the
@@ -146,8 +144,6 @@ closure](#the-account-is-a-value-not-a-closure) below.
 
 Still to adopt, cheapest first:
 
-- **`search`** — two functions, no writes, no cache shaping; `lib/search.ts`
-  deletes when it works.
 - **`session`** — `auth.tsx` onto `services/session`, which is what lets the
   auth gate become a route guard.
 

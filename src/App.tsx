@@ -14,13 +14,8 @@ import { usePreferencesWrite } from './domains/preferences/mutations'
 import { withTimezone } from './domains/preferences/patches'
 import { usePreferences } from './domains/preferences/queries'
 import { useRegisterDevice } from './domains/push/mutations'
-import {
-  dismissWriteError,
-  getWriteError,
-  queryClient,
-  subscribeWriteError,
-} from './lib/queryClient'
 import { NavigationProvider } from './navigation'
+import { dismissWriteError, getWriteError, queryClient, subscribeWriteError } from './queryClient'
 import { routes } from './routes/routes'
 import { clearNotifications, readThisDevice } from './services/push'
 import { startRealtime } from './services/realtime'
