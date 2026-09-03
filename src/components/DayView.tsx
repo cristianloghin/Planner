@@ -16,8 +16,7 @@ import { cx } from '../assets/utils/cx'
 import { addDays, isoLabel, minutesToTime, toISODate } from '../assets/utils/dates'
 import { checklistEntries, hasReminders } from '../domains/events/attachments'
 import { useEvents } from '../domains/events/queries'
-import { useCompletionsForRange, useDependencies } from '../domains/occurrences/queries'
-import type { OccurrenceDependency } from '../domains/occurrences/types'
+import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { usePeople } from '../domains/people/queries'
 import { byId, eventColorKey, personColorKey } from '../domains/people/selectors'
 import { usePreferences } from '../domains/preferences/queries'
@@ -30,12 +29,7 @@ import {
   nextRelevantDate,
   occurrencesOnDate,
 } from '../services/recurrence/expand'
-import {
-  isOccurrenceDone,
-  occKey,
-  occurrenceStatus,
-  prerequisiteDatesInRange,
-} from '../services/recurrence/status'
+import { isOccurrenceDone, occKey } from '../services/recurrence/status'
 import { DAY_MIN, type TimeBlock, layoutBlocks } from '../services/timeline-layout'
 import type { CalendarEvent, CompletionsMap, Person, PersonId } from '../types'
 import { Avatars } from './Avatars'
@@ -52,7 +46,6 @@ export function DayView() {
   const nav = useCalendarNavigation()
   const { accountId, userId } = useAccount()
   const { data: events = [] } = useEvents(accountId)
-  const { data: dependencies = {} } = useDependencies(accountId)
   const day = nav.selectedDay
   const { data: people = [] } = usePeople(accountId)
   const { data: overrides = {} } = usePreferences(accountId, userId, personColors)
@@ -95,20 +88,13 @@ export function DayView() {
   const isToday = dateISO === nowISO
   const nowMin = now.getHours() * 60 + now.getMinutes()
 
-  // Windowed per-occurrence state for the visible day and its swipe
-  // neighbors (plus the dates of any prerequisites their occurrences wait
-  // on, so their met/unmet resolves even when they live outside the window).
+  // Windowed per-occurrence state for the visible day and its swipe neighbors.
   const prevISO = addDays(dateISO, -1)
   const nextISO = addDays(dateISO, 1)
-  const prereqDates = useMemo(
-    () => prerequisiteDatesInRange(dependencies, prevISO, nextISO),
-    [dependencies, prevISO, nextISO],
-  )
   const { completions, isLoading: completionsLoading } = useCompletionsForRange(
     accountId,
     prevISO,
     nextISO,
-    prereqDates,
   )
 
   // Scroll the timeline so `minute` sits a little below the top edge.
@@ -280,8 +266,6 @@ export function DayView() {
                       onOpen={openSheet}
                       people={people}
                       overrides={overrides}
-                      events={events}
-                      dependencies={dependencies}
                     />
                   ))}
                 </div>
@@ -392,8 +376,6 @@ function Lane({
   onOpen,
   people,
   overrides,
-  events,
-  dependencies,
 }: {
   person: Person
   blocks: TimeBlock[]
@@ -406,9 +388,6 @@ function Lane({
   /** Everyone in the account, in lane order, and this user's colour overrides. */
   people: Person[]
   overrides: Record<PersonId, ColorKey>
-  /** Every event, and what each day waits on — for the blocked check. */
-  events: CalendarEvent[]
-  dependencies: Record<string, OccurrenceDependency[]>
 }) {
   // Every block this person is on — shared events simply appear in each
   // attendee's lane, colored by that lane.
@@ -435,8 +414,6 @@ function Lane({
         const status = statuses.get(ev.id)
         const joint = ev.attendees.length > 1
         const done = isOccurrenceDone(completions, ev, block.occ.start)
-        const blocked =
-          occurrenceStatus(dependencies, events, completions, ev, block.occ.start) === 'blocked'
         return (
           <button
             type="button"
@@ -444,7 +421,6 @@ function Lane({
             className={cx(
               s.tlEvent,
               done && s.done,
-              blocked && s.blocked,
               status === 'clash' && s.warnClash,
               status === 'needs' && s.warnNeeds,
             )}

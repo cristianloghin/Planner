@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { DependencyRow, ItemStateRow, OccurrenceRow } from '../../client/occurrences'
-import { patchAddDependency, patchCompletions, patchEntry, patchRemoveDependency } from './patches'
-import { dependenciesByOccurrence, occurrenceKey, toCompletions } from './transformers'
-import type { OccurrenceDependency } from './types'
+import type { ItemStateRow, OccurrenceRow } from '../../client/occurrences'
+import { patchCompletions, patchEntry } from './patches'
+import { occurrenceKey, toCompletions } from './transformers'
 
 const row = (over: Partial<OccurrenceRow> = {}): OccurrenceRow => ({
   seriesId: 'S',
   date: '2026-04-07',
-  status: null,
   cancelled: false,
   start: null,
   duration: null,
@@ -24,14 +22,14 @@ const tick = (over: Partial<ItemStateRow> = {}): ItemStateRow => ({
 
 describe('toCompletions', () => {
   it('keys each day under its event and date', () => {
-    expect(toCompletions([row({ status: 'done' })], [])).toEqual({
-      'S:2026-04-07': { status: 'done' },
+    expect(toCompletions([row({ cancelled: true })], [])).toEqual({
+      'S:2026-04-07': { cancelled: true },
     })
   })
 
   it('leaves out a row carrying nothing the app shows', () => {
-    // Clearing a status can leave an empty row behind. An entry for it would
-    // read as "something happened here" on a day where nothing did.
+    // Clearing a timing override leaves an empty row behind. An entry for it
+    // would read as "something happened here" on a day where nothing did.
     expect(toCompletions([row()], [])).toEqual({})
   })
 
@@ -51,8 +49,8 @@ describe('toCompletions', () => {
   })
 
   it('folds ticks onto the same day as its other state', () => {
-    expect(toCompletions([row({ status: 'done' })], [tick()])).toEqual({
-      'S:2026-04-07': { status: 'done', checked: { c1: true } },
+    expect(toCompletions([row({ cancelled: true })], [tick()])).toEqual({
+      'S:2026-04-07': { cancelled: true, checked: { c1: true } },
     })
   })
 
@@ -69,93 +67,59 @@ describe('toCompletions', () => {
     // Taking the last one alone would drop whatever the first recorded.
     expect(
       toCompletions(
-        [row({ status: 'done' }), row({ start: '2026-04-07T18:00', duration: 90 })],
+        [row({ cancelled: true }), row({ start: '2026-04-07T18:00', duration: 90 })],
         [],
       ),
     ).toEqual({
-      'S:2026-04-07': { status: 'done', start: '2026-04-07T18:00', duration: 90 },
+      'S:2026-04-07': { cancelled: true, start: '2026-04-07T18:00', duration: 90 },
     })
   })
 
   it('lets a later row on the same day win a field they both set', () => {
-    expect(toCompletions([row({ status: 'done' }), row({ status: 'skipped' })], [])).toEqual({
-      'S:2026-04-07': { status: 'skipped' },
-    })
+    expect(
+      toCompletions([row({ start: '2026-04-07T18:00' }), row({ start: '2026-04-07T20:00' })], []),
+    ).toEqual({ 'S:2026-04-07': { start: '2026-04-07T20:00' } })
   })
 
   it('keeps a day whose second row carries nothing', () => {
     // The empty one must not erase what the first row recorded.
-    expect(toCompletions([row({ status: 'done' }), row()], [])).toEqual({
-      'S:2026-04-07': { status: 'done' },
+    expect(toCompletions([row({ cancelled: true }), row()], [])).toEqual({
+      'S:2026-04-07': { cancelled: true },
     })
   })
 
   it('keeps different events and days apart', () => {
     const out = toCompletions(
-      [row({ status: 'done' }), row({ seriesId: 'T', status: 'skipped' })],
+      [row({ cancelled: true }), row({ seriesId: 'T', cancelled: true })],
       [],
     )
     expect(Object.keys(out).sort()).toEqual(['S:2026-04-07', 'T:2026-04-07'])
   })
 })
 
-describe('dependenciesByOccurrence', () => {
-  const dep = (over: Partial<DependencyRow> = {}): DependencyRow => ({
-    dependentSeriesId: 'A',
-    dependentDate: '2026-04-07',
-    prerequisiteSeriesId: 'B',
-    prerequisiteDate: '2026-04-06',
-    requiredStatus: 'done',
-    ...over,
-  })
-
-  it('keeps waits under the day doing the waiting', () => {
-    expect(dependenciesByOccurrence([dep()])).toEqual({
-      'A:2026-04-07': [
-        { prerequisiteSeriesId: 'B', prerequisiteDate: '2026-04-06', requiredStatus: 'done' },
-      ],
-    })
-  })
-
-  it('collects several waits on one day', () => {
-    const out = dependenciesByOccurrence([dep(), dep({ prerequisiteSeriesId: 'C' })])
-    expect(out['A:2026-04-07']).toHaveLength(2)
-  })
-})
-
 describe('patchEntry', () => {
-  it('sets a status and clears it, keeping everything else on the day', () => {
-    expect(patchEntry({ cancelled: true }, { kind: 'status', status: 'done' })).toEqual({
-      cancelled: true,
-      status: 'done',
-    })
-    expect(
-      patchEntry({ status: 'done', start: '2026-04-07T18:00' }, { kind: 'status', status: null }),
-    ).toEqual({ start: '2026-04-07T18:00' })
-  })
-
   it('ticks a line without disturbing the others', () => {
     expect(
       patchEntry({ checked: { c1: true } }, { kind: 'tick', entryId: 'c2', checked: true }),
     ).toEqual({ checked: { c1: true, c2: true } })
   })
 
-  it('moves a day and puts it back, keeping its status', () => {
+  it('moves a day and puts it back, keeping what else is on it', () => {
     const moved = patchEntry(
-      { status: 'done' },
+      { cancelled: true },
       {
         kind: 'override',
         start: '2026-04-07T18:00',
         duration: 90,
       },
     )
-    expect(moved).toEqual({ status: 'done', start: '2026-04-07T18:00', duration: 90 })
-    expect(patchEntry(moved, { kind: 'clearOverride' })).toEqual({ status: 'done' })
+    expect(moved).toEqual({ cancelled: true, start: '2026-04-07T18:00', duration: 90 })
+    expect(patchEntry(moved, { kind: 'clearOverride' })).toEqual({ cancelled: true })
   })
 
   it('takes a day out, leaving what was recorded on it', () => {
-    expect(patchEntry({ status: 'done' }, { kind: 'cancel' })).toEqual({
-      status: 'done',
+    expect(patchEntry({ checked: { c1: true } }, { kind: 'cancel' })).toEqual({
+      checked: { c1: true },
       cancelled: true,
     })
   })
@@ -166,9 +130,8 @@ describe('patchCompletions', () => {
 
   it('drops a day patched back to nothing, matching the read', () => {
     expect(
-      patchCompletions({ [key]: { status: 'done' } }, key, {
-        kind: 'status',
-        status: null,
+      patchCompletions({ [key]: { start: '2026-04-07T18:00', duration: 90 } }, key, {
+        kind: 'clearOverride',
       }),
     ).toEqual({})
   })
@@ -178,38 +141,9 @@ describe('patchCompletions', () => {
   })
 
   it('leaves other days alone and does not modify what it was given', () => {
-    const before = { 'S:2026-04-01': { status: 'done' as const } }
+    const before = { 'S:2026-04-01': { cancelled: true } }
     const after = patchCompletions(before, key, { kind: 'cancel' })
     expect(after['S:2026-04-01']).toBe(before['S:2026-04-01'])
     expect(Object.keys(before)).toEqual(['S:2026-04-01'])
-  })
-})
-
-describe('waiting patches', () => {
-  const key = 'A:2026-04-07'
-  const edge: OccurrenceDependency = {
-    prerequisiteSeriesId: 'B',
-    prerequisiteDate: '2026-04-06',
-    requiredStatus: 'done',
-  }
-
-  it('adds a wait to a day that had none', () => {
-    expect(patchAddDependency({}, key, edge)).toEqual({ [key]: [edge] })
-  })
-
-  it('changing how far along the other day must be replaces it rather than adding a second', () => {
-    const stricter = { ...edge, requiredStatus: 'skipped' as const }
-    expect(patchAddDependency({ [key]: [edge] }, key, stricter)).toEqual({ [key]: [stricter] })
-  })
-
-  it('removes a wait, and drops the day once it waits on nothing', () => {
-    expect(patchRemoveDependency({ [key]: [edge] }, key, 'B', '2026-04-06')).toEqual({})
-  })
-
-  it('removing a wait that was never there changes nothing', () => {
-    expect(patchRemoveDependency({}, key, 'B', '2026-04-06')).toEqual({})
-    expect(patchRemoveDependency({ [key]: [edge] }, key, 'B', '2020-01-01')).toEqual({
-      [key]: [edge],
-    })
   })
 })

@@ -7,7 +7,7 @@
  *
  * - ./timing — where a single event sits in time
  * - ./expand — which days a repeat rule produces
- * - ./status — whether a day counts as done, and what is blocking it
+ * - ./status — whether a day counts as done
  */
 export * from './timing'
 export * from './expand'

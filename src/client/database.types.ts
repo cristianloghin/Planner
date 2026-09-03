@@ -141,27 +141,27 @@ export type Database = {
       event_occurrence: {
         Row: {
           cancelled: boolean
+          metadata: Json
           occurrence_start: string
           rescheduled_duration: string | null
           rescheduled_to: string | null
           series_id: string
-          status: string | null
         }
         Insert: {
           cancelled?: boolean
+          metadata?: Json
           occurrence_start: string
           rescheduled_duration?: string | null
           rescheduled_to?: string | null
           series_id: string
-          status?: string | null
         }
         Update: {
           cancelled?: boolean
+          metadata?: Json
           occurrence_start?: string
           rescheduled_duration?: string | null
           rescheduled_to?: string | null
           series_id?: string
-          status?: string | null
         }
         Relationships: [
           {
@@ -170,13 +170,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "event_series"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_occurrence_status_fkey"
-            columns: ["status"]
-            isOneToOne: false
-            referencedRelation: "occurrence_status"
-            referencedColumns: ["code"]
           },
         ]
       }
@@ -217,11 +210,11 @@ export type Database = {
           color_key: string | null
           created_at: string
           created_by: string | null
-          default_status: string | null
           dtstart: string | null
           duration: string
           id: string
           is_template: boolean
+          metadata: Json
           rrule: string | null
           title: string
           updated_at: string
@@ -232,11 +225,11 @@ export type Database = {
           color_key?: string | null
           created_at?: string
           created_by?: string | null
-          default_status?: string | null
           dtstart?: string | null
           duration?: string
           id?: string
           is_template?: boolean
+          metadata?: Json
           rrule?: string | null
           title?: string
           updated_at?: string
@@ -247,11 +240,11 @@ export type Database = {
           color_key?: string | null
           created_at?: string
           created_by?: string | null
-          default_status?: string | null
           dtstart?: string | null
           duration?: string
           id?: string
           is_template?: boolean
+          metadata?: Json
           rrule?: string | null
           title?: string
           updated_at?: string
@@ -270,13 +263,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "app_user"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_series_default_status_fkey"
-            columns: ["default_status"]
-            isOneToOne: false
-            referencedRelation: "occurrence_status"
-            referencedColumns: ["code"]
           },
         ]
       }
@@ -383,55 +369,6 @@ export type Database = {
           },
         ]
       }
-      occurrence_dependency: {
-        Row: {
-          created_at: string
-          dependent_occurrence: string
-          dependent_series: string
-          prerequisite_occurrence: string
-          prerequisite_series: string
-          required_status: string
-        }
-        Insert: {
-          created_at?: string
-          dependent_occurrence: string
-          dependent_series: string
-          prerequisite_occurrence: string
-          prerequisite_series: string
-          required_status?: string
-        }
-        Update: {
-          created_at?: string
-          dependent_occurrence?: string
-          dependent_series?: string
-          prerequisite_occurrence?: string
-          prerequisite_series?: string
-          required_status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "occurrence_dependency_dependent_series_fkey"
-            columns: ["dependent_series"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "occurrence_dependency_prerequisite_series_fkey"
-            columns: ["prerequisite_series"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "occurrence_dependency_required_status_fkey"
-            columns: ["required_status"]
-            isOneToOne: false
-            referencedRelation: "occurrence_status"
-            referencedColumns: ["code"]
-          },
-        ]
-      }
       occurrence_item_removed: {
         Row: {
           item_id: string
@@ -510,18 +447,6 @@ export type Database = {
             referencedColumns: ["code"]
           },
         ]
-      }
-      occurrence_status: {
-        Row: {
-          code: string
-        }
-        Insert: {
-          code: string
-        }
-        Update: {
-          code?: string
-        }
-        Relationships: []
       }
       person: {
         Row: {

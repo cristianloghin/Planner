@@ -12,11 +12,6 @@ export type {
   Recurrence,
   RecurrenceFreq,
 } from './domains/events/types'
-export type {
-  CompletionsMap,
-  OccurrenceDependency,
-  OccurrenceState,
-  OccurrenceStatusCode,
-} from './domains/occurrences/types'
+export type { CompletionsMap, OccurrenceState } from './domains/occurrences/types'
 export type { Person, PersonId, PersonKind } from './domains/people/types'
 export type { Preferences, WeekLayout } from './domains/preferences/types'

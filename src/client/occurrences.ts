@@ -22,13 +22,6 @@ import type { SeriesTiming } from './series'
 import { supabase } from './supabase'
 
 /**
- * An occurrence's status, matching the DB `occurrence_status` lookup. `done` can
- * also be derived from a checklist (see `isOccurrenceDone`); `skipped`/`blocked`
- * are only ever set explicitly.
- */
-export type OccurrenceStatusCode = 'done' | 'skipped' | 'blocked'
-
-/**
  * One day of a series that has something recorded against it.
  *
  * These rows are sparse by design — one exists only where a day differs from
@@ -38,8 +31,6 @@ export interface OccurrenceRow {
   seriesId: string
   /** The day it belongs to, as `yyyy-mm-dd`. */
   date: string
-  /** Set explicitly; null means work it out (a checklist all ticked, say). */
-  status: OccurrenceStatusCode | null
   /** This day has been taken out of the series. */
   cancelled: boolean
   /** Moved to, in the series' own units. Null when it has not been moved. */
@@ -79,7 +70,7 @@ export async function fetchOccurrenceRows(
     supabase
       .from('event_occurrence')
       .select(
-        'series_id, occurrence_start, status, rescheduled_to, rescheduled_duration, cancelled, event_series!inner(all_day, account_id)',
+        'series_id, occurrence_start, rescheduled_to, rescheduled_duration, cancelled, event_series!inner(all_day, account_id)',
       )
       .eq('event_series.account_id', accountId)
       .or(
@@ -94,7 +85,6 @@ export async function fetchOccurrenceRows(
     return {
       seriesId: o.series_id,
       date: tsToDateKey(o.occurrence_start),
-      status: (o.status as OccurrenceStatusCode | null) ?? null,
       cancelled: o.cancelled,
       start: o.rescheduled_to ? tsToStart(o.rescheduled_to, allDay) : null,
       duration: o.rescheduled_duration ? intervalToDuration(o.rescheduled_duration, allDay) : null,
@@ -176,40 +166,6 @@ async function writeOccurrenceRow(
 }
 
 /**
- * Set one day's status, or clear it with null.
- *
- * Clearing does not simply delete the row: it may also be carrying a reschedule
- * or a cancellation. So rows holding nothing else are deleted, and any row that
- * is holding something else just has its status emptied.
- */
-export async function setOccurrenceStatus(
-  series: SeriesTiming,
-  date: string,
-  status: OccurrenceStatusCode | null,
-): Promise<void> {
-  if (status) return writeOccurrenceRow(series, date, { status })
-
-  const { from, to } = dayRange(date)
-  const del = await supabase
-    .from('event_occurrence')
-    .delete()
-    .eq('series_id', series.id)
-    .gte('occurrence_start', from)
-    .lt('occurrence_start', to)
-    .is('rescheduled_to', null)
-    .is('rescheduled_duration', null)
-    .eq('cancelled', false)
-  if (del.error) throw del.error
-  const upd = await supabase
-    .from('event_occurrence')
-    .update({ status: null })
-    .eq('series_id', series.id)
-    .gte('occurrence_start', from)
-    .lt('occurrence_start', to)
-  if (upd.error) throw upd.error
-}
-
-/**
  * Move or resize a single day, leaving the rest of the series alone.
  *
  * The day keeps its original identity — the new time is recorded alongside it,
@@ -229,7 +185,7 @@ export async function setOccurrenceOverride(
   })
 }
 
-/** Put a moved or resized day back to its series' timing, keeping its status and ticks. */
+/** Put a moved or resized day back to its series' timing, keeping its ticks. */
 export async function clearOccurrenceOverride(series: SeriesTiming, date: string): Promise<void> {
   const { from, to } = dayRange(date)
   const { error } = await supabase
@@ -285,113 +241,5 @@ export async function setChecklistEntry(
     },
     { onConflict: 'series_id,occurrence_start,item_id' },
   )
-  if (error) throw error
-}
-
-// ---- one day waiting on another ------------------------------------------
-
-/**
- * One day waiting on a day of another series, as stored: both ends named.
- *
- * Grouping these by the day doing the waiting is a shape for the screen — see
- * domains/occurrences/transformers.
- */
-export interface DependencyRow {
-  dependentSeriesId: string
-  /** The waiting day, as `yyyy-mm-dd`. */
-  dependentDate: string
-  prerequisiteSeriesId: string
-  /** The day being waited on, as `yyyy-mm-dd`. */
-  prerequisiteDate: string
-  requiredStatus: OccurrenceStatusCode
-}
-
-/**
- * Everything every day is waiting on.
- *
- * Paged, since one response stops at 1000 rows.
- */
-export async function fetchDependencies(accountId: string): Promise<DependencyRow[]> {
-  const rows = await fetchAll((from, to) =>
-    supabase
-      .from('occurrence_dependency')
-      // Scoped through the waiting series. This table names two series, so the
-      // join has to say which one it means.
-      .select(
-        'dependent_series, dependent_occurrence, prerequisite_series, prerequisite_occurrence, required_status, event_series!dependent_series!inner()',
-      )
-      .eq('event_series.account_id', accountId)
-      .order('dependent_series')
-      .order('dependent_occurrence')
-      .order('prerequisite_series')
-      .order('prerequisite_occurrence')
-      .range(from, to),
-  )
-  return rows.map((row) => ({
-    dependentSeriesId: row.dependent_series,
-    dependentDate: tsToDateKey(row.dependent_occurrence),
-    prerequisiteSeriesId: row.prerequisite_series,
-    prerequisiteDate: tsToDateKey(row.prerequisite_occurrence),
-    requiredStatus: row.required_status as OccurrenceStatusCode,
-  }))
-}
-
-/**
- * Make one day wait on a day of another series.
- *
- * Any existing wait between the same two days is cleared first. Both ends are
- * stored as timestamps, and either series may have had its time edited since,
- * so without clearing by day the same pair could end up recorded twice.
- *
- * Both series' timings are needed because a new row has to be written at the
- * time of day each of them keeps.
- */
-export async function addDependency(
-  dependent: SeriesTiming,
-  date: string,
-  prerequisite: SeriesTiming,
-  prerequisiteDate: string,
-  requiredStatus: OccurrenceStatusCode,
-): Promise<void> {
-  await removeDependency(dependent.id, date, prerequisite.id, prerequisiteDate)
-  const { error } = await supabase.from('occurrence_dependency').upsert(
-    {
-      dependent_series: dependent.id,
-      dependent_occurrence: occurrenceTs(dependent, date),
-      prerequisite_series: prerequisite.id,
-      prerequisite_occurrence: occurrenceTs(prerequisite, prerequisiteDate),
-      required_status: requiredStatus,
-    },
-    {
-      onConflict:
-        'dependent_series,dependent_occurrence,prerequisite_series,prerequisite_occurrence',
-    },
-  )
-  if (error) throw error
-}
-
-/**
- * Stop one day waiting on a day of another series.
- *
- * Only ids and dates are needed: both ends are matched by day, so a wait
- * recorded before either series' time was edited is still found.
- */
-export async function removeDependency(
-  dependentId: string,
-  date: string,
-  prerequisiteId: string,
-  prerequisiteDate: string,
-): Promise<void> {
-  const dep = dayRange(date)
-  const pre = dayRange(prerequisiteDate)
-  const { error } = await supabase
-    .from('occurrence_dependency')
-    .delete()
-    .eq('dependent_series', dependentId)
-    .gte('dependent_occurrence', dep.from)
-    .lt('dependent_occurrence', dep.to)
-    .eq('prerequisite_series', prerequisiteId)
-    .gte('prerequisite_occurrence', pre.from)
-    .lt('prerequisite_occurrence', pre.to)
   if (error) throw error
 }

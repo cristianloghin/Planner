@@ -264,12 +264,6 @@
   text-decoration: line-through;
 }
 
-/* Advisory: this occurrence is waiting on an unfinished prerequisite. */
-.tlEvent.blocked {
-  outline: 2px dotted var(--muted);
-  outline-offset: -2px;
-}
-
 /* Conflict markers on Nora's blocks. */
 .tlEvent.warnNeeds {
   outline: 2px dashed var(--warning);

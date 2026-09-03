@@ -51,6 +51,53 @@ drop table list_item_event_link, list_item, list cascade;
 drop function can_access_list(uuid), can_access_list_item(uuid);
 
 -- ---------------------------------------------------------------------------
+-- §3a/§3b. Dependency linking and occurrence status — both entirely.
+-- ---------------------------------------------------------------------------
+
+-- No linking anywhere in the structure. Its RLS, its index and its 0008
+-- publication membership go with it; 0011 left it at default replica identity,
+-- so there is nothing else.
+drop table occurrence_dependency;
+
+-- And no occurrence status at all. After this an occurrence cannot be marked
+-- done by any means: the only per-day facts the app records are *moved* and
+-- *cancelled*.
+--
+-- These two are dropped as COLUMNS, explicitly. Dropping `occurrence_status`
+-- with `cascade` instead would remove the FK constraints and leave the columns
+-- sitting there holding stale text.
+--
+-- The stored values are deliberately carried nowhere — not folded into the new
+-- `metadata` bag below. Preserving them would invite keeping the code that
+-- reads them, and the point is that no such code survives.
+alter table event_occurrence drop column status;
+alter table event_series drop column default_status;
+
+-- Now that its last three referencing columns are gone (default_status,
+-- event_occurrence.status and occurrence_dependency.required_status). With
+-- this and reminder_method gone, item_status is the last enum-as-table
+-- lookup standing; §7 takes it.
+drop table occurrence_status;
+
+
+-- ---------------------------------------------------------------------------
+-- §3c. A freeform `metadata` bag on both event tables — ADDED, not removed.
+-- ---------------------------------------------------------------------------
+
+-- The house pattern already used by note.metadata (0001:181, "pressure-valve
+-- for structured extras") and in spirit by user_preference.prefs. A place for
+-- things the schema has no column for, added now so it exists when something
+-- needs it.
+--
+-- Nothing is written into it by this change, and the app neither reads nor
+-- writes it. That is safe by construction: saveSeries upserts a named column
+-- list, and writeOccurrenceRow does a partial update on an existing row or an
+-- upsert of only the named fields on a new one. Either way `metadata` survives
+-- every app write untouched. Every row starts with {}.
+alter table event_series add column metadata jsonb not null default '{}'::jsonb;
+alter table event_occurrence add column metadata jsonb not null default '{}'::jsonb;
+
+-- ---------------------------------------------------------------------------
 -- §6c. Vestigial columns — each written by exactly one path, read by none.
 -- ---------------------------------------------------------------------------
 

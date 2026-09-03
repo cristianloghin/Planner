@@ -7,12 +7,10 @@
  * easy to miss: a day left with nothing recorded has no entry at all, matching
  * the read, which leaves such rows out.
  */
-import type { OccurrenceStatusCode } from '../../client/occurrences'
-import type { OccurrenceDependency, OccurrenceState } from './types'
+import type { OccurrenceState } from './types'
 
 /** Every change to one day, as one set of values that can be written down. */
 export type OccurrenceChange =
-  | { kind: 'status'; status: OccurrenceStatusCode | null }
   | { kind: 'tick'; entryId: string; checked: boolean }
   | { kind: 'override'; start: string; duration: number }
   | { kind: 'clearOverride' }
@@ -21,18 +19,14 @@ export type OccurrenceChange =
 /**
  * One day's state with `change` applied.
  *
- * Clearing a status keeps everything else on the day — it may also have been
- * moved, or taken out — which is exactly what the write does.
+ * Clearing a timing override keeps everything else on the day — it may also
+ * have been taken out — which is exactly what the write does.
  */
 export function patchEntry(
   entry: OccurrenceState | undefined,
   change: OccurrenceChange,
 ): OccurrenceState {
   switch (change.kind) {
-    case 'status': {
-      const { status: _cleared, ...rest } = entry ?? {}
-      return change.status ? { ...rest, status: change.status } : rest
-    }
     case 'tick':
       return { ...entry, checked: { ...entry?.checked, [change.entryId]: change.checked } }
     case 'override':
@@ -62,39 +56,4 @@ export function patchCompletions(
   if (Object.keys(patched).length) next[key] = patched
   else delete next[key]
   return next
-}
-
-/**
- * With one day waiting on another. Adding the same wait twice replaces it, so
- * changing how far along the other day has to be does not leave two.
- */
-export function patchAddDependency(
-  deps: Record<string, OccurrenceDependency[]>,
-  key: string,
-  edge: OccurrenceDependency,
-): Record<string, OccurrenceDependency[]> {
-  const at = (deps[key] ?? []).filter(
-    (d) =>
-      d.prerequisiteSeriesId !== edge.prerequisiteSeriesId ||
-      d.prerequisiteDate !== edge.prerequisiteDate,
-  )
-  return { ...deps, [key]: [...at, edge] }
-}
-
-/** Without that wait. The day's entry goes when it is waiting on nothing else. */
-export function patchRemoveDependency(
-  deps: Record<string, OccurrenceDependency[]>,
-  key: string,
-  prerequisiteSeriesId: string,
-  prerequisiteDate: string,
-): Record<string, OccurrenceDependency[]> {
-  const at = deps[key]
-  if (!at) return deps
-  const rest = at.filter(
-    (d) =>
-      d.prerequisiteSeriesId !== prerequisiteSeriesId || d.prerequisiteDate !== prerequisiteDate,
-  )
-  if (rest.length) return { ...deps, [key]: rest }
-  const { [key]: _gone, ...others } = deps
-  return others
 }

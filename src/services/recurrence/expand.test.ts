@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CalendarEvent, Recurrence } from '../../domains/events/types'
-import {
-  latestStartOnOrBefore,
-  nextStartOnOrAfter,
-  occurrencesOnDate,
-  recurrenceLabel,
-  seriesOccurrenceDatesInRange,
-  startsOn,
-} from './expand'
+import { nextStartOnOrAfter, occurrencesOnDate, recurrenceLabel, startsOn } from './expand'
 
 /** Minimal all-day event factory; the recurrence math only reads start/recurrence. */
 function ev(
@@ -76,35 +69,6 @@ describe('startsOn', () => {
   })
 })
 
-describe('latestStartOnOrBefore', () => {
-  it('returns null before the first occurrence', () => {
-    const e = ev('2026-06-15', { freq: 'daily', interval: 1 })
-    expect(latestStartOnOrBefore(e, '2026-06-14')).toBeNull()
-  })
-
-  it('finds the most recent daily slot on or before a date', () => {
-    const e = ev('2026-06-15', { freq: 'daily', interval: 3 })
-    expect(latestStartOnOrBefore(e, '2026-06-20')).toBe('2026-06-18')
-    expect(latestStartOnOrBefore(e, '2026-06-18')).toBe('2026-06-18')
-  })
-
-  it('finds the most recent weekly slot', () => {
-    const e = ev('2026-06-15', { freq: 'weekly', interval: 2 })
-    expect(latestStartOnOrBefore(e, '2026-07-01')).toBe('2026-06-29')
-  })
-
-  it('clamps the query to the series UNTIL cap', () => {
-    const e = ev('2026-06-15', { freq: 'daily', interval: 1, until: '2026-06-17' })
-    expect(latestStartOnOrBefore(e, '2026-06-30')).toBe('2026-06-17')
-  })
-
-  it('skips overflow months when walking back monthly slots', () => {
-    const e = ev('2026-01-31', { freq: 'monthly', interval: 1 })
-    // Querying within Feb walks back to Jan 31 (Feb itself is skipped).
-    expect(latestStartOnOrBefore(e, '2026-02-15')).toBe('2026-01-31')
-  })
-})
-
 describe('nextStartOnOrAfter', () => {
   it('returns the anchor when it is on or after the date', () => {
     const e = ev('2026-06-15', { freq: 'daily', interval: 1 })
@@ -133,26 +97,6 @@ describe('nextStartOnOrAfter', () => {
     const e = ev('2026-06-15', { freq: 'daily', interval: 1, until: '2026-06-17' })
     expect(nextStartOnOrAfter(e, '2026-06-17')).toBe('2026-06-17')
     expect(nextStartOnOrAfter(e, '2026-06-18')).toBeNull()
-  })
-})
-
-describe('seriesOccurrenceDatesInRange', () => {
-  it('lists every slot in an inclusive range', () => {
-    const e = ev('2026-06-15', { freq: 'weekly', interval: 1 })
-    expect(seriesOccurrenceDatesInRange(e, '2026-06-15', '2026-07-06')).toEqual([
-      '2026-06-15',
-      '2026-06-22',
-      '2026-06-29',
-      '2026-07-06',
-    ])
-  })
-
-  it('respects the UNTIL cap inside a range', () => {
-    const e = ev('2026-06-15', { freq: 'weekly', interval: 1, until: '2026-06-25' })
-    expect(seriesOccurrenceDatesInRange(e, '2026-06-15', '2026-07-06')).toEqual([
-      '2026-06-15',
-      '2026-06-22',
-    ])
   })
 })
 

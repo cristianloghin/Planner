@@ -15,7 +15,7 @@ import { accountKey } from './account/queries'
 import { registerEventsDefaults } from './events/mutations'
 import { eventsKey, templatesKey } from './events/queries'
 import { registerOccurrencesDefaults } from './occurrences/mutations'
-import { completionsPrefix, dependenciesKey } from './occurrences/queries'
+import { completionsPrefix } from './occurrences/queries'
 import { registerPeopleDefaults } from './people/mutations'
 import { peopleKey } from './people/queries'
 import { registerPreferencesDefaults } from './preferences/mutations'
@@ -56,12 +56,10 @@ export function queryKeysForTable(table: string, { accountId, userId }: Realtime
     case 'note':
     case 'reminder':
       return [eventsKey(accountId), templatesKey(accountId)]
-    // What happened on a day: status and ticks.
+    // What happened on a day: moves, cancellations and ticks.
     case 'event_occurrence':
     case 'occurrence_item_state':
       return [completionsPrefix(accountId)]
-    case 'occurrence_dependency':
-      return [dependenciesKey(accountId)]
     case 'person':
       return [peopleKey(accountId)]
     case 'user_preference':

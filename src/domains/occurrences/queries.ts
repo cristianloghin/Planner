@@ -8,22 +8,17 @@
  * One query per calendar month. Windows overlap on purpose, so a change has to
  * be applied to every cached month that covers the day — see ./mutations.
  */
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueries, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef } from 'react'
 import { addDays } from '../../assets/utils/dates'
-import {
-  fetchDependencies,
-  fetchItemStateRows,
-  fetchOccurrenceRows,
-} from '../../client/occurrences'
-import { dependenciesByOccurrence, toCompletions } from './transformers'
-import type { CompletionsMap, OccurrenceDependency } from './types'
+import { fetchItemStateRows, fetchOccurrenceRows } from '../../client/occurrences'
+import { toCompletions } from './transformers'
+import type { CompletionsMap } from './types'
 
 /** Everything this domain caches for an account, for invalidating the lot. */
 export const completionsPrefix = (accountId: string | null) => ['completions', accountId] as const
 const completionsKey = (accountId: string | null, month: string) =>
   ['completions', accountId, month] as const
-export const dependenciesKey = (accountId: string | null) => ['dependencies', accountId] as const
 
 const STALE_MS = 5 * 60_000
 
@@ -52,11 +47,10 @@ function fetchBounds(month: string): { from: string; to: string } {
   }
 }
 
-/** The months whose windows cover [from, to], plus any odd extra dates. */
-function monthsFor(from: string, to: string, extraDates: string[]): string[] {
+/** The months whose windows cover [from, to]. */
+function monthsFor(from: string, to: string): string[] {
   const months = new Set<string>()
   for (let m = monthOf(from); m <= monthOf(to); m = shiftMonth(m, 1)) months.add(m)
-  for (const d of extraDates) months.add(monthOf(d))
   return [...months].sort()
 }
 
@@ -87,9 +81,8 @@ function useStableMerge(parts: (CompletionsMap | undefined)[]): CompletionsMap {
 }
 
 /**
- * What happened on the days from `from` to `to`, inclusive, plus any
- * `extraDates` — days referenced from inside the range, such as one another day
- * is waiting on. Pass `from` as null to fetch nothing.
+ * What happened on the days from `from` to `to`, inclusive. Pass `from` as null
+ * to fetch nothing.
  *
  * The months either side are fetched quietly too, so swiping across a month
  * boundary does not stall.
@@ -98,15 +91,10 @@ export function useCompletionsForRange(
   accountId: string | null,
   from: string | null,
   to?: string | null,
-  extraDates: string[] = [],
 ): { completions: CompletionsMap; isLoading: boolean } {
   const queryClient = useQueryClient()
 
-  const extraKey = extraDates.join(',')
-  const months = useMemo(
-    () => (from ? monthsFor(from, to ?? from, extraKey ? extraKey.split(',') : []) : []),
-    [from, to, extraKey],
-  )
+  const months = useMemo(() => (from ? monthsFor(from, to ?? from) : []), [from, to])
 
   const results = useQueries({
     queries: months.map((month) => ({
@@ -137,23 +125,4 @@ export function useCompletionsForRange(
     // here would sit there forever.
     isLoading: results.some((r) => r.isPending && r.fetchStatus === 'fetching'),
   }
-}
-
-/**
- * What every day is waiting on, keyed by the day doing the waiting.
- *
- * All of them, not windowed: there are few, and a day can wait on one far
- * outside whatever window is on screen.
- */
-export function useDependencies<T = Record<string, OccurrenceDependency[]>>(
-  accountId: string | null,
-  select?: (deps: Record<string, OccurrenceDependency[]>) => T,
-) {
-  return useQuery({
-    queryKey: dependenciesKey(accountId),
-    queryFn: async () => dependenciesByOccurrence(await fetchDependencies(accountId as string)),
-    enabled: accountId != null,
-    staleTime: STALE_MS,
-    select,
-  })
 }

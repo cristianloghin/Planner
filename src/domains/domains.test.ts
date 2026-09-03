@@ -23,10 +23,6 @@ describe('queryKeysForTable', () => {
     expect(queryKeysForTable('occurrence_item_state', ids)).toEqual([['completions', 'acc']])
   })
 
-  it('routes what a day waits on separately from what happened on it', () => {
-    expect(queryKeysForTable('occurrence_dependency', ids)).toEqual([['dependencies', 'acc']])
-  })
-
   it('keys preferences by user as well as account', () => {
     expect(queryKeysForTable('user_preference', ids)).toEqual([['preferences', 'acc', 'usr']])
   })

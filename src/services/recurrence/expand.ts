@@ -83,48 +83,11 @@ export function startsOn(e: CalendarEvent, date: string): boolean {
 }
 
 /**
- * The latest occurrence start date of `e` on or before ISO `date`, or null if
- * the first occurrence is still in the future. Used to resolve which occurrence
- * of a prerequisite a given dependent occurrence waits on.
- */
-export function latestStartOnOrBefore(e: CalendarEvent, date: string): string | null {
-  const base = eventDate(e)
-  // Never look past the series' inclusive cap: clamp the query date to `until`.
-  if (e.recurrence?.until && diffDays(date, e.recurrence.until) > 0) date = e.recurrence.until
-  const delta = diffDays(date, base)
-  if (delta < 0) return null
-  const r = e.recurrence
-  if (!r) return base
-  const n = Math.max(1, r.interval)
-  switch (r.freq) {
-    case 'daily':
-      return addDays(base, Math.floor(delta / n) * n)
-    case 'weekly':
-      return addDays(base, Math.floor(delta / (7 * n)) * 7 * n)
-    case 'monthly': {
-      const start = new Date(`${base}T00:00:00`)
-      const target = new Date(`${date}T00:00:00`)
-      const months =
-        (target.getFullYear() - start.getFullYear()) * 12 + (target.getMonth() - start.getMonth())
-      for (let k = Math.floor(months / n); k >= 0; k--) {
-        const d = new Date(start)
-        d.setMonth(d.getMonth() + k * n)
-        // Skip months that don't have the anchor day-of-month (date overflow).
-        if (d.getDate() !== start.getDate()) continue
-        const iso = toISODate(d)
-        if (diffDays(date, iso) >= 0) return iso
-      }
-      return null
-    }
-  }
-}
-
-/**
  * The first occurrence start date of `e` on or after ISO `date`, or null when the
  * series has already ended (capped before `date`, or a one-off whose only slot is
- * in the past). The forward mirror of {@link latestStartOnOrBefore} — used to open
- * a found event at its next upcoming occurrence rather than its (possibly
- * long-past) series anchor. Scans day-by-day, which `startsOn` keeps correct
+ * in the past). Used to open a found event at its next upcoming occurrence
+ * rather than its (possibly long-past) series anchor. Scans day-by-day, which
+ * `startsOn` keeps correct
  * across all frequencies and the `until` cap; bounded so a dead series can't loop.
  */
 export function nextStartOnOrAfter(e: CalendarEvent, date: string): string | null {
@@ -144,20 +107,6 @@ export function nextStartOnOrAfter(e: CalendarEvent, date: string): string | nul
  *  occurrence on or after today, or the series anchor once the series ended. */
 export function nextRelevantDate(e: CalendarEvent): string {
   return nextStartOnOrAfter(e, toISODate(new Date())) ?? eventDate(e)
-}
-
-/**
- * Occurrence start dates of `e` within the inclusive ISO range [from, to]. Used
- * to populate the prerequisite-occurrence picker, so the user links to a real
- * RRULE slot (never an arbitrary date). The range is walked day-by-day; callers
- * keep it bounded (a recurring event has no natural end).
- */
-export function seriesOccurrenceDatesInRange(e: CalendarEvent, from: string, to: string): string[] {
-  const out: string[] = []
-  for (let d = from; diffDays(to, d) >= 0; d = addDays(d, 1)) {
-    if (startsOn(e, d)) out.push(d)
-  }
-  return out
 }
 
 /** One materialised event instance covering a specific date. */

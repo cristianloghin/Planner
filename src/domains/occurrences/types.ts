@@ -2,12 +2,10 @@
  * What happened on one day of a repeating event.
  *
  * An event is a pattern; this is everything that makes one day of it differ —
- * ticked off, skipped, moved, or taken out. The database keeps that across two
- * tables of sparse rows. The app wants one thing per day, looked up by day, so
- * this domain owns that shape.
+ * ticked off, moved, or taken out. The database keeps that across two tables of
+ * sparse rows. The app wants one thing per day, looked up by day, so this
+ * domain owns that shape.
  */
-export type { OccurrenceStatusCode } from '../../client/occurrences'
-import type { OccurrenceStatusCode } from '../../client/occurrences'
 
 /**
  * One day's state, found under `${eventId}:${date}`.
@@ -16,11 +14,6 @@ import type { OccurrenceStatusCode } from '../../client/occurrences'
  * that match their series have no entry at all.
  */
 export interface OccurrenceState {
-  /**
-   * Set explicitly. For an event with no checklist this is how it is marked
-   * done; it also carries skipped and blocked. Absent means work it out.
-   */
-  status?: OccurrenceStatusCode
   /** Which checklist lines are ticked, by line id. */
   checked?: Record<string, boolean>
   /**
@@ -40,17 +33,3 @@ export interface OccurrenceState {
  * are never all loaded at once.
  */
 export type CompletionsMap = Record<string, OccurrenceState>
-
-/**
- * Something one day is waiting on: a particular day of another event, and how
- * far along it has to be.
- *
- * Only the far end is named — these are kept under the day doing the waiting,
- * so that end is already known.
- */
-export interface OccurrenceDependency {
-  prerequisiteSeriesId: string
-  /** The day being waited on, as `yyyy-mm-dd`. */
-  prerequisiteDate: string
-  requiredStatus: OccurrenceStatusCode
-}
