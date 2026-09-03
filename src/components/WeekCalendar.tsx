@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useAccount } from '../account'
 import { type ColorKey, colorStyle } from '../assets/palette'
 import shared from '../assets/styles/shared.module.css'
 import { LoadingPill } from '../assets/ui/Spinner'
@@ -13,7 +14,6 @@ import {
   toISODate,
   weekRangeLabel,
 } from '../assets/utils/dates'
-import { useAuth } from '../auth'
 import { useEvents } from '../domains/events/queries'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { usePeople } from '../domains/people/queries'
@@ -41,8 +41,7 @@ const SNAP = 15
 
 export function WeekCalendar() {
   const nav = useCalendarNavigation()
-  const { accountId, session } = useAuth()
-  const userId = session?.user.id ?? null
+  const { accountId, userId } = useAccount()
   const { data: events = [] } = useEvents(accountId)
   const { data: people = [] } = usePeople(accountId)
   const { data: overrides = {} } = usePreferences(accountId, userId, personColors)

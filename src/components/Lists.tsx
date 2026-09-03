@@ -1,5 +1,6 @@
 import { Collapsible, Dialog } from 'radix-ui'
 import { useEffect, useState } from 'react'
+import { useAccount } from '../account'
 import { colorStyle } from '../assets/palette'
 import shared from '../assets/styles/shared.module.css'
 import { CommitTextInput } from '../assets/ui/CommitTextInput'
@@ -8,7 +9,6 @@ import d from '../assets/ui/Dialog.module.css'
 import { cx } from '../assets/utils/cx'
 import { isoLabel } from '../assets/utils/dates'
 import { uid } from '../assets/utils/id'
-import { useAuth } from '../auth'
 import { type ListsChange, useListsWrite } from '../domains/lists/mutations'
 import { useLists } from '../domains/lists/queries'
 import { isOverdue } from '../domains/lists/selectors'
@@ -132,12 +132,12 @@ function GroupPicker({
  * Editing an *existing* list, by contrast, writes through on every change.
  */
 export function Lists() {
-  const { accountId, session } = useAuth()
+  const { accountId, userId } = useAccount()
   const { data: lists = [] } = useLists(accountId)
   const write = useListsWrite()
-  const change = (c: ListsChange) => write.mutate({ accountId: accountId as string, change: c })
+  const change = (c: ListsChange) => write.mutate({ accountId: accountId, change: c })
   const { data: people = [] } = usePeople(accountId)
-  const { data: overrides = {} } = usePreferences(accountId, session?.user.id ?? null, personColors)
+  const { data: overrides = {} } = usePreferences(accountId, userId, personColors)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   // The unsaved new list, or null when we're not creating one.

@@ -1,5 +1,5 @@
+import { useAccount } from '../account'
 import { colorStyle } from '../assets/palette'
-import { useAuth } from '../auth'
 import { usePeople } from '../domains/people/queries'
 import { personColorKey } from '../domains/people/selectors'
 import { usePreferences } from '../domains/preferences/queries'
@@ -9,9 +9,9 @@ import s from './Avatars.module.css'
 
 /** A row of small round initials, one per attendee, in each person's color. */
 export function Avatars({ attendees }: { attendees: PersonId[] }) {
-  const { accountId, session } = useAuth()
+  const { accountId, userId } = useAccount()
   const { data: people = [] } = usePeople(accountId)
-  const { data: overrides = {} } = usePreferences(accountId, session?.user.id ?? null, personColors)
+  const { data: overrides = {} } = usePreferences(accountId, userId, personColors)
   if (attendees.length === 0) return null
   return (
     <span className={s.avatars}>

@@ -6,11 +6,12 @@ import { createRoot } from 'react-dom/client'
 import { Root } from './App'
 import './assets/styles/swatches.css'
 import './assets/styles/tokens.css'
-import { AuthProvider } from './auth'
 import { UpdatePrompt } from './components/UpdatePrompt'
 import { registerDomainDefaults } from './domains'
 import './index.css'
 import { queryClient, queryPersistOptions } from './queryClient'
+import { SessionProvider } from './services/session'
+import { sessionSource } from './session'
 
 // Before anything is read back out of storage: a write paused offline is
 // resumed as soon as the saved cache lands, and one whose behaviour is not
@@ -34,9 +35,9 @@ createRoot(document.getElementById('root')!).render(
         void queryClient.resumePausedMutations().then(() => queryClient.invalidateQueries())
       }
     >
-      <AuthProvider>
+      <SessionProvider source={sessionSource}>
         <Root />
-      </AuthProvider>
+      </SessionProvider>
       <UpdatePrompt />
     </PersistQueryClientProvider>
   </StrictMode>,

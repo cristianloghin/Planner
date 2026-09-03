@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Fragment, useMemo, useRef, useState } from 'react'
+import { useAccount } from '../account'
 import { type ColorKey, colorStyle } from '../assets/palette'
 import shared from '../assets/styles/shared.module.css'
 import { LoadingPill } from '../assets/ui/Spinner'
@@ -14,7 +15,6 @@ import {
   startOfMonth,
   toISODate,
 } from '../assets/utils/dates'
-import { useAuth } from '../auth'
 import { useEvents } from '../domains/events/queries'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { usePeople } from '../domains/people/queries'
@@ -32,10 +32,10 @@ import { ViewHeader } from './ViewHeader'
 const MAX_DOTS = 4
 
 export function MonthView({ onOpenDay }: { onOpenDay: (iso: string) => void }) {
-  const { accountId, session } = useAuth()
+  const { accountId, userId } = useAccount()
   const { data: events = [] } = useEvents(accountId)
   const { data: people = [] } = usePeople(accountId)
-  const { data: overrides = {} } = usePreferences(accountId, session?.user.id ?? null, personColors)
+  const { data: overrides = {} } = usePreferences(accountId, userId, personColors)
   const [cursor, setCursor] = useState(() => startOfMonth(toISODate(new Date())))
   const today = toISODate(new Date())
   // Strip pages: [previous month, visible month, next month].

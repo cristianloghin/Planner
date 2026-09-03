@@ -1,12 +1,12 @@
 import { Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { useAccount } from '../account'
 import shared from '../assets/styles/shared.module.css'
 import { ConfirmDialog } from '../assets/ui/ConfirmDialog'
 import { type ScopeChoice, ScopeSheet } from '../assets/ui/ScopeSheet'
 import { PageLoader } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
 import { addDays, isoLabel, minutesToTime } from '../assets/utils/dates'
-import { useAuth } from '../auth'
 import { checklists, notes, reminderOffsets } from '../domains/events/attachments'
 import { type EventsChange, useEventsWrite } from '../domains/events/mutations'
 import { useEvents } from '../domains/events/queries'
@@ -57,13 +57,13 @@ export function OccurrenceSheet({
   onEdit: () => void
   onClose: () => void
 }) {
-  const { accountId, session } = useAuth()
+  const { accountId, userId } = useAccount()
   const { data: people = [] } = usePeople(accountId)
   const eventsWrite = useEventsWrite()
   const writeEvent = (change: EventsChange) =>
     eventsWrite.mutate({
-      accountId: accountId as string,
-      userId: session?.user.id as string,
+      accountId: accountId,
+      userId: userId,
       change,
     })
   const { data: events = [] } = useEvents(accountId)
@@ -101,7 +101,7 @@ export function OccurrenceSheet({
 
   function setStatus(next: OccurrenceStatusCode | null) {
     occurrences.mutate({
-      accountId: accountId as string,
+      accountId: accountId,
       change: { kind: 'status', series: timingOf(event), date, status: next },
     })
   }
@@ -119,7 +119,7 @@ export function OccurrenceSheet({
   /** Remove just this slot: the rule still produces it, `cancelled` hides it. */
   function deleteThisEvent() {
     occurrences.mutate({
-      accountId: accountId as string,
+      accountId: accountId,
       change: { kind: 'cancel', series: timingOf(event), date },
     })
     onClose()
@@ -239,7 +239,7 @@ export function OccurrenceSheet({
               className={s.resetOverride}
               onClick={() =>
                 occurrences.mutate({
-                  accountId: accountId as string,
+                  accountId: accountId,
                   change: { kind: 'clearOverride', series: timingOf(event), date },
                 })
               }
@@ -271,7 +271,7 @@ export function OccurrenceSheet({
                         checked={!!checked[it.id]}
                         onChange={() =>
                           occurrences.mutate({
-                            accountId: accountId as string,
+                            accountId: accountId,
                             change: {
                               kind: 'tick',
                               series: timingOf(event),
@@ -352,11 +352,11 @@ export function OccurrenceSheet({
  * state). A linked to-do never gates the occurrence's completion.
  */
 function LinkedTodos({ event, date }: { event: CalendarEvent; date: string }) {
-  const { accountId } = useAuth()
+  const { accountId } = useAccount()
   const { data: lists = [] } = useLists(accountId)
   const { data: links = {} } = useListLinks(accountId)
   const write = useListsWrite()
-  const change = (c: ListsChange) => write.mutate({ accountId: accountId as string, change: c })
+  const change = (c: ListsChange) => write.mutate({ accountId: accountId, change: c })
   const linkedIds = links[occKey(event.id, date)] ?? []
   const linked = linkedIds
     .map((id) => findItemFor(id)(lists))
@@ -455,7 +455,7 @@ function DependencyEditor({
   date: string
   completions: CompletionsMap
 }) {
-  const { accountId } = useAuth()
+  const { accountId } = useAccount()
   const { data: events = [] } = useEvents(accountId)
   const { data: dependencies = {} } = useDependencies(accountId)
   const occurrences = useOccurrencesWrite()
@@ -476,7 +476,7 @@ function DependencyEditor({
   function add() {
     if (!prereq || !prereqDate) return
     occurrences.mutate({
-      accountId: accountId as string,
+      accountId: accountId,
       change: {
         kind: 'addDependency',
         dependent: timingOf(event),
@@ -518,7 +518,7 @@ function DependencyEditor({
                   className={s.depRemove}
                   onClick={() =>
                     occurrences.mutate({
-                      accountId: accountId as string,
+                      accountId: accountId,
                       change: {
                         kind: 'removeDependency',
                         dependentId: event.id,

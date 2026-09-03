@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
+import { useAccount } from '../account'
 import shared from '../assets/styles/shared.module.css'
 import { cx } from '../assets/utils/cx'
-import { useAuth } from '../auth'
 import { useForgetDevice, useRegisterDevice } from '../domains/push/mutations'
 import {
   currentSubscription,
@@ -22,7 +22,7 @@ type Status = 'loading' | 'off' | 'on' | 'denied' | 'needs-install' | 'unsupport
  * key configured.
  */
 export function NotificationSettings() {
-  const { session } = useAuth()
+  const { userId } = useAccount()
   const registerDevice = useRegisterDevice()
   const forgetDevice = useForgetDevice()
   const [status, setStatus] = useState<Status>('loading')
@@ -48,7 +48,6 @@ export function NotificationSettings() {
   if (!pushConfigured) return null
 
   async function toggle(next: boolean) {
-    if (!session) return
     setBusy(true)
     setError(null)
     try {
@@ -58,7 +57,7 @@ export function NotificationSettings() {
         if (device === 'denied') {
           setStatus('denied')
         } else {
-          await registerDevice.mutateAsync({ ...device, userId: session.user.id })
+          await registerDevice.mutateAsync({ ...device, userId })
           setStatus('on')
         }
       } else {
@@ -104,7 +103,7 @@ export function NotificationSettings() {
           <input
             type="checkbox"
             checked={status === 'on'}
-            disabled={busy || status === 'loading' || !session}
+            disabled={busy || status === 'loading'}
             onChange={(e) => void toggle(e.target.checked)}
           />
           Reminder notifications on this device

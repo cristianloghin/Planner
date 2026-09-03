@@ -1,10 +1,11 @@
 import { type FormEvent, useState } from 'react'
+import { useAccount } from '../account'
 import { COLOR_OPTIONS } from '../assets/palette'
 import shared from '../assets/styles/shared.module.css'
 import { ColorPicker } from '../assets/ui/ColorPicker'
 import { CommitTextInput } from '../assets/ui/CommitTextInput'
 import { cx } from '../assets/utils/cx'
-import { useAuth } from '../auth'
+import { useSignOut, useUpdatePassword } from '../domains/auth/mutations'
 import { checklistEntries, notes, reminderOffsets } from '../domains/events/attachments'
 import { useEventsWrite } from '../domains/events/mutations'
 import { useTemplates } from '../domains/events/queries'
@@ -26,8 +27,8 @@ const WEEK_LAYOUTS = [
 ] as const
 
 export function Settings() {
-  const { accountId, session, signOut } = useAuth()
-  const userId = session?.user.id ?? null
+  const { accountId, userId, email } = useAccount()
+  const signOut = useSignOut()
   const { data: people = [] } = usePeople(accountId)
   const { data: prefs } = usePreferences(accountId, userId)
   const overrides = prefs?.personColors ?? {}
@@ -36,7 +37,7 @@ export function Settings() {
   // Settings save as one document, so a change is the current document with
   // that one thing changed. Nothing to save against until the first read lands.
   const savePrefs = (next: Preferences) =>
-    prefsWrite.mutate({ accountId: accountId as string, userId: userId as string, prefs: next })
+    prefsWrite.mutate({ accountId: accountId, userId: userId as string, prefs: next })
 
   return (
     <section className={cx(shared.view, s.settings)}>
@@ -73,7 +74,7 @@ export function Settings() {
                   value={p.name}
                   onCommit={(name) =>
                     peopleWrite.mutate({
-                      accountId: accountId as string,
+                      accountId: accountId,
                       change: { kind: 'rename', id: p.id, name },
                     })
                   }
@@ -100,15 +101,13 @@ export function Settings() {
 
         <NotificationSettings />
 
-        {session && (
-          <div className={s.account}>
-            <span className={cx(s.hint, s.small)}>Signed in as {session.user.email}</span>
-            <ChangePassword />
-            <button type="button" className={shared.danger} onClick={() => void signOut()}>
-              Sign out
-            </button>
-          </div>
-        )}
+        <div className={s.account}>
+          <span className={cx(s.hint, s.small)}>Signed in as {email}</span>
+          <ChangePassword />
+          <button type="button" className={shared.danger} onClick={() => signOut.mutate()}>
+            Sign out
+          </button>
+        </div>
       </div>
     </section>
   )
@@ -116,8 +115,7 @@ export function Settings() {
 
 /** Pick how the Week tab lays out the seven days: day-card list or hourly grid. */
 function WeekLayoutSection() {
-  const { accountId, session } = useAuth()
-  const userId = session?.user.id ?? null
+  const { accountId, userId } = useAccount()
   const { data: prefs } = usePreferences(accountId, userId)
   const prefsWrite = usePreferencesWrite()
   const active = prefs ? weekLayout(prefs) : 'list'
@@ -138,7 +136,7 @@ function WeekLayoutSection() {
             onClick={() =>
               prefs &&
               prefsWrite.mutate({
-                accountId: accountId as string,
+                accountId: accountId,
                 userId: userId as string,
                 prefs: withWeekLayout(prefs, opt.value),
               })
@@ -158,14 +156,14 @@ function WeekLayoutSection() {
  * them. Clicking a row opens the full-page {@link TemplateEditor}.
  */
 function TemplatesSection() {
-  const { accountId, session } = useAuth()
+  const { accountId, userId } = useAccount()
   const { data: people = [] } = usePeople(accountId)
   const { data: templates = [], isPending } = useTemplates(accountId)
   const events = useEventsWrite()
   const removeTemplate = (id: string) =>
     events.mutate({
-      accountId: accountId as string,
-      userId: session?.user.id as string,
+      accountId: accountId,
+      userId: userId,
       change: { kind: 'removeTemplate', id },
     })
   const [editing, setEditing] = useState<EventTemplate | null>(null)
@@ -221,7 +219,7 @@ function TemplatesSection() {
 
 /** Set a new password for the signed-in user (no email round-trip needed). */
 function ChangePassword() {
-  const { updatePassword } = useAuth()
+  const updatePassword = useUpdatePassword()
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
@@ -230,12 +228,14 @@ function ChangePassword() {
     e.preventDefault()
     setBusy(true)
     setStatus(null)
-    const { error } = await updatePassword(password)
-    setBusy(false)
-    if (error) setStatus({ ok: false, text: error })
-    else {
+    try {
+      await updatePassword.mutateAsync({ password })
       setStatus({ ok: true, text: 'Password updated.' })
       setPassword('')
+    } catch (e) {
+      setStatus({ ok: false, text: e instanceof Error ? e.message : 'Something went wrong.' })
+    } finally {
+      setBusy(false)
     }
   }
 

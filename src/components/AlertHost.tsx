@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useAccount } from '../account'
 import { useLatest } from '../assets/hooks/useLatest'
 import { addDays, toISODate } from '../assets/utils/dates'
-import { useAuth } from '../auth'
 import { useEvents } from '../domains/events/queries'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { type FiredAlert, dueAlerts } from '../services/notifications/alerts'
@@ -23,7 +23,7 @@ function loadSeen(): number {
  * Fires only while the app is open (no background/push yet).
  */
 export function AlertHost() {
-  const { accountId } = useAuth()
+  const { accountId } = useAccount()
   const { data: events = [] } = useEvents(accountId)
   const [active, setActive] = useState<FiredAlert[]>([])
   const seenRef = useRef(loadSeen())

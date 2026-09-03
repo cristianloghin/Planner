@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { useAccount } from '../account'
 import shared from '../assets/styles/shared.module.css'
 import { NumberField } from '../assets/ui/NumberField'
-import { useAuth } from '../auth'
 import { useEventsWrite } from '../domains/events/mutations'
 import type { Attachment, EventTemplate, PersonId } from '../types'
 import { AttachmentsEditor } from './AttachmentsEditor'
@@ -24,7 +24,7 @@ export function TemplateEditor({
   template: EventTemplate
   onClose: () => void
 }) {
-  const { accountId, session } = useAuth()
+  const { accountId, userId } = useAccount()
   const events = useEventsWrite()
 
   // No reducer edit-guard here: templates are owned by TanStack Query, and this
@@ -60,8 +60,8 @@ export function TemplateEditor({
     e.preventDefault()
     if (!title.trim()) return
     events.mutate({
-      accountId: accountId as string,
-      userId: session?.user.id as string,
+      accountId: accountId,
+      userId: userId,
       change: {
         kind: 'saveTemplate',
         isNew: false,

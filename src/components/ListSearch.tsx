@@ -1,11 +1,11 @@
 import { Search as SearchIcon } from 'lucide-react'
 import { useState } from 'react'
+import { useAccount } from '../account'
 import { useDebouncedValue } from '../assets/hooks/useDebouncedValue'
 import s from '../assets/ui/Search.module.css'
 import { SearchOverlay } from '../assets/ui/SearchOverlay'
 import { cx } from '../assets/utils/cx'
 import { isoLabel } from '../assets/utils/dates'
-import { useAuth } from '../auth'
 import { useListItemSearch } from '../domains/search/queries'
 
 /**
@@ -18,7 +18,7 @@ export function ListSearch({
 }: {
   onPick: (listId: string, itemId: string) => void
 }) {
-  const { accountId } = useAuth()
+  const { accountId } = useAccount()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
 

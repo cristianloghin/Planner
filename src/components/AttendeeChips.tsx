@@ -1,7 +1,7 @@
+import { useAccount } from '../account'
 import { colorVar } from '../assets/palette'
 import shared from '../assets/styles/shared.module.css'
 import { cx } from '../assets/utils/cx'
-import { useAuth } from '../auth'
 import { usePeople } from '../domains/people/queries'
 import { personColorKey } from '../domains/people/selectors'
 import { usePreferences } from '../domains/preferences/queries'
@@ -16,10 +16,10 @@ export function AttendeeChips({
   value: PersonId[]
   onChange: (next: PersonId[]) => void
 }) {
-  const { accountId, session } = useAuth()
+  const { accountId, userId } = useAccount()
   // Already in lane order: the client reads people sorted.
   const { data: people = [] } = usePeople(accountId)
-  const { data: overrides = {} } = usePreferences(accountId, session?.user.id ?? null, personColors)
+  const { data: overrides = {} } = usePreferences(accountId, userId, personColors)
 
   function toggle(id: PersonId) {
     const has = value.includes(id)

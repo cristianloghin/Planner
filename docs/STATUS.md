@@ -40,10 +40,10 @@ sync. Migrations `0001`–`0021` are applied.
   [`PUSH_NOTIFICATIONS.md`](./PUSH_NOTIFICATIONS.md).
 - **Routes** — the five tabs are real URLs (`/day`, `/week`, `/month`, `/lists`,
   `/settings`) over `@mikrostack/router`, with `/` guarded to redirect to
-  `/day`. The screens themselves are unchanged: the editors and the occurrence
-  sheet are still their own local state, and the auth gate is still imperative
-  rather than a route guard, because a guard needs a non-React
-  `isAuthenticated()` and that means adopting `services/session`.
+  `/day`. The editors and the occurrence sheet are still their own local
+  state, and the auth gate is still imperative rather than a route guard; the
+  session service now has the non-React accessor a guard needs, so that is a
+  routes-step change.
 
 ## The data layer, as it stands
 
@@ -102,8 +102,14 @@ Worth knowing before adding a slice:
 - **Push** is the three pieces the plan describes: `services/push` does the
   browser side, `domains/push` stores the row, and the Settings toggle and the
   shell's start-up re-registration pair them at the call site.
-- **Not yet adopted**: `auth.tsx` still owns the session (so the auth gate is
-  imperative). Everything in `client/` and `domains/` is live.
+- **Session and auth.** `services/session` holds who is signed in, fed from
+  `client/auth` by `src/session.ts` at the root. The gate in `App.tsx` reads
+  it, finds or creates the account through `domains/account`, and hands both
+  ids down through `src/account.tsx` — a synchronous context, mounted only
+  once both are known, so screens never wait on it (R8). Sign-in, sign-up,
+  sign-out and password changes go through `domains/auth`; the gate clears the
+  query cache when the session becomes empty. `auth.tsx` is deleted.
+  Everything in `client/` and `domains/` is live.
 - **`lib/` is gone.** The service forwarders are deleted and their consumers
   import `services/` directly; `rrule` and the reminder-sender cross-check live
   in `client/`, the attachment helpers in `domains/events/attachments.ts`, the
@@ -124,7 +130,7 @@ untried against a real database. What that took, for the next one:
   types, so screens are typed against the new shapes before they call them.
 - **`accountId` becomes an argument.** Domains take it rather than reading it
   ambiently (R8). Until a slice's screens are routes, they read it from
-  `useAuth` themselves; the route supplies it later.
+  `useAccount` themselves; the route supplies it later.
 - **The mutation key changes, and queued writes do not survive that.** A write
   paused offline is stored under its key; if nothing is registered for that key
   when it resumes, query-core rejects it, `resumePausedMutations` swallows the
@@ -142,10 +148,7 @@ the account rides in each write's values rather than being handed to the
 register function — see [Decision: the account is a value, not a
 closure](#the-account-is-a-value-not-a-closure) below.
 
-Still to adopt, cheapest first:
-
-- **`session`** — `auth.tsx` onto `services/session`, which is what lets the
-  auth gate become a route guard.
+Every slice is adopted; nothing is left to move onto `client/` and `domains/`.
 
 ### The account is a value, not a closure
 

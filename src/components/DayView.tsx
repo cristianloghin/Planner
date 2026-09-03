@@ -7,13 +7,13 @@ import {
   CircleDashed,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useAccount } from '../account'
 import { useLatest } from '../assets/hooks/useLatest'
 import { type ColorKey, colorStyle } from '../assets/palette'
 import shared from '../assets/styles/shared.module.css'
 import { LoadingPill } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
 import { addDays, isoLabel, minutesToTime, toISODate } from '../assets/utils/dates'
-import { useAuth } from '../auth'
 import { checklistEntries, hasReminders } from '../domains/events/attachments'
 import { useEvents } from '../domains/events/queries'
 import { useCompletionsForRange, useDependencies } from '../domains/occurrences/queries'
@@ -50,12 +50,12 @@ const ZOOM_KEY = 'planner:hourH'
 
 export function DayView() {
   const nav = useCalendarNavigation()
-  const { accountId, session } = useAuth()
+  const { accountId, userId } = useAccount()
   const { data: events = [] } = useEvents(accountId)
   const { data: dependencies = {} } = useDependencies(accountId)
   const day = nav.selectedDay
   const { data: people = [] } = usePeople(accountId)
-  const { data: overrides = {} } = usePreferences(accountId, session?.user.id ?? null, personColors)
+  const { data: overrides = {} } = usePreferences(accountId, userId, personColors)
   const peopleById = useMemo(() => byId(people), [people])
   const [editor, setEditor] = useState<EditorTarget | null>(null)
   const [sheet, setSheet] = useState<{

@@ -544,7 +544,7 @@ stays in localStorage. Both are *how*, not *what* (R13).
 |---|---|
 | `App.tsx` | `Root` gate → route guard (**still imperative**: a guard needs a non-React `isAuthenticated()`, so it waits on `services/session`); tab shell → `layouts/AppShell` (**still in `App.tsx`**); route map → ~~`routes/routes.ts`~~ **done** |
 | ~~`state.tsx`~~ | **deleted.** Reducer state → domains; write queue → mutation `scope`; offline → Query persister; realtime → `client/realtime.ts` + `services/realtime` + `queryKeysForTable`, wired in the shell; edit guard → gone (every write patches the cache first). The visible date sits in `navigation.tsx` until routes put it in the URL |
-| `auth.tsx` | SDK calls → ~~`client/auth.ts`~~ **done**; session + non-React accessors → `services/session`; credential ops → `domains/auth`; `ensureAccount` → `domains/account` over ~~`client/account.ts`~~ **done**; sign-out cache/snapshot clearing → shell orchestration |
+| ~~`auth.tsx`~~ | **deleted.** SDK calls → `client/auth.ts`; session → `services/session`, fed by `src/session.ts`; credential ops → `domains/auth`; `ensureAccount` → `domains/account` over `client/account.ts`; sign-out cache clearing → the gate in `App.tsx`; the resolved ids → `src/account.tsx` |
 | ~~`store/store.ts`~~ | **deleted** |
 | ~~`store/supabaseStore.ts`~~ | **deleted**; every table is served by `client/*` |
 | ~~`store/reducer.ts`, `store/actions.ts`~~ | **deleted**; optimistic logic lives in `domains/*/patches.ts` |

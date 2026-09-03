@@ -1,11 +1,12 @@
 import { type FormEvent, useState } from 'react'
-import { useAuth } from '../auth'
+import { useSignIn, useSignUp } from '../domains/auth/mutations'
 import s from './Login.module.css'
 
 type Mode = 'signin' | 'signup'
 
 export function Login() {
-  const { signIn, signUp } = useAuth()
+  const signIn = useSignIn()
+  const signUp = useSignUp()
   const [mode, setMode] = useState<Mode>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,14 +21,14 @@ export function Login() {
     setNotice(null)
     try {
       if (mode === 'signin') {
-        const { error } = await signIn(email, password)
-        if (error) setError(error)
+        await signIn.mutateAsync({ email, password })
       } else {
-        const { error, needsConfirmation } = await signUp(email, password)
-        if (error) setError(error)
-        else if (needsConfirmation)
-          setNotice('Check your email to confirm your account, then sign in.')
+        const { needsConfirmation } = await signUp.mutateAsync({ email, password })
+        if (needsConfirmation) setNotice('Check your email to confirm your account, then sign in.')
       }
+    } catch (e) {
+      // A refused sign-in arrives as an error with the reason as its message.
+      setError(e instanceof Error ? e.message : 'Something went wrong.')
     } finally {
       setBusy(false)
     }

@@ -3,13 +3,14 @@ import { onlineManager, useMutationState } from '@tanstack/react-query'
 import { ListChecks, type LucideIcon, Settings as SettingsIcon } from 'lucide-react'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import s from './App.module.css'
+import { AccountProvider, useAccount } from './account'
 import { PageLoader } from './assets/ui/Spinner'
-import { useAuth } from './auth'
 import { subscribeToChanges } from './client/realtime'
 import { AlertHost } from './components/AlertHost'
 import { Login } from './components/Login'
 import { SyncBanners } from './components/SyncBanners'
 import { queryKeysForTable } from './domains'
+import { useAccountId } from './domains/account/queries'
 import { usePreferencesWrite } from './domains/preferences/mutations'
 import { withTimezone } from './domains/preferences/patches'
 import { usePreferences } from './domains/preferences/queries'
@@ -19,6 +20,7 @@ import { dismissWriteError, getWriteError, queryClient, subscribeWriteError } fr
 import { routes } from './routes/routes'
 import { clearNotifications, readThisDevice } from './services/push'
 import { startRealtime } from './services/realtime'
+import { useSession } from './services/session'
 
 const TABS: { path: RoutePath; label: string; icon?: LucideIcon }[] = [
   { path: '/lists', label: 'Lists', icon: ListChecks },
@@ -33,18 +35,28 @@ const TABS: { path: RoutePath; label: string; icon?: LucideIcon }[] = [
  * login screen when signed out, and the router + data layer + app only once
  * signed in.
  *
- * The gate stays imperative rather than becoming a route guard: a guard needs
- * a non-React `isAuthenticated()`, which means adopting `services/session`.
+ * The gate stays imperative rather than becoming a route guard for now; the
+ * session service has the non-React accessor a guard needs, so that is a
+ * routes-step change.
  * Mounting the router only inside the authed branch makes every route
  * authenticated by construction — a deep link visited while signed out shows
  * the login screen and still renders its route once the session lands.
  */
 export function Root() {
-  const { session, accountId, loading } = useAuth()
+  const { user, loading } = useSession()
+  const account = useAccountId(user?.id ?? null)
 
-  // Spinner while the session resolves, or while the account bootstraps (every
-  // query is keyed by accountId, so wait for it before mounting the app).
-  if (loading || (session && !accountId)) {
+  // Signed out — on purpose or because the session could not be read: drop the
+  // previous user's cached data (the persister mirrors the clear into storage)
+  // so nothing readable lingers for the next sign-in. Clearing spans every
+  // domain, which is why it is the app's job and not the auth domain's.
+  useEffect(() => {
+    if (!loading && !user) queryClient.clear()
+  }, [loading, user])
+
+  // Spinner while the session resolves, or while the account is found or
+  // created (every query is keyed by it, so wait before mounting the app).
+  if (loading || (user && account.isPending)) {
     return (
       <div className={s.app}>
         <PageLoader />
@@ -52,10 +64,18 @@ export function Root() {
     )
   }
 
-  if (!session) {
+  if (!user) {
     return (
       <div className={s.app}>
         <Login />
+      </div>
+    )
+  }
+
+  if (!account.data) {
+    return (
+      <div className={s.app}>
+        <AccountFailed onRetry={() => void account.refetch()} />
       </div>
     )
   }
@@ -66,24 +86,36 @@ export function Root() {
       routes={routes}
       config={{ basePath: import.meta.env.BASE_URL, defaultLoading: <PageLoader /> }}
     >
-      <NavigationProvider>
-        <AppShell />
-      </NavigationProvider>
+      <AccountProvider accountId={account.data} userId={user.id} email={user.email}>
+        <NavigationProvider>
+          <AppShell />
+        </NavigationProvider>
+      </AccountProvider>
     </RouterProvider>
+  )
+}
+
+/** Signed in, but the account lookup failed: a retry beats an eternal spinner. */
+function AccountFailed({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className={s.notFound}>
+      <p>Couldn&apos;t load your account.</p>
+      <button type="button" className={s.notFoundLink} onClick={onRetry}>
+        Try again
+      </button>
+    </div>
   )
 }
 
 /** The app chrome around whichever route is showing: alerts, sync status and the tab bar. */
 function AppShell() {
-  const { accountId, session } = useAuth()
-  const userId = session?.user.id ?? null
+  const { accountId, userId } = useAccount()
 
   // ---- realtime: a partner's change refreshes what it touched ---------------
   // The client says which table changed, the service folds a burst into one
   // report, and the table map says which cached reads that makes stale. A
   // reconnection means changes were missed, so everything is refetched.
   useEffect(() => {
-    if (!accountId) return
     const ids = { accountId, userId }
     return startRealtime({
       subscribe: subscribeToChanges,
@@ -131,7 +163,7 @@ function AppShell() {
   const { mutate: savePrefs } = usePreferencesWrite()
   const stampedRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!prefs || !accountId || !userId) return
+    if (!prefs) return
     const deviceTz = Intl.DateTimeFormat().resolvedOptions().timeZone
     if (!deviceTz || prefs.timezone === deviceTz || stampedRef.current === deviceTz) return
     stampedRef.current = deviceTz
@@ -143,7 +175,6 @@ function AppShell() {
   // the browser is subscribed as and save it again.
   const { mutate: registerDevice } = useRegisterDevice()
   useEffect(() => {
-    if (!userId) return
     readThisDevice()
       .then((device) => {
         if (device) registerDevice({ ...device, userId })

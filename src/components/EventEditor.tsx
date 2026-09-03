@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useAccount } from '../account'
 import { COLOR_OPTIONS, DEFAULT_COLOR } from '../assets/palette'
 import type { ColorKey } from '../assets/palette'
 import shared from '../assets/styles/shared.module.css'
@@ -8,7 +9,6 @@ import { ScopeSheet } from '../assets/ui/ScopeSheet'
 import { PageLoader } from '../assets/ui/Spinner'
 import { addDays, diffDays, isoLabel, minutesToTime, toDateTimeLocal } from '../assets/utils/dates'
 import { uid } from '../assets/utils/id'
-import { useAuth } from '../auth'
 import { cloneAttachments } from '../domains/events/attachments'
 import { type EventsChange, useEventsWrite } from '../domains/events/mutations'
 import { useTemplates } from '../domains/events/queries'
@@ -103,7 +103,7 @@ export function EventEditor({
   // the view that opened the editor fetched the same month), otherwise the
   // form's initial state would be built without the override.
   const occurrenceDate = target.mode === 'edit' ? (target.occurrenceDate ?? null) : null
-  const { accountId } = useAuth()
+  const { accountId } = useAccount()
   const { completions, isLoading } = useCompletionsForRange(accountId, occurrenceDate)
   if (occurrenceDate && isLoading) {
     // Keep the toolbar: this shell covers the whole screen and the app runs
@@ -135,14 +135,14 @@ function EventEditorForm({
   completions: CompletionsMap
   onClose: () => void
 }) {
-  const { accountId, session } = useAuth()
+  const { accountId, userId } = useAccount()
   const { data: people = [] } = usePeople(accountId)
-  const { data: overrides = {} } = usePreferences(accountId, session?.user.id ?? null, personColors)
+  const { data: overrides = {} } = usePreferences(accountId, userId, personColors)
   const occurrences = useOccurrencesWrite()
   const { data: templates = [] } = useTemplates(accountId)
   const events = useEventsWrite()
   const write = (change: EventsChange) =>
-    events.mutate({ accountId: accountId as string, userId: session?.user.id as string, change })
+    events.mutate({ accountId: accountId, userId: userId, change })
   const isEdit = target.mode === 'edit'
   const base = isEdit ? target.event : null
   // No edit guard: the form holds its own draft, and a partner's change only
@@ -246,8 +246,8 @@ function EventEditorForm({
   function saveAsTemplate() {
     if (!title.trim()) return
     events.mutate({
-      accountId: accountId as string,
-      userId: session?.user.id as string,
+      accountId: accountId,
+      userId: userId,
       change: {
         kind: 'saveTemplate',
         isNew: true,
@@ -324,7 +324,7 @@ function EventEditorForm({
     // carries the form's chosen day + time, so changing the day relocates just
     // this occurrence (it stays part of the series, rendered on the new day).
     occurrences.mutate({
-      accountId: accountId as string,
+      accountId: accountId,
       change: {
         kind: 'override',
         series: timingOf(base!),
