@@ -9,12 +9,13 @@ import { cx } from '../assets/utils/cx'
 import { isoLabel } from '../assets/utils/dates'
 import { uid } from '../assets/utils/id'
 import { useAuth } from '../auth'
+import { type ListsChange, useListsWrite } from '../domains/lists/mutations'
+import { useLists } from '../domains/lists/queries'
+import { isOverdue } from '../domains/lists/selectors'
 import { usePeople } from '../domains/people/queries'
 import { personColorKey } from '../domains/people/selectors'
 import { usePreferences } from '../domains/preferences/queries'
 import { personColors } from '../domains/preferences/selectors'
-import { isOverdue } from '../lib/lists'
-import { useApp } from '../state'
 import type { ListItem, PersonId, TodoList } from '../types'
 import { ListSearch } from './ListSearch'
 import s from './Lists.module.css'
@@ -131,8 +132,10 @@ function GroupPicker({
  * Editing an *existing* list, by contrast, writes through on every change.
  */
 export function Lists() {
-  const { state, dispatch, beginEdit, endEdit } = useApp()
   const { accountId, session } = useAuth()
+  const { data: lists = [] } = useLists(accountId)
+  const write = useListsWrite()
+  const change = (c: ListsChange) => write.mutate({ accountId: accountId as string, change: c })
   const { data: people = [] } = usePeople(accountId)
   const { data: overrides = {} } = usePreferences(accountId, session?.user.id ?? null, personColors)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -155,20 +158,24 @@ export function Lists() {
   // Set when a search result jumps here; scrolls the row in and flashes it.
   const [highlightId, setHighlightId] = useState<string | null>(null)
 
-  const selected = selectedId ? (state.lists.find((l) => l.id === selectedId) ?? null) : null
+  // The list just saved, until the cache has it. The optimistic patch lands a
+  // tick after Save; without this the "deleted list" check below would see no
+  // such list in that tick and drop back to the index.
+  const [justSaved, setJustSaved] = useState<TodoList | null>(null)
+  useEffect(() => {
+    if (justSaved && lists.some((l) => l.id === justSaved.id)) setJustSaved(null)
+  }, [justSaved, lists])
+  const selected = selectedId
+    ? (lists.find((l) => l.id === selectedId) ?? (justSaved?.id === selectedId ? justSaved : null))
+    : null
   // The list on screen when we're not on the index: the draft takes precedence.
   const working = draft ?? selected
   const isDraft = draft !== null
   const isEditing = isDraft || editing
 
-  // While edit mode is active (draft or live), defer realtime reloads: the
-  // controlled inputs would otherwise be clobbered by a reload racing the
-  // user's own keystrokes (or a partner's change).
-  useEffect(() => {
-    if (!isEditing) return
-    beginEdit()
-    return endEdit
-  }, [isEditing, beginEdit, endEdit])
+  // No edit guard needed any more: every write patches the cache before the
+  // server answers, so a refetch landing mid-edit shows the user's own latest
+  // change rather than pulling an older version out from under the inputs.
 
   // A deleted list (only existing ones can be deleted) drops us to the index.
   useEffect(() => {
@@ -219,7 +226,7 @@ export function Lists() {
     setSelectedId(null)
     setEditing(false)
     resetAddForm()
-    setDraft({ id: uid(), title: '', sortOrder: state.lists.length, items: [] })
+    setDraft({ id: uid(), title: '', sortOrder: lists.length, items: [] })
   }
 
   // Anything entered that would be lost? Guards the cancel confirmation.
@@ -239,20 +246,13 @@ export function Lists() {
 
   function saveDraft() {
     if (!draft) return
-    // The draft already carries its id, so the items can be dispatched against
-    // it directly — no guessing which list the reducer appended (a realtime
-    // reload landing in between could make "the last list" someone else's).
-    dispatch({ type: 'addList', id: draft.id, title: draft.title.trim() || 'New list' })
-    for (const it of draft.items) {
-      dispatch({
-        type: 'addListItem',
-        listId: draft.id,
-        title: it.title,
-        personId: it.personId,
-        group: it.groupLabel,
-        dueOn: it.dueOn,
-      })
-    }
+    // The list goes first and its to-dos follow; every write shares one order,
+    // so they land in that order even after a spell offline. The list is sent
+    // without its items so the cache patches add each to-do exactly once.
+    const list = { ...draft, title: draft.title.trim() || 'New list' }
+    change({ kind: 'addList', list: { ...list, items: [] } })
+    for (const it of draft.items) change({ kind: 'addItem', listId: draft.id, item: it })
+    setJustSaved(list)
     setSelectedId(draft.id)
     setDraft(null)
     setEditing(false)
@@ -263,7 +263,7 @@ export function Lists() {
 
   function patchTitle(next: string) {
     if (draft) setDraft({ ...draft, title: next })
-    else if (selected) dispatch({ type: 'renameList', id: selected.id, title: next })
+    else if (selected) change({ kind: 'renameList', listId: selected.id, title: next })
   }
 
   function addWorkingItem(e: React.FormEvent) {
@@ -273,28 +273,18 @@ export function Lists() {
     const personId = assignee === 'shared' ? null : assignee
     const groupLabel = group.trim() || null
     const dueOn = due || null
-    if (draft) {
-      const item: ListItem = {
-        id: uid(),
-        title: text,
-        done: false,
-        personId,
-        groupLabel,
-        dueOn,
-        sortOrder: draft.items.length,
-        createdAt: Date.now(),
-      }
-      setDraft({ ...draft, items: [...draft.items, item] })
-    } else if (selected) {
-      dispatch({
-        type: 'addListItem',
-        listId: selected.id,
-        title: text,
-        personId,
-        group: groupLabel,
-        dueOn,
-      })
+    const item: ListItem = {
+      id: uid(),
+      title: text,
+      done: false,
+      personId,
+      groupLabel,
+      dueOn,
+      sortOrder: working.items.length,
+      createdAt: Date.now(),
     }
+    if (draft) setDraft({ ...draft, items: [...draft.items, item] })
+    else if (selected) change({ kind: 'addItem', listId: selected.id, item })
     setTitle('')
     setDue('')
     // Keep `group` so consecutive adds land in the same section; a deadline,
@@ -311,28 +301,20 @@ export function Lists() {
     }
     if (!selected) return
     if ('dueOn' in patch) {
-      dispatch({
-        type: 'setListItemDue',
-        listId: selected.id,
-        itemId: item.id,
-        dueOn: patch.dueOn ?? null,
-      })
+      change({ kind: 'setItemDue', itemId: item.id, dueOn: patch.dueOn ?? null })
       return
     }
     const merged = { ...item, ...patch }
-    dispatch({
-      type: 'editListItem',
-      listId: selected.id,
+    change({
+      kind: 'editItem',
       itemId: item.id,
-      title: merged.title,
-      personId: merged.personId,
-      group: merged.groupLabel,
+      fields: { title: merged.title, personId: merged.personId, groupLabel: merged.groupLabel },
     })
   }
 
   function removeWorkingItem(itemId: string) {
     if (draft) setDraft({ ...draft, items: draft.items.filter((i) => i.id !== itemId) })
-    else if (selected) dispatch({ type: 'removeListItem', listId: selected.id, itemId })
+    else if (selected) change({ kind: 'removeItem', itemId })
   }
 
   function badge(personId: PersonId | null) {
@@ -362,13 +344,7 @@ export function Lists() {
             <input
               type="checkbox"
               checked={t.done}
-              onChange={() =>
-                dispatch({
-                  type: 'toggleListItem',
-                  listId: working.id,
-                  itemId: t.id,
-                })
-              }
+              onChange={() => change({ kind: 'setItemDone', itemId: t.id, done: !t.done })}
             />
             <span className={s.taskTitle}>{t.title}</span>
           </label>
@@ -534,11 +510,11 @@ export function Lists() {
       <div className={shared.viewBody}>
         {/* ---- Index: every list (create via the header "+") ---- */}
         {!working &&
-          (state.lists.length === 0 ? (
+          (lists.length === 0 ? (
             <p className={shared.empty}>No lists yet. Tap + to create one.</p>
           ) : (
             <ul className={s.listIndex}>
-              {state.lists.map((l) => {
+              {lists.map((l) => {
                 const remaining = l.items.filter((i) => !i.done).length
                 return (
                   <li key={l.id}>
@@ -686,7 +662,7 @@ export function Lists() {
           confirmLabel="Delete"
           destructive
           onConfirm={() => {
-            dispatch({ type: 'removeList', id: selected.id })
+            change({ kind: 'removeList', listId: selected.id })
             backToIndex()
           }}
         />
