@@ -292,125 +292,6 @@ export type Database = {
         }
         Relationships: []
       }
-      list: {
-        Row: {
-          account_id: string
-          created_at: string
-          id: string
-          sort_order: number
-          title: string
-        }
-        Insert: {
-          account_id: string
-          created_at?: string
-          id?: string
-          sort_order?: number
-          title: string
-        }
-        Update: {
-          account_id?: string
-          created_at?: string
-          id?: string
-          sort_order?: number
-          title?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "list_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      list_item: {
-        Row: {
-          created_at: string
-          done: boolean
-          due_on: string | null
-          group_label: string | null
-          id: string
-          list_id: string
-          person_id: string | null
-          sort_order: number
-          title: string
-        }
-        Insert: {
-          created_at?: string
-          done?: boolean
-          due_on?: string | null
-          group_label?: string | null
-          id?: string
-          list_id: string
-          person_id?: string | null
-          sort_order?: number
-          title: string
-        }
-        Update: {
-          created_at?: string
-          done?: boolean
-          due_on?: string | null
-          group_label?: string | null
-          id?: string
-          list_id?: string
-          person_id?: string | null
-          sort_order?: number
-          title?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "list_item_list_id_fkey"
-            columns: ["list_id"]
-            isOneToOne: false
-            referencedRelation: "list"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "list_item_person_id_fkey"
-            columns: ["person_id"]
-            isOneToOne: false
-            referencedRelation: "person"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      list_item_event_link: {
-        Row: {
-          created_at: string
-          list_item_id: string
-          occurrence_start: string
-          series_id: string
-        }
-        Insert: {
-          created_at?: string
-          list_item_id: string
-          occurrence_start: string
-          series_id: string
-        }
-        Update: {
-          created_at?: string
-          list_item_id?: string
-          occurrence_start?: string
-          series_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "list_item_event_link_list_item_id_fkey"
-            columns: ["list_item_id"]
-            isOneToOne: false
-            referencedRelation: "list_item"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "list_item_event_link_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       note: {
         Row: {
           author_id: string | null
@@ -798,8 +679,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      can_access_list: { Args: { p_list: string }; Returns: boolean }
-      can_access_list_item: { Args: { p_item: string }; Returns: boolean }
       can_access_series: { Args: { p_series: string }; Returns: boolean }
       create_account: { Args: { p_name: string }; Returns: string }
       is_account_member: { Args: { p_account: string }; Returns: boolean }
@@ -820,20 +699,6 @@ export type Database = {
           rrule: string
           series_id: string
           snippet: string
-          title: string
-        }[]
-      }
-      search_list_items: {
-        Args: { p_account: string; p_query: string }
-        Returns: {
-          done: boolean
-          due_on: string
-          group_label: string
-          item_id: string
-          list_id: string
-          list_title: string
-          person_id: string
-          rank: number
           title: string
         }[]
       }

@@ -80,13 +80,13 @@ describe('startRealtime', () => {
     const onChanged = vi.fn<(change: RealtimeChange) => void>()
     startRealtime({ subscribe: conn.subscribe, onChanged })
 
-    conn.change('list_item')
+    conn.change('event_series')
     conn.change(undefined)
     vi.advanceTimersByTime(200)
 
     const change = onChanged.mock.calls[0][0]
     expect(change.missedSome).toBe(true)
-    expect([...change.tables]).toEqual(['list_item'])
+    expect([...change.tables]).toEqual(['event_series'])
   })
 
   it('starts each report empty rather than repeating the last one', () => {

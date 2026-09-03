@@ -1,6 +1,6 @@
 import { Link, type RoutePath, AppProvider as RouterProvider, RouterView } from '@mikrostack/router'
 import { onlineManager, useMutationState } from '@tanstack/react-query'
-import { ListChecks, type LucideIcon, Settings as SettingsIcon } from 'lucide-react'
+import { type LucideIcon, Settings as SettingsIcon } from 'lucide-react'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import s from './App.module.css'
 import { AccountProvider, useAccount } from './account'
@@ -23,7 +23,6 @@ import { startRealtime } from './services/realtime'
 import { useSession } from './services/session'
 
 const TABS: { path: RoutePath; label: string; icon?: LucideIcon }[] = [
-  { path: '/lists', label: 'Lists', icon: ListChecks },
   { path: '/day', label: 'Day' },
   { path: '/week', label: 'Week' },
   { path: '/month', label: 'Month' },

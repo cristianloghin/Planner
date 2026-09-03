@@ -1,6 +1,5 @@
 import { defineRoutes, useNavigation } from '@mikrostack/router'
 import { DayView } from '../components/DayView'
-import { Lists } from '../components/Lists'
 import { MonthView } from '../components/MonthView'
 import { Settings } from '../components/Settings'
 import { WeekCalendar } from '../components/WeekCalendar'
@@ -27,7 +26,7 @@ function MonthRoute() {
 }
 
 /**
- * The five tabs, as routes. Everything a view opens (the event editor, the
+ * The four tabs, as routes. Everything a view opens (the event editor, the
  * occurrence sheet) is still its own local state rather than a route.
  *
  * `/` exists because the PWA's `start_url` is the bare base, so every cold
@@ -40,7 +39,6 @@ export const routes = defineRoutes({
   '/day': { component: DayView },
   '/week': { component: WeekCalendar },
   '/month': { component: MonthRoute },
-  '/lists': { component: Lists },
   '/settings': { component: Settings },
 })
 

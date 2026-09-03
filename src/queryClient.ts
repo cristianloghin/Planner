@@ -12,7 +12,7 @@ import { MutationCache, QueryClient } from '@tanstack/react-query'
  * such a write silently rather than waiting. Discarding the stored cache loses
  * it too, but visibly and once, rather than leaving it to fail unnoticed.
  */
-const CACHE_BUSTER = 'v2'
+const CACHE_BUSTER = 'v3'
 export const QUERY_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
 
 // Shared cache for the slices migrated to TanStack Query (templates and

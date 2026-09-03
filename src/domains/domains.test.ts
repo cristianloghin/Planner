@@ -27,15 +27,6 @@ describe('queryKeysForTable', () => {
     expect(queryKeysForTable('occurrence_dependency', ids)).toEqual([['dependencies', 'acc']])
   })
 
-  it('treats a link change as a list change', () => {
-    for (const table of ['list', 'list_item', 'list_item_event_link']) {
-      expect(queryKeysForTable(table, ids)).toEqual([
-        ['lists', 'acc'],
-        ['list-links', 'acc'],
-      ])
-    }
-  })
-
   it('keys preferences by user as well as account', () => {
     expect(queryKeysForTable('user_preference', ids)).toEqual([['preferences', 'acc', 'usr']])
   })

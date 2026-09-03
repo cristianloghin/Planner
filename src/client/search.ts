@@ -1,8 +1,8 @@
 /**
- * Account-scoped full-text search over events and list items.
+ * Account-scoped full-text search over events.
  *
- * Both are `SECURITY INVOKER` RPCs (migration `0014`, recreated in `0017`), so
- * RLS scopes the results to the caller. `accountId` is still passed explicitly:
+ * A `SECURITY INVOKER` RPC (migration `0014`, recreated in `0017`), so RLS
+ * scopes the results to the caller. `accountId` is still passed explicitly:
  * a user may belong to more than one account, and RLS alone would return the
  * union of all of them.
  *
@@ -23,18 +23,6 @@ export interface EventSearchResult {
   rrule: string | null
   /** A short note excerpt for context, or null when the match was title-only. */
   snippet: string | null
-}
-
-/** One matching to-do, carrying enough of its parent list to render standalone. */
-export interface ListItemSearchResult {
-  itemId: string
-  listId: string
-  listTitle: string
-  title: string
-  groupLabel: string | null
-  done: boolean
-  dueOn: string | null
-  personId: string | null
 }
 
 /**
@@ -63,33 +51,5 @@ export async function searchEvents(accountId: string, query: string): Promise<Ev
     allDay: r.all_day,
     rrule: r.rrule,
     snippet: r.snippet,
-  }))
-}
-
-/**
- * List items matching `query`, best first. Same empty-query and `rank` handling
- * as {@link searchEvents}; this RPC breaks ties by `done asc, sort_order asc`,
- * so open to-dos sort above completed ones at equal relevance.
- */
-export async function searchListItems(
-  accountId: string,
-  query: string,
-): Promise<ListItemSearchResult[]> {
-  const q = query.trim()
-  if (!q) return []
-  const { data, error } = await supabase.rpc('search_list_items', {
-    p_account: accountId,
-    p_query: q,
-  })
-  if (error) throw error
-  return (data ?? []).map((r) => ({
-    itemId: r.item_id,
-    listId: r.list_id,
-    listTitle: r.list_title,
-    title: r.title,
-    groupLabel: r.group_label,
-    done: r.done,
-    dueOn: r.due_on,
-    personId: r.person_id,
   }))
 }

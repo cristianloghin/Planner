@@ -5,8 +5,7 @@ import type { QueryClient } from '@tanstack/react-query'
  * overwrote, paired with whatever was there before.
  *
  * A list rather than one entry, because a write can touch more than one cache:
- * pinning a to-do changes where to-dos appear as well as the lists themselves,
- * and one day can sit in several cached months at once.
+ * one day can sit in several cached months at once.
  */
 export type Rollback = { entries: [readonly unknown[], unknown][] }
 

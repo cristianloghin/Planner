@@ -12,7 +12,6 @@ export type {
   Recurrence,
   RecurrenceFreq,
 } from './domains/events/types'
-export type { ListItem, TodoList } from './domains/lists/types'
 export type {
   CompletionsMap,
   OccurrenceDependency,

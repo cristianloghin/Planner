@@ -14,8 +14,6 @@ import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { accountKey } from './account/queries'
 import { registerEventsDefaults } from './events/mutations'
 import { eventsKey, templatesKey } from './events/queries'
-import { registerListsDefaults } from './lists/mutations'
-import { listLinksKey, listsKey } from './lists/queries'
 import { registerOccurrencesDefaults } from './occurrences/mutations'
 import { completionsPrefix, dependenciesKey } from './occurrences/queries'
 import { registerPeopleDefaults } from './people/mutations'
@@ -25,7 +23,6 @@ import { preferencesKey } from './preferences/queries'
 
 export function registerDomainDefaults(queryClient: QueryClient): void {
   registerEventsDefaults(queryClient)
-  registerListsDefaults(queryClient)
   registerOccurrencesDefaults(queryClient)
   registerPeopleDefaults(queryClient)
   registerPreferencesDefaults(queryClient)
@@ -69,11 +66,6 @@ export function queryKeysForTable(table: string, { accountId, userId }: Realtime
       return [peopleKey(accountId)]
     case 'user_preference':
       return [preferencesKey(accountId, userId)]
-    // Links are read with the lists, so a link change is a list change.
-    case 'list':
-    case 'list_item':
-    case 'list_item_event_link':
-      return [listsKey(accountId), listLinksKey(accountId)]
     case 'account_member':
       return [accountKey(userId)]
     default:

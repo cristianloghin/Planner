@@ -149,26 +149,3 @@ insert into reminder (id, series_id, user_id, offset_seconds) values
    '11111111-1111-4111-8111-111111111111', 1800)
 on conflict (id) do nothing;
 
--- ---------------------------------------------------------------------------
--- Lists. One with a section header, a deadline and an assignee, so the list
--- screen has each of its cases on show.
--- ---------------------------------------------------------------------------
-insert into list (id, account_id, title, sort_order) values
-  ('88888888-0000-4000-8000-000000000001', '22222222-2222-4222-8222-222222222222', 'Shopping', 0),
-  ('88888888-0000-4000-8000-000000000002', '22222222-2222-4222-8222-222222222222', 'House', 1)
-on conflict (id) do nothing;
-
-insert into list_item
-  (id, list_id, title, done, person_id, group_label, due_on, sort_order)
-values
-  ('99999999-0000-4000-8000-000000000001', '88888888-0000-4000-8000-000000000001',
-   'Milk', false, null, 'Groceries', null, 0),
-  ('99999999-0000-4000-8000-000000000002', '88888888-0000-4000-8000-000000000001',
-   'Bread', true, null, 'Groceries', null, 1),
-  ('99999999-0000-4000-8000-000000000003', '88888888-0000-4000-8000-000000000001',
-   'Light bulbs', false, '33333333-0000-4000-8000-000000000002', null, null, 2),
-  -- Overdue on purpose, so the overdue styling shows without waiting.
-  ('99999999-0000-4000-8000-000000000004', '88888888-0000-4000-8000-000000000002',
-   'Call the plumber', false, '33333333-0000-4000-8000-000000000001', null,
-   current_date - 2, 0)
-on conflict (id) do nothing;

@@ -29,6 +29,26 @@
 -- from 0017 goes with the function.
 drop function split_series(uuid, timestamptz, text);
 
+-- §1: the to-do search RPC (0014, recreated in 0017). A SQL-language body's
+-- dependency on a table is not recorded, so this would survive the table drops
+-- below as a dead object that errors if ever called. Its grant goes with it.
+drop function search_list_items(uuid, text);
+
+
+-- ---------------------------------------------------------------------------
+-- §1. Lists — the whole feature.
+-- ---------------------------------------------------------------------------
+
+-- The tab, the model and the occurrence links all go. RLS policies, grants,
+-- indexes and realtime publication membership go with the tables, so 0009's
+-- and 0011's statements need no separate reversal.
+drop table list_item_event_link, list_item, list cascade;
+
+-- 0009's RLS helpers, and these come AFTER the tables, not before: an RLS
+-- policy's dependency on a function *is* recorded, so dropping these while
+-- list_item_rw still existed would fail with "other objects depend on it".
+-- Dropping the tables takes their policies, which frees the functions.
+drop function can_access_list(uuid), can_access_list_item(uuid);
 
 -- ---------------------------------------------------------------------------
 -- §6c. Vestigial columns — each written by exactly one path, read by none.

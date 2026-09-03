@@ -1,5 +1,5 @@
 /**
- * Searching events and to-dos.
+ * Searching events.
  *
  * The search runs on the server, so it keeps working however little of the
  * account is loaded. Results are cached per search term, which means going back
@@ -11,13 +11,11 @@
  * pause in typing before passing it in.
  */
 import { useQuery } from '@tanstack/react-query'
-import { searchEvents, searchListItems } from '../../client/search'
-import type { EventSearchResult, ListItemSearchResult } from './types'
+import { searchEvents } from '../../client/search'
+import type { EventSearchResult } from './types'
 
 export const eventSearchKey = (accountId: string | null, query: string) =>
   ['search', 'events', accountId, query] as const
-export const listItemSearchKey = (accountId: string | null, query: string) =>
-  ['search', 'list-items', accountId, query] as const
 
 // Long enough that repeating a search is instant, short enough that something
 // added a moment ago turns up.
@@ -38,22 +36,6 @@ export function useEventSearch<T = EventSearchResult[]>(
   return useQuery({
     queryKey: eventSearchKey(accountId, q),
     queryFn: () => searchEvents(accountId as string, q),
-    enabled: accountId != null && q.length > 0,
-    staleTime: STALE_MS,
-    select,
-  })
-}
-
-/** To-dos matching `query`, best first, with open ones above done at equal relevance. */
-export function useListItemSearch<T = ListItemSearchResult[]>(
-  accountId: string | null,
-  query: string,
-  select?: (results: ListItemSearchResult[]) => T,
-) {
-  const q = query.trim()
-  return useQuery({
-    queryKey: listItemSearchKey(accountId, q),
-    queryFn: () => searchListItems(accountId as string, q),
     enabled: accountId != null && q.length > 0,
     staleTime: STALE_MS,
     select,
