@@ -84,13 +84,6 @@ describe('parseRRule ≡ client encoding', () => {
     expect(parseRRule(null)).toBeUndefined()
     expect(parseRRule('FREQ=YEARLY')).toBeUndefined()
   })
-
-  it('decodes a legacy locally-encoded UNTIL to its intended date', () => {
-    // Written by a UTC+2 client as local end-of-day 2026-06-17.
-    expect(parseRRule('FREQ=DAILY;UNTIL=20260617T215959Z')?.until).toBe('2026-06-17')
-    // Written by a UTC-5 client.
-    expect(parseRRule('FREQ=DAILY;UNTIL=20260618T045959Z')?.until).toBe('2026-06-17')
-  })
 })
 
 describe('timezone bridging', () => {

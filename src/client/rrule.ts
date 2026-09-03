@@ -62,12 +62,8 @@ export function rruleToRecurrence(rrule: string | null | undefined): Recurrence 
   if (!freq) return undefined
   // UNTIL comes back as a Date (UTC instant); reduce it to the ISO date it
   // identifies — in UTC, so every reader decodes the same date regardless of
-  // device timezone. Rewinding 10h first keeps legacy values (encoded as the
-  // *writer's local* 23:59:59, i.e. up to ±half a day off UTC end-of-day)
-  // decoding to their intended date for writer offsets in [-10h, +13h]; the
-  // current UTC encoding (23:59:59Z) is unaffected by the rewind.
-  const until = options.until
-    ? new Date(options.until.getTime() - 10 * 3_600_000).toISOString().slice(0, 10)
-    : undefined
+  // device timezone. `recurrenceToRRule` is the only writer and always encodes
+  // the UTC end of the day, so the instant's UTC date *is* the intended date.
+  const until = options.until ? options.until.toISOString().slice(0, 10) : undefined
   return { freq, interval: options.interval ?? 1, ...(until ? { until } : {}) }
 }

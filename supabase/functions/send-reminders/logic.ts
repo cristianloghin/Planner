@@ -46,9 +46,9 @@ const FREQ_MAP: Record<string, Recurrence['freq'] | undefined> = {
 
 /**
  * Parse the stored bare RRULE. UNTIL decodes exactly like the client
- * (rruleToRecurrence): the UTC date of the instant rewound 10h, which maps
- * both the current UTC-end-of-day encoding and legacy locally-encoded values
- * onto their intended date. An unmodelled FREQ returns undefined (one-off).
+ * (rruleToRecurrence): the UTC date of the instant, which is the intended date
+ * because the only writer encodes the UTC end of the day. An unmodelled FREQ
+ * returns undefined (one-off).
  */
 export function parseRRule(rrule: string | null): Recurrence | undefined {
   if (!rrule) return undefined
@@ -70,7 +70,7 @@ export function parseRRule(rrule: string | null): Recurrence | undefined {
     const m = untilRaw.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?$/)
     if (m) {
       const instant = Date.parse(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`)
-      until = new Date(instant - 10 * 3_600_000).toISOString().slice(0, 10)
+      until = new Date(instant).toISOString().slice(0, 10)
     }
   }
   return { freq, interval, ...(until ? { until } : {}) }
