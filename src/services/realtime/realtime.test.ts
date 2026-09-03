@@ -37,15 +37,15 @@ describe('startRealtime', () => {
     startRealtime({ subscribe: conn.subscribe, onChanged })
 
     conn.change('event_series')
-    conn.change('event_person')
+    conn.change('person')
     conn.change('reminder')
     conn.change('event_series')
     vi.advanceTimersByTime(200)
 
     expect(onChanged).toHaveBeenCalledTimes(1)
     expect([...onChanged.mock.calls[0][0].tables].sort()).toEqual([
-      'event_person',
       'event_series',
+      'person',
       'reminder',
     ])
   })

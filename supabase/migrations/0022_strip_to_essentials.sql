@@ -192,6 +192,48 @@ drop table rsvp_status, participant_role;
 alter table person drop column kind;
 
 -- ---------------------------------------------------------------------------
+-- §10. Who is on an event: one shape for the series and the day.
+-- ---------------------------------------------------------------------------
+
+-- `event_person` was a junction table used as an array with extra steps: no SQL
+-- ever joined it, and the app flattened it to `PersonId[]` the moment it was
+-- read. Holding it as a column instead means the per-day override added below
+-- is the SAME shape as the series' own list, so reading through one to the
+-- other is `occurrence.attendees ?? series.attendees` and nothing converts.
+--
+-- Order is now defined. The embed had no `order by`, so attendee order was
+-- whatever the scan returned; the array is seeded in lane order and keeps it.
+alter table event_series add column attendees uuid[] not null default '{}';
+
+-- Copy first, drop last. If anything fails before the drop, event_person is
+-- still there and nothing is lost — that ordering is the safeguard, not a
+-- check afterwards: `event_person_person_id_fkey` already guarantees every
+-- person_id resolves, so the join cannot silently lose a row.
+update event_series s
+   set attendees = coalesce((
+     select array_agg(ep.person_id order by p.sort_order)
+     from event_person ep
+     join person p on p.id = ep.person_id
+     where ep.series_id = s.id
+   ), '{}');
+
+-- Its RLS policy, indexes and realtime publication membership go with it. A
+-- change to who is on an event now arrives as an `event_series` change, which
+-- already invalidates the same cached read.
+drop table event_person;
+
+-- The per-day override. NULL means "as the series" — which is why this one is
+-- nullable where the series' column is not. An array means exactly these people
+-- on this day.
+--
+-- NOTE for whoever adds a delete-person feature: `event_person.person_id` had
+-- ON DELETE CASCADE, so removing a person used to remove them from every event
+-- for free. An array has no foreign key, so that cleanup is now yours to do —
+-- in both columns. The read side degrades safely (an unknown id renders as "?"
+-- rather than throwing), but it will not tidy itself.
+alter table event_occurrence add column attendees uuid[];
+
+-- ---------------------------------------------------------------------------
 -- §6d. `person.color` holds a palette key — name it like event_series.color_key.
 -- ---------------------------------------------------------------------------
 

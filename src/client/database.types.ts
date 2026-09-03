@@ -102,6 +102,7 @@ export type Database = {
       }
       event_occurrence: {
         Row: {
+          attendees: string[] | null
           cancelled: boolean
           metadata: Json
           occurrence_start: string
@@ -110,6 +111,7 @@ export type Database = {
           series_id: string
         }
         Insert: {
+          attendees?: string[] | null
           cancelled?: boolean
           metadata?: Json
           occurrence_start: string
@@ -118,6 +120,7 @@ export type Database = {
           series_id: string
         }
         Update: {
+          attendees?: string[] | null
           cancelled?: boolean
           metadata?: Json
           occurrence_start?: string
@@ -135,40 +138,11 @@ export type Database = {
           },
         ]
       }
-      event_person: {
-        Row: {
-          person_id: string
-          series_id: string
-        }
-        Insert: {
-          person_id: string
-          series_id: string
-        }
-        Update: {
-          person_id?: string
-          series_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "event_person_person_id_fkey"
-            columns: ["person_id"]
-            isOneToOne: false
-            referencedRelation: "person"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_person_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       event_series: {
         Row: {
           account_id: string
           all_day: boolean
+          attendees: string[]
           color_key: string | null
           created_at: string
           created_by: string | null
@@ -184,6 +158,7 @@ export type Database = {
         Insert: {
           account_id: string
           all_day?: boolean
+          attendees?: string[]
           color_key?: string | null
           created_at?: string
           created_by?: string | null
@@ -199,6 +174,7 @@ export type Database = {
         Update: {
           account_id?: string
           all_day?: boolean
+          attendees?: string[]
           color_key?: string | null
           created_at?: string
           created_by?: string | null

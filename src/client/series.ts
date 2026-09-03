@@ -96,18 +96,17 @@ interface SeriesRow {
   duration: string | null
   rrule: string | null
   color_key: string | null
-  event_person: { person_id: string }[]
+  attendees: string[]
   reminder: { id: string; offset_seconds: number }[]
 }
 
 /**
- * The `table!fk_column` hints are kept although each remaining child now has a
- * single path to `event_series`. They were required while `checklist_item` was
- * also reachable through `occurrence_item_removed` and the request would fail
- * as ambiguous without them; they are merely explicit now.
+ * `reminder` is the only child left, and the `!fk_column` hint is kept though it
+ * now has a single path to `event_series` — it was required while other
+ * children were reachable by more than one route, and it costs nothing to be
+ * explicit. Attendees are a column on the row itself, not a child.
  */
-const SERIES_SELECT = `id, title, all_day, dtstart, duration, rrule, color_key,
-   event_person!series_id ( person_id ),
+const SERIES_SELECT = `id, title, all_day, dtstart, duration, rrule, attendees, color_key,
    reminder!series_id ( id, offset_seconds )`
 
 /**
@@ -136,7 +135,7 @@ export async function fetchSeries(
     start: r.dtstart ? tsToStart(r.dtstart, r.all_day) : null,
     duration: intervalToDuration(r.duration, r.all_day),
     recurrence: rruleToRecurrence(r.rrule),
-    attendees: r.event_person.map((ep) => ep.person_id),
+    attendees: r.attendees,
     colorKey: isColorKey(r.color_key) ? r.color_key : undefined,
     reminders: r.reminder.map((rem) => ({
       id: rem.id,
@@ -147,7 +146,9 @@ export async function fetchSeries(
 }
 
 /**
- * Save a series and bring its people and reminders in line with it.
+ * Save a series and bring its reminders in line with it.
+ *
+ * The people are a column on the row, so they go out with the upsert below.
  *
  * `isNew` records who created it. It is only stamped on the first save, so a
  * partner editing a series later does not become its author.
@@ -166,6 +167,7 @@ export async function saveSeries(
     dtstart: series.start ? startToTs(series.start, series.allDay) : null,
     duration: durationToInterval(series.duration, series.allDay),
     rrule: recurrenceToRRule(series.recurrence),
+    attendees: series.attendees,
     color_key: series.colorKey ?? null,
     is_template: series.isTemplate,
     ...(isNew ? { created_by: userId } : {}),
@@ -173,7 +175,7 @@ export async function saveSeries(
   const up = await supabase.from('event_series').upsert(row, { onConflict: 'id' })
   if (up.error) throw up.error
 
-  await Promise.all([syncAttendees(series), syncReminders(series, userId)])
+  await syncReminders(series, userId)
 }
 
 /**
@@ -188,24 +190,6 @@ export async function deleteSeries(id: string): Promise<void> {
 }
 
 // ---- children ------------------------------------------------------------
-
-async function syncAttendees(series: { id: string; attendees: PersonId[] }): Promise<void> {
-  // Add the current people first, then remove whoever is no longer on it.
-  // Doing it in this order means the series is never briefly empty for someone
-  // reading it at the same time, and two devices saving at once cannot fail the
-  // whole write on a shared person's duplicate key.
-  if (series.attendees.length) {
-    const up = await supabase.from('event_person').upsert(
-      series.attendees.map((person_id) => ({ series_id: series.id, person_id })),
-      { onConflict: 'series_id,person_id', ignoreDuplicates: true },
-    )
-    if (up.error) throw up.error
-  }
-  let del = supabase.from('event_person').delete().eq('series_id', series.id)
-  if (series.attendees.length) del = del.not('person_id', 'in', `(${series.attendees.join(',')})`)
-  const res = await del
-  if (res.error) throw res.error
-}
 
 async function syncReminders(series: Series, userId: string): Promise<void> {
   const desired = series.reminders.map((r) => ({

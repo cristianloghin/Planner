@@ -48,10 +48,9 @@ export interface RealtimeIds {
 export function queryKeysForTable(table: string, { accountId, userId }: RealtimeIds): QueryKey[] {
   switch (table) {
     // Events and blueprints are one table, told apart by whether they have a
-    // date. Their attendees and reminders are read alongside them, so a change
-    // to either is a change to the event.
+    // date. Attendees are a column on it and reminders are read alongside it,
+    // so a change to either is a change to the event.
     case 'event_series':
-    case 'event_person':
     case 'reminder':
       return [eventsKey(accountId), templatesKey(accountId)]
     // What happened on a day: moves and cancellations.
