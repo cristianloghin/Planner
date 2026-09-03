@@ -1,6 +1,5 @@
 import { isColorKey } from '../assets/palette'
 import { toISODate } from '../assets/utils/dates'
-import { uid } from '../assets/utils/id'
 import {
   dayRange,
   durationToInterval,
@@ -19,20 +18,13 @@ import type {
   CalendarEvent,
   ChecklistEntry,
   EventTemplate,
-  ListItem,
   OccurrenceDependency,
   OccurrenceStatusCode,
   PersonId,
-  TodoList,
 } from '../types'
 import type { Action } from './actions'
 import type { ScheduleStore } from './store'
 import { defaultState } from './store'
-
-// Legacy device-local Lists store (pre-migration 0009). Read once to migrate any
-// existing items into the backend, then marked imported so it never runs again.
-const LEGACY_LISTS_KEY = 'planner.lists.v1'
-const LEGACY_LISTS_IMPORTED_KEY = 'planner.lists.v1.imported'
 
 /** The original-slot timestamptz of `event`'s occurrence starting on ISO `date`. */
 function occurrenceTs(event: CalendarEvent, date: string): string {
@@ -78,19 +70,14 @@ export class SupabaseStore implements ScheduleStore {
   async load(): Promise<AppState> {
     const base = defaultState()
 
-    // Not loaded here: people, preferences, templates and per-occurrence state
-    // (completions) are owned by TanStack Query (src/domains/*)
+    // Not loaded here: people, preferences, lists, templates and per-occurrence
+    // state (completions) are owned by TanStack Query (src/domains/*)
     // and fetched per window — completions grow with every tick ever made, so
     // hydrating them whole would scale startup with account age. The mappings
     // still live in this class and are reused via the public methods.
-    const [events, dependencies, lists, listLinks] = await Promise.all([
-      this.loadEvents(),
-      this.loadDependencies(),
-      this.loadLists(),
-      this.loadListLinks(),
-    ])
+    const [events, dependencies] = await Promise.all([this.loadEvents(), this.loadDependencies()])
 
-    return { ...base, events, dependencies, lists, listLinks }
+    return { ...base, events, dependencies }
   }
 
   // ---- TEMPLATES (owned by TanStack Query, served from the same mapping) ----
@@ -213,149 +200,6 @@ export class SupabaseStore implements ScheduleStore {
     return out
   }
 
-  /**
-   * Named lists with their items, ordered + grouped like checklists (sort_order
-   * ascending). One-time migrates any pre-0009 device-local items first.
-   */
-  private async loadLists(): Promise<TodoList[]> {
-    await this.importLegacyLists()
-
-    const [lists, items] = await Promise.all([
-      supabase
-        .from('list')
-        .select('id, title, sort_order')
-        .eq('account_id', this.accountId)
-        .order('sort_order'),
-      // Scoped to the account through the parent list, and paged: an unfiltered
-      // scan is capped at 1000 rows and would silently drop items.
-      fetchAll((from, to) =>
-        supabase
-          .from('list_item')
-          .select(
-            'id, list_id, group_label, title, done, person_id, due_on, sort_order, created_at, list!inner()',
-          )
-          .eq('list.account_id', this.accountId)
-          .order('sort_order')
-          .order('id')
-          .range(from, to),
-      ),
-    ])
-    if (lists.error) throw lists.error
-
-    const byList = new Map<string, ListItem[]>()
-    for (const it of items) {
-      const arr = byList.get(it.list_id) ?? []
-      arr.push({
-        id: it.id,
-        title: it.title,
-        done: it.done,
-        personId: it.person_id,
-        groupLabel: it.group_label,
-        dueOn: it.due_on,
-        sortOrder: it.sort_order,
-        createdAt: Date.parse(it.created_at),
-      })
-      byList.set(it.list_id, arr)
-    }
-
-    return (lists.data ?? []).map((l) => ({
-      id: l.id,
-      title: l.title,
-      sortOrder: l.sort_order,
-      // The query already orders by sort_order; sort again defensively in case a
-      // list's items arrive interleaved across the result set.
-      items: (byList.get(l.id) ?? []).sort((a, b) => a.sortOrder - b.sortOrder),
-    }))
-  }
-
-  /**
-   * Migrate pre-0009 `planner.lists.v1` items (a flat, device-local array) into a
-   * single backend list, once. Guarded by a localStorage flag AND by the account
-   * already having lists, so it can't double-import or fight a partner's data.
-   */
-  private async importLegacyLists(): Promise<void> {
-    let legacy: { title?: string; done?: boolean; personId?: string | null }[]
-    try {
-      if (localStorage.getItem(LEGACY_LISTS_IMPORTED_KEY)) return
-      const raw = localStorage.getItem(LEGACY_LISTS_KEY)
-      legacy = raw ? JSON.parse(raw) : []
-    } catch {
-      return
-    }
-    if (!Array.isArray(legacy) || legacy.length === 0) {
-      try {
-        localStorage.setItem(LEGACY_LISTS_IMPORTED_KEY, '1')
-      } catch {
-        /* ignore */
-      }
-      return
-    }
-
-    // Only import into an empty account, so we never duplicate on a second device.
-    const existing = await supabase
-      .from('list')
-      .select('id')
-      .eq('account_id', this.accountId)
-      .limit(1)
-    if (existing.error) throw existing.error
-    if ((existing.data ?? []).length > 0) {
-      try {
-        localStorage.setItem(LEGACY_LISTS_IMPORTED_KEY, '1')
-      } catch {
-        /* ignore */
-      }
-      return
-    }
-
-    const listId = uid()
-    const insList = await supabase
-      .from('list')
-      .insert({ id: listId, account_id: this.accountId, title: 'To-do', sort_order: 0 })
-    if (insList.error) throw insList.error
-
-    const rows = legacy.map((it, i) => ({
-      id: uid(),
-      list_id: listId,
-      title: String(it.title ?? ''),
-      done: Boolean(it.done),
-      person_id: it.personId ?? null,
-      sort_order: i,
-    }))
-    const insItems = await supabase.from('list_item').insert(rows)
-    if (insItems.error) throw insItems.error
-
-    try {
-      localStorage.setItem(LEGACY_LISTS_IMPORTED_KEY, '1')
-    } catch {
-      /* ignore */
-    }
-  }
-
-  /**
-   * To-do→occurrence links (`list_item_event_link`), keyed by the occurrence
-   * (`${series_id}:${date}`) like `AppState.dependencies`. `occurrence_start` is
-   * the original slot; we store it as the occurrence date.
-   */
-  private async loadListLinks(): Promise<Record<string, string[]>> {
-    const data = await fetchAll((from, to) =>
-      supabase
-        .from('list_item_event_link')
-        .select('list_item_id, series_id, occurrence_start, event_series!inner()')
-        .eq('event_series.account_id', this.accountId)
-        .order('list_item_id')
-        .order('series_id')
-        .order('occurrence_start')
-        .range(from, to),
-    )
-    const out: Record<string, string[]> = {}
-    for (const row of data ?? []) {
-      const k = `${row.series_id}:${tsToDateKey(row.occurrence_start)}`
-      out[k] ??= []
-      out[k].push(row.list_item_id)
-    }
-    return out
-  }
-
   // ---- SUBSCRIBE ---------------------------------------------------------
 
   // ---- WRITE -------------------------------------------------------------
@@ -470,134 +314,6 @@ export class SupabaseStore implements ScheduleStore {
           .eq('prerequisite_series', prerequisite.id)
           .gte('prerequisite_occurrence', pre.from)
           .lt('prerequisite_occurrence', pre.to)
-        if (error) throw error
-        return
-      }
-      case 'addList': {
-        // Resolve by id when the action carries one (see addEvent); else the
-        // reducer just appended it.
-        const list = action.id
-          ? next.lists.find((l) => l.id === action.id)
-          : next.lists[next.lists.length - 1]
-        if (!list) return
-        const { error } = await supabase.from('list').insert({
-          id: list.id,
-          account_id: this.accountId,
-          title: list.title,
-          sort_order: list.sortOrder,
-        })
-        if (error) throw error
-        return
-      }
-      case 'renameList': {
-        const { error } = await supabase
-          .from('list')
-          .update({ title: action.title })
-          .eq('id', action.id)
-        if (error) throw error
-        return
-      }
-      case 'removeList': {
-        // Cascade drops the list's items and any event links.
-        const { error } = await supabase.from('list').delete().eq('id', action.id)
-        if (error) throw error
-        return
-      }
-      case 'addListItem': {
-        // Resolve by id when the action carries one (see addEvent); else the
-        // reducer just appended it to its list.
-        const list = next.lists.find((l) => l.id === action.listId)
-        const item = action.id
-          ? list?.items.find((i) => i.id === action.id)
-          : list?.items[list.items.length - 1]
-        if (!item) return
-        const { error } = await supabase.from('list_item').insert({
-          id: item.id,
-          list_id: action.listId,
-          title: item.title,
-          done: item.done,
-          person_id: item.personId,
-          group_label: item.groupLabel,
-          due_on: item.dueOn,
-          sort_order: item.sortOrder,
-        })
-        if (error) throw error
-        return
-      }
-      case 'toggleListItem': {
-        // `done` lives on the item (single context); read the post-toggle value.
-        const item = next.lists
-          .find((l) => l.id === action.listId)
-          ?.items.find((t) => t.id === action.itemId)
-        if (!item) return
-        const { error } = await supabase
-          .from('list_item')
-          .update({ done: item.done })
-          .eq('id', action.itemId)
-        if (error) throw error
-        return
-      }
-      case 'removeListItem': {
-        const { error } = await supabase.from('list_item').delete().eq('id', action.itemId)
-        if (error) throw error
-        return
-      }
-      case 'editListItem': {
-        const { error } = await supabase
-          .from('list_item')
-          .update({
-            title: action.title,
-            person_id: action.personId,
-            group_label: action.group,
-          })
-          .eq('id', action.itemId)
-        if (error) throw error
-        return
-      }
-      case 'setListItemDue': {
-        const { error } = await supabase
-          .from('list_item')
-          .update({ due_on: action.dueOn })
-          .eq('id', action.itemId)
-        if (error) throw error
-        return
-      }
-      case 'linkListItem': {
-        const ev = next.events.find((e) => e.id === action.eventId)
-        if (!ev) return
-        // Clear any same-day link first (see addDependency) to avoid duplicates.
-        const { from, to } = dayRange(action.date)
-        const del = await supabase
-          .from('list_item_event_link')
-          .delete()
-          .eq('list_item_id', action.itemId)
-          .eq('series_id', ev.id)
-          .gte('occurrence_start', from)
-          .lt('occurrence_start', to)
-        if (del.error) throw del.error
-        const { error } = await supabase.from('list_item_event_link').upsert(
-          {
-            list_item_id: action.itemId,
-            series_id: ev.id,
-            occurrence_start: occurrenceTs(ev, action.date),
-          },
-          { onConflict: 'list_item_id,series_id,occurrence_start' },
-        )
-        if (error) throw error
-        return
-      }
-      case 'unlinkListItem': {
-        const ev = next.events.find((e) => e.id === action.eventId)
-        if (!ev) return
-        // Range-match the slot: the stored timestamp may predate a series edit.
-        const { from, to } = dayRange(action.date)
-        const { error } = await supabase
-          .from('list_item_event_link')
-          .delete()
-          .eq('list_item_id', action.itemId)
-          .eq('series_id', ev.id)
-          .gte('occurrence_start', from)
-          .lt('occurrence_start', to)
         if (error) throw error
         return
       }

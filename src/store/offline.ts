@@ -15,7 +15,7 @@ const queueKey = (accountId: string) => `planner.pendingWrites.v1.${accountId}`
 
 /** The data fields worth carrying across launches — weekStart/selectedDay are
  *  per-session navigation and re-derive from "today". */
-type Snapshot = Pick<AppState, 'lists' | 'events' | 'dependencies' | 'listLinks'>
+type Snapshot = Pick<AppState, 'events' | 'dependencies'>
 
 export function readSnapshot(accountId: string): Snapshot | null {
   try {
@@ -32,10 +32,8 @@ export function readSnapshot(accountId: string): Snapshot | null {
 
 export function writeSnapshot(accountId: string, state: AppState): void {
   const snap: Snapshot = {
-    lists: state.lists,
     events: state.events,
     dependencies: state.dependencies,
-    listLinks: state.listLinks,
   }
   try {
     localStorage.setItem(snapshotKey(accountId), JSON.stringify(snap))
@@ -90,13 +88,6 @@ export function enrichForQueue(action: Action, next: AppState): Action {
   switch (action.type) {
     case 'addEvent':
       return action.id ? action : { ...action, id: next.events[next.events.length - 1]?.id }
-    case 'addList':
-      return action.id ? action : { ...action, id: next.lists[next.lists.length - 1]?.id }
-    case 'addListItem': {
-      if (action.id) return action
-      const list = next.lists.find((l) => l.id === action.listId)
-      return { ...action, id: list?.items[list.items.length - 1]?.id }
-    }
     default:
       return action
   }

@@ -1,33 +1,7 @@
 import { mondayOf } from '../assets/utils/dates'
-import { uid } from '../assets/utils/id'
-import type { AppState, ListItem, TodoList } from '../types'
+import type { AppState } from '../types'
 import type { Action } from './actions'
 import { SupabaseStore } from './supabaseStore'
-
-/**
- * Tolerate saved state from before Lists became multi-list: the `lists` field
- * used to be a flat `ListItem[]` (one implicit list). Wrap any such legacy array
- * into a single default list so old localStorage data isn't dropped.
- */
-function normalizeLists(raw: unknown): TodoList[] {
-  if (!Array.isArray(raw) || raw.length === 0) return []
-  // Already the new shape (a list carries an `items` array)?
-  if (raw.every((l) => l && typeof l === 'object' && 'items' in l)) {
-    return raw as TodoList[]
-  }
-  // Legacy flat items → one default list.
-  const items: ListItem[] = (raw as Record<string, unknown>[]).map((it, i) => ({
-    id: typeof it.id === 'string' ? it.id : uid(),
-    title: String(it.title ?? ''),
-    done: Boolean(it.done),
-    personId: (it.personId as string | null) ?? null,
-    groupLabel: null,
-    dueOn: null,
-    sortOrder: i,
-    createdAt: typeof it.createdAt === 'number' ? it.createdAt : 0,
-  }))
-  return [{ id: uid(), title: 'To-do', sortOrder: 0, items }]
-}
 
 /**
  * Storage abstraction. Two backings exist: `LocalStorageStore` (single device,
@@ -52,10 +26,8 @@ export interface ScheduleStore {
 export function defaultState(): AppState {
   const today = new Date()
   return {
-    lists: [],
     events: [],
     dependencies: {},
-    listLinks: {},
     weekStart: mondayOf(today),
     selectedDay: (today.getDay() + 6) % 7, // 0 = Monday
   }
@@ -77,10 +49,8 @@ export class LocalStorageStore implements ScheduleStore {
       return {
         ...base,
         ...parsed,
-        lists: normalizeLists(parsed.lists),
         events: parsed.events ?? base.events,
         dependencies: parsed.dependencies ?? base.dependencies,
-        listLinks: parsed.listLinks ?? base.listLinks,
       } as AppState
     } catch {
       return defaultState()

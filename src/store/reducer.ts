@@ -1,7 +1,7 @@
 import { addDays, mondayOf, weekdayIndex } from '../assets/utils/dates'
 import { uid } from '../assets/utils/id'
 import { occKey } from '../lib/occurrences'
-import type { AppState, ListItem, TodoList } from '../types'
+import type { AppState } from '../types'
 import type { Action } from './actions'
 
 // The pure in-memory half of a state change: every Action is applied here
@@ -9,134 +9,10 @@ import type { Action } from './actions'
 // the queue that keeps the two in step). No I/O, no side effects — which is
 // also what keeps it unit-testable (reducer.test.ts).
 
-/**
- * Remove the given to-do ids from every occurrence's link list, dropping keys
- * that empty out. Used to mirror the DB's cascade when an item or list is gone.
- */
-function dropLinkedItems(
-  listLinks: AppState['listLinks'],
-  removedIds: string[],
-): AppState['listLinks'] {
-  if (removedIds.length === 0) return listLinks
-  const drop = new Set(removedIds)
-  const out: AppState['listLinks'] = {}
-  for (const [k, ids] of Object.entries(listLinks)) {
-    const kept = ids.filter((id) => !drop.has(id))
-    if (kept.length) out[k] = kept
-  }
-  return out
-}
-
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'hydrate':
       return action.state
-    case 'addList': {
-      const list: TodoList = {
-        id: action.id ?? uid(),
-        title: action.title,
-        sortOrder: state.lists.length,
-        items: [],
-      }
-      return { ...state, lists: [...state.lists, list] }
-    }
-    case 'renameList':
-      return {
-        ...state,
-        lists: state.lists.map((l) => (l.id === action.id ? { ...l, title: action.title } : l)),
-      }
-    case 'removeList': {
-      const removed = state.lists.find((l) => l.id === action.id)
-      return {
-        ...state,
-        lists: state.lists.filter((l) => l.id !== action.id),
-        // The DB cascades the list's items and their links; mirror it in memory.
-        listLinks: removed
-          ? dropLinkedItems(
-              state.listLinks,
-              removed.items.map((i) => i.id),
-            )
-          : state.listLinks,
-      }
-    }
-    case 'addListItem': {
-      const item: ListItem = {
-        id: action.id ?? uid(),
-        title: action.title,
-        done: false,
-        personId: action.personId,
-        groupLabel: action.group,
-        dueOn: action.dueOn,
-        sortOrder: 0, // set below from the target list's length
-        createdAt: Date.now(),
-      }
-      return {
-        ...state,
-        lists: state.lists.map((l) =>
-          l.id === action.listId
-            ? { ...l, items: [...l.items, { ...item, sortOrder: l.items.length }] }
-            : l,
-        ),
-      }
-    }
-    case 'toggleListItem':
-      return {
-        ...state,
-        lists: state.lists.map((l) =>
-          l.id === action.listId
-            ? {
-                ...l,
-                items: l.items.map((t) => (t.id === action.itemId ? { ...t, done: !t.done } : t)),
-              }
-            : l,
-        ),
-      }
-    case 'editListItem':
-      return {
-        ...state,
-        lists: state.lists.map((l) =>
-          l.id === action.listId
-            ? {
-                ...l,
-                items: l.items.map((t) =>
-                  t.id === action.itemId
-                    ? {
-                        ...t,
-                        title: action.title,
-                        personId: action.personId,
-                        groupLabel: action.group,
-                      }
-                    : t,
-                ),
-              }
-            : l,
-        ),
-      }
-    case 'setListItemDue':
-      return {
-        ...state,
-        lists: state.lists.map((l) =>
-          l.id === action.listId
-            ? {
-                ...l,
-                items: l.items.map((t) =>
-                  t.id === action.itemId ? { ...t, dueOn: action.dueOn } : t,
-                ),
-              }
-            : l,
-        ),
-      }
-    case 'removeListItem':
-      return {
-        ...state,
-        lists: state.lists.map((l) =>
-          l.id === action.listId
-            ? { ...l, items: l.items.filter((t) => t.id !== action.itemId) }
-            : l,
-        ),
-        // The DB cascades the item's links; drop them in memory too.
-        listLinks: dropLinkedItems(state.listLinks, [action.itemId]),
-      }
     case 'addEvent':
       return { ...state, events: [...state.events, { ...action.event, id: action.id ?? uid() }] }
     case 'updateEvent':
@@ -157,12 +33,7 @@ export function reducer(state: AppState, action: Action): AppState {
         const kept = edges.filter((e) => e.prerequisiteSeriesId !== action.id)
         if (kept.length) dependencies[k] = kept
       }
-      // Drop every to-do link surfaced on this event's occurrences (the DB
-      // cascades them via series_id); the to-dos themselves are untouched.
-      const listLinks = Object.fromEntries(
-        Object.entries(state.listLinks).filter(([k]) => !k.startsWith(prefix)),
-      )
-      return { ...state, events, dependencies, listLinks }
+      return { ...state, events, dependencies }
     }
     case 'splitSeries': {
       // Optimistic only: cap the old series and append the edited clone. The
@@ -209,20 +80,6 @@ export function reducer(state: AppState, action: Action): AppState {
       if (edges.length) dependencies[key] = edges
       else delete dependencies[key]
       return { ...state, dependencies }
-    }
-    case 'linkListItem': {
-      const key = occKey(action.eventId, action.date)
-      const ids = state.listLinks[key] ?? []
-      if (ids.includes(action.itemId)) return state
-      return { ...state, listLinks: { ...state.listLinks, [key]: [...ids, action.itemId] } }
-    }
-    case 'unlinkListItem': {
-      const key = occKey(action.eventId, action.date)
-      const ids = (state.listLinks[key] ?? []).filter((id) => id !== action.itemId)
-      const listLinks = { ...state.listLinks }
-      if (ids.length) listLinks[key] = ids
-      else delete listLinks[key]
-      return { ...state, listLinks }
     }
     case 'shiftWeek':
       return { ...state, weekStart: addDays(state.weekStart, action.delta * 7) }

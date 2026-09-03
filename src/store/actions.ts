@@ -1,4 +1,4 @@
-import type { CalendarEvent, OccurrenceStatusCode, PersonId } from '../types'
+import type { CalendarEvent, OccurrenceStatusCode } from '../types'
 
 /**
  * Every state change flows through one of these. The reducer applies it to
@@ -6,42 +6,6 @@ import type { CalendarEvent, OccurrenceStatusCode, PersonId } from '../types'
  * here so both sides agree without a circular import through `state.tsx`.
  */
 export type Action =
-  // Named lists (the `list` table). Items live nested under their list.
-  // `id` lets the caller mint the id up front (e.g. to add items to the new
-  // list in the same breath without guessing which list the reducer created).
-  | { type: 'addList'; title: string; id?: string }
-  | { type: 'renameList'; id: string; title: string }
-  | { type: 'removeList'; id: string }
-  | {
-      type: 'addListItem'
-      listId: string
-      title: string
-      personId: PersonId | null
-      group: string | null
-      dueOn: string | null
-      /** Optional caller-minted id (see `addList.id`); the reducer mints one
-       *  when absent, and the dispatcher backfills it onto the queued action
-       *  so an offline replay targets the same row. */
-      id?: string
-    }
-  | { type: 'toggleListItem'; listId: string; itemId: string }
-  | { type: 'removeListItem'; listId: string; itemId: string }
-  // Edit a to-do's content (used by the list's edit mode): its text, assignee,
-  // and in-list header in one write. The deadline has its own action below.
-  | {
-      type: 'editListItem'
-      listId: string
-      itemId: string
-      title: string
-      personId: PersonId | null
-      group: string | null
-    }
-  // Set (or clear, with dueOn: null) a to-do's optional deadline.
-  | { type: 'setListItemDue'; listId: string; itemId: string; dueOn: string | null }
-  // Surface a to-do inside a concrete occurrence (`list_item_event_link`). The
-  // occurrence is (eventId, date); the tick stays on the item's own `done`.
-  | { type: 'linkListItem'; eventId: string; date: string; itemId: string }
-  | { type: 'unlinkListItem'; eventId: string; date: string; itemId: string }
   // `templateId` is pure provenance — the source template, written to the new
   // series' `template_id` column. Omitted for an event built from scratch.
   | { type: 'addEvent'; event: Omit<CalendarEvent, 'id'>; templateId?: string; id?: string }

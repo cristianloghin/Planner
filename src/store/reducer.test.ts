@@ -1,20 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { AppState, CalendarEvent, ListItem, TodoList } from '../types'
+import type { AppState, CalendarEvent } from '../types'
 import { reducer } from './reducer'
-
-function item(over: Partial<ListItem> = {}): ListItem {
-  return {
-    id: 'i1',
-    title: 'Buy milk',
-    done: false,
-    personId: null,
-    groupLabel: null,
-    dueOn: null,
-    sortOrder: 0,
-    createdAt: 0,
-    ...over,
-  }
-}
 
 function event(over: Partial<CalendarEvent> = {}): CalendarEvent {
   return {
@@ -31,62 +17,13 @@ function event(over: Partial<CalendarEvent> = {}): CalendarEvent {
 
 function baseState(over: Partial<AppState> = {}): AppState {
   return {
-    lists: [],
     events: [],
     dependencies: {},
-    listLinks: {},
     weekStart: '2026-07-06', // a Monday
     selectedDay: 0,
     ...over,
   }
 }
-
-describe('lists', () => {
-  it('appends a new list with the next sortOrder, keeping the caller-minted id', () => {
-    const state = baseState({ lists: [{ id: 'l1', title: 'A', sortOrder: 0, items: [] }] })
-    const next = reducer(state, { type: 'addList', title: 'B', id: 'l2' })
-    expect(next.lists.map((l) => l.id)).toEqual(['l1', 'l2'])
-    expect(next.lists[1].sortOrder).toBe(1)
-  })
-
-  it('appends an item at the end of its list with the next sortOrder', () => {
-    const lists: TodoList[] = [{ id: 'l1', title: 'A', sortOrder: 0, items: [item()] }]
-    const next = reducer(baseState({ lists }), {
-      type: 'addListItem',
-      listId: 'l1',
-      title: 'Eggs',
-      personId: null,
-      group: null,
-      dueOn: null,
-      id: 'i2',
-    })
-    expect(next.lists[0].items.map((i) => i.id)).toEqual(['i1', 'i2'])
-    expect(next.lists[0].items[1].sortOrder).toBe(1)
-  })
-
-  it('removing a list also drops its items from occurrence links (mirrors the DB cascade)', () => {
-    const lists: TodoList[] = [
-      { id: 'l1', title: 'A', sortOrder: 0, items: [item({ id: 'a' }), item({ id: 'b' })] },
-    ]
-    const listLinks = { 'e1:2026-07-06': ['a', 'x'], 'e2:2026-07-07': ['b'] }
-    const next = reducer(baseState({ lists, listLinks }), { type: 'removeList', id: 'l1' })
-    expect(next.lists).toEqual([])
-    // 'a' is filtered out; 'e2's key emptied out entirely and is dropped.
-    expect(next.listLinks).toEqual({ 'e1:2026-07-06': ['x'] })
-  })
-
-  it('removing one item drops only its links', () => {
-    const lists: TodoList[] = [{ id: 'l1', title: 'A', sortOrder: 0, items: [item({ id: 'a' })] }]
-    const listLinks = { 'e1:2026-07-06': ['a', 'x'] }
-    const next = reducer(baseState({ lists, listLinks }), {
-      type: 'removeListItem',
-      listId: 'l1',
-      itemId: 'a',
-    })
-    expect(next.lists[0].items).toEqual([])
-    expect(next.listLinks).toEqual({ 'e1:2026-07-06': ['x'] })
-  })
-})
 
 describe('events', () => {
   it('removeEvent drops the event, both directions of its dependency edges, and its to-do links', () => {
@@ -116,7 +53,6 @@ describe('events', () => {
     const state = baseState({
       events: [event(), event({ id: 'e2' })],
       dependencies,
-      listLinks: { 'e1:2026-07-06': ['a'], 'e2:2026-07-07': ['b'] },
     })
     const next = reducer(state, { type: 'removeEvent', id: 'e1' })
     expect(next.events.map((e) => e.id)).toEqual(['e2'])
@@ -125,7 +61,6 @@ describe('events', () => {
         { prerequisiteSeriesId: 'e3', prerequisiteDate: '2026-07-06', requiredStatus: 'done' },
       ],
     })
-    expect(next.listLinks).toEqual({ 'e2:2026-07-07': ['b'] })
   })
 
   it('splitSeries caps the old series the day before the split and appends the clone', () => {
@@ -201,24 +136,6 @@ describe('dependencies and links', () => {
       prerequisiteDate: '2026-07-05',
     })
     expect(next.dependencies).toEqual({})
-  })
-
-  it('linkListItem is idempotent; unlinking the last item drops the key', () => {
-    const state = baseState({ listLinks: { 'e1:2026-07-06': ['a'] } })
-    const relinked = reducer(state, {
-      type: 'linkListItem',
-      eventId: 'e1',
-      date: '2026-07-06',
-      itemId: 'a',
-    })
-    expect(relinked).toBe(state)
-    const unlinked = reducer(state, {
-      type: 'unlinkListItem',
-      eventId: 'e1',
-      date: '2026-07-06',
-      itemId: 'a',
-    })
-    expect(unlinked.listLinks).toEqual({})
   })
 })
 

@@ -55,15 +55,13 @@ const REDUCER_TABLES = new Set([
   'note',
   'reminder',
   'occurrence_dependency',
-  'list',
-  'list_item',
-  'list_item_event_link',
 ])
 
 /**
  * Action types the reducer used to handle and no longer does. A queue saved by
  * an older build can still hold one; replaying it would wedge the pump, so it
- * is dropped on read. The people and preferences domains own those writes now.
+ * is dropped on read. The people, preferences and lists domains own those
+ * writes now.
  */
 const RETIRED_ACTIONS = new Set([
   'renamePerson',
@@ -72,6 +70,16 @@ const RETIRED_ACTIONS = new Set([
   'clearColorPref',
   'setTimezone',
   'setWeekLayout',
+  'addList',
+  'renameList',
+  'removeList',
+  'addListItem',
+  'toggleListItem',
+  'removeListItem',
+  'editListItem',
+  'setListItemDue',
+  'linkListItem',
+  'unlinkListItem',
 ])
 
 function readLiveQueue(accountId: string): Action[] {

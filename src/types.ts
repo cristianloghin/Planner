@@ -1,5 +1,4 @@
 import type { CalendarEvent } from './domains/events/types'
-import type { TodoList } from './domains/lists/types'
 import type { OccurrenceDependency } from './domains/occurrences/types'
 
 // Every type the app uses is declared by the domain that owns it, and
@@ -27,10 +26,9 @@ export type { Person, PersonId, PersonKind } from './domains/people/types'
 export type { Preferences, WeekLayout } from './domains/preferences/types'
 
 export interface AppState {
-  lists: TodoList[]
   events: CalendarEvent[]
-  // Not here: people and preferences (src/domains/people, src/domains/preferences),
-  // event templates (src/domains/events) and per-occurrence state
+  // Not here: people, preferences and lists (src/domains/people, /preferences,
+  // /lists), event templates (src/domains/events) and per-occurrence state
   // (src/domains/occurrences) are owned by TanStack Query, not this state tree.
   /**
    * Prerequisite edges keyed by the dependent occurrence (`${eventId}:${date}`),
@@ -38,13 +36,6 @@ export interface AppState {
    * occurrences that occurrence waits on.
    */
   dependencies: Record<string, OccurrenceDependency[]>
-  /**
-   * To-dos surfaced inside a concrete occurrence — `list_item_event_link` rows,
-   * keyed by the dependent occurrence (`${seriesId}:${date}`) like `dependencies`.
-   * Each value is the linked {@link ListItem} ids; the tick lives on the item's
-   * own `done`, so the same to-do may appear under several occurrences.
-   */
-  listLinks: Record<string, string[]>
   /** ISO date (yyyy-mm-dd) of the Monday of the week being viewed. */
   weekStart: string
   /** 0 = Monday ... 6 = Sunday — the day shown in the Day view. */

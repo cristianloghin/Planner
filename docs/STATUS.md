@@ -49,9 +49,9 @@ sync. Migrations `0001`–`0021` are applied.
 
 Mid-migration, and worth knowing before adding a slice:
 
-- Events, lists, dependencies and list links still flow through the **reducer
-  + `ScheduleStore`** (`src/state.tsx`, `src/store/`) with a hand-rolled write
-  queue and a localStorage snapshot.
+- Events and dependencies still flow through the **reducer + `ScheduleStore`**
+  (`src/state.tsx`, `src/store/`) with a hand-rolled write queue and a
+  localStorage snapshot. That is all the reducer holds now.
 - **`occurrences` is adopted** — the first slice to run through `client/` and
   `domains/` for real. Reads and writes both go through the domain, and
   `data/completions.ts` is gone. Six screens call `useCompletionsForRange` from
@@ -72,6 +72,13 @@ Mid-migration, and worth knowing before adding a slice:
   refetch; and the stamp now compares against the cached document, so a
   restart inside the five-minute stale window compares against the last cached
   zone rather than a fresh read (the next focus refetch corrects it).
+- **Lists are adopted.** The Lists screen and the sheet's linked to-dos read
+  through `useLists` / `useListLinks` and write through `useListsWrite`; the
+  reducer edit guard is gone from Lists because every write patches the cache
+  first. The ten list actions, their reducer cases, the store's two loads, ten
+  write cases and the pre-0009 legacy import, `lib/lists.ts` and the two
+  slices on `AppState` are deleted; `state.tsx` drops a queued list action
+  from an older build on read.
 - **Realtime** runs through `services/realtime` over `client/realtime.ts`.
   `state.tsx` hands the service the client's channel and gets one folded
   report per burst; `queryKeysForTable` in `domains/index.ts` turns each table
@@ -82,9 +89,9 @@ Mid-migration, and worth knowing before adding a slice:
 - The rest of **`client/` and `domains/`** is built and **not yet adopted**.
   Every call the app makes to Supabase has a client function — 15 tables, 4
   RPCs, the 6 auth methods, the realtime channel — and eight domains sit over
-  them. Everything outside occurrences, templates, people and preferences
-  still runs through `SupabaseStore`, `state.tsx`, `auth.tsx`, `lib/search.ts`
-  and `lib/push.ts`.
+  them. Everything outside occurrences, templates, people, preferences and
+  lists still runs through `SupabaseStore`, `state.tsx`, `auth.tsx`,
+  `lib/search.ts` and `lib/push.ts`.
 - **`services/` is different, and better off.** Those were real moves, not
   parallel copies: `lib/recurrence`, `lib/occurrences`, `lib/timing`,
   `lib/timelineLayout`, `lib/conflicts`, `lib/notifications`,
@@ -139,9 +146,10 @@ Still to adopt, cheapest first:
 
 - **`search`** — two functions, no writes, no cache shaping; `lib/search.ts`
   deletes when it works.
-- **The reducer slices** — events (with dependencies) and lists (with links).
-  People and preferences went first and set the pattern: readers one screen at
-  a time, then the writers, then delete the old path in one commit.
+- **The reducer slice** — events with dependencies, the last one. People,
+  preferences and lists set the pattern: readers one screen at a time, then
+  the writers, then delete the old path in one commit. Events carries the edit
+  guard and the split flow, so it is the biggest.
 
 ### The account is a value, not a closure
 

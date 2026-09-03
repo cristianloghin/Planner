@@ -41,10 +41,8 @@ function ev(id: string): CalendarEvent {
 
 function state(over: Partial<AppState> = {}): AppState {
   return {
-    lists: [],
     events: [],
     dependencies: {},
-    listLinks: {},
     weekStart: '2026-06-15',
     selectedDay: 0,
     ...over,
@@ -67,45 +65,6 @@ describe('enrichForQueue', () => {
     expect(queued).toMatchObject({ id: 'mine' })
   })
 
-  it('backfills the appended item id onto addListItem', () => {
-    const next = state({
-      lists: [
-        {
-          id: 'l1',
-          title: 'L',
-          sortOrder: 0,
-          items: [
-            {
-              id: 'i1',
-              title: 'a',
-              done: false,
-              personId: null,
-              groupLabel: null,
-              dueOn: null,
-              sortOrder: 0,
-              createdAt: 0,
-            },
-            {
-              id: 'i2',
-              title: 'b',
-              done: false,
-              personId: null,
-              groupLabel: null,
-              dueOn: null,
-              sortOrder: 1,
-              createdAt: 0,
-            },
-          ],
-        },
-      ],
-    })
-    const queued = enrichForQueue(
-      { type: 'addListItem', listId: 'l1', title: 'b', personId: null, group: null, dueOn: null },
-      next,
-    )
-    expect(queued).toMatchObject({ type: 'addListItem', id: 'i2' })
-  })
-
   it('passes every other action through untouched', () => {
     const action = { type: 'removeEvent', id: 'x' } as const
     expect(enrichForQueue(action, state())).toBe(action)
@@ -117,7 +76,15 @@ describe('isPersistedAction', () => {
     expect(isPersistedAction({ type: 'setDay', day: 2 })).toBe(false)
     expect(isPersistedAction({ type: 'shiftWeek', delta: 1 })).toBe(false)
     expect(isPersistedAction({ type: 'removeEvent', id: 'x' })).toBe(true)
-    expect(isPersistedAction({ type: 'renameList', id: 'l', title: 't' })).toBe(true)
+    expect(
+      isPersistedAction({
+        type: 'removeDependency',
+        eventId: 'e',
+        date: '2026-06-15',
+        prerequisiteSeriesId: 'p',
+        prerequisiteDate: '2026-06-14',
+      }),
+    ).toBe(true)
   })
 })
 
