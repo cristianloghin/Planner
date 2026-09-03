@@ -1048,10 +1048,6 @@ export type Database = {
           title: string
         }[]
       }
-      split_series: {
-        Args: { p_cutover: string; p_series: string; p_truncated_rrule: string }
-        Returns: string
-      }
       unschedule_reminder_sender: { Args: never; Returns: undefined }
     }
     Enums: {

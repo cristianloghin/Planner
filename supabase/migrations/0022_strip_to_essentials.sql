@@ -13,6 +13,24 @@
 
 
 -- ---------------------------------------------------------------------------
+-- §9. The series split — drop the RPC. FIRST, before any schema change.
+-- ---------------------------------------------------------------------------
+
+-- An edit now goes to the whole series or to one occurrence, and to nothing in
+-- between. `split_series` was the most intricate SQL in the schema and the only
+-- writer of `event_series.split_from_id`; the app no longer calls it.
+--
+-- It has to go before the tables and columns it names, not after: the body is
+-- plpgsql, so `drop table ... cascade` does not take it, and it reads
+-- `default_status` and copies `note` / `checklist_item` / list-link /
+-- `event_participant` / `participation_requirement` rows. A survivor would be a
+-- dead object that fails at its first call. Recreated in 0003, 0010 and 0017;
+-- all three definitions are history once this lands, and the `grant execute`
+-- from 0017 goes with the function.
+drop function split_series(uuid, timestamptz, text);
+
+
+-- ---------------------------------------------------------------------------
 -- §6c. Vestigial columns — each written by exactly one path, read by none.
 -- ---------------------------------------------------------------------------
 

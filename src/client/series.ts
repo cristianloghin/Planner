@@ -9,16 +9,10 @@
  * business.
  */
 import { type ColorKey, isColorKey } from '../assets/palette'
-import {
-  durationToInterval,
-  intervalToDuration,
-  occurrenceTs,
-  startToTs,
-  tsToStart,
-} from './mappers'
+import { durationToInterval, intervalToDuration, startToTs, tsToStart } from './mappers'
 import { fetchAll } from './pagination'
 import type { PersonId } from './people'
-import { recurrenceToRRule, rruleToRecurrence, truncatedRRule } from './rrule'
+import { recurrenceToRRule, rruleToRecurrence } from './rrule'
 import { supabase } from './supabase'
 
 /** How often a series repeats. */
@@ -237,53 +231,6 @@ export async function saveSeries(
 export async function deleteSeries(id: string): Promise<void> {
   const { error } = await supabase.from('event_series').delete().eq('id', id)
   if (error) throw error
-}
-
-/**
- * Split a repeating series in two at `fromDate`, and apply `edits` to the new
- * half. Returns the new series' id.
- *
- * For "change this one and all the ones after it". The old series stops
- * repeating the day before `fromDate`, and a copy takes over from `fromDate`
- * onwards carrying the edits. Days already passed keep what they had.
- *
- * The database does the split in one transaction: it makes the copy, moves the
- * ticks, people and notes on or after the cutover onto it, and caps the old
- * one's repeat rule. Both the cutover and the capped rule are worked out here
- * from `old`, so they line up with a real day of that series — a cutover that
- * is not one silently reschedules the event and strands its rows.
- *
- * `edits` deliberately cannot carry the notes, checklists or reminders. The
- * database already copied those onto the new series and gave them new ids, so
- * writing the ones the app is holding would write the wrong rows.
- */
-export async function splitSeries(
-  old: SeriesTiming & { recurrence: Recurrence },
-  fromDate: string,
-  edits: Omit<Series, 'id' | 'checklist' | 'notes' | 'reminders' | 'isTemplate'>,
-): Promise<string> {
-  const { data: newId, error: rpcErr } = await supabase.rpc('split_series', {
-    p_series: old.id,
-    p_cutover: occurrenceTs(old, fromDate),
-    p_truncated_rrule: truncatedRRule(old.recurrence, fromDate),
-  })
-  if (rpcErr) throw rpcErr
-
-  const up = await supabase
-    .from('event_series')
-    .update({
-      title: edits.title,
-      all_day: edits.allDay,
-      dtstart: edits.start ? startToTs(edits.start, edits.allDay) : null,
-      duration: durationToInterval(edits.duration, edits.allDay),
-      rrule: recurrenceToRRule(edits.recurrence),
-      color_key: edits.colorKey ?? null,
-    })
-    .eq('id', newId)
-  if (up.error) throw up.error
-
-  await syncAttendees({ id: newId, attendees: edits.attendees })
-  return newId
 }
 
 // ---- children ------------------------------------------------------------

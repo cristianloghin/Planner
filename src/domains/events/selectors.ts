@@ -42,11 +42,6 @@ export function forAttendeeFor(personId: PersonId) {
     events.filter((e) => e.attendees.includes(personId))
 }
 
-/** The events that repeat, which are the only ones that can be split. */
-export function repeating(events: CalendarEvent[]): CalendarEvent[] {
-  return events.filter((e) => e.recurrence != null)
-}
-
 /** One blueprint, or undefined if it has been deleted. */
 export function templateFor(id: string) {
   return (templates: EventTemplate[]): EventTemplate | undefined =>

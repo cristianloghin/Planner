@@ -51,7 +51,7 @@ export type EditorTarget =
       /**
        * The ISO date of the specific occurrence the edit was opened from. Present
        * only when entered via an occurrence (not a series-level chip); unlocks the
-       * "this occurrence / this & following / all" save-scope chooser.
+       * "this occurrence / all events" save-scope chooser.
        */
       occurrenceDate?: string
     }
@@ -281,9 +281,8 @@ function EventEditorForm({
           : {
               freq: repeat,
               interval: Math.max(1, interval),
-              // `until` is a structural cap (set when a series is split), not a
-              // form field — preserve it across edits so editing a split-off
-              // series doesn't silently un-cap it and run past the split.
+              // `until` is not a form field yet, so carry whatever the series
+              // already has across an edit rather than silently un-capping it.
               ...(base?.recurrence?.until ? { until: base.recurrence.until } : {}),
             },
       attendees,
@@ -332,26 +331,6 @@ function EventEditorForm({
         start: allDay ? date : startDT,
         duration: currentDuration(),
       },
-    })
-    onClose()
-  }
-  function saveThisAndFollowing() {
-    // Re-anchor to the occurrence's own day so the new series keeps the series'
-    // cadence — only the time/length (and other fields) carry the edit. A day
-    // move is a "this occurrence" operation, not a cadence change.
-    const start = allDay ? occurrenceDate! : `${occurrenceDate}T${startDT.slice(11)}`
-    const ev = buildEvent()
-    // The new forward series runs indefinitely — never inherit the old series'
-    // cap (buildEvent copies `until` from the base, which here is the series
-    // being split).
-    const recurrence = ev.recurrence
-      ? { freq: ev.recurrence.freq, interval: ev.recurrence.interval }
-      : undefined
-    write({
-      kind: 'split',
-      from: { ...timingOf(base!), recurrence: base!.recurrence! },
-      fromDate: occurrenceDate!,
-      edits: { ...ev, start, recurrence, id: base!.id },
     })
     onClose()
   }
@@ -533,11 +512,6 @@ function EventEditorForm({
             label: 'This event only',
             detail: occurrenceDate ? isoLabel(occurrenceDate) : undefined,
             onSelect: saveThisOccurrence,
-          },
-          {
-            label: 'This and following events',
-            detail: occurrenceDate ? `From ${isoLabel(occurrenceDate)}` : undefined,
-            onSelect: saveThisAndFollowing,
           },
           { label: 'All events', detail: 'The whole series', onSelect: saveAllEvents },
         ]}

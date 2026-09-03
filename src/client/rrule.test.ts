@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Recurrence } from '../types'
-import { recurrenceToRRule, rruleToRecurrence, truncatedRRule } from './rrule'
+import { recurrenceToRRule, rruleToRecurrence } from './rrule'
 
 describe('recurrenceToRRule', () => {
   it('returns null for a one-off', () => {
@@ -51,14 +51,5 @@ describe('rruleToRecurrence', () => {
 
   it('treats an unmodelled frequency as a one-off rather than crashing', () => {
     expect(rruleToRecurrence('FREQ=YEARLY')).toBeUndefined()
-  })
-})
-
-describe('truncatedRRule', () => {
-  it('caps the rule at the day before the split (split day belongs to the new series)', () => {
-    const r: Recurrence = { freq: 'weekly', interval: 1 }
-    const trimmed = truncatedRRule(r, '2026-06-22')
-    // The truncated rule must reload with an UNTIL of 2026-06-21.
-    expect(rruleToRecurrence(trimmed)).toEqual({ freq: 'weekly', interval: 1, until: '2026-06-21' })
   })
 })

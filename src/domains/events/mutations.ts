@@ -11,13 +11,7 @@
 import { type QueryClient, useMutation } from '@tanstack/react-query'
 import { APP_SCOPE } from '../../assets/constants'
 import { type Rollback, rollback } from '../../assets/rollback'
-import {
-  type Recurrence,
-  type SeriesTiming,
-  deleteSeries,
-  saveSeries,
-  splitSeries,
-} from '../../client/series'
+import { deleteSeries, saveSeries } from '../../client/series'
 import { patchRemoveEvent, patchRemoveTemplate, patchSaveEvent, patchSaveTemplate } from './patches'
 import { eventsKey, templatesKey } from './queries'
 import { fromEvent, fromTemplate } from './transformers'
@@ -40,15 +34,6 @@ export type EventsChange =
   | { kind: 'removeEvent'; id: string }
   | { kind: 'saveTemplate'; template: EventTemplate; isNew: boolean }
   | { kind: 'removeTemplate'; id: string }
-  | {
-      kind: 'split'
-      /** The repeating event being cut, as it stands before the edit. */
-      from: SeriesTiming & { recurrence: Recurrence }
-      /** The first day that belongs to the new half. */
-      fromDate: string
-      /** What the new half should look like. */
-      edits: CalendarEvent
-    }
 
 /** What `mutate()` takes: the change, plus the account and user it belongs to. */
 export type EventsWrite = {
@@ -80,31 +65,12 @@ export function registerEventsDefaults(queryClient: QueryClient): void {
           })
         case 'removeTemplate':
           return deleteSeries(w.id)
-        case 'split': {
-          // Everything attached is dropped on purpose: the server made its own
-          // fresh copies during the split, and writing the ones held here would
-          // land on the wrong rows.
-          const {
-            checklist: _c,
-            notes: _n,
-            reminders: _r,
-            isTemplate: _t,
-            id: _i,
-            ...edits
-          } = fromEvent(w.edits)
-          await splitSeries(w.from, w.fromDate, edits)
-          return undefined
-        }
       }
     },
 
     onMutate: async ({ accountId, change: w }: EventsWrite): Promise<Rollback> => {
       const events = eventsKey(accountId)
       const templates = templatesKey(accountId)
-      // A split makes a second event on the server that cannot be guessed at
-      // here, so it shows nothing and waits for the re-read.
-      if (w.kind === 'split') return { entries: [] }
-
       const key = isTemplateWrite(w) ? templates : events
       await queryClient.cancelQueries({ queryKey: key })
 
@@ -136,8 +102,8 @@ export function registerEventsDefaults(queryClient: QueryClient): void {
     onSettled: (_data, _err, { accountId, change: w }: EventsWrite) => {
       const events = eventsKey(accountId)
       const templates = templatesKey(accountId)
-      // A split changes both halves and moves rows between them, so both the
-      // old event and the new one have to be re-read.
+      // The optimistic patch is a guess; the server's row is the truth, so
+      // re-read it either way.
       void queryClient.invalidateQueries({
         queryKey: isTemplateWrite(w) ? templates : events,
       })

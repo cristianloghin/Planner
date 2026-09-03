@@ -30,12 +30,7 @@ import {
   occKey,
   occurrenceEffectiveStatus,
 } from '../services/recurrence/status'
-import {
-  MINS_PER_DAY,
-  eventDate,
-  eventSpanDays,
-  eventStartMinutes,
-} from '../services/recurrence/timing'
+import { MINS_PER_DAY, eventSpanDays, eventStartMinutes } from '../services/recurrence/timing'
 import type { CalendarEvent, CompletionsMap, OccurrenceStatusCode } from '../types'
 import s from './OccurrenceSheet.module.css'
 
@@ -107,9 +102,6 @@ export function OccurrenceSheet({
   }
 
   // ---- delete (scoped for a series) --------------------------------------
-  // Deleting forward from the series' anchor leaves nothing behind, so on the
-  // first slot "this and future" collapses into "all".
-  const isFirstOccurrence = eventDate(event) === date
 
   /** Drop the whole series, every occurrence with it. */
   function deleteAllEvents() {
@@ -124,34 +116,8 @@ export function OccurrenceSheet({
     })
     onClose()
   }
-  /**
-   * End the series the day before this occurrence — the inclusive `until` cap
-   * `startsOn` already honours, so everything from here on stops being produced
-   * (relocated occurrences included: pass 1 of occurrencesOnDate re-checks
-   * `startsOn` against the origin slot).
-   */
-  function deleteThisAndFuture() {
-    if (isFirstOccurrence) return deleteAllEvents()
-    writeEvent({
-      kind: 'saveEvent',
-      isNew: false,
-      event: { ...event, recurrence: { ...event.recurrence!, until: addDays(date, -1) } },
-    })
-    onClose()
-  }
-
   const deleteChoices: ScopeChoice[] = [
     { label: 'This event only', detail: isoLabel(date), onSelect: deleteThisEvent },
-    // Omitted on the first occurrence, where it would duplicate "All events".
-    ...(isFirstOccurrence
-      ? []
-      : [
-          {
-            label: 'This and future events',
-            detail: `From ${isoLabel(date)}`,
-            onSelect: deleteThisAndFuture,
-          },
-        ]),
     { label: 'All events', detail: 'The whole series', onSelect: deleteAllEvents },
   ]
 

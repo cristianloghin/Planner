@@ -1,5 +1,4 @@
 import { type Frequency, RRule } from 'rrule'
-import { addDays } from '../assets/utils/dates'
 import type { Recurrence, RecurrenceFreq } from './series'
 
 /**
@@ -9,8 +8,8 @@ import type { Recurrence, RecurrenceFreq } from './series'
  * Per DATA_MODEL.md Decision 2 the DB does NO recurrence math and `COUNT` is
  * forbidden — every stored rule is UNTIL-bounded or infinite. Phase-1 only ever
  * produces FREQ + INTERVAL (always infinite), so the conversion is total and
- * lossless. `rrule` is the single source of truth so the later split / expand
- * work (which needs real RRULE math) builds on the same parser.
+ * lossless. `rrule` is the single source of truth so the expansion work (which
+ * needs real RRULE math) builds on the same parser.
  */
 
 const FREQ_TO_RRULE: Record<RecurrenceFreq, Frequency> = {
@@ -44,17 +43,6 @@ export function recurrenceToRRule(r: Recurrence | undefined): string | null {
   })
   // RRule.toString() yields "RRULE:FREQ=WEEKLY;INTERVAL=2"; store the bare rule.
   return rule.toString().replace(/^RRULE:/, '')
-}
-
-/**
- * The bare RRULE for `r` capped so its last occurrence falls strictly *before*
- * `splitDate` (i.e. `UNTIL = splitDate − 1 day`). Used to truncate the old series
- * on a "this and following" split, so the split day belongs only to the new
- * series. `splitDate` is a local ISO date.
- */
-export function truncatedRRule(r: Recurrence, splitDate: string): string {
-  // recurrenceToRRule never returns null for a defined recurrence.
-  return recurrenceToRRule({ ...r, until: addDays(splitDate, -1) }) as string
 }
 
 /**

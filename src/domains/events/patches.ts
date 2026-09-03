@@ -4,11 +4,6 @@
  *
  * Pure, so the rules a screen shows instantly can be tested without a database
  * or a cache.
- *
- * There is deliberately nothing here for splitting a repeating event. That one
- * makes a second event on the server, with its own new id and its own fresh
- * copies of everything attached — none of which can be guessed at here. Showing
- * a guess and then replacing it is worse than waiting, so it re-reads instead.
  */
 import type { CalendarEvent, EventTemplate } from './types'
 

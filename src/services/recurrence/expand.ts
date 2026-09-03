@@ -60,7 +60,7 @@ export function startsOn(e: CalendarEvent, date: string): boolean {
   const base = eventDate(e)
   const delta = diffDays(date, base)
   if (delta < 0) return false
-  // A capped series (split lineage) produces nothing after its inclusive `until`.
+  // A capped series produces nothing after its inclusive `until`.
   if (e.recurrence?.until && diffDays(date, e.recurrence.until) > 0) return false
   if (delta === 0) return true
   const r = e.recurrence
