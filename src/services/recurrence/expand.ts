@@ -1,3 +1,4 @@
+import { DAY_NAMES, addDays, diffDays, toISODate, weekdayIndex } from '../../assets/utils/dates'
 /**
  * Turning a repeating event into the actual days it lands on.
  *
@@ -7,8 +8,6 @@
  *
  * Fed events and per-day state; fetches nothing.
  */
-import { RRule } from 'rrule'
-import { DAY_NAMES, addDays, diffDays, toISODate, weekdayIndex } from '../../assets/utils/dates'
 import type { CalendarEvent } from '../../domains/events/types'
 import type { OccurrenceState } from '../../domains/occurrences/types'
 import { occKey } from './timing'
@@ -57,94 +56,87 @@ function maxEffectiveSpan(
 }
 
 /**
- * The `rrule` rule for an event, or null for a one-off.
+ * The zero-based position of `date` on `e`'s grid, or null when `date` is not a
+ * slot at all (off-grid, or before the anchor). The anchor itself is 0.
  *
- * Built in UTC on purpose. The app's model is date-level and its `start` is a
- * local wall time with no zone, so anchoring at UTC midnight makes the library's
- * instants stand for plain days — the "floating time" idiom rrule documents —
- * and DST cannot shift an occurrence onto the wrong date.
+ * Daily and weekly are plain division — every grid step is a slot. Monthly is
+ * not: a series anchored on the 31st produces nothing in February, and that
+ * missing month must NOT consume one of a counted series' N, or "12 lessons on
+ * the 31st" would yield fewer than 12. So the monthly index counts *produced*
+ * months only, walking at most a few dozen steps. This matches RFC 5545's
+ * COUNT, which counts instances.
+ *
+ * Ignores `until` and `count` — this is the position on the grid, not whether
+ * the series still reaches it. `startsOn` puts the two together.
  */
-function ruleFor(e: CalendarEvent): RRule | null {
+export function occurrenceIndex(e: CalendarEvent, date: string): number | null {
+  const base = eventDate(e)
+  const delta = diffDays(date, base)
+  if (delta < 0) return null
+  if (delta === 0) return 0
   const r = e.recurrence
   if (!r) return null
-  const [y, m, d] = eventDate(e).split('-').map(Number)
-  const until = r.until?.split('-').map(Number)
-  return new RRule({
-    freq: FREQ[r.freq],
-    interval: Math.max(1, r.interval),
-    dtstart: new Date(Date.UTC(y, m - 1, d)),
-    // The app's `until` is an inclusive date; end-of-day keeps the cap day in.
-    ...(until ? { until: new Date(Date.UTC(until[0], until[1] - 1, until[2], 23, 59, 59)) } : {}),
-    ...(r.count != null ? { count: r.count } : {}),
-  })
+  const n = Math.max(1, r.interval)
+  switch (r.freq) {
+    case 'daily':
+      return delta % n === 0 ? delta / n : null
+    case 'weekly':
+      return delta % (7 * n) === 0 ? delta / (7 * n) : null
+    case 'monthly': {
+      const a = new Date(`${base}T00:00:00`)
+      const b = new Date(`${date}T00:00:00`)
+      // Same day-of-month only (months missing that day simply skip).
+      if (a.getDate() !== b.getDate()) return null
+      const months = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth())
+      if (months % n !== 0) return null
+      let index = 0
+      for (let j = 0; j < months / n; j++) {
+        const d = new Date(a)
+        d.setMonth(d.getMonth() + j * n)
+        // Date overflow (Feb 31 -> Mar 3) marks a month that produces nothing.
+        if (d.getDate() === a.getDate()) index++
+      }
+      return index
+    }
+  }
 }
 
-const FREQ = { daily: RRule.DAILY, weekly: RRule.WEEKLY, monthly: RRule.MONTHLY } as const
-
-/**
- * Occurrence dates are read a WINDOW at a time and cached, never one date at a
- * time. This is not premature: `rrule` has no O(1) "is this date an instance"
- * test — every query walks from `dtstart` — and `startsOn` is called for each
- * event on each rendered day. Measured over a 42-cell month grid with 40
- * events, asking the library per day costs ~316ms per render against ~0.1ms for
- * the arithmetic this replaced; asking it once per window and looking the day
- * up costs ~1.3ms. The window is what makes using the library affordable.
- */
-const BAND_DAYS = 190
-const cache = new Map<string, { from: string; to: string; dates: Set<string> }>()
-
-function signature(e: CalendarEvent): string {
-  const r = e.recurrence
-  return `${e.id}|${e.start}|${r ? `${r.freq}:${r.interval}:${r.until ?? ''}:${r.count ?? ''}` : ''}`
-}
-
-/** Every date this event's rule produces in a band around `date`. */
-function datesAround(e: CalendarEvent, date: string): Set<string> {
-  const key = signature(e)
-  const hit = cache.get(key)
-  if (hit && date >= hit.from && date <= hit.to) return hit.dates
-  const rule = ruleFor(e)
-  if (!rule) return new Set([eventDate(e)])
-  const from = addDays(date, -BAND_DAYS)
-  const to = addDays(date, BAND_DAYS)
-  const dates = new Set(
-    rule
-      .between(new Date(`${from}T00:00:00Z`), new Date(`${to}T23:59:59Z`), true)
-      .map((d) => d.toISOString().slice(0, 10)),
-  )
-  // Keyed on the rule's own shape, so an edit misses and re-expands. Bounded so
-  // a long session paging through months cannot grow it without limit.
-  if (cache.size > 400) cache.clear()
-  cache.set(key, { from, to, dates })
-  return dates
-}
-
-/**
- * Does an occurrence of `e` start exactly on ISO `date`?
- *
- * `until` and `count` are the library's job now: both are carried in the rule
- * (RFC-5545 UNTIL and COUNT), so a counted series stops after its Nth slot and
- * the monthly-overflow rule — an anchor on the 31st produces nothing in
- * February, and that missing month does not consume one of the N — comes from
- * `rrule` rather than from arithmetic maintained here and mirrored in the
- * sender.
- */
+/** Does an occurrence of `e` start exactly on ISO `date`? */
 export function startsOn(e: CalendarEvent, date: string): boolean {
-  if (!e.recurrence) return date === eventDate(e)
-  return datesAround(e, date).has(date)
+  // A capped series produces nothing after its inclusive `until`.
+  if (e.recurrence?.until && diffDays(date, e.recurrence.until) > 0) return false
+  const index = occurrenceIndex(e, date)
+  if (index == null) return false
+  // A counted series stops after its Nth slot. Slots, not survivors: a
+  // cancelled occurrence is one of the N and does not extend the series.
+  // Both set is "whichever comes first", which is only defensive — the editor
+  // writes exactly one.
+  return e.recurrence?.count == null || index < e.recurrence.count
 }
 
 /**
- * The first occurrence start date of `e` on or after ISO `date`, or null when
- * the series has already ended. Used to open a found event at its next upcoming
- * occurrence rather than its (possibly long-past) series anchor.
+ * The first occurrence start date of `e` on or after ISO `date`, or null when the
+ * series has already ended (capped before `date`, or a one-off whose only slot is
+ * in the past). Used to open a found event at its next upcoming occurrence
+ * rather than its (possibly long-past) series anchor. Scans day-by-day, which
+ * `startsOn` keeps correct
+ * across all frequencies and the `until` cap; bounded so a dead series can't loop.
  */
 export function nextStartOnOrAfter(e: CalendarEvent, date: string): string | null {
   const base = eventDate(e)
-  if (!e.recurrence) return diffDays(date, base) <= 0 ? base : null
-  const rule = ruleFor(e)
-  const next = rule?.after(new Date(`${date}T00:00:00Z`), true)
-  return next ? next.toISOString().slice(0, 10) : null
+  const from = diffDays(date, base) <= 0 ? base : date
+  // A one-off only ever sits on its anchor; recurring series walk forward.
+  if (!e.recurrence) return from === base ? base : null
+  for (let d = from, i = 0; i < 366 * 5; d = addDays(d, 1), i++) {
+    if (startsOn(e, d)) return d
+    // Past the inclusive cap there can be no further occurrence.
+    if (e.recurrence.until && diffDays(d, e.recurrence.until) > 0) return null
+    // Nor past the last counted slot — this exits in a few steps rather than
+    // scanning five years of a series that has already finished.
+    const index = occurrenceIndex(e, d)
+    if (e.recurrence.count != null && index != null && index >= e.recurrence.count) return null
+  }
+  return null
 }
 
 /** Where to land when jumping to `e` (e.g. from a search hit): its next

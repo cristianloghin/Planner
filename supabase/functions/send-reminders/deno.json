@@ -1,5 +1,0 @@
-{
-  "imports": {
-    "rrule": "npm:rrule@2.8.1"
-  }
-}

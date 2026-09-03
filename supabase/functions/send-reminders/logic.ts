@@ -1,12 +1,3 @@
-// `rrule` is CommonJS. Vite/vitest resolves a named import from it, but Deno's
-// npm interop does not — the edge runtime fails to boot with "does not provide
-// an export named 'RRule'". The default import works in both, so this is the
-// form that runs where this file actually runs.
-import rrulePkg from 'rrule'
-// Type-only, so it is erased before either runtime sees it.
-import type { RRule as RRuleInstance } from 'rrule'
-
-const { RRule } = rrulePkg
 /**
  * Pure logic for the reminder sender — no Deno APIs, no Supabase client, so
  * the unit suite (vitest, Node) covers it directly:
@@ -49,82 +40,108 @@ export interface Recurrence {
   count?: number
 }
 
-const FREQ_TO_APP: Record<number, Recurrence['freq'] | undefined> = {
-  [RRule.DAILY]: 'daily',
-  [RRule.WEEKLY]: 'weekly',
-  [RRule.MONTHLY]: 'monthly',
+const FREQ_MAP: Record<string, Recurrence['freq'] | undefined> = {
+  DAILY: 'daily',
+  WEEKLY: 'weekly',
+  MONTHLY: 'monthly',
 }
-const FREQ_TO_RRULE = { daily: RRule.DAILY, weekly: RRule.WEEKLY, monthly: RRule.MONTHLY } as const
 
 /**
- * Parse the stored bare RRULE, through the same library the client uses.
- *
- * UNTIL decodes exactly like the client's `rruleToRecurrence`: the UTC date of
- * the instant, which is the intended date because the only writer encodes the
- * UTC end of the day. COUNT comes through the same way. An unmodelled FREQ
- * returns undefined (one-off).
+ * Parse the stored bare RRULE. UNTIL decodes exactly like the client
+ * (rruleToRecurrence): the UTC date of the instant, which is the intended date
+ * because the only writer encodes the UTC end of the day. COUNT is read
+ * straight through. An unmodelled FREQ returns undefined (one-off).
  */
 export function parseRRule(rrule: string | null): Recurrence | undefined {
   if (!rrule) return undefined
-  const o = RRule.parseString(rrule.replace(/^RRULE:/, ''))
-  const freq = o.freq != null ? FREQ_TO_APP[o.freq] : undefined
+  const fields = new Map(
+    rrule
+      .replace(/^RRULE:/, '')
+      .split(';')
+      .map((part) => {
+        const [k, v] = part.split('=')
+        return [k?.toUpperCase() ?? '', v ?? ''] as const
+      }),
+  )
+  const freq = FREQ_MAP[fields.get('FREQ') ?? '']
   if (!freq) return undefined
+  const interval = Math.max(1, Number(fields.get('INTERVAL') ?? 1) || 1)
+  const countRaw = fields.get('COUNT')
+  const count = countRaw ? Number(countRaw) : undefined
+  const untilRaw = fields.get('UNTIL')
+  let until: string | undefined
+  if (untilRaw) {
+    const m = untilRaw.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?$/)
+    if (m) {
+      const instant = Date.parse(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`)
+      until = new Date(instant).toISOString().slice(0, 10)
+    }
+  }
   return {
     freq,
-    interval: Math.max(1, o.interval ?? 1),
-    ...(o.until ? { until: o.until.toISOString().slice(0, 10) } : {}),
-    ...(o.count != null ? { count: o.count } : {}),
+    interval,
+    ...(until ? { until } : {}),
+    ...(count != null && Number.isFinite(count) ? { count } : {}),
   }
 }
 
-// ---- recurrence expansion, delegated to the same library as the client -----
-
-/**
- * The rule for an anchor date, built in UTC so the library's instants stand for
- * plain days. The sender is pure UTC and occurrence identity is date-level, so
- * this is the same construction `expand.ts` uses on the client.
- */
-function ruleFor(anchor: string, recurrence: Recurrence): RRuleInstance {
-  const [y, m, d] = anchor.split('-').map(Number)
-  const until = recurrence.until?.split('-').map(Number)
-  return new RRule({
-    freq: FREQ_TO_RRULE[recurrence.freq],
-    interval: Math.max(1, recurrence.interval),
-    dtstart: new Date(Date.UTC(y, m - 1, d)),
-    // The app's `until` is an inclusive date; end-of-day keeps the cap day in.
-    ...(until ? { until: new Date(Date.UTC(until[0], until[1] - 1, until[2], 23, 59, 59)) } : {}),
-    ...(recurrence.count != null ? { count: recurrence.count } : {}),
-  })
-}
-
-// Expanded a band at a time and cached, for the same reason as the client: the
-// library has no O(1) membership test, and computeDueReminders walks a range of
-// days for every series it looks at.
-const BAND_DAYS = 190
-const cache = new Map<string, { from: string; to: string; dates: Set<string> }>()
+// ---- recurrence expansion (mirrors src/lib/recurrence.ts startsOn) ----------
 
 /** Does an occurrence anchored on `anchor` with `recurrence` start on `date`? */
+/**
+ * The zero-based position of `date` on the grid, or null when it is not a slot.
+ * The UTC twin of the client's `occurrenceIndex` (src/services/recurrence/
+ * expand.ts) — the cross-validation test pins the two together.
+ *
+ * The monthly walk counts *produced* months only: an anchor on the 31st yields
+ * nothing in February, and that missing month must not consume one of a counted
+ * series' N.
+ */
+export function occurrenceIndex(
+  anchor: string,
+  recurrence: Recurrence | undefined,
+  date: string,
+): number | null {
+  const delta = diffDays(date, anchor)
+  if (delta < 0) return null
+  if (delta === 0) return 0
+  if (!recurrence) return null
+  const n = recurrence.interval
+  switch (recurrence.freq) {
+    case 'daily':
+      return delta % n === 0 ? delta / n : null
+    case 'weekly':
+      return delta % (7 * n) === 0 ? delta / (7 * n) : null
+    case 'monthly': {
+      const a = new Date(isoToUtcMs(anchor))
+      const b = new Date(isoToUtcMs(date))
+      // Same day-of-month only (months missing that day simply skip).
+      if (a.getUTCDate() !== b.getUTCDate()) return null
+      const months =
+        (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + (b.getUTCMonth() - a.getUTCMonth())
+      if (months % n !== 0) return null
+      let index = 0
+      for (let j = 0; j < months / n; j++) {
+        const d = new Date(a)
+        d.setUTCMonth(d.getUTCMonth() + j * n)
+        // Date overflow (Feb 31 -> Mar 3) marks a month that produces nothing.
+        if (d.getUTCDate() === a.getUTCDate()) index++
+      }
+      return index
+    }
+  }
+}
+
 export function startsOn(
   anchor: string,
   recurrence: Recurrence | undefined,
   date: string,
 ): boolean {
-  if (!recurrence) return date === anchor
-  const r = recurrence
-  const key = `${anchor}|${r.freq}:${r.interval}:${r.until ?? ''}:${r.count ?? ''}`
-  const hit = cache.get(key)
-  if (hit && date >= hit.from && date <= hit.to) return hit.dates.has(date)
-
-  const from = addDays(date, -BAND_DAYS)
-  const to = addDays(date, BAND_DAYS)
-  const dates = new Set<string>(
-    ruleFor(anchor, r)
-      .between(new Date(`${from}T00:00:00Z`), new Date(`${to}T23:59:59Z`), true)
-      .map((d: Date) => d.toISOString().slice(0, 10)),
-  )
-  if (cache.size > 400) cache.clear()
-  cache.set(key, { from, to, dates })
-  return dates.has(date)
+  if (recurrence?.until && diffDays(date, recurrence.until) > 0) return false
+  const index = occurrenceIndex(anchor, recurrence, date)
+  if (index == null) return false
+  // A counted series stops after its Nth slot — slots, not survivors.
+  return recurrence?.count == null || index < recurrence.count
 }
 
 // ---- timezone bridging -------------------------------------------------------
