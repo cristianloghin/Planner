@@ -1,8 +1,8 @@
 # Planner — Data Model (Supabase / Phase 2)
 
 This is the canonical design for the synced backend. It supersedes the Phase‑1
-in‑browser shape in [`src/types.ts`](../src/types.ts). The SQL that implements it
-lives in [`supabase/migrations/`](../supabase/migrations); this document explains
+in‑browser shape in [`src/types.ts`](../../src/types.ts). The SQL that implements it
+lives in [`supabase/migrations/`](../../supabase/migrations); this document explains
 **why** it is shaped this way so a future session can build on it with confidence.
 
 Status: **design frozen, and built.** Every decision below is implemented and

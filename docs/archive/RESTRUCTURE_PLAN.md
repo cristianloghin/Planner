@@ -25,7 +25,7 @@ into orchestrators over props-only views. [`STATUS.md`](./STATUS.md) describes
 where things actually stand.
 
 The pattern itself — its primitives, rationale, decision heuristics and
-anti-patterns — is defined in [`ARCHITECTURE.md`](./ARCHITECTURE.md). This document
+anti-patterns — is defined in [`ARCHITECTURE.md`](../ARCHITECTURE.md). This document
 is the Planner-specific application of it: what goes where in *this* codebase, and
 which mechanisms implement each rule.
 
@@ -41,7 +41,7 @@ expressible at all.
 ## 1. The pattern, as it lands here
 
 Six layers with a single permitted direction of dependency (see
-[`ARCHITECTURE.md`](./ARCHITECTURE.md) for why each one exists):
+[`ARCHITECTURE.md`](../ARCHITECTURE.md) for why each one exists):
 
 ```
 client/     → nothing                                  owns the network boundary
@@ -359,7 +359,7 @@ install.
 | R1 | Only `client/` imports `@supabase/supabase-js`. |
 | R2 | Only `client/` imports `database.types.ts`. |
 | R3 | Domain components never call domain data functions. They take props. |
-| R4 | Services never import *values* from `domains/` or `client/`. Type-only imports are allowed (see [`ARCHITECTURE.md`](./ARCHITECTURE.md) §3). |
+| R4 | Services never import *values* from `domains/` or `client/`. Type-only imports are allowed (see [`ARCHITECTURE.md`](../ARCHITECTURE.md) §3). |
 | R5 | Routes are the only orchestrators. |
 | R6 | Layouts are presentational and slotted. They receive no data functions. |
 | R7 | `assets/` imports nothing from the app. |

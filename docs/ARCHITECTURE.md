@@ -5,7 +5,7 @@ A way of structuring React applications around **one direction of data flow**.
 This document defines the pattern itself: its primitives, the rules between them,
 and how to decide where a given piece of code belongs. It is project-agnostic —
 Planner is the reference implementation, and
-[`RESTRUCTURE_PLAN.md`](./RESTRUCTURE_PLAN.md) is where the pattern is applied to
+[`RESTRUCTURE_PLAN.md`](./archive/RESTRUCTURE_PLAN.md) is where the pattern is applied to
 this codebase specifically.
 
 ---

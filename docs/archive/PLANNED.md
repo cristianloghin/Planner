@@ -105,7 +105,7 @@ A looser, more flexible way to attach information to an occurrence — a note as
 small ordered document of headings, checklist rows and paragraphs, standalone or
 series-owned, with sparse per-occurrence divergence.
 
-Design of record: [`NOTE_MODEL.md`](./NOTE_MODEL.md), which is complete and
+Design of record: [`NOTE_MODEL.md`](../NOTE_MODEL.md), which is complete and
 includes its own staged build order. None of its tables (`note_row`,
 `row_state`, `note_row_override`, `note_occurrence_link`) exist.
 
