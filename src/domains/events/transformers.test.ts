@@ -2,15 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { toISODate } from '../../assets/utils/dates'
 import type { Series } from '../../client/series'
 import { patchRemoveEvent, patchRemoveTemplate, patchSaveEvent, patchSaveTemplate } from './patches'
-import {
-  fromAttachments,
-  fromEvent,
-  fromTemplate,
-  toAttachments,
-  toEvent,
-  toTemplate,
-} from './transformers'
-import type { Attachment, CalendarEvent } from './types'
+import { cloneReminders, fromEvent, fromTemplate, toEvent, toTemplate } from './transformers'
+import type { CalendarEvent } from './types'
 
 const series = (over: Partial<Series> = {}): Series => ({
   id: 'S1',
@@ -21,113 +14,9 @@ const series = (over: Partial<Series> = {}): Series => ({
   recurrence: { freq: 'weekly', interval: 1 },
   attendees: ['p1'],
   colorKey: '3',
-  checklist: [],
   reminders: [],
   isTemplate: false,
   ...over,
-})
-
-describe('toAttachments', () => {
-  it('gathers lines under their heading, in stored order', () => {
-    const out = toAttachments('S1', {
-      checklist: [
-        { id: 'c2', label: 'Towel', groupLabel: 'Bag', sortOrder: 1 },
-        { id: 'c1', label: 'Goggles', groupLabel: 'Bag', sortOrder: 0 },
-      ],
-      reminders: [],
-    })
-    expect(out).toEqual([
-      {
-        id: 'S1:checklist:Bag',
-        kind: 'checklist',
-        title: 'Bag',
-        items: [
-          { id: 'c1', title: 'Goggles' },
-          { id: 'c2', title: 'Towel' },
-        ],
-      },
-    ])
-  })
-
-  it('keeps two checklists apart and in the order their lines were numbered', () => {
-    const out = toAttachments('S1', {
-      checklist: [
-        { id: 'b1', label: 'Snack', groupLabel: 'After', sortOrder: 1000 },
-        { id: 'a1', label: 'Goggles', groupLabel: 'Bag', sortOrder: 0 },
-      ],
-      reminders: [],
-    })
-    expect(out.map((a) => a.kind === 'checklist' && a.title)).toEqual(['Bag', 'After'])
-  })
-
-  it('treats a checklist with no heading as untitled rather than named empty', () => {
-    const [only] = toAttachments('S1', {
-      checklist: [{ id: 'c1', label: 'Thing', groupLabel: null, sortOrder: 0 }],
-      reminders: [],
-    })
-    expect(only).toMatchObject({ kind: 'checklist', title: undefined, id: 'S1:checklist:' })
-  })
-
-  it('puts checklists first, then reminders', () => {
-    const out = toAttachments('S1', {
-      checklist: [{ id: 'c1', label: 'Goggles', groupLabel: 'Bag', sortOrder: 0 }],
-      reminders: [{ id: 'r1', offset: 30 }],
-    })
-    expect(out.map((a) => a.kind)).toEqual(['checklist', 'reminder'])
-  })
-
-  it('gives a checklist the same id every time, since it has no row of its own', () => {
-    const lines = { checklist: [{ id: 'c1', label: 'x', groupLabel: 'Bag', sortOrder: 0 }] }
-    const a = toAttachments('S1', { ...lines, reminders: [] })
-    const b = toAttachments('S1', { ...lines, reminders: [] })
-    expect(a[0].id).toBe(b[0].id)
-  })
-})
-
-describe('attachments round trip', () => {
-  const attachments: Attachment[] = [
-    {
-      id: 'S1:checklist:Bag',
-      kind: 'checklist',
-      title: 'Bag',
-      items: [
-        { id: 'c1', title: 'Goggles' },
-        { id: 'c2', title: 'Towel' },
-      ],
-    },
-    {
-      id: 'S1:checklist:After',
-      kind: 'checklist',
-      title: 'After',
-      items: [{ id: 'c3', title: 'Snack' }],
-    },
-    { id: 'r1', kind: 'reminder', offset: 30 },
-  ]
-
-  it('survives being taken apart and put back together', () => {
-    expect(toAttachments('S1', fromAttachments(attachments))).toEqual(attachments)
-  })
-
-  it('numbers each checklist from its own block so the two stay apart', () => {
-    expect(fromAttachments(attachments).checklist.map((l) => l.sortOrder)).toEqual([0, 1, 1000])
-  })
-
-  it('does not keep the order reminders and checklists were written in', () => {
-    // The database has nowhere to record it. Contents survive; interleaving does not.
-    const interleaved: Attachment[] = [
-      { id: 'r1', kind: 'reminder', offset: 30 },
-      {
-        id: 'S1:checklist:Bag',
-        kind: 'checklist',
-        title: 'Bag',
-        items: [{ id: 'c1', title: 'x' }],
-      },
-    ]
-    expect(toAttachments('S1', fromAttachments(interleaved)).map((a) => a.kind)).toEqual([
-      'checklist',
-      'reminder',
-    ])
-  })
 })
 
 describe('toEvent', () => {
@@ -140,6 +29,11 @@ describe('toEvent', () => {
       colorKey: '3',
       recurrence: { freq: 'weekly', interval: 1 },
     })
+  })
+
+  it('carries reminders straight through, with no conversion', () => {
+    const reminders = [{ id: 'r1', offset: 30 }]
+    expect(toEvent(series({ reminders })).reminders).toEqual(reminders)
   })
 
   it('starts a series with no date today, so it can be drawn at all', () => {
@@ -156,14 +50,14 @@ describe('toTemplate', () => {
       allDay: false,
       duration: 60,
       attendees: ['p1'],
-      attachments: [],
+      reminders: [],
     })
   })
 })
 
 describe('back to a series', () => {
   it('an event round-trips', () => {
-    const original = series({ checklist: [], reminders: [{ id: 'r1', offset: 30 }] })
+    const original = series({ reminders: [{ id: 'r1', offset: 30 }] })
     expect(fromEvent(toEvent(original))).toEqual(original)
   })
 
@@ -172,6 +66,21 @@ describe('back to a series', () => {
     expect(stored.isTemplate).toBe(true)
     expect(stored.start).toBeNull()
     expect(stored.recurrence).toBeUndefined()
+  })
+})
+
+describe('cloneReminders', () => {
+  it('keeps the offsets but gives every reminder a fresh id', () => {
+    const source = [
+      { id: 'r1', offset: 30 },
+      { id: 'r2', offset: 60 },
+    ]
+    const copy = cloneReminders(source)
+    expect(copy.map((r) => r.offset)).toEqual([30, 60])
+    expect(copy.map((r) => r.id)).not.toEqual(['r1', 'r2'])
+    expect(new Set(copy.map((r) => r.id)).size).toBe(2)
+    // The source is untouched — the copy owns brand-new rows.
+    expect(source.map((r) => r.id)).toEqual(['r1', 'r2'])
   })
 })
 
@@ -192,20 +101,12 @@ describe('patches', () => {
 
   it('removes one, and leaves the list alone for an unknown id', () => {
     expect(patchRemoveEvent([a, b], 'A').map((e) => e.id)).toEqual(['B'])
-    expect(patchRemoveEvent([a, b], 'gone')).toEqual([a, b])
+    expect(patchRemoveEvent([a, b], 'nope').map((e) => e.id)).toEqual(['A', 'B'])
   })
 
   it('does the same for blueprints', () => {
-    const t = toTemplate(series({ id: 'T' }))
-    expect(patchSaveTemplate([], t)).toEqual([t])
-    expect(patchSaveTemplate([t], { ...t, title: 'Renamed' })[0].title).toBe('Renamed')
+    const t = toTemplate(series({ id: 'T', isTemplate: true }))
+    expect(patchSaveTemplate([], t).map((x) => x.id)).toEqual(['T'])
     expect(patchRemoveTemplate([t], 'T')).toEqual([])
-  })
-
-  it('does not modify the list it was given', () => {
-    const list = [a, b]
-    patchSaveEvent(list, { ...a, title: 'x' })
-    patchRemoveEvent(list, 'A')
-    expect(list.map((e) => `${e.id}:${e.title}`)).toEqual(['A:Swimming', 'B:Swimming'])
   })
 })

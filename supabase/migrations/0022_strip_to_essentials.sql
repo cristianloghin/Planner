@@ -114,6 +114,23 @@ alter table event_series add column metadata jsonb not null default '{}'::jsonb;
 alter table event_occurrence add column metadata jsonb not null default '{}'::jsonb;
 
 -- ---------------------------------------------------------------------------
+-- §7. Checklists — remove entirely.
+-- ---------------------------------------------------------------------------
+
+-- The attachment kind, the editor, the per-day ticks and the tables. With
+-- occurrence status already gone (§3b) this removes the last notion of
+-- completion from the app: an occurrence can no longer be marked done by any
+-- means. RLS, indexes, 0011's replica identity and the 0006 / 0016 publication
+-- membership go with the tables.
+drop table occurrence_item_state, occurrence_item_removed, checklist_item cascade;
+
+-- Its only referencing column (occurrence_item_state.status) went with the
+-- table above. This is the last enum-as-table lookup in the schema — after it
+-- there are none, and the only enumeration left anywhere is person.kind's check
+-- constraint, which §10 takes.
+drop table item_status;
+
+-- ---------------------------------------------------------------------------
 -- §6c. Vestigial columns — each written by exactly one path, read by none.
 -- ---------------------------------------------------------------------------
 
@@ -208,16 +225,17 @@ $$;
 
 
 -- ---------------------------------------------------------------------------
--- §2/§4. search_events, without notes.
+-- §2/§7/§4. search_events, collapsed to a title search.
 -- ---------------------------------------------------------------------------
 
--- The `note` left join, the `notes_text` aggregate and the `snippet` column are
--- gone; results are title + date. The `checklist_item` join stays for now — it
--- still contributes searchable text, and §7 is what collapses this to a plain
--- title search.
+-- With notes (§2) and checklists (§7) gone there is nothing left to aggregate,
+-- so 0017's `docs` CTE collapses to a plain scan of `event_series`: both left
+-- joins, the `string_agg`s, the `group by`, the `notes_text` aggregate and the
+-- `snippet` column are all gone. Results are title + date.
 --
 -- Everything else is 0017's body unchanged: the same websearch_to_tsquery with
--- an escaped-ilike fallback, the same ordering, the same limit.
+-- an escaped-ilike fallback applied to the title alone, the same ordering, the
+-- same limit.
 create function search_events(p_account uuid, p_query text)
 returns table (
   series_id uuid,
@@ -241,17 +259,10 @@ set search_path = public as $$
       s.dtstart,
       s.all_day,
       s.rrule,
-      -- One combined text per series: title + every series-level checklist
-      -- label. string_agg(distinct …) collapses the row-multiplication from
-      -- the left join.
-      coalesce(s.title, '') || ' ' ||
-        coalesce(string_agg(distinct ci.label, ' '), '') as raw
+      coalesce(s.title, '') as raw
     from event_series s
-    left join checklist_item ci on ci.owner_series_id = s.id
-                              and ci.occurrence_start is null
     where s.account_id = p_account
       and s.is_template = false
-    group by s.id
   )
   select
     d.id,

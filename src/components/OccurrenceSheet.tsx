@@ -7,24 +7,26 @@ import { type ScopeChoice, ScopeSheet } from '../assets/ui/ScopeSheet'
 import { PageLoader } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
 import { isoLabel, minutesToTime } from '../assets/utils/dates'
-import { checklists, reminderOffsets } from '../domains/events/attachments'
 import { type EventsChange, useEventsWrite } from '../domains/events/mutations'
-import { timingOf } from '../domains/events/selectors'
+import { reminderOffsets, timingOf } from '../domains/events/selectors'
 import { useOccurrencesWrite } from '../domains/occurrences/mutations'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { usePeople } from '../domains/people/queries'
 import { attendeeLabelFor } from '../domains/people/selectors'
 import { offsetLabel } from '../services/notifications/alerts'
 import { effectiveOccurrence, recurrenceLabel } from '../services/recurrence/expand'
-import { isOccurrenceDone, occKey } from '../services/recurrence/status'
-import { MINS_PER_DAY, eventSpanDays, eventStartMinutes } from '../services/recurrence/timing'
+import {
+  MINS_PER_DAY,
+  eventSpanDays,
+  eventStartMinutes,
+  occKey,
+} from '../services/recurrence/timing'
 import type { CalendarEvent } from '../types'
 import s from './OccurrenceSheet.module.css'
 
 /**
- * A single occurrence of an event on a date: the place to work its checklist,
- * and to move, cancel or delete the day. Editing the *series* hands off to the
- * EventEditor.
+ * A single occurrence of an event on a date: the place to move, cancel or
+ * delete the day. Editing the *series* hands off to the EventEditor.
  */
 export function OccurrenceSheet({
   event,
@@ -56,11 +58,7 @@ export function OccurrenceSheet({
   const [deleteScope, setDeleteScope] = useState(false)
   const isRecurring = !!event.recurrence
 
-  const cls = checklists(event).filter((c) => c.items.length > 0)
-  const hasChecklist = cls.length > 0
-  const done = isOccurrenceDone(completions, event, date)
   const occState = completions[occKey(event.id, date)]
-  const checked = occState?.checked ?? {}
   // A one-off override on this slot. `date` is the occurrence's identity (the day
   // the series would normally place it); if the override's start lands on another
   // day, it's been moved there.
@@ -152,7 +150,7 @@ export function OccurrenceSheet({
       </header>
 
       <div className={shared.editorBody}>
-        <h1 className={cx(shared.editorTitle, done && s.doneTitle)}>{event.title}</h1>
+        <h1 className={shared.editorTitle}>{event.title}</h1>
 
         <p className={s.meta}>
           {timeLabel} · {attendeeLabelFor(event.attendees)(people)}
@@ -179,38 +177,6 @@ export function OccurrenceSheet({
             </button>
           </p>
         )}
-
-        {hasChecklist &&
-          cls.map((c) => (
-            <div key={c.id} className={s.checklist}>
-              {c.title && <h4 className={s.checklistTitle}>{c.title}</h4>}
-              <ul className={s.checklistItems}>
-                {c.items.map((it) => (
-                  <li key={it.id}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={!!checked[it.id]}
-                        onChange={() =>
-                          occurrences.mutate({
-                            accountId: accountId,
-                            change: {
-                              kind: 'tick',
-                              series: timingOf(event),
-                              date,
-                              entryId: it.id,
-                              checked: !checked[it.id],
-                            },
-                          })
-                        }
-                      />
-                      <span className={cx(checked[it.id] && s.doneTitle)}>{it.title}</span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
 
         {reminderOffsets(event).length > 0 && (
           <div className={s.reminders}>

@@ -1,11 +1,10 @@
 /**
- * Per-occurrence state: statuses, checklist ticks, timing overrides and
- * cancellations.
+ * Per-occurrence state: timing overrides and cancellations.
  *
- * Two tables (`event_occurrence` + `occurrence_item_state`) come back as one
- * map keyed by occurrence, because that is the shape the app reads and patches.
- * Rows are sparse by design — one exists only where an occurrence diverges from
- * its series — so an absent key means "nothing set", not "not loaded".
+ * Rows of `event_occurrence` come back as one map keyed by occurrence, because
+ * that is the shape the app reads and patches. Rows are sparse by design — one
+ * exists only where an occurrence diverges from its series — so an absent key
+ * means "nothing set", not "not loaded".
  */
 import type { TablesUpdate } from './database.types'
 import {
@@ -37,14 +36,6 @@ export interface OccurrenceRow {
   start: string | null
   /** Its own length, in the series' own units. Null when unchanged. */
   duration: number | null
-}
-
-/** One checklist line ticked on one day. */
-export interface ItemStateRow {
-  seriesId: string
-  date: string
-  itemId: string
-  done: boolean
 }
 
 /**
@@ -92,34 +83,6 @@ export async function fetchOccurrenceRows(
   })
 }
 
-/** Checklist lines ticked on days between `fromDate` and `toDate`. */
-export async function fetchItemStateRows(
-  accountId: string,
-  fromDate: string,
-  toDate: string,
-): Promise<ItemStateRow[]> {
-  const fromTs = dayRange(fromDate).from
-  const toTs = dayRange(toDate).from
-  const rows = await fetchAll((from, to) =>
-    supabase
-      .from('occurrence_item_state')
-      .select('series_id, occurrence_start, item_id, status, event_series!inner()')
-      .eq('event_series.account_id', accountId)
-      .gte('occurrence_start', fromTs)
-      .lt('occurrence_start', toTs)
-      .order('series_id')
-      .order('occurrence_start')
-      .order('item_id')
-      .range(from, to),
-  )
-  return rows.map((it) => ({
-    seriesId: it.series_id,
-    date: tsToDateKey(it.occurrence_start),
-    itemId: it.item_id,
-    done: it.status === 'done',
-  }))
-}
-
 // ---- writes --------------------------------------------------------------
 
 /**
@@ -131,7 +94,7 @@ export async function fetchItemStateRows(
  * this is a lookup and not a plain upsert: a row written before the series' time
  * was edited still sits at the old time of day, so an upsert keyed on today's
  * computed timestamp would insert a second row for the same day and strand the
- * ticks, status and reschedule already on the first one.
+ * reschedule already on the first one.
  *
  * Only fields passed in are touched, so recording one thing never wipes another.
  */
@@ -206,40 +169,4 @@ export async function clearOccurrenceOverride(series: SeriesTiming, date: string
  */
 export async function cancelOccurrence(series: SeriesTiming, date: string): Promise<void> {
   return writeOccurrenceRow(series, date, { cancelled: true })
-}
-
-/**
- * Tick or untick one checklist line on one day.
- *
- * A tick is recorded by the presence of a row and unticking removes it, so this
- * clears the day's row first either way. Clearing by day, not by exact
- * timestamp, is what lets a tick made before the series' time was edited still
- * be found — and stops a second row being written for the same day.
- */
-export async function setChecklistEntry(
-  series: SeriesTiming,
-  date: string,
-  entryId: string,
-  checked: boolean,
-): Promise<void> {
-  const { from, to } = dayRange(date)
-  const del = await supabase
-    .from('occurrence_item_state')
-    .delete()
-    .eq('series_id', series.id)
-    .eq('item_id', entryId)
-    .gte('occurrence_start', from)
-    .lt('occurrence_start', to)
-  if (del.error) throw del.error
-  if (!checked) return
-  const { error } = await supabase.from('occurrence_item_state').upsert(
-    {
-      series_id: series.id,
-      occurrence_start: occurrenceTs(series, date),
-      item_id: entryId,
-      status: 'done',
-    },
-    { onConflict: 'series_id,occurrence_start,item_id' },
-  )
-  if (error) throw error
 }

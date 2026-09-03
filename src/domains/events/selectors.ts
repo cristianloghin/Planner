@@ -12,6 +12,18 @@ import type { SeriesTiming } from '../../client/series'
 import type { PersonId } from '../people/types'
 import type { CalendarEvent, EventTemplate } from './types'
 
+// Anything carrying reminders (a CalendarEvent or an EventTemplate).
+type WithReminders = { reminders: { offset: number }[] }
+
+/** Reminder offsets (minutes before start), ascending. */
+export function reminderOffsets(e: WithReminders): number[] {
+  return e.reminders.map((r) => r.offset).sort((a, b) => a - b)
+}
+
+export function hasReminders(e: WithReminders): boolean {
+  return e.reminders.length > 0
+}
+
 /**
  * The little of an event a write about one of its days needs: which series, and
  * where its days sit in time.

@@ -38,7 +38,7 @@ describe('sender startsOn ≡ client startsOn', () => {
       allDay: true,
       duration: 1,
       attendees: [],
-      attachments: [],
+      reminders: [],
       recurrence,
     }
   }

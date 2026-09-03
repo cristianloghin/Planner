@@ -9,10 +9,10 @@ import { ScopeSheet } from '../assets/ui/ScopeSheet'
 import { PageLoader } from '../assets/ui/Spinner'
 import { addDays, diffDays, isoLabel, minutesToTime, toDateTimeLocal } from '../assets/utils/dates'
 import { uid } from '../assets/utils/id'
-import { cloneAttachments } from '../domains/events/attachments'
 import { type EventsChange, useEventsWrite } from '../domains/events/mutations'
 import { useTemplates } from '../domains/events/queries'
 import { timingOf } from '../domains/events/selectors'
+import { cloneReminders } from '../domains/events/transformers'
 import { useOccurrencesWrite } from '../domains/occurrences/mutations'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { usePeople } from '../domains/people/queries'
@@ -22,16 +22,16 @@ import { personColors } from '../domains/preferences/selectors'
 import { effectiveOccurrence } from '../services/recurrence/expand'
 import { eventDate, eventStartMinutes } from '../services/recurrence/timing'
 import type {
-  Attachment,
   CalendarEvent,
   CompletionsMap,
+  EventReminder,
   EventTemplate,
   PersonId,
   RecurrenceFreq,
 } from '../types'
-import { AttachmentsEditor } from './AttachmentsEditor'
 import { AttendeeChips } from './AttendeeChips'
 import s from './EventEditor.module.css'
+import { RemindersEditor } from './RemindersEditor'
 
 const SNAP = 15
 
@@ -89,7 +89,7 @@ function isCompleteDT(v: string): boolean {
   return v.length >= 16 && ISO_DATE_RE.test(v.slice(0, 10)) && !Number.isNaN(new Date(v).getTime())
 }
 
-/** Shared full-page editor for the event *template* (timing, attendees, attachments, deps). */
+/** Shared full-page editor for the event *series* (timing, attendees, reminders). */
 export function EventEditor({
   target,
   onClose,
@@ -196,7 +196,7 @@ function EventEditorForm({
   const [colorKey, setColorKey] = useState<ColorKey | undefined>(base?.colorKey)
   const [repeat, setRepeat] = useState<RepeatChoice>(base?.recurrence?.freq ?? 'none')
   const [interval, setInterval] = useState(base?.recurrence?.interval ?? 1)
-  const [attachments, setAttachments] = useState<Attachment[]>(base?.attachments ?? [])
+  const [reminders, setReminders] = useState<EventReminder[]>(base?.reminders ?? [])
   // Which template a *new* event was started from — it chooses whose people and
   // reminders get copied into the draft. Nothing is stored about it; stays null
   // for from-scratch events and edits.
@@ -212,21 +212,17 @@ function EventEditorForm({
   useEffect(() => titleRef.current?.focus(), [])
 
   // Drop empty checklists so saving doesn't keep stubs around.
-  function cleanedAttachments(): Attachment[] {
-    return attachments.filter((a) => (a.kind === 'checklist' ? a.items.length > 0 : true))
-  }
-
   // The duration the form currently describes (whole days all-day, else minutes).
   function currentDuration(): number {
     return allDay ? Math.max(1, days) : Math.max(SNAP, minutesBetween(startDT, endDT))
   }
 
-  /** Pre-fill the form from a template (deep-copying its attachments). */
+  /** Pre-fill the form from a template (copying its reminders with fresh ids). */
   function applyTemplate(t: EventTemplate) {
     setTemplateId(t.id)
     setTitle(t.title)
     setAttendees(t.attendees)
-    setAttachments(cloneAttachments(t.attachments))
+    setReminders(cloneReminders(t.reminders))
     setAllDay(t.allDay)
     if (t.allDay) {
       setDays(Math.max(1, t.duration))
@@ -239,7 +235,7 @@ function EventEditorForm({
   }
 
   /** Save the current form as a reusable template (a separate row; the event,
-   *  if any, is untouched). Attachments are copied with fresh ids. */
+   *  if any, is untouched). Reminders are copied with fresh ids. */
   function saveAsTemplate() {
     if (!title.trim()) return
     events.mutate({
@@ -256,7 +252,7 @@ function EventEditorForm({
           allDay,
           duration: currentDuration(),
           attendees,
-          attachments: cloneAttachments(cleanedAttachments()),
+          reminders: cloneReminders(reminders),
         },
       },
     })
@@ -284,7 +280,7 @@ function EventEditorForm({
             },
       attendees,
       ...(colorKey ? { colorKey } : {}),
-      attachments: cleanedAttachments(),
+      reminders,
     }
   }
 
@@ -482,7 +478,7 @@ function EventEditorForm({
           onChange={setColorKey}
         />
 
-        <AttachmentsEditor attachments={attachments} onChange={setAttachments} />
+        <RemindersEditor reminders={reminders} onChange={setReminders} />
 
         <div className={s.templateBar}>
           <button

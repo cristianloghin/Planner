@@ -2,81 +2,20 @@ import { toISODate } from '../../assets/utils/dates'
 /**
  * Turning a stored series into an event or a blueprint, and back.
  *
- * Used only inside this domain. The interesting part is the checklists: the
- * database has no notion of a checklist as a thing, only lines each carrying a
- * heading and a position. Putting them back together — and taking them apart
- * again to save — happens here, where it can be tested without a database.
+ * Used only inside this domain. Reminders carry straight through — the stored
+ * shape and the app's are the same `{ id, offset }` — so this is now just the
+ * event/blueprint split and the missing-date rule.
  */
+import { uid } from '../../assets/utils/id'
 import type { Series } from '../../client/series'
-import type { Attachment, CalendarEvent, EventTemplate } from './types'
-
-/** Lines of one checklist are `${GROUP_STRIDE}` apart, so their order survives. */
-const GROUP_STRIDE = 1000
+import type { CalendarEvent, EventReminder, EventTemplate } from './types'
 
 /**
- * Everything attached to a series, in display order.
- *
- * Checklists come back first, then reminders. The database does not record the
- * order the two kinds were written in, so that grouping is the order — the
- * contents survive a round trip, but interleaving a reminder between two
- * checklists does not.
- *
- * Lines are sorted before grouping, because their position is what says which
- * checklist they belong to. Walking them in order reproduces the same
- * checklists every time, whatever order the rows arrived in.
+ * Reminders copied with **fresh ids**, for the template ↔ event copy paths: the
+ * copy owns brand-new `reminder` rows rather than aliasing the source's.
  */
-export function toAttachments(
-  seriesId: string,
-  { checklist, reminders }: Pick<Series, 'checklist' | 'reminders'>,
-): Attachment[] {
-  const out: Attachment[] = []
-
-  const groups = new Map<string, { id: string; title: string }[]>()
-  for (const line of [...checklist].sort((a, b) => a.sortOrder - b.sortOrder)) {
-    const heading = line.groupLabel ?? ''
-    const lines = groups.get(heading)
-    if (lines) lines.push({ id: line.id, title: line.label })
-    else groups.set(heading, [{ id: line.id, title: line.label }])
-  }
-  for (const [heading, items] of groups) {
-    out.push({
-      // Built from the series and the heading, so a checklist keeps the same
-      // identity across reloads — it has no row of its own to get an id from.
-      id: `${seriesId}:checklist:${heading}`,
-      kind: 'checklist',
-      title: heading || undefined,
-      items,
-    })
-  }
-
-  for (const r of reminders) out.push({ id: r.id, kind: 'reminder', offset: r.offset })
-  return out
-}
-
-/**
- * Attachments taken apart into the rows that store them.
- *
- * Each checklist's lines are numbered from its own block, which is what lets
- * {@link toAttachments} tell them apart again. Two checklists sharing a heading
- * would merge on the way back, so headings are effectively their identity.
- */
-export function fromAttachments(
-  attachments: Attachment[],
-): Pick<Series, 'checklist' | 'reminders'> {
-  const checklists = attachments.filter((a) => a.kind === 'checklist')
-  return {
-    checklist: checklists.flatMap((c, ci) =>
-      c.items.map((item, idx) => ({
-        id: item.id,
-        label: item.title,
-        groupLabel: c.title ?? null,
-        sortOrder: ci * GROUP_STRIDE + idx,
-      })),
-    ),
-    reminders: attachments
-      .filter((a) => a.kind === 'reminder')
-      .map((r) => ({ id: r.id, offset: r.offset })),
-  }
+export function cloneReminders(reminders: EventReminder[]): EventReminder[] {
+  return reminders.map((r) => ({ ...r, id: uid() }))
 }
 
 /**
@@ -97,7 +36,7 @@ export function toEvent(series: Series): CalendarEvent {
     recurrence: series.recurrence,
     attendees: series.attendees,
     colorKey: series.colorKey,
-    attachments: toAttachments(series.id, series),
+    reminders: series.reminders,
   }
 }
 
@@ -109,7 +48,7 @@ export function toTemplate(series: Series): EventTemplate {
     allDay: series.allDay,
     duration: series.duration,
     attendees: series.attendees,
-    attachments: toAttachments(series.id, series),
+    reminders: series.reminders,
   }
 }
 
@@ -124,7 +63,7 @@ export function fromEvent(event: CalendarEvent): Series {
     recurrence: event.recurrence,
     attendees: event.attendees,
     colorKey: event.colorKey,
-    ...fromAttachments(event.attachments),
+    reminders: event.reminders,
     isTemplate: false,
   }
 }
@@ -143,7 +82,7 @@ export function fromTemplate(template: EventTemplate): Series {
     recurrence: undefined,
     attendees: template.attendees,
     colorKey: undefined,
-    ...fromAttachments(template.attachments),
+    reminders: template.reminders,
     isTemplate: true,
   }
 }

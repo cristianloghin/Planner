@@ -10,7 +10,7 @@ import { addDays, diffDays, toISODate } from '../../assets/utils/dates'
  */
 import type { CalendarEvent, Recurrence } from '../../domains/events/types'
 import type { OccurrenceState } from '../../domains/occurrences/types'
-import { occKey } from './status'
+import { occKey } from './timing'
 import { eventDate, eventSpanDays, timedSegment } from './timing'
 
 /**

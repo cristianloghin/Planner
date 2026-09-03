@@ -5,9 +5,8 @@
  * selector — it merges several months into one object, so there is nothing to
  * hand a selector to. Call these directly on what it returns instead.
  *
- * What a day's state MEANS — whether it counts as done — is not here. That is
- * worked out from the event's checklist, which is a job of its own; feed it
- * these.
+ * A day's state is only ever what was recorded against it: whether it moved,
+ * and whether it was taken out.
  */
 import { occurrenceKey } from './transformers'
 import type { CompletionsMap, OccurrenceState } from './types'

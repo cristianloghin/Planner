@@ -11,7 +11,6 @@ import { type Rollback, rollback } from '../../assets/rollback'
 import {
   cancelOccurrence,
   clearOccurrenceOverride,
-  setChecklistEntry,
   setOccurrenceOverride,
 } from '../../client/occurrences'
 import type { SeriesTiming } from '../../client/series'
@@ -28,7 +27,6 @@ import type { CompletionsMap } from './types'
  * has to survive a restart should be as small as it can be.
  */
 export type OccurrencesChange =
-  | { kind: 'tick'; series: SeriesTiming; date: string; entryId: string; checked: boolean }
   | { kind: 'override'; series: SeriesTiming; date: string; start: string; duration: number }
   | { kind: 'clearOverride'; series: SeriesTiming; date: string }
   | { kind: 'cancel'; series: SeriesTiming; date: string }
@@ -41,8 +39,6 @@ const OCCURRENCES_WRITE_KEY = ['occurrences-write'] as const
 /** The change a day write makes, without the values naming which day. */
 function changeOf(w: OccurrencesChange): OccurrenceChange {
   switch (w.kind) {
-    case 'tick':
-      return { kind: 'tick', entryId: w.entryId, checked: w.checked }
     case 'override':
       return { kind: 'override', start: w.start, duration: w.duration }
     case 'clearOverride':
@@ -57,8 +53,6 @@ export function registerOccurrencesDefaults(queryClient: QueryClient): void {
     scope: { id: APP_SCOPE },
     mutationFn: ({ change: w }: OccurrencesWrite) => {
       switch (w.kind) {
-        case 'tick':
-          return setChecklistEntry(w.series, w.date, w.entryId, w.checked)
         case 'override':
           return setOccurrenceOverride(w.series, w.date, w.start, w.duration)
         case 'clearOverride':
@@ -93,7 +87,7 @@ export function registerOccurrencesDefaults(queryClient: QueryClient): void {
 /**
  * Record something against a day.
  *
- * `mutate({ accountId, change: { kind: 'tick', series, date, entryId, checked: true } })`
+ * `mutate({ accountId, change: { kind: 'cancel', series, date } })`
  */
 export function useOccurrencesWrite() {
   return useMutation<void, Error, OccurrencesWrite>({ mutationKey: [...OCCURRENCES_WRITE_KEY] })

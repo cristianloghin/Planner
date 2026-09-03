@@ -100,44 +100,6 @@ export type Database = {
         }
         Relationships: []
       }
-      checklist_item: {
-        Row: {
-          group_label: string | null
-          id: string
-          label: string
-          occurrence_start: string | null
-          owner_series_id: string
-          required: boolean
-          sort_order: number
-        }
-        Insert: {
-          group_label?: string | null
-          id?: string
-          label: string
-          occurrence_start?: string | null
-          owner_series_id: string
-          required?: boolean
-          sort_order?: number
-        }
-        Update: {
-          group_label?: string | null
-          id?: string
-          label?: string
-          occurrence_start?: string | null
-          owner_series_id?: string
-          required?: boolean
-          sort_order?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "checklist_item_owner_series_id_fkey"
-            columns: ["owner_series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       event_occurrence: {
         Row: {
           cancelled: boolean
@@ -266,18 +228,6 @@ export type Database = {
           },
         ]
       }
-      item_status: {
-        Row: {
-          code: string
-        }
-        Insert: {
-          code: string
-        }
-        Update: {
-          code?: string
-        }
-        Relationships: []
-      }
       notification_log: {
         Row: {
           occurrence_start: string
@@ -321,85 +271,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "app_user"
             referencedColumns: ["id"]
-          },
-        ]
-      }
-      occurrence_item_removed: {
-        Row: {
-          item_id: string
-          occurrence_start: string
-          series_id: string
-        }
-        Insert: {
-          item_id: string
-          occurrence_start: string
-          series_id: string
-        }
-        Update: {
-          item_id?: string
-          occurrence_start?: string
-          series_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "occurrence_item_removed_item_id_fkey"
-            columns: ["item_id"]
-            isOneToOne: false
-            referencedRelation: "checklist_item"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "occurrence_item_removed_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      occurrence_item_state: {
-        Row: {
-          completed_at: string
-          item_id: string
-          occurrence_start: string
-          series_id: string
-          status: string
-        }
-        Insert: {
-          completed_at?: string
-          item_id: string
-          occurrence_start: string
-          series_id: string
-          status: string
-        }
-        Update: {
-          completed_at?: string
-          item_id?: string
-          occurrence_start?: string
-          series_id?: string
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "occurrence_item_state_item_id_fkey"
-            columns: ["item_id"]
-            isOneToOne: false
-            referencedRelation: "checklist_item"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "occurrence_item_state_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "occurrence_item_state_status_fkey"
-            columns: ["status"]
-            isOneToOne: false
-            referencedRelation: "item_status"
-            referencedColumns: ["code"]
           },
         ]
       }

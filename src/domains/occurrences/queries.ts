@@ -1,9 +1,9 @@
 /**
  * Reading what happened on which days.
  *
- * Read a window at a time, not all at once: these rows grow with every tick
- * ever made, so a screen loads the month it is showing plus a margin, and
- * start-up stays the same speed however old the account gets.
+ * Read a window at a time, not all at once: a screen loads the month it is
+ * showing plus a margin, so start-up stays the same speed however old the
+ * account gets.
  *
  * One query per calendar month. Windows overlap on purpose, so a change has to
  * be applied to every cached month that covers the day — see ./mutations.
@@ -11,7 +11,7 @@
 import { useQueries, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef } from 'react'
 import { addDays } from '../../assets/utils/dates'
-import { fetchItemStateRows, fetchOccurrenceRows } from '../../client/occurrences'
+import { fetchOccurrenceRows } from '../../client/occurrences'
 import { toCompletions } from './transformers'
 import type { CompletionsMap } from './types'
 
@@ -56,11 +56,7 @@ function monthsFor(from: string, to: string): string[] {
 
 async function fetchMonth(accountId: string, month: string): Promise<CompletionsMap> {
   const { from, to } = fetchBounds(month)
-  const [occurrences, itemStates] = await Promise.all([
-    fetchOccurrenceRows(accountId, from, to),
-    fetchItemStateRows(accountId, from, to),
-  ])
-  return toCompletions(occurrences, itemStates)
+  return toCompletions(await fetchOccurrenceRows(accountId, from, to))
 }
 
 /**

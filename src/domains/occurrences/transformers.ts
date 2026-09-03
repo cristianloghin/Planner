@@ -1,17 +1,17 @@
 /**
  * Putting the stored rows into the shapes screens read.
  *
- * Used only inside this domain. Two tables of sparse rows become one thing per
- * day, looked up by day.
+ * Used only inside this domain. Sparse rows become one thing per day, looked
+ * up by day.
  */
-import type { ItemStateRow, OccurrenceRow } from '../../client/occurrences'
+import type { OccurrenceRow } from '../../client/occurrences'
 import type { CompletionsMap, OccurrenceState } from './types'
 
 /** The key one day of one event is found under. */
 export const occurrenceKey = (eventId: string, date: string): string => `${eventId}:${date}`
 
 /**
- * Every day with something recorded, from the two tables that hold it.
+ * Every day with something recorded.
  *
  * A row that carries nothing the app shows is left out entirely — clearing a
  * timing override leaves an empty row behind, and an entry for it would read as
@@ -25,10 +25,7 @@ export const occurrenceKey = (eventId: string, date: string): string => `${event
  * back as two. They are layered rather than replaced, so a day that was
  * cancelled by one row and moved by another keeps both.
  */
-export function toCompletions(
-  occurrences: OccurrenceRow[],
-  itemStates: ItemStateRow[],
-): CompletionsMap {
+export function toCompletions(occurrences: OccurrenceRow[]): CompletionsMap {
   const out: CompletionsMap = {}
 
   for (const o of occurrences) {
@@ -38,12 +35,6 @@ export function toCompletions(
     if (o.start != null) entry.start = o.start
     if (o.duration != null) entry.duration = o.duration
     if (Object.keys(entry).length) out[key] = entry
-  }
-
-  for (const it of itemStates) {
-    const key = occurrenceKey(it.seriesId, it.date)
-    const at = out[key]
-    out[key] = { ...at, checked: { ...at?.checked, [it.itemId]: it.done } }
   }
 
   return out

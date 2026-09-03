@@ -126,7 +126,6 @@ export function WeekCalendar() {
         {timeline && (
           <WeekTimelineHead
             weekDays={weeks[1]}
-            completions={completions}
             onOpen={openSheet}
             focusDay={focusDay}
             onToggleDay={(idx) => setFocusDay((cur) => (cur === idx ? null : idx))}
@@ -139,7 +138,6 @@ export function WeekCalendar() {
       {timeline ? (
         <WeekTimelineBody
           weeks={weeks}
-          completions={completions}
           onOpen={openSheet}
           onAddAt={addAt}
           focusDay={focusDay}

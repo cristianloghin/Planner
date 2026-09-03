@@ -38,15 +38,15 @@ describe('startRealtime', () => {
 
     conn.change('event_series')
     conn.change('event_person')
-    conn.change('checklist_item')
+    conn.change('reminder')
     conn.change('event_series')
     vi.advanceTimersByTime(200)
 
     expect(onChanged).toHaveBeenCalledTimes(1)
     expect([...onChanged.mock.calls[0][0].tables].sort()).toEqual([
-      'checklist_item',
       'event_person',
       'event_series',
+      'reminder',
     ])
   })
 

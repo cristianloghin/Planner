@@ -9,7 +9,7 @@ import { addDays, diffDays, toISODate } from '../../assets/utils/dates'
 import type { CalendarEvent } from '../../domains/events/types'
 import type { OccurrenceState } from '../../domains/occurrences/types'
 import { startsOn } from '../recurrence/expand'
-import { occKey } from '../recurrence/status'
+import { occKey } from '../recurrence/timing'
 import { eventStartMinutes } from '../recurrence/timing'
 
 /**
@@ -18,11 +18,8 @@ import { eventStartMinutes } from '../recurrence/timing'
  * Inlined rather than taken from the events domain: a service cannot reach into
  * a domain, and this is a one-line read over a shape it was handed.
  */
-function reminderOffsets(event: Pick<CalendarEvent, 'attachments'>): number[] {
-  return event.attachments
-    .filter((a) => a.kind === 'reminder')
-    .map((a) => a.offset)
-    .sort((a, b) => a - b)
+function reminderOffsets(event: Pick<CalendarEvent, 'reminders'>): number[] {
+  return event.reminders.map((a) => a.offset).sort((a, b) => a - b)
 }
 
 /** Reminder offsets (minutes before start) offered in the event editor. */

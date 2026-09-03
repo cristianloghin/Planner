@@ -15,7 +15,7 @@ function ev(
     allDay: true,
     duration: 1,
     attendees: [],
-    attachments: [],
+    reminders: [],
     recurrence,
     ...over,
   }

@@ -7,9 +7,8 @@ import { eventColorKey } from '../domains/people/selectors'
 import { useCalendarNavigation } from '../navigation'
 import { loadZoom, pageInert, useSwipeGestures } from '../services/gestures'
 import type { DayOccurrence } from '../services/recurrence/expand'
-import { isOccurrenceDone } from '../services/recurrence/status'
 import { DAY_MIN, layoutBlocks } from '../services/timeline-layout'
-import type { CompletionsMap, Person, PersonId } from '../types'
+import type { Person, PersonId } from '../types'
 import { TimeGutter } from './TimeGutter'
 import s from './WeekTimeline.module.css'
 
@@ -44,7 +43,6 @@ function dayColumns(focusDay: number | null): string | undefined {
  */
 export function WeekTimelineHead({
   weekDays,
-  completions,
   onOpen,
   focusDay,
   onToggleDay,
@@ -52,7 +50,6 @@ export function WeekTimelineHead({
   overrides,
 }: {
   weekDays: WeekDay[]
-  completions: CompletionsMap
   onOpen: (occ: DayOccurrence) => void
   /** Weekday index (0 = Mon) whose column is maximized, if any. */
   focusDay: number | null
@@ -93,10 +90,7 @@ export function WeekTimelineHead({
                   <button
                     type="button"
                     key={`${o.event.id}:${o.start}`}
-                    className={cx(
-                      s.alldayChip,
-                      isOccurrenceDone(completions, o.event, o.start) && s.done,
-                    )}
+                    className={s.alldayChip}
                     style={colorStyle(
                       eventColorKey(people, overrides, o.event.attendees[0], o.event.colorKey),
                     )}
@@ -123,7 +117,6 @@ export function WeekTimelineHead({
  */
 export function WeekTimelineBody({
   weeks,
-  completions,
   onOpen,
   onAddAt,
   focusDay,
@@ -132,7 +125,6 @@ export function WeekTimelineBody({
 }: {
   /** Strip pages: [previous week, visible week, next week], seven days each. */
   weeks: WeekDay[][]
-  completions: CompletionsMap
   onOpen: (occ: DayOccurrence) => void
   /** Tap on empty grid: create an event on `dateISO` around `minute`. */
   onAddAt: (dateISO: string, minute: number) => void
@@ -241,12 +233,11 @@ export function WeekTimelineBody({
                     {laid.map(({ block, col, cols }) => {
                       const ev = block.occ.event
                       const height = Math.max((block.end - block.start) * pxPerMin, 12)
-                      const done = isOccurrenceDone(completions, ev, block.occ.start)
                       return (
                         <button
                           type="button"
                           key={`${ev.id}:${block.occ.start}`}
-                          className={cx(s.bar, done && s.done)}
+                          className={s.bar}
                           style={{
                             top: block.start * pxPerMin,
                             height,

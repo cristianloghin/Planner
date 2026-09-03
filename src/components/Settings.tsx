@@ -6,9 +6,9 @@ import { ColorPicker } from '../assets/ui/ColorPicker'
 import { CommitTextInput } from '../assets/ui/CommitTextInput'
 import { cx } from '../assets/utils/cx'
 import { useSignOut, useUpdatePassword } from '../domains/auth/mutations'
-import { checklistEntries, reminderOffsets } from '../domains/events/attachments'
 import { useEventsWrite } from '../domains/events/mutations'
 import { useTemplates } from '../domains/events/queries'
+import { reminderOffsets } from '../domains/events/selectors'
 import { usePeopleWrite } from '../domains/people/mutations'
 import { usePeople } from '../domains/people/queries'
 import { attendeeLabelFor, personColorKey } from '../domains/people/selectors'
@@ -171,9 +171,8 @@ function TemplatesSection() {
   return (
     <div className={s.templates}>
       <span className={cx(s.hint, s.small)}>
-        Event templates — reusable blueprints. Pick one when creating an event to prefill its
-        people, checklists, notes and reminders. Save a new one from the event editor, or tap one
-        here to edit it.
+        Event templates — reusable blueprints. Pick one when creating an event to prefill its people
+        and reminders. Save a new one from the event editor, or tap one here to edit it.
       </span>
       {isPending ? (
         <p className={s.templatesEmpty}>Loading templates…</p>
@@ -183,8 +182,6 @@ function TemplatesSection() {
         templates.map((t) => {
           const bits: string[] = []
           if (t.attendees.length) bits.push(attendeeLabelFor(t.attendees)(people))
-          const checks = checklistEntries(t).length
-          if (checks) bits.push(`${checks} checklist item${checks > 1 ? 's' : ''}`)
           const reminders = reminderOffsets(t).length
           if (reminders) bits.push(`${reminders} reminder${reminders > 1 ? 's' : ''}`)
           return (

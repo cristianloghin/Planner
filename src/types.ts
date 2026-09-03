@@ -5,9 +5,8 @@
 // the two it is doing, and why.
 
 export type {
-  Attachment,
   CalendarEvent,
-  ChecklistEntry,
+  EventReminder,
   EventTemplate,
   Recurrence,
   RecurrenceFreq,

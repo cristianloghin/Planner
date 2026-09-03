@@ -41,12 +41,6 @@
   gap: 0.25em;
 }
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.1em;
-}
-
 .badgeIcon {
   width: 0.825rem;
   height: 0.825rem;
@@ -251,17 +245,6 @@
   height: 8px;
   border-radius: 50%;
   background: var(--now);
-}
-
-/* Completed occurrences fade and strike through. */
-.tlEvent.done,
-.alldayChip.done {
-  opacity: 0.5;
-}
-
-.tlEvent.done .tlTitle,
-.alldayChip.done .alldayTitle {
-  text-decoration: line-through;
 }
 
 /* Conflict markers on Nora's blocks. */

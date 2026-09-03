@@ -2,9 +2,8 @@
  * What happened on one day of a repeating event.
  *
  * An event is a pattern; this is everything that makes one day of it differ —
- * ticked off, moved, or taken out. The database keeps that across two tables of
- * sparse rows. The app wants one thing per day, looked up by day, so this
- * domain owns that shape.
+ * moved, or taken out. The database keeps that as sparse rows. The app wants
+ * one thing per day, looked up by day, so this domain owns that shape.
  */
 
 /**
@@ -14,8 +13,6 @@
  * that match their series have no entry at all.
  */
 export interface OccurrenceState {
-  /** Which checklist lines are ticked, by line id. */
-  checked?: Record<string, boolean>
   /**
    * Moved to, for this day only, in the event's own units. The day itself does
    * not change — only the time within it, and how long it runs.
@@ -29,7 +26,7 @@ export interface OccurrenceState {
 /**
  * Every day with something recorded, keyed `${eventId}:${date}`.
  *
- * Read a window at a time. These rows grow with every tick ever made, so they
- * are never all loaded at once.
+ * Read a window at a time, so start-up stays the same speed however old the
+ * account gets.
  */
 export type CompletionsMap = Record<string, OccurrenceState>

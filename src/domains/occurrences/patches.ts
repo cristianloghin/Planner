@@ -11,7 +11,6 @@ import type { OccurrenceState } from './types'
 
 /** Every change to one day, as one set of values that can be written down. */
 export type OccurrenceChange =
-  | { kind: 'tick'; entryId: string; checked: boolean }
   | { kind: 'override'; start: string; duration: number }
   | { kind: 'clearOverride' }
   | { kind: 'cancel' }
@@ -27,8 +26,6 @@ export function patchEntry(
   change: OccurrenceChange,
 ): OccurrenceState {
   switch (change.kind) {
-    case 'tick':
-      return { ...entry, checked: { ...entry?.checked, [change.entryId]: change.checked } }
     case 'override':
       return { ...entry, start: change.start, duration: change.duration }
     case 'clearOverride': {

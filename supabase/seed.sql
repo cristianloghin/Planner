@@ -125,19 +125,6 @@ insert into event_person (series_id, person_id) values
   ('44444444-0000-4000-8000-000000000004', '33333333-0000-4000-8000-000000000003')
 on conflict do nothing;
 
--- Two checklists on one event, so the grouping survives a round trip: lines are
--- numbered from their own block of a thousand, which is what tells them apart.
-insert into checklist_item
-  (id, owner_series_id, label, group_label, sort_order, required, occurrence_start)
-values
-  ('55555555-0000-4000-8000-000000000001', '44444444-0000-4000-8000-000000000001',
-   'Goggles', 'Bag', 0, true, null),
-  ('55555555-0000-4000-8000-000000000002', '44444444-0000-4000-8000-000000000001',
-   'Towel',   'Bag', 1, true, null),
-  ('55555555-0000-4000-8000-000000000003', '44444444-0000-4000-8000-000000000001',
-   'Snack',   'After', 1000, true, null)
-on conflict (id) do nothing;
-
 -- Half an hour before, as the app stores it: seconds, per user.
 insert into reminder (id, series_id, user_id, offset_seconds) values
   ('77777777-0000-4000-8000-000000000001', '44444444-0000-4000-8000-000000000001',

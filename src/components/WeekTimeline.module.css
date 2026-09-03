@@ -179,15 +179,6 @@
   }
 }
 
-.bar.done,
-.alldayChip.done {
-  opacity: 0.5;
-}
-
-.bar.done .barTitle {
-  text-decoration: line-through;
-}
-
 /* ---- Current time ---- */
 .nowLine {
   position: absolute;

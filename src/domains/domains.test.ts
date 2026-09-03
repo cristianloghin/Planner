@@ -10,7 +10,7 @@ const ids = { accountId: 'acc', userId: 'usr' }
 
 describe('queryKeysForTable', () => {
   it('treats a change to anything attached to an event as a change to the event', () => {
-    for (const table of ['event_series', 'event_person', 'checklist_item', 'reminder']) {
+    for (const table of ['event_series', 'event_person', 'reminder']) {
       expect(queryKeysForTable(table, ids)).toEqual([
         ['events', 'acc'],
         ['templates', 'acc'],
@@ -20,7 +20,6 @@ describe('queryKeysForTable', () => {
 
   it('routes what happened on a day to the completions windows', () => {
     expect(queryKeysForTable('event_occurrence', ids)).toEqual([['completions', 'acc']])
-    expect(queryKeysForTable('occurrence_item_state', ids)).toEqual([['completions', 'acc']])
   })
 
   it('keys preferences by user as well as account', () => {

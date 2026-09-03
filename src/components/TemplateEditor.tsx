@@ -3,9 +3,9 @@ import { useAccount } from '../account'
 import shared from '../assets/styles/shared.module.css'
 import { NumberField } from '../assets/ui/NumberField'
 import { useEventsWrite } from '../domains/events/mutations'
-import type { Attachment, EventTemplate, PersonId } from '../types'
-import { AttachmentsEditor } from './AttachmentsEditor'
+import type { EventReminder, EventTemplate, PersonId } from '../types'
 import { AttendeeChips } from './AttendeeChips'
+import { RemindersEditor } from './RemindersEditor'
 
 const SNAP = 15
 
@@ -13,7 +13,7 @@ const SNAP = 15
  * Full-page editor for a saved event template (DATA_MODEL Decision 10). A
  * template is a blueprint with no point in time, so unlike {@link EventEditor}
  * there's no start date or recurrence — just the defaults a new event inherits:
- * title, all-day flag, default duration, attendees and attachments. Saving
+ * title, all-day flag, default duration, attendees and reminders. Saving
  * writes a `saveTemplate` change through the events domain; existing events
  * made from it are untouched.
  */
@@ -37,7 +37,7 @@ export function TemplateEditor({
   const [hours, setHours] = useState(template.allDay ? 1 : Math.floor(template.duration / 60))
   const [minutes, setMinutes] = useState(template.allDay ? 0 : template.duration % 60)
   const [attendees, setAttendees] = useState<PersonId[]>(template.attendees)
-  const [attachments, setAttachments] = useState<Attachment[]>(template.attachments)
+  const [reminders, setReminders] = useState<EventReminder[]>(template.reminders)
 
   const titleRef = useRef<HTMLInputElement>(null)
   useEffect(() => titleRef.current?.focus(), [])
@@ -48,10 +48,6 @@ export function TemplateEditor({
   }
 
   // Drop empty checklists so saving doesn't keep stubs around.
-  function cleanedAttachments(): Attachment[] {
-    return attachments.filter((a) => (a.kind === 'checklist' ? a.items.length > 0 : true))
-  }
-
   function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
@@ -67,7 +63,7 @@ export function TemplateEditor({
           allDay,
           duration: currentDuration(),
           attendees,
-          attachments: cleanedAttachments(),
+          reminders,
         },
       },
     })
@@ -122,7 +118,7 @@ export function TemplateEditor({
         <label className={shared.label}>Who's involved?</label>
         <AttendeeChips value={attendees} onChange={setAttendees} />
 
-        <AttachmentsEditor attachments={attachments} onChange={setAttachments} />
+        <RemindersEditor reminders={reminders} onChange={setReminders} />
       </div>
     </form>
   )

@@ -1,11 +1,4 @@
-import {
-  AlertTriangle,
-  Bell,
-  CheckSquare,
-  ChevronLeft,
-  ChevronRight,
-  CircleDashed,
-} from 'lucide-react'
+import { AlertTriangle, Bell, ChevronLeft, ChevronRight, CircleDashed } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '../account'
 import { useLatest } from '../assets/hooks/useLatest'
@@ -14,8 +7,8 @@ import shared from '../assets/styles/shared.module.css'
 import { LoadingPill } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
 import { addDays, isoLabel, minutesToTime, toISODate } from '../assets/utils/dates'
-import { checklistEntries, hasReminders } from '../domains/events/attachments'
 import { useEvents } from '../domains/events/queries'
+import { hasReminders } from '../domains/events/selectors'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { usePeople } from '../domains/people/queries'
 import { byId, eventColorKey, personColorKey } from '../domains/people/selectors'
@@ -29,9 +22,8 @@ import {
   nextRelevantDate,
   occurrencesOnDate,
 } from '../services/recurrence/expand'
-import { isOccurrenceDone, occKey } from '../services/recurrence/status'
 import { DAY_MIN, type TimeBlock, layoutBlocks } from '../services/timeline-layout'
-import type { CalendarEvent, CompletionsMap, Person, PersonId } from '../types'
+import type { CalendarEvent, Person, PersonId } from '../types'
 import { Avatars } from './Avatars'
 import s from './DayView.module.css'
 import { type EditorTarget, EventEditor } from './EventEditor'
@@ -214,7 +206,6 @@ export function DayView() {
                         occ={o}
                         personId={p.id}
                         status={statuses.get(o.event.id)}
-                        completions={completions}
                         onClick={() => openSheet(o)}
                         people={people}
                         overrides={overrides}
@@ -259,7 +250,6 @@ export function DayView() {
                       person={p}
                       blocks={page.timedBlocks}
                       statuses={page.statuses}
-                      completions={completions}
                       nowMin={page.iso === nowISO ? nowMin : null}
                       pxPerMin={pxPerMin}
                       onAddAt={(min) => addAt(page.iso, [p.id], min)}
@@ -297,29 +287,11 @@ export function DayView() {
   )
 }
 
-/** Compact badges shown on a block / chip: reminders, checklist progress, done, kid status. */
-function badges(
-  completions: CompletionsMap,
-  event: CalendarEvent,
-  date: string,
-  status: ChildStatus | undefined,
-) {
-  const entries = checklistEntries(event)
-  let checklist: { n: number; total: number } | null = null
-  if (entries.length) {
-    const checked = completions[occKey(event.id, date)]?.checked ?? {}
-    const n = entries.filter((e) => checked[e.id]).length
-    checklist = { n, total: entries.length }
-  }
+/** Compact badges shown on a block / chip: reminders, kid status. */
+function badges(event: CalendarEvent, status: ChildStatus | undefined) {
   return (
     <span className={s.badges}>
       {hasReminders(event) && <Bell className={s.badgeIcon} aria-label="Reminders" />}
-      {checklist && (
-        <span className={s.badge}>
-          <CheckSquare className={s.badgeIcon} aria-label="Checklist" />
-          {checklist.n}/{checklist.total}
-        </span>
-      )}
       {status === 'clash' && <AlertTriangle className={s.badgeIcon} aria-label="Clash" />}
       {status === 'needs' && <CircleDashed className={s.badgeIcon} aria-label="Needs attention" />}
     </span>
@@ -330,7 +302,6 @@ function AllDayChip({
   occ,
   personId,
   status,
-  completions,
   onClick,
   people,
   overrides,
@@ -338,27 +309,24 @@ function AllDayChip({
   occ: DayOccurrence
   personId: PersonId
   status: ChildStatus | undefined
-  completions: CompletionsMap
   onClick: () => void
   /** Everyone in the account, in lane order, and this user's colour overrides. */
   people: Person[]
   overrides: Record<PersonId, ColorKey>
 }) {
   const { event } = occ
-  const done = isOccurrenceDone(completions, event, occ.start)
   return (
     <button
       type="button"
       className={cx(
         s.alldayChip,
-        done && s.done,
         status === 'clash' && s.warnClash,
         status === 'needs' && s.warnNeeds,
       )}
       style={colorStyle(eventColorKey(people, overrides, personId, event.colorKey))}
       onClick={onClick}
     >
-      <span className={s.alldayMeta}>{badges(completions, event, occ.start, status)}</span>
+      <span className={s.alldayMeta}>{badges(event, status)}</span>
       <span className={s.alldayTitle}>{event.title}</span>
       {occ.span > 1 && <span className={s.allDayOffset}>{`${occ.offset + 1}/${occ.span}`}</span>}
     </button>
@@ -369,7 +337,6 @@ function Lane({
   person,
   blocks,
   statuses,
-  completions,
   nowMin,
   pxPerMin,
   onAddAt,
@@ -380,7 +347,6 @@ function Lane({
   person: Person
   blocks: TimeBlock[]
   statuses: Map<string, ChildStatus>
-  completions: CompletionsMap
   nowMin: number | null
   pxPerMin: number
   onAddAt: (minute: number) => void
@@ -413,14 +379,12 @@ function Lane({
         const ev = block.occ.event
         const status = statuses.get(ev.id)
         const joint = ev.attendees.length > 1
-        const done = isOccurrenceDone(completions, ev, block.occ.start)
         return (
           <button
             type="button"
             key={`${ev.id}:${block.occ.start}`}
             className={cx(
               s.tlEvent,
-              done && s.done,
               status === 'clash' && s.warnClash,
               status === 'needs' && s.warnNeeds,
             )}
@@ -441,7 +405,7 @@ function Lane({
                   ↔ moved
                 </span>
               )}
-              {badges(completions, ev, block.occ.start, status)}
+              {badges(ev, status)}
             </span>
             <span className={s.tlTitle}>{ev.title}</span>
             {joint && <Avatars attendees={ev.attendees} />}

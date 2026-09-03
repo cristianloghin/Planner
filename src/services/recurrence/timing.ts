@@ -10,6 +10,18 @@ import type { CalendarEvent } from '../../domains/events/types'
 
 export const MINS_PER_DAY = 24 * 60
 
+/**
+ * Where one day of one event is filed.
+ *
+ * The same format `domains/occurrences` uses (`occurrenceKey` there). Two
+ * copies of one line, because a service may not import a domain and there is no
+ * layer below both yet — they must agree, and a change to either is a change to
+ * both.
+ */
+export function occKey(eventId: string, date: string): string {
+  return `${eventId}:${date}`
+}
+
 /** ISO date (yyyy-mm-dd) the event's first occurrence starts on. */
 export function eventDate(e: CalendarEvent): string {
   return e.start.slice(0, 10)

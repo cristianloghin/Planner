@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ItemStateRow, OccurrenceRow } from '../../client/occurrences'
+import type { OccurrenceRow } from '../../client/occurrences'
 import { patchCompletions, patchEntry } from './patches'
 import { occurrenceKey, toCompletions } from './transformers'
 
@@ -12,17 +12,9 @@ const row = (over: Partial<OccurrenceRow> = {}): OccurrenceRow => ({
   ...over,
 })
 
-const tick = (over: Partial<ItemStateRow> = {}): ItemStateRow => ({
-  seriesId: 'S',
-  date: '2026-04-07',
-  itemId: 'c1',
-  done: true,
-  ...over,
-})
-
 describe('toCompletions', () => {
   it('keys each day under its event and date', () => {
-    expect(toCompletions([row({ cancelled: true })], [])).toEqual({
+    expect(toCompletions([row({ cancelled: true })])).toEqual({
       'S:2026-04-07': { cancelled: true },
     })
   })
@@ -30,33 +22,18 @@ describe('toCompletions', () => {
   it('leaves out a row carrying nothing the app shows', () => {
     // Clearing a timing override leaves an empty row behind. An entry for it
     // would read as "something happened here" on a day where nothing did.
-    expect(toCompletions([row()], [])).toEqual({})
+    expect(toCompletions([row()])).toEqual({})
   })
 
   it('carries a day that was moved, and one taken out', () => {
     expect(
-      toCompletions(
-        [
-          row({ start: '2026-04-07T18:00', duration: 90 }),
-          row({ date: '2026-04-08', cancelled: true }),
-        ],
-        [],
-      ),
+      toCompletions([
+        row({ start: '2026-04-07T18:00', duration: 90 }),
+        row({ date: '2026-04-08', cancelled: true }),
+      ]),
     ).toEqual({
       'S:2026-04-07': { start: '2026-04-07T18:00', duration: 90 },
       'S:2026-04-08': { cancelled: true },
-    })
-  })
-
-  it('folds ticks onto the same day as its other state', () => {
-    expect(toCompletions([row({ cancelled: true })], [tick()])).toEqual({
-      'S:2026-04-07': { cancelled: true, checked: { c1: true } },
-    })
-  })
-
-  it('records a ticked day that has nothing else on it', () => {
-    expect(toCompletions([], [tick(), tick({ itemId: 'c2', done: false })])).toEqual({
-      'S:2026-04-07': { checked: { c1: true, c2: false } },
     })
   })
 
@@ -66,10 +43,7 @@ describe('toCompletions', () => {
     // and one at the new — both on the same day, which is all this is keyed by.
     // Taking the last one alone would drop whatever the first recorded.
     expect(
-      toCompletions(
-        [row({ cancelled: true }), row({ start: '2026-04-07T18:00', duration: 90 })],
-        [],
-      ),
+      toCompletions([row({ cancelled: true }), row({ start: '2026-04-07T18:00', duration: 90 })]),
     ).toEqual({
       'S:2026-04-07': { cancelled: true, start: '2026-04-07T18:00', duration: 90 },
     })
@@ -77,49 +51,36 @@ describe('toCompletions', () => {
 
   it('lets a later row on the same day win a field they both set', () => {
     expect(
-      toCompletions([row({ start: '2026-04-07T18:00' }), row({ start: '2026-04-07T20:00' })], []),
+      toCompletions([row({ start: '2026-04-07T18:00' }), row({ start: '2026-04-07T20:00' })]),
     ).toEqual({ 'S:2026-04-07': { start: '2026-04-07T20:00' } })
   })
 
   it('keeps a day whose second row carries nothing', () => {
     // The empty one must not erase what the first row recorded.
-    expect(toCompletions([row({ cancelled: true }), row()], [])).toEqual({
+    expect(toCompletions([row({ cancelled: true }), row()])).toEqual({
       'S:2026-04-07': { cancelled: true },
     })
   })
 
   it('keeps different events and days apart', () => {
-    const out = toCompletions(
-      [row({ cancelled: true }), row({ seriesId: 'T', cancelled: true })],
-      [],
-    )
+    const out = toCompletions([row({ cancelled: true }), row({ seriesId: 'T', cancelled: true })])
     expect(Object.keys(out).sort()).toEqual(['S:2026-04-07', 'T:2026-04-07'])
   })
 })
 
 describe('patchEntry', () => {
-  it('ticks a line without disturbing the others', () => {
-    expect(
-      patchEntry({ checked: { c1: true } }, { kind: 'tick', entryId: 'c2', checked: true }),
-    ).toEqual({ checked: { c1: true, c2: true } })
-  })
-
   it('moves a day and puts it back, keeping what else is on it', () => {
     const moved = patchEntry(
       { cancelled: true },
-      {
-        kind: 'override',
-        start: '2026-04-07T18:00',
-        duration: 90,
-      },
+      { kind: 'override', start: '2026-04-07T18:00', duration: 90 },
     )
     expect(moved).toEqual({ cancelled: true, start: '2026-04-07T18:00', duration: 90 })
     expect(patchEntry(moved, { kind: 'clearOverride' })).toEqual({ cancelled: true })
   })
 
   it('takes a day out, leaving what was recorded on it', () => {
-    expect(patchEntry({ checked: { c1: true } }, { kind: 'cancel' })).toEqual({
-      checked: { c1: true },
+    expect(patchEntry({ start: '2026-04-07T18:00' }, { kind: 'cancel' })).toEqual({
+      start: '2026-04-07T18:00',
       cancelled: true,
     })
   })
