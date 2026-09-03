@@ -8,12 +8,14 @@ import { cx } from '../assets/utils/cx'
 import { addDays, isoLabel, minutesToTime } from '../assets/utils/dates'
 import { useAuth } from '../auth'
 import { timingOf } from '../domains/events/selectors'
+import { type ListsChange, useListsWrite } from '../domains/lists/mutations'
+import { useListLinks, useLists } from '../domains/lists/queries'
+import { findItemFor, isOverdue } from '../domains/lists/selectors'
 import { useOccurrencesWrite } from '../domains/occurrences/mutations'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { usePeople } from '../domains/people/queries'
 import { attendeeLabelFor } from '../domains/people/selectors'
 import { checklists, notes, reminderOffsets } from '../lib/attachments'
-import { findListItem, isOverdue } from '../lib/lists'
 import { offsetLabel } from '../lib/notifications'
 import {
   blockingPrerequisites,
@@ -338,16 +340,20 @@ export function OccurrenceSheet({
  * state). A linked to-do never gates the occurrence's completion.
  */
 function LinkedTodos({ event, date }: { event: CalendarEvent; date: string }) {
-  const { state, dispatch } = useApp()
-  const linkedIds = state.listLinks[occKey(event.id, date)] ?? []
+  const { accountId } = useAuth()
+  const { data: lists = [] } = useLists(accountId)
+  const { data: links = {} } = useListLinks(accountId)
+  const write = useListsWrite()
+  const change = (c: ListsChange) => write.mutate({ accountId: accountId as string, change: c })
+  const linkedIds = links[occKey(event.id, date)] ?? []
   const linked = linkedIds
-    .map((id) => findListItem(state, id))
-    .filter((r): r is NonNullable<typeof r> => r !== null)
+    .map((id) => findItemFor(id)(lists))
+    .filter((r): r is NonNullable<typeof r> => r !== undefined)
 
   const [pick, setPick] = useState('')
 
   // Items not already linked here, kept under their list as <optgroup>s.
-  const groups = state.lists
+  const groups = lists
     .map((list) => ({
       list,
       items: list.items.filter((i) => !linkedIds.includes(i.id)),
@@ -356,7 +362,7 @@ function LinkedTodos({ event, date }: { event: CalendarEvent; date: string }) {
 
   function add() {
     if (!pick) return
-    dispatch({ type: 'linkListItem', eventId: event.id, date, itemId: pick })
+    change({ kind: 'link', itemId: pick, series: timingOf(event), date })
     setPick('')
   }
 
@@ -366,14 +372,14 @@ function LinkedTodos({ event, date }: { event: CalendarEvent; date: string }) {
 
       {linked.length > 0 && (
         <ul className={s.todoList}>
-          {linked.map(({ list, item }) => (
+          {linked.map(({ item }) => (
             <li key={item.id} className={s.todoRow}>
               <label className={s.todoLabel}>
                 <input
                   type="checkbox"
                   checked={item.done}
                   onChange={() =>
-                    dispatch({ type: 'toggleListItem', listId: list.id, itemId: item.id })
+                    change({ kind: 'setItemDone', itemId: item.id, done: !item.done })
                   }
                 />
                 <span className={cx(item.done && s.doneTitle)}>{item.title}</span>
@@ -387,7 +393,7 @@ function LinkedTodos({ event, date }: { event: CalendarEvent; date: string }) {
                 type="button"
                 className={s.depRemove}
                 onClick={() =>
-                  dispatch({ type: 'unlinkListItem', eventId: event.id, date, itemId: item.id })
+                  change({ kind: 'unlink', itemId: item.id, series: timingOf(event), date })
                 }
                 aria-label="Unlink to-do"
               >
