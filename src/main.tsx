@@ -19,15 +19,20 @@ registerDomainDefaults(queryClient)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {/* Persist variant of the provider: restores the query cache (templates,
-        completions windows) from localStorage before first render, so an
-        offline or slow launch shows last-known data instantly. Paused offline
-        mutations are dehydrated too; once the restore lands, resume them —
-        their behaviour is looked up from the defaults registered above. */}
+    {/* Persist variant of the provider: restores the query cache from
+        localStorage before first render, so an offline or slow launch shows
+        last-known data instantly. Once the restore lands: resume the writes
+        paused offline (their behaviour is looked up from the defaults
+        registered above), then treat the launch like a reconnection — nothing
+        was subscribed while the app was closed, so everything cached may be
+        stale and is refetched once. Offline, the resume waits for the network
+        and the refetch waits with it, with the cached data still on screen. */}
     <PersistQueryClientProvider
       client={queryClient}
       persistOptions={queryPersistOptions}
-      onSuccess={() => void queryClient.resumePausedMutations()}
+      onSuccess={() =>
+        void queryClient.resumePausedMutations().then(() => queryClient.invalidateQueries())
+      }
     >
       <AuthProvider>
         <Root />

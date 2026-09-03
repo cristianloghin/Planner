@@ -67,11 +67,17 @@ Mid-migration, and worth knowing before adding a slice:
   zone per session. Both slices, their six actions, the reducer cases, the
   store's loads and writes, and `lib/people.ts` are deleted. A queue saved by
   an older build may still hold one of those actions; `state.tsx` drops it on
-  read with a warning. Two things worth knowing: `user_preference` is **not in
+  read with a warning. One thing worth knowing: `user_preference` is **not in
   the realtime publication**, so another device's change only arrives on a
-  refetch; and the stamp now compares against the cached document, so a
-  restart inside the five-minute stale window compares against the last cached
-  zone rather than a fresh read (the next focus refetch corrects it).
+  refetch.
+- **Cold starts read fresh.** Every Query slice starts from the persisted
+  cache with a five-minute stale time, which alone would let a change made
+  while the app was closed sit unseen for up to five minutes. So `main.tsx`
+  treats a launch like a reconnection: once the saved cache lands and any
+  paused writes have gone out, the whole cache is invalidated once. The
+  cached data still paints instantly; what a screen is showing refetches
+  right away and the rest refetch when first read. Offline, the resume waits
+  for the network and the refetch waits with it.
 - **Lists are adopted.** The Lists screen and the sheet's linked to-dos read
   through `useLists` / `useListLinks` and write through `useListsWrite`; the
   reducer edit guard is gone from Lists because every write patches the cache
