@@ -264,7 +264,7 @@ function WeekListBody({
                               <span className={s.eventTitle}>{e.title}</span>
                               <span className={s.eventMeta}>
                                 <Avatars attendees={e.attendees} />
-                                {e.recurrence && recurrenceLabel(e.recurrence).toLowerCase()}
+                                {e.recurrence && recurrenceLabel(e).toLowerCase()}
                               </span>
                             </button>
                           </div>

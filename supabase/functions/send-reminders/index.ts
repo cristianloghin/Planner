@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
 
   const { data: seriesRows, error: serErr } = await db
     .from('event_series')
-    .select('id, title, all_day, dtstart, rrule, account_id')
+    .select('id, title, all_day, dtstart, rrule, repeat_count, account_id')
     .in('account_id', accountIds)
     .eq('is_template', false)
     .not('dtstart', 'is', null)

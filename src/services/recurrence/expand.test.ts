@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { CalendarEvent, Recurrence } from '../../domains/events/types'
-import { nextStartOnOrAfter, occurrencesOnDate, recurrenceLabel, startsOn } from './expand'
+import {
+  nextStartOnOrAfter,
+  occurrenceIndex,
+  occurrencesOnDate,
+  recurrenceLabel,
+  startsOn,
+} from './expand'
 
 /** Minimal all-day event factory; the recurrence math only reads start/recurrence. */
 function ev(
@@ -100,12 +106,102 @@ describe('nextStartOnOrAfter', () => {
   })
 })
 
+describe('occurrenceIndex', () => {
+  it('numbers daily and weekly slots by plain division', () => {
+    const daily = ev('2026-06-15', { freq: 'daily', interval: 3 })
+    expect(occurrenceIndex(daily, '2026-06-15')).toBe(0)
+    expect(occurrenceIndex(daily, '2026-06-18')).toBe(1)
+    expect(occurrenceIndex(daily, '2026-06-16')).toBeNull() // off-grid
+    const weekly = ev('2026-06-15', { freq: 'weekly', interval: 2 })
+    expect(occurrenceIndex(weekly, '2026-06-29')).toBe(1)
+    expect(occurrenceIndex(weekly, '2026-06-22')).toBeNull()
+  })
+
+  it('is null before the anchor, and 0 on it for a one-off', () => {
+    expect(occurrenceIndex(ev('2026-06-15'), '2026-06-15')).toBe(0)
+    expect(occurrenceIndex(ev('2026-06-15'), '2026-06-14')).toBeNull()
+    expect(occurrenceIndex(ev('2026-06-15'), '2026-06-16')).toBeNull()
+  })
+
+  it('counts only months that produce a slot, so a skipped Feb costs nothing', () => {
+    // Anchored on the 31st: February produces nothing and must not consume one
+    // of a counted series' N, or "12 lessons on the 31st" yields fewer than 12.
+    const e = ev('2026-01-31', { freq: 'monthly', interval: 1 })
+    expect(occurrenceIndex(e, '2026-01-31')).toBe(0)
+    expect(occurrenceIndex(e, '2026-03-31')).toBe(1) // NOT 2 — Feb was skipped
+    expect(occurrenceIndex(e, '2026-05-31')).toBe(2) // April has no 31st either
+  })
+})
+
+describe('startsOn with a count', () => {
+  it('stops after the Nth slot', () => {
+    const e = ev('2026-06-15', { freq: 'weekly', interval: 1, count: 3 })
+    expect(startsOn(e, '2026-06-15')).toBe(true) // 1st
+    expect(startsOn(e, '2026-06-22')).toBe(true) // 2nd
+    expect(startsOn(e, '2026-06-29')).toBe(true) // 3rd
+    expect(startsOn(e, '2026-07-06')).toBe(false) // there is no 4th
+  })
+
+  it('counts slots, not survivors — cancelling one does not extend the series', () => {
+    // startsOn knows nothing of cancellations by design: the grid is the grid,
+    // so the 4th week is off it whether or not the 2nd was cancelled.
+    const e = ev('2026-06-15', { freq: 'weekly', interval: 1, count: 3 })
+    expect(startsOn(e, '2026-07-06')).toBe(false)
+  })
+
+  it('takes whichever of count and until comes first', () => {
+    const countFirst = ev('2026-06-15', {
+      freq: 'daily',
+      interval: 1,
+      count: 2,
+      until: '2026-06-30',
+    })
+    expect(startsOn(countFirst, '2026-06-16')).toBe(true)
+    expect(startsOn(countFirst, '2026-06-17')).toBe(false) // count ran out first
+
+    const untilFirst = ev('2026-06-15', {
+      freq: 'daily',
+      interval: 1,
+      count: 30,
+      until: '2026-06-16',
+    })
+    expect(startsOn(untilFirst, '2026-06-16')).toBe(true)
+    expect(startsOn(untilFirst, '2026-06-17')).toBe(false) // until ran out first
+  })
+
+  it('ends the forward scan at the last counted slot', () => {
+    const e = ev('2026-06-15', { freq: 'weekly', interval: 1, count: 2 })
+    expect(nextStartOnOrAfter(e, '2026-06-16')).toBe('2026-06-22')
+    expect(nextStartOnOrAfter(e, '2026-06-23')).toBeNull()
+  })
+})
+
 describe('recurrenceLabel', () => {
   it('describes the cadence', () => {
     expect(recurrenceLabel()).toBe('Does not repeat')
-    expect(recurrenceLabel({ freq: 'weekly', interval: 1 })).toBe('Every week')
-    expect(recurrenceLabel({ freq: 'daily', interval: 3 })).toBe('Every 3 days')
-    expect(recurrenceLabel({ freq: 'monthly', interval: 2 })).toBe('Every 2 months')
+    expect(recurrenceLabel(ev('2026-06-15', { freq: 'daily', interval: 3 }))).toBe('Every 3 days')
+    expect(recurrenceLabel(ev('2026-06-15', { freq: 'monthly', interval: 2 }))).toBe(
+      'Every 2 months',
+    )
+  })
+
+  it('names the weekday for a weekly rule, which is never stored', () => {
+    // 2026-06-15 is a Monday; the weekday comes from the anchor alone.
+    expect(recurrenceLabel(ev('2026-06-15', { freq: 'weekly', interval: 1 }))).toBe(
+      'Every week on Mon',
+    )
+    expect(recurrenceLabel(ev('2026-06-16', { freq: 'weekly', interval: 2 }))).toBe(
+      'Every 2 weeks on Tue',
+    )
+  })
+
+  it('says how the series ends', () => {
+    expect(recurrenceLabel(ev('2026-06-16', { freq: 'weekly', interval: 2, count: 12 }))).toBe(
+      'Every 2 weeks on Tue · 12 times',
+    )
+    expect(
+      recurrenceLabel(ev('2026-06-15', { freq: 'weekly', interval: 1, until: '2026-12-25' })),
+    ).toMatch(/^Every week on Mon · until /)
   })
 })
 

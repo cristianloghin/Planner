@@ -92,28 +92,42 @@ on conflict (id) do nothing;
 -- — the same as what the app writes. Never a COUNT rule (DATA_MODEL 2).
 -- ---------------------------------------------------------------------------
 insert into event_series
-  (id, account_id, created_by, title, all_day, dtstart, duration, rrule, color_key, is_template)
+  (id, account_id, created_by, title, all_day, dtstart, duration, rrule, repeat_count,
+   color_key, is_template)
 values
   -- Weekly, timed, with a checklist: the case per-day ticks are about.
   ('44444444-0000-4000-8000-000000000001', '22222222-2222-4222-8222-222222222222',
    '11111111-1111-4111-8111-111111111111', 'Swimming', false,
    date_trunc('day', now()) + interval '16 hours', '60 minutes',
-   'FREQ=WEEKLY;INTERVAL=1', '3', false),
+   'FREQ=WEEKLY;INTERVAL=1', null, '3', false),
   -- A one-off all-day, spanning two days.
   ('44444444-0000-4000-8000-000000000002', '22222222-2222-4222-8222-222222222222',
    '11111111-1111-4111-8111-111111111111', 'Trip', true,
    date_trunc('day', now()) + interval '3 days', '2 days',
-   null, '7', false),
+   null, null, '7', false),
   -- A child's event with no adult on it, so conflict detection has something
   -- to find.
   ('44444444-0000-4000-8000-000000000003', '22222222-2222-4222-8222-222222222222',
    '11111111-1111-4111-8111-111111111111', 'Football practice', false,
    date_trunc('day', now()) + interval '1 day' + interval '17 hours', '90 minutes',
-   'FREQ=WEEKLY;INTERVAL=1', null, false),
+   'FREQ=WEEKLY;INTERVAL=1', null, null, false),
   -- A blueprint: a series with no date and no repeat (DATA_MODEL 10).
   ('44444444-0000-4000-8000-000000000004', '22222222-2222-4222-8222-222222222222',
    '11111111-1111-4111-8111-111111111111', 'Dentist', false,
-   null, '30 minutes', null, '11', true)
+   null, '30 minutes', null, null, '11', true),
+  -- Ends after a count: five lessons and no sixth (§8). The Month view should
+  -- show exactly five.
+  ('44444444-0000-4000-8000-000000000005', '22222222-2222-4222-8222-222222222222',
+   '11111111-1111-4111-8111-111111111111', 'Piano lesson', false,
+   date_trunc('day', now()) + interval '2 days' + interval '15 hours', '45 minutes',
+   'FREQ=WEEKLY;INTERVAL=1', 5, '5', false),
+  -- Ends on a date: the other half of §8, as an UNTIL in the stored rule.
+  ('44444444-0000-4000-8000-000000000006', '22222222-2222-4222-8222-222222222222',
+   '11111111-1111-4111-8111-111111111111', 'Eat a fish', false,
+   date_trunc('day', now()) + interval '4 days' + interval '8 hours', '30 minutes',
+   'FREQ=WEEKLY;INTERVAL=1;UNTIL=' ||
+     to_char((date_trunc('day', now()) + interval '46 days')::date, 'YYYYMMDD') || 'T235959Z',
+   null, '9', false)
 on conflict (id) do nothing;
 
 insert into event_person (series_id, person_id) values
@@ -122,7 +136,9 @@ insert into event_person (series_id, person_id) values
   ('44444444-0000-4000-8000-000000000002', '33333333-0000-4000-8000-000000000001'),
   ('44444444-0000-4000-8000-000000000002', '33333333-0000-4000-8000-000000000002'),
   ('44444444-0000-4000-8000-000000000003', '33333333-0000-4000-8000-000000000003'),
-  ('44444444-0000-4000-8000-000000000004', '33333333-0000-4000-8000-000000000003')
+  ('44444444-0000-4000-8000-000000000004', '33333333-0000-4000-8000-000000000003'),
+  ('44444444-0000-4000-8000-000000000005', '33333333-0000-4000-8000-000000000003'),
+  ('44444444-0000-4000-8000-000000000006', '33333333-0000-4000-8000-000000000002')
 on conflict do nothing;
 
 -- Half an hour before, as the app stores it: seconds, per user.

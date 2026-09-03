@@ -36,6 +36,12 @@ export interface Recurrence {
   interval: number
   /** Inclusive last occurrence date. */
   until?: string
+  /**
+   * Stop after this many occurrences. Not in the rrule string — it lives in
+   * `event_series.repeat_count`, so `parseRRule` never sees it and the join
+   * happens in `computeDueReminders`.
+   */
+  count?: number
 }
 
 const FREQ_MAP: Record<string, Recurrence['freq'] | undefined> = {
@@ -79,32 +85,60 @@ export function parseRRule(rrule: string | null): Recurrence | undefined {
 // ---- recurrence expansion (mirrors src/lib/recurrence.ts startsOn) ----------
 
 /** Does an occurrence anchored on `anchor` with `recurrence` start on `date`? */
+/**
+ * The zero-based position of `date` on the grid, or null when it is not a slot.
+ * The UTC twin of the client's `occurrenceIndex` (src/services/recurrence/
+ * expand.ts) — the cross-validation test pins the two together.
+ *
+ * The monthly walk counts *produced* months only: an anchor on the 31st yields
+ * nothing in February, and that missing month must not consume one of a counted
+ * series' N.
+ */
+export function occurrenceIndex(
+  anchor: string,
+  recurrence: Recurrence | undefined,
+  date: string,
+): number | null {
+  const delta = diffDays(date, anchor)
+  if (delta < 0) return null
+  if (delta === 0) return 0
+  if (!recurrence) return null
+  const n = recurrence.interval
+  switch (recurrence.freq) {
+    case 'daily':
+      return delta % n === 0 ? delta / n : null
+    case 'weekly':
+      return delta % (7 * n) === 0 ? delta / (7 * n) : null
+    case 'monthly': {
+      const a = new Date(isoToUtcMs(anchor))
+      const b = new Date(isoToUtcMs(date))
+      // Same day-of-month only (months missing that day simply skip).
+      if (a.getUTCDate() !== b.getUTCDate()) return null
+      const months =
+        (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + (b.getUTCMonth() - a.getUTCMonth())
+      if (months % n !== 0) return null
+      let index = 0
+      for (let j = 0; j < months / n; j++) {
+        const d = new Date(a)
+        d.setUTCMonth(d.getUTCMonth() + j * n)
+        // Date overflow (Feb 31 -> Mar 3) marks a month that produces nothing.
+        if (d.getUTCDate() === a.getUTCDate()) index++
+      }
+      return index
+    }
+  }
+}
+
 export function startsOn(
   anchor: string,
   recurrence: Recurrence | undefined,
   date: string,
 ): boolean {
-  const delta = diffDays(date, anchor)
-  if (delta < 0) return false
   if (recurrence?.until && diffDays(date, recurrence.until) > 0) return false
-  if (delta === 0) return true
-  if (!recurrence) return false
-  const n = recurrence.interval
-  switch (recurrence.freq) {
-    case 'daily':
-      return delta % n === 0
-    case 'weekly':
-      return delta % 7 === 0 && (delta / 7) % n === 0
-    case 'monthly': {
-      const a = new Date(isoToUtcMs(anchor))
-      const b = new Date(isoToUtcMs(date))
-      // Same day-of-month only (months missing that day simply skip).
-      if (a.getUTCDate() !== b.getUTCDate()) return false
-      const months =
-        (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + (b.getUTCMonth() - a.getUTCMonth())
-      return months % n === 0
-    }
-  }
+  const index = occurrenceIndex(anchor, recurrence, date)
+  if (index == null) return false
+  // A counted series stops after its Nth slot — slots, not survivors.
+  return recurrence?.count == null || index < recurrence.count
 }
 
 // ---- timezone bridging -------------------------------------------------------
@@ -164,6 +198,7 @@ export interface SenderSeries {
   all_day: boolean
   dtstart: string // timestamptz ISO
   rrule: string | null
+  repeat_count: number | null
 }
 
 export interface SenderReminder {
@@ -235,7 +270,11 @@ export function computeDueReminders(args: DueArgs): DueNotification[] {
     if (!reminders?.length || !s.dtstart) continue
 
     const anchor = wallParts(timeZone, Date.parse(s.dtstart))
-    const recurrence = parseRRule(s.rrule)
+    // The count is not in the rrule string, so it is joined on here. This one
+    // line is what the cross-validation test does NOT cover (it calls startsOn
+    // with prebuilt Recurrence objects), which is why it has a case of its own.
+    const parsed = parseRRule(s.rrule)
+    const recurrence = parsed && { ...parsed, count: s.repeat_count ?? undefined }
     const maxOffsetMs = Math.max(...reminders.map((r) => r.offset_seconds), 0) * 1000
 
     // Candidate occurrence dates: reminders fire BEFORE the start, so an

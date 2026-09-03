@@ -154,7 +154,7 @@ export function OccurrenceSheet({
 
         <p className={s.meta}>
           {timeLabel} · {attendeeLabelFor(event.attendees)(people)}
-          {event.recurrence && ` · ${recurrenceLabel(event.recurrence).toLowerCase()}`}
+          {event.recurrence && ` · ${recurrenceLabel(event).toLowerCase()}`}
         </p>
 
         {hasTimingOverride && (

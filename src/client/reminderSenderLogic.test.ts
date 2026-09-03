@@ -28,6 +28,15 @@ describe('sender startsOn ≡ client startsOn', () => {
     { freq: 'monthly', interval: 2 },
     { freq: 'daily', interval: 1, until: '2026-06-20' },
     { freq: 'weekly', interval: 1, until: '2026-07-06' },
+    // Counted ends (§8). The count is not in the rrule string, so these pin
+    // that both implementations apply it identically off the same field.
+    { freq: 'daily', interval: 1, count: 3 },
+    { freq: 'weekly', interval: 1, count: 5 },
+    { freq: 'weekly', interval: 2, count: 4 },
+    { freq: 'monthly', interval: 1, count: 2 },
+    // Both set: whichever comes first, from each side.
+    { freq: 'daily', interval: 1, count: 3, until: '2026-06-30' },
+    { freq: 'daily', interval: 1, count: 30, until: '2026-06-18' },
   ]
 
   function clientEvent(recurrence?: Recurrence): CalendarEvent {
@@ -112,6 +121,7 @@ describe('computeDueReminders', () => {
     all_day: false,
     dtstart: '2026-07-09T06:00:00Z', // 09:00 +03
     rrule: 'FREQ=WEEKLY;INTERVAL=1',
+    repeat_count: null,
   }
   const reminder: SenderReminder = {
     id: 'r1',
@@ -274,5 +284,32 @@ describe('computeDueReminders', () => {
         ...windowAround(fireMs + 7 * 86_400_000),
       }),
     ).toHaveLength(0)
+  })
+
+  it('respects a repeat_count, which lives outside the rrule string', () => {
+    // The count reaches startsOn only through computeDueReminders joining the
+    // column onto the parsed rule. The cross-validation above calls startsOn
+    // with prebuilt Recurrence objects, so this one line is not covered there —
+    // and getting it wrong pushes a partner about a lesson the calendar has
+    // already stopped showing.
+    const counted: SenderSeries = { ...series, repeat_count: 1 }
+    expect(
+      computeDueReminders({
+        series: [counted],
+        reminders: [reminder],
+        overrides: [],
+        timeZone: TZ,
+        ...windowAround(fireMs),
+      }),
+    ).toHaveLength(1) // the first (and only) slot
+    expect(
+      computeDueReminders({
+        series: [counted],
+        reminders: [reminder],
+        overrides: [],
+        timeZone: TZ,
+        ...windowAround(fireMs + 7 * 86_400_000),
+      }),
+    ).toHaveLength(0) // there is no second
   })
 })

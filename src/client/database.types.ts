@@ -177,6 +177,7 @@ export type Database = {
           id: string
           is_template: boolean
           metadata: Json
+          repeat_count: number | null
           rrule: string | null
           title: string
           updated_at: string
@@ -192,6 +193,7 @@ export type Database = {
           id?: string
           is_template?: boolean
           metadata?: Json
+          repeat_count?: number | null
           rrule?: string | null
           title?: string
           updated_at?: string
@@ -207,6 +209,7 @@ export type Database = {
           id?: string
           is_template?: boolean
           metadata?: Json
+          repeat_count?: number | null
           rrule?: string | null
           title?: string
           updated_at?: string

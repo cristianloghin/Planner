@@ -57,6 +57,7 @@ export type EditorTarget =
     }
 
 type RepeatChoice = 'none' | RecurrenceFreq
+type EndsChoice = 'never' | 'after' | 'on'
 
 /** datetime-local value for a date + minutes-from-midnight. Minutes past the
  *  day roll into the next date — `<input type="datetime-local">` rejects the
@@ -196,6 +197,13 @@ function EventEditorForm({
   const [colorKey, setColorKey] = useState<ColorKey | undefined>(base?.colorKey)
   const [repeat, setRepeat] = useState<RepeatChoice>(base?.recurrence?.freq ?? 'none')
   const [interval, setInterval] = useState(base?.recurrence?.interval ?? 1)
+  // How the series ends. Exactly one of count / until is ever written, so the
+  // choice is the state and the other input keeps whatever it last held.
+  const [ends, setEnds] = useState<EndsChoice>(
+    base?.recurrence?.count != null ? 'after' : base?.recurrence?.until ? 'on' : 'never',
+  )
+  const [endCount, setEndCount] = useState(base?.recurrence?.count ?? 12)
+  const [endDate, setEndDate] = useState(base?.recurrence?.until ?? '')
   const [reminders, setReminders] = useState<EventReminder[]>(base?.reminders ?? [])
   // Which template a *new* event was started from — it chooses whose people and
   // reminders get copied into the draft. Nothing is stored about it; stays null
@@ -274,9 +282,11 @@ function EventEditorForm({
           : {
               freq: repeat,
               interval: Math.max(1, interval),
-              // `until` is not a form field yet, so carry whatever the series
-              // already has across an edit rather than silently un-capping it.
-              ...(base?.recurrence?.until ? { until: base.recurrence.until } : {}),
+              // Exactly one end, or neither. Writing both would leave the two
+              // racing, and clearing the other is what makes switching between
+              // them actually take effect.
+              ...(ends === 'after' ? { count: Math.max(1, endCount) } : {}),
+              ...(ends === 'on' && endDate ? { until: endDate } : {}),
             },
       attendees,
       ...(colorKey ? { colorKey } : {}),
@@ -463,6 +473,43 @@ function EventEditorForm({
             </label>
           )}
         </div>
+
+        {repeat !== 'none' && (
+          <div className={shared.row}>
+            <label className={shared.field}>
+              Ends
+              <select value={ends} onChange={(e) => setEnds(e.target.value as EndsChoice)}>
+                <option value="never">Never</option>
+                <option value="after">After…</option>
+                <option value="on">On…</option>
+              </select>
+            </label>
+            {ends === 'after' && (
+              <label className={shared.field}>
+                Occurrences
+                <div className={shared.interval}>
+                  <NumberField min={1} value={endCount} onChange={setEndCount} />
+                  <span>times</span>
+                </div>
+              </label>
+            )}
+            {ends === 'on' && (
+              <label className={shared.field}>
+                Last day
+                <input
+                  type="date"
+                  value={endDate}
+                  // The series' own anchor, not the editor's `date` — that holds
+                  // the opened occurrence's day when the editor came from a
+                  // sheet, and a user must be able to end a series before the
+                  // occurrence they opened.
+                  min={base ? eventDate(base) : date}
+                  onChange={(e) => setEndDate(e.target.value)}
+                />
+              </label>
+            )}
+          </div>
+        )}
 
         <label className={shared.label}>Who's involved?</label>
         <AttendeeChips value={attendees} onChange={setAttendees} />

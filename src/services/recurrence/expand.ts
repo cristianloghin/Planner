@@ -1,4 +1,4 @@
-import { addDays, diffDays, toISODate } from '../../assets/utils/dates'
+import { DAY_NAMES, addDays, diffDays, toISODate, weekdayIndex } from '../../assets/utils/dates'
 /**
  * Turning a repeating event into the actual days it lands on.
  *
@@ -8,7 +8,7 @@ import { addDays, diffDays, toISODate } from '../../assets/utils/dates'
  *
  * Fed events and per-day state; fetches nothing.
  */
-import type { CalendarEvent, Recurrence } from '../../domains/events/types'
+import type { CalendarEvent } from '../../domains/events/types'
 import type { OccurrenceState } from '../../domains/occurrences/types'
 import { occKey } from './timing'
 import { eventDate, eventSpanDays, timedSegment } from './timing'
@@ -55,31 +55,63 @@ function maxEffectiveSpan(
   return max
 }
 
-/** Does an occurrence of `e` start exactly on ISO `date`? */
-export function startsOn(e: CalendarEvent, date: string): boolean {
+/**
+ * The zero-based position of `date` on `e`'s grid, or null when `date` is not a
+ * slot at all (off-grid, or before the anchor). The anchor itself is 0.
+ *
+ * Daily and weekly are plain division — every grid step is a slot. Monthly is
+ * not: a series anchored on the 31st produces nothing in February, and that
+ * missing month must NOT consume one of a counted series' N, or "12 lessons on
+ * the 31st" would yield fewer than 12. So the monthly index counts *produced*
+ * months only, walking at most a few dozen steps. This matches RFC 5545's
+ * COUNT, which counts instances.
+ *
+ * Ignores `until` and `count` — this is the position on the grid, not whether
+ * the series still reaches it. `startsOn` puts the two together.
+ */
+export function occurrenceIndex(e: CalendarEvent, date: string): number | null {
   const base = eventDate(e)
   const delta = diffDays(date, base)
-  if (delta < 0) return false
-  // A capped series produces nothing after its inclusive `until`.
-  if (e.recurrence?.until && diffDays(date, e.recurrence.until) > 0) return false
-  if (delta === 0) return true
+  if (delta < 0) return null
+  if (delta === 0) return 0
   const r = e.recurrence
-  if (!r) return false
+  if (!r) return null
   const n = Math.max(1, r.interval)
   switch (r.freq) {
     case 'daily':
-      return delta % n === 0
+      return delta % n === 0 ? delta / n : null
     case 'weekly':
-      return delta % 7 === 0 && (delta / 7) % n === 0
+      return delta % (7 * n) === 0 ? delta / (7 * n) : null
     case 'monthly': {
       const a = new Date(`${base}T00:00:00`)
       const b = new Date(`${date}T00:00:00`)
       // Same day-of-month only (months missing that day simply skip).
-      if (a.getDate() !== b.getDate()) return false
+      if (a.getDate() !== b.getDate()) return null
       const months = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth())
-      return months % n === 0
+      if (months % n !== 0) return null
+      let index = 0
+      for (let j = 0; j < months / n; j++) {
+        const d = new Date(a)
+        d.setMonth(d.getMonth() + j * n)
+        // Date overflow (Feb 31 -> Mar 3) marks a month that produces nothing.
+        if (d.getDate() === a.getDate()) index++
+      }
+      return index
     }
   }
+}
+
+/** Does an occurrence of `e` start exactly on ISO `date`? */
+export function startsOn(e: CalendarEvent, date: string): boolean {
+  // A capped series produces nothing after its inclusive `until`.
+  if (e.recurrence?.until && diffDays(date, e.recurrence.until) > 0) return false
+  const index = occurrenceIndex(e, date)
+  if (index == null) return false
+  // A counted series stops after its Nth slot. Slots, not survivors: a
+  // cancelled occurrence is one of the N and does not extend the series.
+  // Both set is "whichever comes first", which is only defensive — the editor
+  // writes exactly one.
+  return e.recurrence?.count == null || index < e.recurrence.count
 }
 
 /**
@@ -99,6 +131,10 @@ export function nextStartOnOrAfter(e: CalendarEvent, date: string): string | nul
     if (startsOn(e, d)) return d
     // Past the inclusive cap there can be no further occurrence.
     if (e.recurrence.until && diffDays(d, e.recurrence.until) > 0) return null
+    // Nor past the last counted slot — this exits in a few steps rather than
+    // scanning five years of a series that has already finished.
+    const index = occurrenceIndex(e, d)
+    if (e.recurrence.count != null && index != null && index >= e.recurrence.count) return null
   }
   return null
 }
@@ -222,9 +258,25 @@ export function occurrencesOnDate(
   return out
 }
 
-export function recurrenceLabel(r?: Recurrence): string {
+export function recurrenceLabel(e?: Pick<CalendarEvent, 'start' | 'recurrence'>): string {
+  const r = e?.recurrence
   if (!r) return 'Does not repeat'
   const n = Math.max(1, r.interval)
   const unit = r.freq === 'daily' ? 'day' : r.freq === 'weekly' ? 'week' : 'month'
-  return n === 1 ? `Every ${unit}` : `Every ${n} ${unit}s`
+  const every = n === 1 ? `Every ${unit}` : `Every ${n} ${unit}s`
+  // A weekly rule's weekday comes from the anchor and is never stored, so say
+  // it back: read in the sheet's meta line, this label is the sentence the user
+  // had in their head, which is the check that the model expresses it.
+  const on = r.freq === 'weekly' ? ` on ${DAY_NAMES[weekdayIndex(e.start.slice(0, 10))]}` : ''
+  const end =
+    r.count != null ? ` · ${r.count} times` : r.until ? ` · until ${endLabel(r.until)}` : ''
+  return `${every}${on}${end}`
+}
+
+/** "25 Dec" — the end of a series, short enough for a meta line. */
+function endLabel(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+  })
 }
