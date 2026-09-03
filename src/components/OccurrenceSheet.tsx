@@ -7,6 +7,7 @@ import { PageLoader } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
 import { addDays, isoLabel, minutesToTime } from '../assets/utils/dates'
 import { useAuth } from '../auth'
+import { type EventsChange, useEventsWrite } from '../domains/events/mutations'
 import { useEvents } from '../domains/events/queries'
 import { timingOf } from '../domains/events/selectors'
 import { type ListsChange, useListsWrite } from '../domains/lists/mutations'
@@ -30,7 +31,6 @@ import {
   occKey,
   occurrenceEffectiveStatus,
 } from '../services/recurrence/status'
-import { useApp } from '../state'
 import type { CalendarEvent, CompletionsMap, OccurrenceStatusCode } from '../types'
 import s from './OccurrenceSheet.module.css'
 
@@ -52,9 +52,15 @@ export function OccurrenceSheet({
   onEdit: () => void
   onClose: () => void
 }) {
-  const { dispatch } = useApp()
-  const { accountId } = useAuth()
+  const { accountId, session } = useAuth()
   const { data: people = [] } = usePeople(accountId)
+  const eventsWrite = useEventsWrite()
+  const writeEvent = (change: EventsChange) =>
+    eventsWrite.mutate({
+      accountId: accountId as string,
+      userId: session?.user.id as string,
+      change,
+    })
   const { data: events = [] } = useEvents(accountId)
   const { data: dependencies = {} } = useDependencies(accountId)
   // Windowed per-occurrence state: this occurrence's month, plus the dates of
@@ -102,7 +108,7 @@ export function OccurrenceSheet({
 
   /** Drop the whole series, every occurrence with it. */
   function deleteAllEvents() {
-    dispatch({ type: 'removeEvent', id: event.id })
+    writeEvent({ kind: 'removeEvent', id: event.id })
     onClose()
   }
   /** Remove just this slot: the rule still produces it, `cancelled` hides it. */
@@ -121,12 +127,10 @@ export function OccurrenceSheet({
    */
   function deleteThisAndFuture() {
     if (isFirstOccurrence) return deleteAllEvents()
-    dispatch({
-      type: 'updateEvent',
-      event: {
-        ...event,
-        recurrence: { ...event.recurrence!, until: addDays(date, -1) },
-      },
+    writeEvent({
+      kind: 'saveEvent',
+      isNew: false,
+      event: { ...event, recurrence: { ...event.recurrence!, until: addDays(date, -1) } },
     })
     onClose()
   }
@@ -446,10 +450,10 @@ function DependencyEditor({
   date: string
   completions: CompletionsMap
 }) {
-  const { dispatch } = useApp()
   const { accountId } = useAuth()
   const { data: events = [] } = useEvents(accountId)
   const { data: dependencies = {} } = useDependencies(accountId)
+  const occurrences = useOccurrencesWrite()
   const edges = dependencies[occKey(event.id, date)] ?? []
   const others = events.filter((e) => e.id !== event.id)
 
@@ -465,14 +469,17 @@ function DependencyEditor({
     : []
 
   function add() {
-    if (!prereqId || !prereqDate) return
-    dispatch({
-      type: 'addDependency',
-      eventId: event.id,
-      date,
-      prerequisiteSeriesId: prereqId,
-      prerequisiteDate: prereqDate,
-      requiredStatus,
+    if (!prereq || !prereqDate) return
+    occurrences.mutate({
+      accountId: accountId as string,
+      change: {
+        kind: 'addDependency',
+        dependent: timingOf(event),
+        date,
+        prerequisite: timingOf(prereq),
+        prerequisiteDate: prereqDate,
+        requiredStatus,
+      },
     })
     setPrereqId('')
     setPrereqDate('')
@@ -505,12 +512,15 @@ function DependencyEditor({
                   type="button"
                   className={s.depRemove}
                   onClick={() =>
-                    dispatch({
-                      type: 'removeDependency',
-                      eventId: event.id,
-                      date,
-                      prerequisiteSeriesId: edge.prerequisiteSeriesId,
-                      prerequisiteDate: edge.prerequisiteDate,
+                    occurrences.mutate({
+                      accountId: accountId as string,
+                      change: {
+                        kind: 'removeDependency',
+                        dependentId: event.id,
+                        date,
+                        prerequisiteId: edge.prerequisiteSeriesId,
+                        prerequisiteDate: edge.prerequisiteDate,
+                      },
                     })
                   }
                   aria-label="Remove link"

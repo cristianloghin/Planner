@@ -9,7 +9,7 @@ import { PageLoader } from '../assets/ui/Spinner'
 import { addDays, diffDays, isoLabel, minutesToTime, toDateTimeLocal } from '../assets/utils/dates'
 import { uid } from '../assets/utils/id'
 import { useAuth } from '../auth'
-import { useEventsWrite } from '../domains/events/mutations'
+import { type EventsChange, useEventsWrite } from '../domains/events/mutations'
 import { useTemplates } from '../domains/events/queries'
 import { timingOf } from '../domains/events/selectors'
 import { useOccurrencesWrite } from '../domains/occurrences/mutations'
@@ -21,7 +21,6 @@ import { personColors } from '../domains/preferences/selectors'
 import { cloneAttachments } from '../lib/attachments'
 import { effectiveOccurrence } from '../lib/recurrence'
 import { eventDate, eventStartMinutes } from '../lib/timing'
-import { useApp } from '../state'
 import type {
   Attachment,
   CalendarEvent,
@@ -136,22 +135,18 @@ function EventEditorForm({
   completions: CompletionsMap
   onClose: () => void
 }) {
-  const { dispatch, beginEdit, endEdit } = useApp()
   const { accountId, session } = useAuth()
   const { data: people = [] } = usePeople(accountId)
   const { data: overrides = {} } = usePreferences(accountId, session?.user.id ?? null, personColors)
   const occurrences = useOccurrencesWrite()
   const { data: templates = [] } = useTemplates(accountId)
   const events = useEventsWrite()
+  const write = (change: EventsChange) =>
+    events.mutate({ accountId: accountId as string, userId: session?.user.id as string, change })
   const isEdit = target.mode === 'edit'
   const base = isEdit ? target.event : null
-
-  // While this editor is open, defer realtime reloads so a partner's change
-  // can't pull data out from under the unsaved draft.
-  useEffect(() => {
-    beginEdit()
-    return endEdit
-  }, [beginEdit, endEdit])
+  // No edit guard: the form holds its own draft, and a partner's change only
+  // refetches the events query behind it.
 
   const [title, setTitle] = useState(base?.title ?? '')
   const [allDay, setAllDay] = useState(base?.allDay ?? (isEdit ? false : (target.allDay ?? false)))
@@ -310,12 +305,15 @@ function EventEditorForm({
       setShowScope(true)
       return
     }
-    if (isEdit) dispatch({ type: 'updateEvent', event: { ...buildEvent(), id: base!.id } })
+    if (isEdit) write({ kind: 'saveEvent', event: { ...buildEvent(), id: base!.id }, isNew: false })
     else
-      dispatch({
-        type: 'addEvent',
-        event: buildEvent(),
-        templateId: templateId ?? undefined,
+      write({
+        kind: 'saveEvent',
+        // Minted here so a second edit before the first write lands still
+        // names a real row.
+        event: { ...buildEvent(), id: uid() },
+        isNew: true,
+        fromTemplateId: templateId ?? undefined,
       })
     onClose()
   }
@@ -349,11 +347,11 @@ function EventEditorForm({
     const recurrence = ev.recurrence
       ? { freq: ev.recurrence.freq, interval: ev.recurrence.interval }
       : undefined
-    dispatch({
-      type: 'splitSeries',
-      eventId: base!.id,
+    write({
+      kind: 'split',
+      from: { ...timingOf(base!), recurrence: base!.recurrence! },
       fromDate: occurrenceDate!,
-      event: { ...ev, start, recurrence },
+      edits: { ...ev, start, recurrence, id: base!.id },
     })
     onClose()
   }
@@ -363,10 +361,7 @@ function EventEditorForm({
     // series to another day is out of scope) — apply only the new time/duration.
     const ev = buildEvent()
     const start = allDay ? eventDate(base!) : `${eventDate(base!)}T${startDT.slice(11)}`
-    dispatch({
-      type: 'updateEvent',
-      event: { ...ev, start, id: base!.id },
-    })
+    write({ kind: 'saveEvent', event: { ...ev, start, id: base!.id }, isNew: false })
     onClose()
   }
 
