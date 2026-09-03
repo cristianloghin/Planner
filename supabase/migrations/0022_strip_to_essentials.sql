@@ -47,6 +47,39 @@ alter table account_member drop column role;
 -- Never written, by the app or by the reminder sender.
 alter table notification_log drop column dismissed_at;
 
+-- Never written. The reminder sender reads `user_preference.prefs.timezone`
+-- instead, stamped per user by the app on startup.
+alter table event_series drop column timezone;
+
+-- Written on new-from-template, never read. The editor keeps its own
+-- `templateId` state — it chooses whose people and reminders are copied into
+-- the draft — but the stored provenance goes, and its index with it.
+alter table event_series drop column template_id;
+
+-- Set only by split_series, dropped above; never read. Its 0017 index goes too.
+alter table event_series drop column split_from_id;
+
+-- Always 'app', ignored by the sender; nothing ever sent `push` or `email`.
+-- The column first, then the lookup it referenced.
+alter table reminder drop column method;
+drop table reminder_method;
+
+
+-- ---------------------------------------------------------------------------
+-- §6a. The dead roster model.
+-- ---------------------------------------------------------------------------
+
+-- 0005 replaced the original user-keyed roster with `person` / `event_person`,
+-- and the original stayed behind. No app path and no sender path reads or
+-- writes any of it; the only SQL that did was split_series, dropped above.
+-- RLS policies and indexes go with the tables, and none is in the realtime
+-- publication.
+drop table event_participant, occurrence_participant_override,
+           participation_requirement cascade;
+
+-- Their lookups, once nothing references them.
+drop table rsvp_status, participant_role;
+
 
 -- ---------------------------------------------------------------------------
 -- §6d. `person.color` holds a palette key — name it like event_series.color_key.

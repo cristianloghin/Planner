@@ -180,66 +180,6 @@ export type Database = {
           },
         ]
       }
-      event_participant: {
-        Row: {
-          invited_by: string | null
-          role: string
-          rsvp: string
-          series_id: string
-          user_id: string
-        }
-        Insert: {
-          invited_by?: string | null
-          role: string
-          rsvp?: string
-          series_id: string
-          user_id: string
-        }
-        Update: {
-          invited_by?: string | null
-          role?: string
-          rsvp?: string
-          series_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "event_participant_invited_by_fkey"
-            columns: ["invited_by"]
-            isOneToOne: false
-            referencedRelation: "app_user"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_participant_role_fkey"
-            columns: ["role"]
-            isOneToOne: false
-            referencedRelation: "participant_role"
-            referencedColumns: ["code"]
-          },
-          {
-            foreignKeyName: "event_participant_rsvp_fkey"
-            columns: ["rsvp"]
-            isOneToOne: false
-            referencedRelation: "rsvp_status"
-            referencedColumns: ["code"]
-          },
-          {
-            foreignKeyName: "event_participant_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_participant_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "app_user"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       event_person: {
         Row: {
           person_id: string
@@ -283,9 +223,6 @@ export type Database = {
           id: string
           is_template: boolean
           rrule: string | null
-          split_from_id: string | null
-          template_id: string | null
-          timezone: string
           title: string
           updated_at: string
         }
@@ -301,9 +238,6 @@ export type Database = {
           id?: string
           is_template?: boolean
           rrule?: string | null
-          split_from_id?: string | null
-          template_id?: string | null
-          timezone?: string
           title?: string
           updated_at?: string
         }
@@ -319,9 +253,6 @@ export type Database = {
           id?: string
           is_template?: boolean
           rrule?: string | null
-          split_from_id?: string | null
-          template_id?: string | null
-          timezone?: string
           title?: string
           updated_at?: string
         }
@@ -346,20 +277,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "occurrence_status"
             referencedColumns: ["code"]
-          },
-          {
-            foreignKeyName: "event_series_split_from_id_fkey"
-            columns: ["split_from_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_series_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
           },
         ]
       }
@@ -713,52 +630,6 @@ export type Database = {
           },
         ]
       }
-      occurrence_participant_override: {
-        Row: {
-          occurrence_start: string
-          removed: boolean
-          rsvp: string | null
-          series_id: string
-          user_id: string
-        }
-        Insert: {
-          occurrence_start: string
-          removed?: boolean
-          rsvp?: string | null
-          series_id: string
-          user_id: string
-        }
-        Update: {
-          occurrence_start?: string
-          removed?: boolean
-          rsvp?: string | null
-          series_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "occurrence_participant_override_rsvp_fkey"
-            columns: ["rsvp"]
-            isOneToOne: false
-            referencedRelation: "rsvp_status"
-            referencedColumns: ["code"]
-          },
-          {
-            foreignKeyName: "occurrence_participant_override_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "occurrence_participant_override_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "app_user"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       occurrence_status: {
         Row: {
           code: string
@@ -770,54 +641,6 @@ export type Database = {
           code?: string
         }
         Relationships: []
-      }
-      participant_role: {
-        Row: {
-          code: string
-        }
-        Insert: {
-          code: string
-        }
-        Update: {
-          code?: string
-        }
-        Relationships: []
-      }
-      participation_requirement: {
-        Row: {
-          id: string
-          min_count: number
-          role: string
-          series_id: string
-        }
-        Insert: {
-          id?: string
-          min_count?: number
-          role: string
-          series_id: string
-        }
-        Update: {
-          id?: string
-          min_count?: number
-          role?: string
-          series_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "participation_requirement_role_fkey"
-            columns: ["role"]
-            isOneToOne: false
-            referencedRelation: "participant_role"
-            referencedColumns: ["code"]
-          },
-          {
-            foreignKeyName: "participation_requirement_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       person: {
         Row: {
@@ -908,33 +731,23 @@ export type Database = {
       reminder: {
         Row: {
           id: string
-          method: string
           offset_seconds: number
           series_id: string
           user_id: string
         }
         Insert: {
           id?: string
-          method?: string
           offset_seconds: number
           series_id: string
           user_id: string
         }
         Update: {
           id?: string
-          method?: string
           offset_seconds?: number
           series_id?: string
           user_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "reminder_method_fkey"
-            columns: ["method"]
-            isOneToOne: false
-            referencedRelation: "reminder_method"
-            referencedColumns: ["code"]
-          },
           {
             foreignKeyName: "reminder_series_id_fkey"
             columns: ["series_id"]
@@ -950,30 +763,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      reminder_method: {
-        Row: {
-          code: string
-        }
-        Insert: {
-          code: string
-        }
-        Update: {
-          code?: string
-        }
-        Relationships: []
-      }
-      rsvp_status: {
-        Row: {
-          code: string
-        }
-        Insert: {
-          code: string
-        }
-        Update: {
-          code?: string
-        }
-        Relationships: []
       }
       user_preference: {
         Row: {

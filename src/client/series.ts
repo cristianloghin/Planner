@@ -188,15 +188,12 @@ export async function fetchSeries(
  *
  * `isNew` records who created it. It is only stamped on the first save, so a
  * partner editing a series later does not become its author.
- *
- * `templateId` records which blueprint a series was made from. It is only sent
- * when given, so an ordinary edit never clears an existing link.
  */
 export async function saveSeries(
   accountId: string,
   userId: string,
   series: Series,
-  { isNew, templateId }: { isNew: boolean; templateId?: string },
+  { isNew }: { isNew: boolean },
 ): Promise<void> {
   const row = {
     id: series.id,
@@ -208,7 +205,6 @@ export async function saveSeries(
     rrule: recurrenceToRRule(series.recurrence),
     color_key: series.colorKey ?? null,
     is_template: series.isTemplate,
-    ...(templateId ? { template_id: templateId } : {}),
     ...(isNew ? { created_by: userId } : {}),
   }
   const up = await supabase.from('event_series').upsert(row, { onConflict: 'id' })
@@ -315,7 +311,6 @@ async function syncReminders(series: Series, userId: string): Promise<void> {
     series_id: series.id,
     user_id: userId,
     offset_seconds: Math.round(r.offset * 60),
-    method: 'app',
   }))
   if (desired.length) {
     const up = await supabase.from('reminder').upsert(desired, { onConflict: 'id' })

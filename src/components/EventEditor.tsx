@@ -197,8 +197,9 @@ function EventEditorForm({
   const [repeat, setRepeat] = useState<RepeatChoice>(base?.recurrence?.freq ?? 'none')
   const [interval, setInterval] = useState(base?.recurrence?.interval ?? 1)
   const [attachments, setAttachments] = useState<Attachment[]>(base?.attachments ?? [])
-  // Provenance: the template a *new* event was started from (written to the
-  // series' `template_id`). Stays null for from-scratch events and edits.
+  // Which template a *new* event was started from — it chooses whose people and
+  // reminders get copied into the draft. Nothing is stored about it; stays null
+  // for from-scratch events and edits.
   const [templateId, setTemplateId] = useState<string | null>(null)
   // Transient "Saved to templates" confirmation.
   const [savedTemplate, setSavedTemplate] = useState(false)
@@ -312,7 +313,6 @@ function EventEditorForm({
         // names a real row.
         event: { ...buildEvent(), id: uid() },
         isNew: true,
-        fromTemplateId: templateId ?? undefined,
       })
     onClose()
   }

@@ -25,12 +25,7 @@ import type { CalendarEvent, EventTemplate } from './types'
  * real.
  */
 export type EventsChange =
-  | {
-      kind: 'saveEvent'
-      event: CalendarEvent
-      isNew: boolean
-      fromTemplateId?: string
-    }
+  | { kind: 'saveEvent'; event: CalendarEvent; isNew: boolean }
   | { kind: 'removeEvent'; id: string }
   | { kind: 'saveTemplate'; template: EventTemplate; isNew: boolean }
   | { kind: 'removeTemplate'; id: string }
@@ -53,10 +48,7 @@ export function registerEventsDefaults(queryClient: QueryClient): void {
     mutationFn: async ({ accountId, userId, change: w }: EventsWrite) => {
       switch (w.kind) {
         case 'saveEvent':
-          return saveSeries(accountId, userId, fromEvent(w.event), {
-            isNew: w.isNew,
-            templateId: w.fromTemplateId,
-          })
+          return saveSeries(accountId, userId, fromEvent(w.event), { isNew: w.isNew })
         case 'removeEvent':
           return deleteSeries(w.id)
         case 'saveTemplate':
