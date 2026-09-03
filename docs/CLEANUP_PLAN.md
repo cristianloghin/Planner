@@ -44,6 +44,10 @@ All of it is agreed and specified below. The removals are independent in the
 app code and can land as separate commits; the schema changes land in one
 migration, `0022` — see §4 for the functions it recreates and drops.
 
+Validated against the code on 2026-09-03 at `95719f2`; every `:line`
+reference below is to that revision. Typecheck is clean and the suite runs
+219 tests at that point.
+
 ---
 
 ## 1. Lists — remove entirely
@@ -65,9 +69,13 @@ new migration.
 ### App code — edit at the four seams
 
 1. **`src/components/OccurrenceSheet.tsx`** — delete the `LinkedTodos`
-   component (~90 lines) and its `<LinkedTodos …/>` call site, plus the four
-   list imports (`domains/lists/{mutations,queries,selectors}`). This is the
-   only place Lists reaches into the calendar.
+   component (~90 lines, `:354–442`) and its `<LinkedTodos …/>` call site
+   (`:322`), plus the three list import statements
+   (`domains/lists/{mutations,queries,selectors}`, `:14–16`). This is the
+   only place Lists reaches into the calendar. The `.todoList` / `.todoRow` /
+   `.todoLabel` / `.todoDue` / `.todoOverdue` rules in
+   `OccurrenceSheet.module.css` (`:192–226`) serve only this component and go
+   with it.
 2. **`src/App.tsx`** (TABS, ~line 26) and **`src/routes/routes.tsx`** — drop the
    `/lists` route and tab; five tabs become four. `ListChecks` becomes an unused
    `lucide-react` import. The `/` guard already redirects to `/day`, so no
@@ -84,6 +92,9 @@ Also: drop the `ListItem` / `TodoList` re-exports from `src/types.ts`, and bump
 `CACHE_BUSTER` in `src/queryClient.ts` — the mutation keys change, and a write
 paused offline under a removed key is otherwise dropped silently (the rule is
 recorded in `docs/STATUS.md`, "Adopting a slice").
+`src/services/realtime/realtime.test.ts:83–89` uses `'list_item'` as a sample
+table name; it still passes (it is a plain string) but should name a surviving
+table so the test keeps meaning something.
 
 ### Database — new migration `0022`
 
@@ -147,13 +158,19 @@ intermediate `checklist | reminder` state.
   the `toAttachments` / round-trip describe blocks (§7).
 - **`src/client/search.ts`** — remove `snippet` from `EventSearchResult` and its
   mapping; **`src/components/EventSearch.tsx:72`** — remove the snippet render
-  and the `.snippet` rule from `Search.module.css`; fix the doc comment at
-  `EventSearch.tsx:13` that still says "titles + note and checklist text".
+  and the `.snippet` rule from `src/assets/ui/Search.module.css:134`; fix the
+  doc comment at `EventSearch.tsx:13` that still says "titles + note and
+  checklist text".
+- Stale comments that name notes: `domains/events/attachments.ts:49` (the
+  module goes in §7) and `domains/index.ts:54`. The `notes: _n` omit in the
+  split case of `domains/events/mutations.ts:89` goes with the case (§9).
 
 ### Database — folded into migration `0022`
 
 - `drop table note cascade;` — takes its RLS policy, grants, replica identity
-  and realtime publication membership with it.
+  and realtime publication membership with it. `split_series` copies `note`
+  rows on a split (`0017:99`), as it does list links; it is dropped first
+  (§4), so no function body is left naming the table.
 - **Recreate `search_events`** without the `left join note`, the `notes_text`
   aggregate and the `snippet` column — §4. This cannot be a
   `create or replace`: the `returns table (…)` signature changes, so it must be
@@ -181,10 +198,14 @@ column for future use.
 ### 3a. Dependency wiring
 
 - **`src/components/OccurrenceSheet.tsx`** — delete the `DependencyEditor`
-  component (~130 lines), its call site, the "⏳ Waiting on…" banner, the
-  `blockers` binding, and the `edges` / `prereqDates` memo that widens the
-  completions window at the top of the component. `useCompletionsForRange` then
-  takes no `extraDates`.
+  component (~150 lines, `:444–597`), its call site (`:324`), the "⏳ Waiting
+  on…" banner (`:252–260`), the `blockers` binding (`:95`), and the `edges` /
+  `prereqDates` memo (`:73–78`) that widens the completions window at the top
+  of the component. `useCompletionsForRange` then takes no `extraDates`: the
+  parameter itself (`domains/occurrences/queries.ts:101`) and `monthsFor`'s
+  third argument (`:56–59`) go; the other four callers never pass it. CSS:
+  `.waiting` (`:28`) and the eleven `.dep*` rules (`:124–186`) in
+  `OccurrenceSheet.module.css`.
 - **`src/services/recurrence/status.ts`** — delete `blockingPrerequisites`,
   `occurrenceStatus`, `prerequisiteDatesInRange`, `UnmetPrerequisite`,
   `EventStatus` and `occurrenceEffectiveStatus`. Every consumer of these six was
@@ -196,31 +217,40 @@ column for future use.
   the `blocked` computation (`:438`) and its class; drop `.blocked` from
   `DayView.module.css`.
 - **`src/domains/occurrences/`** — remove the dependency half of six files:
-  `useDependencies` and `dependenciesKey` (queries), `addDependency` /
-  `removeDependency` change kinds (mutations, patches), `dependenciesByOccurrence`
-  (transformers), `waitsFor` (selectors), `OccurrenceDependency` (types), and the
-  dependency cases in `occurrences.test.ts`.
+  `useDependencies` and `dependenciesKey` (queries), the `addDependency` /
+  `removeDependency` change kinds and their plumbing — `WaitWrite`, `isWait`,
+  the `onMutate` wait branch (`:123–150`) and the `onSettled` key choice
+  (`:169`) in mutations; `patchAddDependency` / `patchRemoveDependency`
+  (`:71–100`) in patches — `dependenciesByOccurrence` (transformers),
+  `waitsFor` (selectors), `OccurrenceDependency` (types), and the dependency
+  cases in `occurrences.test.ts` (`:102–125`, `:188–215`).
 - **`src/client/occurrences.ts`** — delete `DependencyRow`, `fetchDependencies`,
-  `addDependency`, `removeDependency` (~95 lines).
+  `addDependency`, `removeDependency` (~107 lines, `:291–397`).
 - **`src/domains/index.ts`** — remove the `occurrence_dependency` case and the
-  `dependenciesKey` import; **`src/types.ts`** — drop the `OccurrenceDependency`
-  re-export.
-- **`src/services/recurrence/expand.ts`** — `latestStartOnOrBefore` and
-  `seriesOccurrenceDatesInRange` exist only for the prerequisite picker
-  (their own doc comments say so) and have no other live consumer. Delete the
-  second; §8 replaces the first with `occurrenceIndex`, which is the same
+  `dependenciesKey` import, and the matching case in `domains.test.ts:26–28`,
+  which asserts the `dependencies` key for that table; **`src/types.ts`** —
+  drop the `OccurrenceDependency` re-export.
+- **`src/services/recurrence/expand.ts`** — `seriesOccurrenceDatesInRange`
+  (`:150–161`) exists only for the prerequisite picker (its doc comment says
+  so) and has no other consumer. `latestStartOnOrBefore` (`:90–120`) is
+  already dead today: nothing calls it but its own tests and a `{@link}` in
+  `nextStartOnOrAfter`'s doc comment (`:125`), which is reworded. Delete the
+  first; §8 replaces the second with `occurrenceIndex`, which is the same
   arithmetic asked the other way round. Their describe blocks in
-  `expand.test.ts` (`:79`, `:139`) go.
+  `expand.test.ts` (`:79`, `:139`) go. `DayView.tsx:20` loses the
+  `OccurrenceDependency` type import.
 
 ### 3b. Occurrence status
 
 - **`src/client/occurrences.ts`** — delete `OccurrenceStatusCode`, `status` from
   `OccurrenceRow` and from the select column list (`:82`), the `?? null` mapping
-  (`:97`), and `setOccurrenceStatus()` (`:184`, ~30 lines). Note what that last
+  (`:97`), and `setOccurrenceStatus()` (`:185`, ~30 lines). Note what that last
   one takes with it: its null branch is also the only code that garbage-collects
   an `event_occurrence` row holding nothing else. Rows are still written by
-  `cancel` and `override`, so nothing breaks — but if a later change wants that
-  cleanup back, it has to be rebuilt rather than found.
+  `cancel` and `override`, so nothing breaks — and `clearOccurrenceOverride`
+  (`:233`) already leaves such empty rows behind today, so the app has never
+  relied on the cleanup being complete. If a later change wants it back, it
+  has to be rebuilt rather than found.
 - **`src/domains/occurrences/`** — `OccurrenceState.status` and the
   `OccurrenceStatusCode` re-export (types), the `'status'` change kind and its
   dispatch (mutations `:40,:80,:98`), its patch arm (patches `:32`), and
@@ -262,8 +292,9 @@ column for, added now so it exists when something needs it.
 
 - `alter table event_series add column metadata jsonb not null default '{}'::jsonb;`
   and the same on `event_occurrence`. No data is written into either.
-- `drop table occurrence_dependency;` (RLS, indexes, publication membership and
-  replica identity go with it).
+- `drop table occurrence_dependency;` (its RLS, index and `0008` publication
+  membership go with it; `0011` left it at default replica identity, so there
+  is nothing else).
 - `alter table event_occurrence drop column status;` and
   `alter table event_series drop column default_status;` — both must be dropped
   as *columns* explicitly; dropping the lookup table with `cascade` would remove
@@ -296,13 +327,29 @@ Three are recreated and one is dropped. Two rules for the migration as a whole:
 
 **`split_series`** — `drop function split_series(uuid, timestamptz, text);`
 (§9). It was recreated in `0003`, `0010` and `0017`; all three definitions are
-history once this lands. Its `grant execute` goes with it.
+history once this lands. Its `grant execute` goes with it. It must be dropped
+*before* the tables and columns: it is plpgsql, so `drop table … cascade` does
+not take it, and its body reads `default_status`, copies `note` /
+`checklist_item` / list-link rows and updates `occurrence_dependency`
+(`0017:54–58`, `:142–145`) — a survivor would fail at first call.
 
 **`search_events`** — with notes (§2) and checklists (§7) gone there is nothing
 to aggregate, so the `docs` CTE and both `left join`s collapse. The body becomes
 a direct query on `event_series`: same `websearch_to_tsquery` + escaped-`ilike`
 fallback, applied to `title` alone; `returns table` loses `snippet`; ordering
-and the `limit 50` stay.
+and the `limit 50` stay. **Re-grant it after the `create`:**
+
+```sql
+grant execute on function search_events(uuid, text) to authenticated;
+```
+
+`0017`'s `create or replace` kept the grant from `0014:126`; a plain `create`
+after a `drop` does not, and the default privileges for functions created by
+the migration role are execute for `postgres` only (`0004` sets defaults for
+tables and sequences, not functions — the comment at `0019:64` saying
+otherwise is wrong). Without the grant, search fails with a permission error
+for every signed-in user. `create_account` stays a `create or replace` and
+keeps its grant; `handle_new_user` runs from a trigger and needs none.
 
 **`create_account`** — from `0015`: the `account_member` insert loses `role`;
 the `person` insert writes `color_key` instead of `color` and loses `kind`
@@ -321,8 +368,9 @@ which is in the verification list for exactly that reason.
 
 - **`src/client/database.types.ts`** (1,167 lines) is the generated `Database`
   type behind `createClient<Database>` (`supabase.ts:14`). It describes every
-  table, column, lookup and function this plan removes, knows nothing of
-  `metadata` or `repeat_count`, and still calls `person.color` by its old name.
+  table, column, lookup and function this plan removes, knows nothing of the
+  new `metadata` columns, `repeat_count` or `event_occurrence.attendees`, and
+  still calls `person.color` by its old name.
   Regenerate it against the migrated local stack
   (`supabase gen types typescript --local`) rather than hand-editing — there is
   no npm script for this today, so the command goes in the commit message or a
@@ -333,17 +381,24 @@ which is in the verification list for exactly that reason.
 - **Docs.** `README.md`, `docs/STATUS.md`, `docs/DATA_MODEL.md`,
   `docs/PLANNED.md` and `docs/RESTRUCTURE_PLAN.md` all describe lists, notes,
   dependencies, status, checklists and the split as built features; each needs
-  its claims cut to match. Specifically stale: the README's "238 tests" and its
-  seed description ("one weekly with two checklists, two lists and a
-  blueprint"); `STATUS.md`'s gotchas about FK hints (`checklist_item` is gone,
+  its claims cut to match. Specifically stale: the README's "238 tests"
+  (`:167`; the suite runs 219 today) and its seed description ("a few events
+  (one weekly with two checklists), two lists and a blueprint", `:68–70`,
+  repeated verbatim in `STATUS.md:250–252`); `STATUS.md`'s smoke test
+  (`:316–320`, which names `occurrence_item_state`, `split_series`, ticks and
+  "owner" membership); its gotchas about FK hints (`checklist_item` is gone,
   and the remaining embeds are single-FK), about children-sync cascades "wiping
   ticks" (no ticks), about note authorship, and both of its "easy to break"
   rules — the `COUNT` one is rewritten by §8 and the `split_series` cutover
   one goes with §9; and its claim that the checklist round-trip is the suite's
   most valuable test. `DATA_MODEL.md` Decisions 2, 3 and 4 are rewritten by
-  §8 and §9. The "people as data" rationale in `DATA_MODEL.md` and the header
-  of `0005_person.sql` explain the person model by supervision and lanes; the
-  migration header is history and stays, the doc is rewritten by §10.
+  §8 and §9; Decision 1
+  (`:97–104`) and the type map at `:420` still describe `event_participant`
+  as the roster and go stale with §6a. `DATA_MODEL.md` has no "people as
+  data" section — the phrase is one row of its migrations table (`:444`), and
+  the supervision-and-lanes rationale for the person model exists only in the
+  header of `0005_person.sql`. The migration header is history and stays; the
+  doc gains a short people section under §10 rather than having one rewritten.
 - **`docs/NOTE_MODEL.md` is not touched.** It is a design for work that comes
   *after* this cleanup, not documentation of the `note` table being removed
   here. Leave the file and the README's link to it exactly as they are. Removing
@@ -373,7 +428,14 @@ dropped (§9).
 Subsumed by §7. The columns this group originally named —
 `checklist_item.occurrence_start` and `.required`,
 `occurrence_item_state.status` and `.completed_at` — go because their tables go,
-and `occurrence_item_removed` and the `item_status` lookup go with them.
+and `occurrence_item_removed` and the `item_status` lookup go with them. Three
+of the four columns are *not* unused today, contrary to this section's
+heading: `required` is written (`series.ts:319`), `occurrence_start` is
+selected, filtered and written (`series.ts:142`, `:176`, `:320`), and
+`occurrence_item_state.status` is read and written (`occurrences.ts:116`,
+`:284`). Only `completed_at` and `occurrence_item_removed` are untouched by
+app code. They are listed here for the schema inventory; §7 removes their
+readers and writers.
 
 ### 6c. Vestigial columns
 
@@ -387,7 +449,10 @@ Each is a `drop column` plus the one place that writes it.
   `domains/events/mutations.ts:73` stops passing `fromTemplateId`, and that
   field leaves the `saveEvent` change. **The editor's own `templateId` state
   (`EventEditor.tsx:202`) stays** — it chooses which template's people and
-  reminders are copied into the draft; only the stored provenance goes.
+  reminders are copied into the draft; only the stored provenance goes. Its
+  comment at `:200–201` says the value is "written to the series'
+  `template_id`"; reword. The `templateId` doc comment at `series.ts:198–199`
+  goes with the option.
 - **`event_series.split_from_id`** — set only by `split_series`, which is
   dropped (§9); never read. `event_series_split_from_id_idx` goes with it.
 - **`app_user.display_name`** — never read. `handle_new_user` is recreated to
@@ -395,7 +460,9 @@ Each is a `drop column` plus the one place that writes it.
   drop it for tidiness.
 - **`account_member.role`** — set `'owner'` once, never consulted;
   `is_account_member` (`0002:11`) checks membership only. `create_account` is
-  recreated without it (§4).
+  recreated without it (§4), and **`seed.sql:69` inserts it too** — drop the
+  column from that insert's list, or `supabase db reset` fails on the first
+  run after `0022`.
 - **`reminder.method`** and the **`reminder_method`** lookup — always `'app'`,
   ignored by the sender, and `push` / `email` are never sent by anything.
   `syncReminders` (`series.ts:371`) stops writing it; `seed.sql:148` drops it.
@@ -414,10 +481,13 @@ hex-era name, while `event_series.color_key` says what it is.
 `alter table person rename column color to color_key;`. App: `client/people.ts`
 — the select (`:48`), the mapping (`:55`) and `recolorPerson`'s update (`:74`).
 `create_account` (§4) and `seed.sql:79` insert `color_key`. **The app-side
-`Person.color` field keeps its name in this pass** — renaming it to `colorKey`
-would ripple through `domains/people/{mutations,patches}` and
-`domains/preferences/patches`, about four more sites. Worth doing, as its own
-commit.
+`Person.color` field keeps its name in this pass** — the type lives in
+`client/people.ts:20–32`, and renaming the field to `colorKey` would ripple
+through `domains/people/patches.ts:21`, `domains/people/selectors.ts:92`, the
+`people.test.ts` fixtures and the doc comment at `client/preferences.ts:25`.
+(`domains/people/mutations.ts` reads the *change's* `color` field and
+`domains/preferences/patches.ts` never touches `Person.color`; neither needs
+to move.) Worth doing, as its own commit.
 
 ---
 
@@ -443,8 +513,10 @@ exactly the leftover plumbing this work is meant to remove, so **flatten it**:
   re-exports in `src/types.ts`.
 - **`src/domains/events/attachments.ts`** — delete the module. `reminderOffsets`
   and `hasReminders` are one-liners over `e.reminders`; put them in
-  `src/domains/events/selectors.ts` beside `timingOf`, which is where
-  `DayView`, `OccurrenceSheet` and `Settings` already import from.
+  `src/domains/events/selectors.ts` beside `timingOf`, so the domain keeps one
+  selectors file. `DayView` (`:17`) and `Settings` (`:9`) import them from
+  `attachments.ts` today and re-point; `OccurrenceSheet` already imports from
+  `selectors.ts` (`:13`). `hasChecklist` has no consumer at all.
   `cloneAttachments` becomes a `cloneReminders` (fresh ids, three lines) in
   `transformers.ts` for the two template copy paths (`EventEditor.tsx:232`,
   `:262`).
@@ -456,20 +528,27 @@ exactly the leftover plumbing this work is meant to remove, so **flatten it**:
   `fromEvent` / `fromTemplate` copy `reminders` straight through. In
   `transformers.test.ts` the `toAttachments` and `attachments round trip`
   describe blocks (`:31`, `:92`) go; `toEvent`, `toTemplate`, `back to a series`
-  and `patches` stay.
+  and `patches` stay, but their shared `series()` fixture (`:24–26`,
+  `checklist: []`, `notes: []`), the `toTemplate` expectation (`:165`) and
+  the `back to a series` fixture (`:172`) are rewritten to the flat shape.
+  The same `attachments: []` fixture appears in `expand.test.ts:25` and
+  `reminderSenderLogic.test.ts:41`.
 - **`src/components/AttachmentsEditor.tsx`** — becomes a `RemindersEditor`: the
   "Remind me" chip row (`:22–33` and its render) is all that survives. The
-  `.module.css` loses every note and checklist rule.
+  `.module.css` goes entirely: it holds no reminder rule (the chips use
+  `shared.chips` / `shared.chip`).
 - **`src/components/EventEditor.tsx`** — `attachments` state (`:199`) becomes
   `reminders`; `cleanedAttachments()` (`:214`) goes — there is nothing left to
   clean; the doc comment at `:92` still says "attachments, deps".
-  **`TemplateEditor.tsx:50`** the same.
+  **`TemplateEditor.tsx`** the same (`attachments` state `:40`,
+  `cleanedAttachments` `:51`).
 - **`src/client/series.ts`** — delete `ChecklistLine`, `Series.checklist`, the
   `checklist_item!owner_series_id (…)` embed and the `checklist_item` field on
   `SeriesRow`, the `.filter((c) => c.occurrence_start === null)` mapping
-  (`:169`), and `syncChecklist()` with its call. `Series.reminders` stays. The
-  FK-hint comment at `:135` loses its reason (the remaining embeds,
-  `event_person` and `reminder`, each have one path); the hints can stay.
+  (`:176`), and `syncChecklist()` with its call. `Series.reminders` stays. The
+  FK-hint comment at `:134–139` cites `occurrence_item_removed` and loses its
+  reason (the remaining embeds, `event_person` and `reminder`, each have one
+  path); the hints can stay.
 - **`src/components/Settings.tsx:187`** — the "N checklist items" bit of the
   template summary, and the hint text at `:175` that promises "checklists,
   notes and reminders".
@@ -477,21 +556,32 @@ exactly the leftover plumbing this work is meant to remove, so **flatten it**:
 ### The per-day ticks
 
 - **`src/client/occurrences.ts`** — delete `ItemStateRow`, `fetchItemStateRows`
-  (`:107`) and `setChecklistEntry` (`:263`).
+  (`:106`) and `setChecklistEntry` (`:263`).
 - **`src/domains/occurrences/`** — `OccurrenceState.checked` (types); the
-  `'tick'` change kind (mutations `:83`, `:101`; patches `:37`); `fetchMonth` in
-  `queries.ts` fetches occurrence rows only and `toCompletions` takes one
-  argument (transformers `:47`). `OccurrenceState` ends as
+  `'tick'` change kind (mutations `:41`, `:69`, `:83`, `:101` and the
+  `setChecklistEntry` import `:17`; patches `:16`, `:37`); `fetchMonth` in
+  `queries.ts` (`:63–67`) fetches occurrence rows only and `toCompletions`
+  (transformers `:28–31`) takes one argument, losing the `checked` write at
+  `:47` and the `ItemStateRow` import. `OccurrenceState` ends as
   `{ start?, duration?, cancelled? }`. The tick cases in `occurrences.test.ts`
-  go.
+  (the `tick` helper `:17–23`, cases `:53`, `:59`, `:137`) go. The
+  *completions* name — `CompletionsMap`, `toCompletions`,
+  `useCompletionsForRange`, the `'completions'` query key — survives holding
+  only moved and cancelled days; renaming it is a separate mechanical commit
+  and not part of this plan.
 - **`src/services/recurrence/status.ts`** — **delete the module.**
   `isOccurrenceDone` has no inputs left. `occKey` moves to
   `src/services/recurrence/timing.ts` (a leaf: it imports one type), and its
   four consumers re-point: `expand.ts:13`, `alerts.ts:12`, `DayView`,
-  `OccurrenceSheet`. `status.test.ts` goes with it. (The domain's own
-  `occurrenceKey` in `domains/occurrences/transformers.ts` stays — the two are
-  deliberately separate copies, per the comment there.)
-- **`src/components/OccurrenceSheet.tsx`** — the checklist block (`:252–292`),
+  `OccurrenceSheet`. **The barrel `src/services/recurrence/index.ts:14`
+  re-exports the module** (`export * from './status'`) and its header lists it
+  (`:10`); both lines go, or the build breaks. `status.test.ts` goes with it.
+  (The domain's own `occurrenceKey` in `domains/occurrences/transformers.ts`
+  stays — the two are deliberately separate copies. The comment explaining why
+  lives in `status.ts:24–31`, not beside `occurrenceKey`; it travels with
+  `occKey` to `timing.ts`.)
+- **`src/components/OccurrenceSheet.tsx`** — the checklist block (`:261–292`;
+  `:252–259` is the waits-on banner, §3a),
   `cls` / `hasChecklist` / `checked` / `done`, and `doneTitle` on the title;
   `.checklist*` and `.doneTitle` from its CSS module.
 - **`src/components/DayView.tsx`** — `checklistEntries`, the `CheckSquare`
@@ -499,7 +589,17 @@ exactly the leftover plumbing this work is meant to remove, so **flatten it**:
   chips and blocks (`:364`, `:437`). **`WeekTimeline.tsx`** — `:10`, `:98`,
   `:244` the same. Drop `.done` from both CSS modules.
 - **`src/domains/index.ts`** — the `checklist_item` and `occurrence_item_state`
-  cases; `domains.test.ts:13`.
+  cases; `domains.test.ts:13` and `:23`.
+  `src/services/realtime/realtime.test.ts:41`, `:47` drive a realtime change
+  for `'checklist_item'`; once `queryKeysForTable` returns nothing for it the
+  test needs a surviving table.
+- **Comment residue** naming ticks, checklists or attachments, for the same
+  pass: `domains/events/types.ts:8–10`; `client/series.ts:2–3`, `:39–47`,
+  `:251`, `:256`; `client/occurrences.ts:1–8`, `:144`, `:216`, `:232`,
+  `:249`; `domains/occurrences/types.ts:4–7`, `:20–21`, `:39`;
+  `domains/occurrences/selectors.ts:10`; `DayView.tsx:316`;
+  `OccurrenceSheet.tsx:44–47`. `.doneToggle` in `OccurrenceSheet.module.css`
+  (`:67–79`) is already unused.
 
 ### Database — folded into migration `0022`
 
@@ -546,6 +646,17 @@ beside it in `repeat_count`; a series ends at whichever comes first.*
   the N; it does not extend the series. Anything else makes a series' end
   depend on per-occurrence state, which the sender and every view would each
   have to reproduce.
+- **A month without the day is not a slot.** A monthly series anchored on the
+  31st produces nothing in February (`startsOn` skips it, `expand.ts:77`). If
+  `occurrenceIndex` were plain `months / n`, that missing month would consume
+  one of the N and "12 lessons on the 31st" would yield fewer than 12. So the
+  monthly index counts *produced* months only: walk `k = 0 … months / n` and
+  count the ones whose day exists (at most a few dozen steps). Daily and
+  weekly need nothing — every grid step is a slot. This matches RFC 5545's
+  `COUNT`, which counts instances; the "slots" rule above is about
+  cancellations, which are instances the user saw. Both `expand.ts` and the
+  sender's `logic.ts` implement the same walk, and the cross-validation test
+  gets a Jan-31 counted case so they cannot drift.
 - **`until` is one thing: the last day the series produces an occurrence, and
   only the user sets it.** Nothing else writes it once the split (§9) and
   "delete this and future" (§9) are gone. The editor sets exactly one of
@@ -563,9 +674,11 @@ beside it in `repeat_count`; a series ends at whichever comes first.*
 - **`src/services/recurrence/expand.ts`** — the one place the client evaluates
   where a series ends. Add `occurrenceIndex(e, date): number | null` — the
   zero-based position of `date` on the grid, or null off-grid: `delta / n`
-  (daily), `delta / 7n` (weekly), `months / n` on a matching day-of-month
-  (monthly). This is the arithmetic `latestStartOnOrBefore` does today
-  (`:88–110`); that function is dead after §3a, so replace it. `startsOn`
+  (daily), `delta / 7n` (weekly), and for monthly the produced-month count
+  above. This is the arithmetic `latestStartOnOrBefore` does today
+  (`:90–120`); that function is already dead, so replace it. `delta` is safe
+  across DST: `diffDays` is a calendar-day difference (`dates.ts:25–29`) and
+  the sender is pure UTC. `startsOn`
   becomes: on-grid, not past `until`, and `count == null || index < count`.
   `nextStartOnOrAfter` gets the matching early exit so an ended counted series
   returns null in a few steps rather than after its five-year scan.
@@ -573,12 +686,19 @@ beside it in `repeat_count`; a series ends at whichever comes first.*
   the weekday for weekly rules and the end: "Every 2 weeks on Tuesday ·
   12 times", "Every week on Monday · until 25 Dec". Read back in the sheet's
   meta line, that label *is* the sentence the user had in their head — which is
-  the check that the model expresses it.
+  the check that the model expresses it. Its two consumers
+  (`WeekCalendar.tsx:269`, `OccurrenceSheet.tsx:228`) both have the event in
+  scope; `expand.test.ts:159–165` calls it with bare rules and is updated.
 - **`src/components/EventEditor.tsx`** — an **Ends** control in the repeat row
   (`:476`), shown when `repeat !== 'none'`: a select `Never` / `After…` /
-  `On…`, with a `NumberField` (min 1) for the count or a date input (min: the
-  start date) for `until`. Form state is seeded from `base.recurrence`, and
-  `buildEvent` (`:278`) writes exactly one of `count` / `until` from the choice.
+  `On…`, with a `NumberField` (min 1) for the count or a date input for
+  `until` whose `min` is the **series anchor** (`eventDate(base)`), not the
+  editor's `date` state — that state holds the *opened occurrence's* day when
+  the editor comes from a sheet (`:167`, `:179`), and a user must be able to
+  end a series before the occurrence they opened, since that is what replaces
+  "delete this and future" (§9). Form state is seeded from `base.recurrence`,
+  and `buildEvent` (`:272`; the `recurrence:` key at `:278`) writes exactly
+  one of `count` / `until` from the choice.
   The preserve-`until` spread and its comment (`:284–287`) go: the field now
   round-trips through the form like every other. `TemplateEditor` is
   unaffected: templates carry no recurrence.
@@ -586,7 +706,13 @@ beside it in `repeat_count`; a series ends at whichever comes first.*
   `index.ts:157` gain `repeat_count`; `logic.ts`'s `Recurrence` gains `count?`;
   its `startsOn` gets the identical index check (its monthly arithmetic is
   already the UTC twin of the client's). `parseRRule` is untouched — the count
-  is not in the string.
+  is not in the string. The join is in `computeDueReminders`, which builds
+  the rule with `parseRRule(s.rrule)` (`logic.ts:238`); that becomes
+  `{ ...parseRRule(s.rrule), count: s.repeat_count ?? undefined }`. This one
+  line is exactly what the cross-validation test does *not* cover — it calls
+  `startsOn` with prebuilt `Recurrence` objects — so it gets its own case in
+  `reminderSenderLogic.test.ts`: a counted series with a reminder due past its
+  last slot, run through `computeDueReminders`, yields nothing.
 - **`src/client/reminderSenderLogic.test.ts`** — extend the `rules` array
   (`:20`) with counted cases (daily × 3, weekly × 5, monthly × 2, and one with
   both `until` and `count` for each side of whichever-first), so the property
@@ -598,11 +724,16 @@ beside it in `repeat_count`; a series ends at whichever comes first.*
 
 ### Database — folded into `0022`
 
-- `alter table event_series add column repeat_count integer check (repeat_count > 0);`
-  plus `constraint repeat_count_needs_rule check (repeat_count is null or rrule is not null)`
+- ```sql
+  alter table event_series
+    add column repeat_count integer check (repeat_count > 0),
+    add constraint repeat_count_needs_rule
+      check (repeat_count is null or rrule is not null);
+  ```
   — a count on a one-off is meaningless and should not be storable.
 - `seed.sql` — seed one counted series ("Piano lesson", weekly × 5) and one
-  dated one, so every screen has both to look at.
+  dated one, so every screen has both to look at. The `event_series` insert's
+  column list (`:96`) gains `repeat_count`.
 
 ### Docs
 
@@ -654,8 +785,10 @@ ever used, and it is the single most intricate piece of SQL in the schema.
   the sender's `parseRRule` (`logic.ts:50`, `:73`) both rewind an `UNTIL`
   instant by ten hours before taking its date, to tolerate values an earlier
   build wrote as the writer's *local* 23:59:59. The only code that ever wrote
-  `until` was the split and the forward delete, so a legacy value can exist
-  only if one of them was used before the encoding was fixed. Check the hosted
+  `until` was the split and the forward delete, and the forward delete
+  (`e1ba172`) landed *after* the encoding fix (`608bcd7`), so a legacy value
+  can exist only from a split performed between `bc32803` and `608bcd7`.
+  Check the hosted
   project once — `select id, rrule from event_series where rrule ilike '%UNTIL%'`
   — and if every `UNTIL` ends in `T235959Z`, or there are none, delete the
   rewind from both implementations and the "decodes a legacy locally-encoded
@@ -664,15 +797,23 @@ ever used, and it is the single most intricate piece of SQL in the schema.
   writes `until` through `recurrenceToRRule`, which uses the UTC encoding, so
   nothing new will ever need it.
 - **Comments that explain things by the split.** `expand.ts:63` ("a capped
-  series (split lineage)…") and `:124`; `domains/events/patches.ts:8` ("there
-  is deliberately nothing here for splitting…"); and
+  series (split lineage)…") and `:122–129` (which explains `until` as a cap
+  and links `latestStartOnOrBefore`); `domains/events/patches.ts:8` ("there
+  is deliberately nothing here for splitting…"); `EventEditor.tsx:51–56` (the
+  `EditorTarget` doc); `assets/ui/ScopeSheet.tsx:13–17` ("three-way
+  question"); `rrule.ts:9–13` ("later split / expand work"); and
   `domains/events/mutations.ts:139`, where the `onSettled` invalidation is
   justified by "a split changes both halves and moves rows between them". The
   invalidation stays — the optimistic patch is a guess and the server's row is
   the truth — but the stated reason has to change, because wrong reasons are
   how the next reader re-learns that the split exists.
-- **Not redundant, and worth saying so:** `SeriesTiming`, `occurrenceTs` and
-  `dayRange` in `client/mappers.ts` are shared with every occurrence write;
+- **Imports left dangling.** `client/series.ts:21` imports `truncatedRRule`;
+  `domains/events/mutations.ts:14–20` imports `splitSeries`, and its
+  `Recurrence` / `SeriesTiming` imports become unused with the `'split'`
+  kind. The compiler finds these; listed so nobody wonders.
+- **Not redundant, and worth saying so:** `SeriesTiming` (`client/series.ts:102`)
+  and `occurrenceTs` / `dayRange` (`client/mappers.ts`) are shared with every
+  occurrence write;
   `can_access_series` in `0002` gates the RLS of every series-owned table; and
   the editor's scope sheet still has two real choices. All stay.
 
@@ -684,9 +825,18 @@ corollary says never to do that "in a way that shifts the grid", because the
 per-day rows are keyed by the original slot and could be orphaned. That is
 exactly what happens, and it is harmless:
 
-- an `event_occurrence` row for a day the rule no longer produces is never
-  read — the views look up the days the rule *does* produce, and the sender
-  matches its ±2-day override window by date the same way — so it is inert;
+- an `event_occurrence` row for a day the rule no longer produces is fetched
+  (the month query pulls every row in the window, `client/occurrences.ts:85`)
+  but never *matched*: pass 2 of `occurrencesOnDate` looks up only days
+  `startsOn` produces, pass 1 already discards a relocated row whose origin is
+  off-grid (`expand.ts:228–230`), `alerts.ts:101` guards with `startsOn`, and
+  the sender walks on-grid days only (`logic.ts:247`). So it is inert;
+- inert, that is, **until the grid returns to that day.** Rows are keyed by
+  day, not by slot: cancel Tuesday 10 March on a weekly series, edit the
+  series to daily, and the new daily occurrence on 10 March inherits the old
+  `cancelled` row and is hidden; edit back and the orphan revives. This is the
+  price of editing in place and it is accepted — an occurrence *is* "the one
+  on this day" — but `DATA_MODEL.md` Decision 3 says it out loud;
 - it goes with the series on delete (cascade);
 - a *time* change on the same days keeps every row findable, because rows are
   matched by day range, not exact timestamp (the gotcha that already exists for
@@ -699,8 +849,11 @@ scope", `:361`); that restriction stays as it is.
 
 `DATA_MODEL.md` Decision 3 is rewritten: no split, no temporal versioning; a
 series is edited in place, per-day rows are sparse overrides keyed by the
-original slot, and an override for a day the rule no longer produces is inert.
-Decision 4 loses its "goes through `split_series`" corollary. `STATUS.md` loses
+original day, and an override for a day the rule no longer produces is inert
+until the rule produces that day again. Decision 4 loses its "goes through
+`split_series`" corollary. The split is also named in the entity map (`:53`),
+Decisions 5, 6, 8, 9, 10 and 12, and the migrations table; §5's doc pass
+sweeps those. `STATUS.md` loses
 the "cutover must be a real `occurrence_start`" rule. The header comment in
 `0003_functions.sql` is history and stays as it is.
 
@@ -721,21 +874,26 @@ is `repeat(3, minmax(0, 1fr))` in CSS with no inline override, so the "narrow
 child lane" the CSS comment describes does not exist either. What remains:
 
 - **`src/services/conflicts/index.ts`** — the whole module (`childStatuses`,
-  `ChildStatus`, `Busy`). Delete.
+  `ChildStatus`, `Busy`). Delete; its one consumer is `DayView.tsx:26` and it
+  has no test file.
 - **`src/components/DayView.tsx`** — the `coverage` / `statuses` computation in
-  `pages` (`:155–163`), `hasWarnings` and the `rightExtra` alert badge on the
-  header (`:170`, `:191`), the `status` prop threaded through `AllDayChip`, the
-  `badges()` helper and `Lane`, the `clash` / `needs` icons and classes
-  (`:339–340`, `:371–372`, `:448–449`), and the `AlertTriangle` /
-  `CircleDashed` imports. `peopleById` goes too if nothing else reads it. CSS:
-  `.alertBadge`, `.warnKey.*`, `.warnClash`, `.warnNeeds`.
+  `pages` (`:156–163`), `hasWarnings` and the `rightExtra` alert badge on the
+  header (`:170`, `:196`), the `status` prop threaded through `AllDayChip`, the
+  `badges()` helper (`:317`) and `Lane` (`:384`), the `clash` / `needs` icons
+  and classes (`:339–340`, `:371–372`, `:448–449`), and the `AlertTriangle` /
+  `CircleDashed` imports. `peopleById` (`:59`) has no other reader and goes,
+  taking the `byId` import with it. CSS: `.alertBadge`, `.warnClash`,
+  `.warnNeeds` (`:81–91`, `:274–283`) and the comment above them at `:273`
+  ("Conflict markers on Nora's blocks"); `.warnKey.*` (`:95–99`) is already
+  unreferenced.
 - **`src/domains/people/selectors.ts`** — delete `adults`, `children`,
   `involvesChildFor`, `isAllAdultsFor`. `attendeeLabelFor` becomes names
   joined with " + ", nothing else; `defaultAttendees` becomes the first person
   in lane order. In `people.test.ts` the `adults / children`,
   `involvesChildFor` and `isAllAdultsFor` describe blocks go; the
   `attendeeLabelFor` and `defaultAttendees` cases are rewritten to the simpler
-  rules.
+  rules, and the `person()` fixture (`:20–27`) loses its `kind` argument.
+  `attendeeLabelFor`'s other consumer, `Settings.tsx:185`, is unaffected.
 - **`src/client/people.ts`** — `PersonKind`, `Person.kind`, `kind` in the
   select and the `p.kind === 'child'` mapping; the doc comments about lanes
   and supervision. `Person` ends as `{ id, name, color, sortOrder }`.
@@ -782,8 +940,12 @@ row, in the same style as a timing override: absent means "as the series".
   needs nothing — same table, same `completionsPrefix` invalidation. Cases in
   `occurrences.test.ts` for both directions.
 - **`src/services/recurrence/expand.ts`** — `effectiveOccurrence` applies
-  `ov.attendees` alongside `start` / `duration`, and `DayOccurrence` gains
-  `attendees: PersonId[]` set from the effective event in both passes of
+  `ov.attendees` alongside `start` / `duration` — **including in its early
+  return** (`:30`, `if (!ov || (ov.start == null && ov.duration == null))
+  return event`), which must also test `ov.attendees` or a people-only
+  override is silently ignored. `maxEffectiveSpan` (`:52`) skips on the same
+  condition and can stay: attendees do not change the span. `DayOccurrence`
+  gains `attendees: PersonId[]` set from the effective event in both passes of
   `occurrencesOnDate`. Its doc comment ("the series `id`, roster and
   attachments are untouched") is rewritten: roster is exactly what now changes.
 - **Readers switch from the series' list to the occurrence's.** Every
@@ -799,20 +961,29 @@ row, in the same style as a timing override: absent means "as the series".
   action beside it — the same pattern as the existing "Reset to series time"
   paragraph. `AttendeeChips` already refuses an empty selection, so an
   occurrence can never override to nobody.
-- **`src/components/EventEditor.tsx`**, `saveThisOccurrence` (`:326`) — today
-  it writes timing only and silently drops any change to the people chips. It
-  should also write `attendees` when the form's list differs from the series',
-  so "This event only" means the whole form, not half of it.
+- **`src/components/EventEditor.tsx`**, `saveThisOccurrence` (`:322`) — today
+  it writes timing only (`:326–335`) and silently drops any change to the
+  people chips. It should also write `attendees` when the form's list differs
+  from the series', so "This event only" means the whole form, not half of it.
+  For that to be right the form must **start from the effective list**: the
+  chips are seeded from `base.attendees` (`:194`), the series' roster, so on a
+  day that already carries an override the editor would show the wrong people
+  and, on save, either clear the override or rewrite it from stale input. When
+  the editor is opened for an occurrence (`occurrenceDate` set), seed the
+  chips from that day's effective attendees and compare against that list;
+  and when the form's list equals the series' roster again, write
+  `clearAttendees` rather than an array that happens to match.
 - **Reminders are unaffected.** A `reminder` row belongs to a user, not to an
   attendee, and neither the sender nor `alerts.ts` consults who is on the
   event.
 - `seed.sql` — one occurrence with a different set of people, so the override
-  is visible on a fresh reset.
+  is visible on a fresh reset. This is the first `event_occurrence` row the
+  seed writes; its `occurrence_start` must be a day the series' rule produces.
 
 ### Docs
 
-`DATA_MODEL.md`'s "people as data" section loses supervision and lanes as its
-reasons and gains the occurrence override; the README's feature list drops
+`DATA_MODEL.md` gets a short people section — it has none today (§5): `person`
++ `event_person` as the roster, the occurrence override, no kinds; the README's feature list drops
 "per-person colours" as a headline only if it also drops the rest of the
 paragraph it sits in.
 
@@ -829,7 +1000,8 @@ order. Nothing here is run as part of producing the change.
 2. `npm test` — the removals take out all 24 cases in `lists.test.ts`, all of
    `status.test.ts`, the two attachment describe blocks in
    `transformers.test.ts`, the `truncatedRRule` block in `rrule.test.ts`, and
-   the tick and dependency cases in `occurrences.test.ts`. Don't chase a target
+   the tick and dependency cases in `occurrences.test.ts`, and three cases in
+   `domains.test.ts`. Don't chase a target
    number: the repo's own docs already disagree with each other (`README.md`
    says 238, `docs/STATUS.md` says 219), so whatever the suite prints after this
    work is the figure to write back into both. The one test to watch is the
