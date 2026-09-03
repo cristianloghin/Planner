@@ -10,7 +10,7 @@ const ids = { accountId: 'acc', userId: 'usr' }
 
 describe('queryKeysForTable', () => {
   it('treats a change to anything attached to an event as a change to the event', () => {
-    for (const table of ['event_series', 'event_person', 'checklist_item', 'note', 'reminder']) {
+    for (const table of ['event_series', 'event_person', 'checklist_item', 'reminder']) {
       expect(queryKeysForTable(table, ids)).toEqual([
         ['events', 'acc'],
         ['templates', 'acc'],

@@ -34,6 +34,13 @@ drop function split_series(uuid, timestamptz, text);
 -- below as a dead object that errors if ever called. Its grant goes with it.
 drop function search_list_items(uuid, text);
 
+-- §2: search_events loses its `snippet` column, which changes the
+-- `returns table (…)` signature — so it cannot be a `create or replace`. It is
+-- recreated at the very bottom of this migration, after the schema settles: the
+-- body is SQL-language, so it is parsed at `create` time and creating it last
+-- makes this migration check itself.
+drop function search_events(uuid, text);
+
 
 -- ---------------------------------------------------------------------------
 -- §1. Lists — the whole feature.
@@ -49,6 +56,15 @@ drop table list_item_event_link, list_item, list cascade;
 -- list_item_rw still existed would fail with "other objects depend on it".
 -- Dropping the tables takes their policies, which frees the functions.
 drop function can_access_list(uuid), can_access_list_item(uuid);
+
+-- ---------------------------------------------------------------------------
+-- §2. Notes on events — remove entirely.
+-- ---------------------------------------------------------------------------
+
+-- Events keep no free text. Takes its RLS policy, grants, replica identity and
+-- realtime publication membership with it. `split_series` copied note rows on a
+-- split; it was dropped above, so no function body is left naming the table.
+drop table note cascade;
 
 -- ---------------------------------------------------------------------------
 -- §3a/§3b. Dependency linking and occurrence status — both entirely.
@@ -189,3 +205,70 @@ begin
   return v_id;
 end;
 $$;
+
+
+-- ---------------------------------------------------------------------------
+-- §2/§4. search_events, without notes.
+-- ---------------------------------------------------------------------------
+
+-- The `note` left join, the `notes_text` aggregate and the `snippet` column are
+-- gone; results are title + date. The `checklist_item` join stays for now — it
+-- still contributes searchable text, and §7 is what collapses this to a plain
+-- title search.
+--
+-- Everything else is 0017's body unchanged: the same websearch_to_tsquery with
+-- an escaped-ilike fallback, the same ordering, the same limit.
+create function search_events(p_account uuid, p_query text)
+returns table (
+  series_id uuid,
+  title     text,
+  dtstart   timestamptz,
+  all_day   boolean,
+  rrule     text,
+  rank      real
+)
+language sql stable
+set search_path = public as $$
+  with q as (
+    select
+      websearch_to_tsquery('english', p_query) as tsq,
+      '%' || replace(replace(replace(p_query, '\', '\\'), '%', '\%'), '_', '\_') || '%' as likeq
+  ),
+  docs as (
+    select
+      s.id,
+      s.title,
+      s.dtstart,
+      s.all_day,
+      s.rrule,
+      -- One combined text per series: title + every series-level checklist
+      -- label. string_agg(distinct …) collapses the row-multiplication from
+      -- the left join.
+      coalesce(s.title, '') || ' ' ||
+        coalesce(string_agg(distinct ci.label, ' '), '') as raw
+    from event_series s
+    left join checklist_item ci on ci.owner_series_id = s.id
+                              and ci.occurrence_start is null
+    where s.account_id = p_account
+      and s.is_template = false
+    group by s.id
+  )
+  select
+    d.id,
+    d.title,
+    d.dtstart,
+    d.all_day,
+    d.rrule,
+    ts_rank(to_tsvector('english', d.raw), q.tsq) as rank
+  from docs d, q
+  where btrim(p_query) <> ''
+    and (to_tsvector('english', d.raw) @@ q.tsq or d.raw ilike q.likeq)
+  order by rank desc, d.dtstart desc nulls last
+  limit 50;
+$$;
+
+-- 0017's `create or replace` inherited the grant from 0014. A plain `create`
+-- after a `drop` does not, and the migration role's default privileges cover
+-- tables and sequences only (0004) — not functions. Without this, search fails
+-- with a permission error for every signed-in user.
+grant execute on function search_events(uuid, text) to authenticated;

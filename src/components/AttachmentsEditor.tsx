@@ -8,7 +8,7 @@ import s from './AttachmentsEditor.module.css'
 
 /**
  * Shared editor for the attachments an event or template carries: reminder
- * offsets, notes and checklists. Owns no state of its own — it edits the passed
+ * offsets and checklists. Owns no state of its own — it edits the passed
  * `attachments` array through `onChange`, so EventEditor and the Settings
  * template editor stay perfectly in sync on what an attachment can be.
  */
@@ -31,9 +31,6 @@ export function AttachmentsEditor({
     )
   }
 
-  function addNote() {
-    onChange([...attachments, { id: uid(), kind: 'note', text: '' }])
-  }
   function addChecklist() {
     onChange([...attachments, { id: uid(), kind: 'checklist', items: [] }])
   }
@@ -74,67 +71,22 @@ export function AttachmentsEditor({
       <div className={s.attachments}>
         {attachments
           .filter((a) => a.kind !== 'reminder')
-          .map((a) =>
-            a.kind === 'note' ? (
-              <NoteEditor
-                key={a.id}
-                text={a.text}
-                onChange={(text) => updateAttachment(a.id, { text })}
-                onRemove={() => removeAttachment(a.id)}
-              />
-            ) : (
-              <ChecklistEditor
-                key={a.id}
-                title={a.title ?? ''}
-                items={a.items}
-                onChange={(patch) => updateAttachment(a.id, patch)}
-                onRemove={() => removeAttachment(a.id)}
-              />
-            ),
-          )}
+          .map((a) => (
+            <ChecklistEditor
+              key={a.id}
+              title={a.title ?? ''}
+              items={a.items}
+              onChange={(patch) => updateAttachment(a.id, patch)}
+              onRemove={() => removeAttachment(a.id)}
+            />
+          ))}
         <div className={s.addRow}>
-          <button type="button" className={s.addAttachment} onClick={addNote}>
-            + Note
-          </button>
           <button type="button" className={s.addAttachment} onClick={addChecklist}>
             + Checklist
           </button>
         </div>
       </div>
     </>
-  )
-}
-
-function NoteEditor({
-  text,
-  onChange,
-  onRemove,
-}: {
-  text: string
-  onChange: (text: string) => void
-  onRemove: () => void
-}) {
-  return (
-    <div className={s.attachment}>
-      <div className={s.attachmentHead}>
-        <span className={s.attachmentKind}>Note</span>
-        <button
-          type="button"
-          className={s.attachmentDel}
-          onClick={onRemove}
-          aria-label="Remove note"
-        >
-          ×
-        </button>
-      </div>
-      <textarea
-        className={s.note}
-        rows={3}
-        placeholder="Add a note…"
-        value={text}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </div>
   )
 }
 

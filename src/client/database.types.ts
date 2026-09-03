@@ -278,51 +278,6 @@ export type Database = {
         }
         Relationships: []
       }
-      note: {
-        Row: {
-          author_id: string | null
-          body: string
-          created_at: string
-          id: string
-          metadata: Json
-          owner_series_id: string
-          updated_at: string
-        }
-        Insert: {
-          author_id?: string | null
-          body?: string
-          created_at?: string
-          id?: string
-          metadata?: Json
-          owner_series_id: string
-          updated_at?: string
-        }
-        Update: {
-          author_id?: string | null
-          body?: string
-          created_at?: string
-          id?: string
-          metadata?: Json
-          owner_series_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "note_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "app_user"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "note_owner_series_id_fkey"
-            columns: ["owner_series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       notification_log: {
         Row: {
           occurrence_start: string
@@ -623,7 +578,6 @@ export type Database = {
           rank: number
           rrule: string
           series_id: string
-          snippet: string
           title: string
         }[]
       }

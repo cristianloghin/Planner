@@ -47,13 +47,9 @@ export function TemplateEditor({
     return allDay ? Math.max(1, days) : Math.max(SNAP, hours * 60 + minutes)
   }
 
-  // Drop empty notes / empty checklists so saving doesn't keep stubs around.
+  // Drop empty checklists so saving doesn't keep stubs around.
   function cleanedAttachments(): Attachment[] {
-    return attachments.filter((a) => {
-      if (a.kind === 'note') return a.text.trim().length > 0
-      if (a.kind === 'checklist') return a.items.length > 0
-      return true
-    })
+    return attachments.filter((a) => (a.kind === 'checklist' ? a.items.length > 0 : true))
   }
 
   function submit(e: React.FormEvent) {

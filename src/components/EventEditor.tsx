@@ -211,13 +211,9 @@ function EventEditorForm({
   const titleRef = useRef<HTMLInputElement>(null)
   useEffect(() => titleRef.current?.focus(), [])
 
-  // Drop empty notes / empty checklists so saving doesn't keep stubs around.
+  // Drop empty checklists so saving doesn't keep stubs around.
   function cleanedAttachments(): Attachment[] {
-    return attachments.filter((a) => {
-      if (a.kind === 'note') return a.text.trim().length > 0
-      if (a.kind === 'checklist') return a.items.length > 0
-      return true
-    })
+    return attachments.filter((a) => (a.kind === 'checklist' ? a.items.length > 0 : true))
   }
 
   // The duration the form currently describes (whole days all-day, else minutes).

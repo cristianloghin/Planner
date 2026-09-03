@@ -130,11 +130,3 @@
   flex-wrap: wrap;
   gap: 6px;
 }
-
-.snippet {
-  font-size: var(--fs-base);
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}

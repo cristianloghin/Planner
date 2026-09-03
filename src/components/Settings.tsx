@@ -6,7 +6,7 @@ import { ColorPicker } from '../assets/ui/ColorPicker'
 import { CommitTextInput } from '../assets/ui/CommitTextInput'
 import { cx } from '../assets/utils/cx'
 import { useSignOut, useUpdatePassword } from '../domains/auth/mutations'
-import { checklistEntries, notes, reminderOffsets } from '../domains/events/attachments'
+import { checklistEntries, reminderOffsets } from '../domains/events/attachments'
 import { useEventsWrite } from '../domains/events/mutations'
 import { useTemplates } from '../domains/events/queries'
 import { usePeopleWrite } from '../domains/people/mutations'
@@ -185,8 +185,6 @@ function TemplatesSection() {
           if (t.attendees.length) bits.push(attendeeLabelFor(t.attendees)(people))
           const checks = checklistEntries(t).length
           if (checks) bits.push(`${checks} checklist item${checks > 1 ? 's' : ''}`)
-          const noteCount = notes(t).length
-          if (noteCount) bits.push(`${noteCount} note${noteCount > 1 ? 's' : ''}`)
           const reminders = reminderOffsets(t).length
           if (reminders) bits.push(`${reminders} reminder${reminders > 1 ? 's' : ''}`)
           return (

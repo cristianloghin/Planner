@@ -67,12 +67,6 @@
   height: 20px;
 }
 
-.note {
-  margin: 0;
-  white-space: pre-wrap;
-  font-size: var(--fs-md);
-}
-
 .reminders {
   display: flex;
   flex-wrap: wrap;

@@ -21,8 +21,6 @@ export interface EventSearchResult {
   allDay: boolean
   /** RRULE string; non-null means the event repeats. */
   rrule: string | null
-  /** A short note excerpt for context, or null when the match was title-only. */
-  snippet: string | null
 }
 
 /**
@@ -50,6 +48,5 @@ export async function searchEvents(accountId: string, query: string): Promise<Ev
     dtstart: r.dtstart,
     allDay: r.all_day,
     rrule: r.rrule,
-    snippet: r.snippet,
   }))
 }

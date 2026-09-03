@@ -47,12 +47,6 @@ export interface ChecklistLine {
   sortOrder: number
 }
 
-/** A note on a series. Its author is kept by the database, not set from here. */
-export interface SeriesNote {
-  id: string
-  body: string
-}
-
 /** A reminder, as minutes before the series starts. */
 export interface SeriesReminder {
   id: string
@@ -79,7 +73,6 @@ export interface Series {
   /** Absent means it takes the colour of the person whose lane it sits in. */
   colorKey?: ColorKey
   checklist: ChecklistLine[]
-  notes: SeriesNote[]
   reminders: SeriesReminder[]
   /** True for a blueprint with no date, false for a real dated series. */
   isTemplate: boolean
@@ -121,7 +114,6 @@ interface SeriesRow {
     sort_order: number
     occurrence_start: string | null
   }[]
-  note: { id: string; body: string }[]
   reminder: { id: string; offset_seconds: number }[]
 }
 
@@ -134,7 +126,6 @@ interface SeriesRow {
 const SERIES_SELECT = `id, title, all_day, dtstart, duration, rrule, color_key,
    event_person!series_id ( person_id ),
    checklist_item!owner_series_id ( id, label, group_label, sort_order, occurrence_start ),
-   note!owner_series_id ( id, body ),
    reminder!series_id ( id, offset_seconds )`
 
 /**
@@ -174,7 +165,6 @@ export async function fetchSeries(
         groupLabel: c.group_label,
         sortOrder: c.sort_order,
       })),
-    notes: r.note.map((n) => ({ id: n.id, body: n.body })),
     reminders: r.reminder.map((rem) => ({
       id: rem.id,
       offset: Math.round(rem.offset_seconds / 60),
@@ -210,12 +200,7 @@ export async function saveSeries(
   const up = await supabase.from('event_series').upsert(row, { onConflict: 'id' })
   if (up.error) throw up.error
 
-  await Promise.all([
-    syncAttendees(series),
-    syncChecklist(series),
-    syncNotes(series, userId),
-    syncReminders(series, userId),
-  ])
+  await Promise.all([syncAttendees(series), syncChecklist(series), syncReminders(series, userId)])
 }
 
 /**
@@ -274,32 +259,6 @@ async function syncChecklist(series: Series): Promise<void> {
     .delete()
     .eq('owner_series_id', series.id)
     .is('occurrence_start', null)
-  if (keepIds.length) del = del.not('id', 'in', `(${keepIds.join(',')})`)
-  const res = await del
-  if (res.error) throw res.error
-}
-
-async function syncNotes(series: Series, userId: string): Promise<void> {
-  // Keep whoever wrote a note as its author: editing a series must not reassign
-  // a partner's notes to whoever saved last.
-  const { data: existing, error: exErr } = await supabase
-    .from('note')
-    .select('id, author_id')
-    .eq('owner_series_id', series.id)
-  if (exErr) throw exErr
-  const authorById = new Map((existing ?? []).map((n) => [n.id, n.author_id]))
-  const desired = series.notes.map((n) => ({
-    id: n.id,
-    owner_series_id: series.id,
-    body: n.body,
-    author_id: authorById.get(n.id) ?? userId,
-  }))
-  if (desired.length) {
-    const up = await supabase.from('note').upsert(desired, { onConflict: 'id' })
-    if (up.error) throw up.error
-  }
-  const keepIds = desired.map((d) => d.id)
-  let del = supabase.from('note').delete().eq('owner_series_id', series.id)
   if (keepIds.length) del = del.not('id', 'in', `(${keepIds.join(',')})`)
   const res = await del
   if (res.error) throw res.error

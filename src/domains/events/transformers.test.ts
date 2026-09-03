@@ -22,7 +22,6 @@ const series = (over: Partial<Series> = {}): Series => ({
   attendees: ['p1'],
   colorKey: '3',
   checklist: [],
-  notes: [],
   reminders: [],
   isTemplate: false,
   ...over,
@@ -35,7 +34,6 @@ describe('toAttachments', () => {
         { id: 'c2', label: 'Towel', groupLabel: 'Bag', sortOrder: 1 },
         { id: 'c1', label: 'Goggles', groupLabel: 'Bag', sortOrder: 0 },
       ],
-      notes: [],
       reminders: [],
     })
     expect(out).toEqual([
@@ -57,7 +55,6 @@ describe('toAttachments', () => {
         { id: 'b1', label: 'Snack', groupLabel: 'After', sortOrder: 1000 },
         { id: 'a1', label: 'Goggles', groupLabel: 'Bag', sortOrder: 0 },
       ],
-      notes: [],
       reminders: [],
     })
     expect(out.map((a) => a.kind === 'checklist' && a.title)).toEqual(['Bag', 'After'])
@@ -66,25 +63,23 @@ describe('toAttachments', () => {
   it('treats a checklist with no heading as untitled rather than named empty', () => {
     const [only] = toAttachments('S1', {
       checklist: [{ id: 'c1', label: 'Thing', groupLabel: null, sortOrder: 0 }],
-      notes: [],
       reminders: [],
     })
     expect(only).toMatchObject({ kind: 'checklist', title: undefined, id: 'S1:checklist:' })
   })
 
-  it('puts checklists first, then notes, then reminders', () => {
+  it('puts checklists first, then reminders', () => {
     const out = toAttachments('S1', {
       checklist: [{ id: 'c1', label: 'Goggles', groupLabel: 'Bag', sortOrder: 0 }],
-      notes: [{ id: 'n1', body: 'Bring cash' }],
       reminders: [{ id: 'r1', offset: 30 }],
     })
-    expect(out.map((a) => a.kind)).toEqual(['checklist', 'note', 'reminder'])
+    expect(out.map((a) => a.kind)).toEqual(['checklist', 'reminder'])
   })
 
   it('gives a checklist the same id every time, since it has no row of its own', () => {
     const lines = { checklist: [{ id: 'c1', label: 'x', groupLabel: 'Bag', sortOrder: 0 }] }
-    const a = toAttachments('S1', { ...lines, notes: [], reminders: [] })
-    const b = toAttachments('S1', { ...lines, notes: [], reminders: [] })
+    const a = toAttachments('S1', { ...lines, reminders: [] })
+    const b = toAttachments('S1', { ...lines, reminders: [] })
     expect(a[0].id).toBe(b[0].id)
   })
 })
@@ -106,7 +101,6 @@ describe('attachments round trip', () => {
       title: 'After',
       items: [{ id: 'c3', title: 'Snack' }],
     },
-    { id: 'n1', kind: 'note', text: 'Bring cash' },
     { id: 'r1', kind: 'reminder', offset: 30 },
   ]
 
@@ -118,10 +112,10 @@ describe('attachments round trip', () => {
     expect(fromAttachments(attachments).checklist.map((l) => l.sortOrder)).toEqual([0, 1, 1000])
   })
 
-  it('does not keep the order notes and checklists were written in', () => {
+  it('does not keep the order reminders and checklists were written in', () => {
     // The database has nowhere to record it. Contents survive; interleaving does not.
     const interleaved: Attachment[] = [
-      { id: 'n1', kind: 'note', text: 'first' },
+      { id: 'r1', kind: 'reminder', offset: 30 },
       {
         id: 'S1:checklist:Bag',
         kind: 'checklist',
@@ -131,7 +125,7 @@ describe('attachments round trip', () => {
     ]
     expect(toAttachments('S1', fromAttachments(interleaved)).map((a) => a.kind)).toEqual([
       'checklist',
-      'note',
+      'reminder',
     ])
   })
 })
@@ -169,7 +163,7 @@ describe('toTemplate', () => {
 
 describe('back to a series', () => {
   it('an event round-trips', () => {
-    const original = series({ checklist: [], notes: [{ id: 'n1', body: 'hi' }] })
+    const original = series({ checklist: [], reminders: [{ id: 'r1', offset: 30 }] })
     expect(fromEvent(toEvent(original))).toEqual(original)
   })
 

@@ -24,12 +24,10 @@ export interface ChecklistEntry {
 /**
  * Something attached to an event, in display order:
  *
- * - `note` — free text. An event can have several.
  * - `checklist` — a titled set of lines; the event is done when all are ticked.
  * - `reminder` — how many minutes before the start to be told.
  */
 export type Attachment =
-  | { id: string; kind: 'note'; text: string }
   | { id: string; kind: 'checklist'; title?: string; items: ChecklistEntry[] }
   | { id: string; kind: 'reminder'; offset: number }
 

@@ -7,7 +7,7 @@ import { type ScopeChoice, ScopeSheet } from '../assets/ui/ScopeSheet'
 import { PageLoader } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
 import { isoLabel, minutesToTime } from '../assets/utils/dates'
-import { checklists, notes, reminderOffsets } from '../domains/events/attachments'
+import { checklists, reminderOffsets } from '../domains/events/attachments'
 import { type EventsChange, useEventsWrite } from '../domains/events/mutations'
 import { timingOf } from '../domains/events/selectors'
 import { useOccurrencesWrite } from '../domains/occurrences/mutations'
@@ -211,12 +211,6 @@ export function OccurrenceSheet({
               </ul>
             </div>
           ))}
-
-        {notes(event).map((n) => (
-          <p key={n.id} className={s.note}>
-            {n.text}
-          </p>
-        ))}
 
         {reminderOffsets(event).length > 0 && (
           <div className={s.reminders}>

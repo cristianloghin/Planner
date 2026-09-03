@@ -138,11 +138,6 @@ values
    'Snack',   'After', 1000, true, null)
 on conflict (id) do nothing;
 
-insert into note (id, owner_series_id, body, author_id) values
-  ('66666666-0000-4000-8000-000000000001', '44444444-0000-4000-8000-000000000001',
-   'Lane 3. Bring change for the locker.', '11111111-1111-4111-8111-111111111111')
-on conflict (id) do nothing;
-
 -- Half an hour before, as the app stores it: seconds, per user.
 insert into reminder (id, series_id, user_id, offset_seconds) values
   ('77777777-0000-4000-8000-000000000001', '44444444-0000-4000-8000-000000000001',

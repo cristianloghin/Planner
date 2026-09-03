@@ -10,7 +10,7 @@ import { useEventSearch } from '../domains/search/queries'
 
 /**
  * Event search in the shared view header (Day / Week / Month). Hits the
- * `search_events` RPC (titles + note and checklist text); picking a result hands
+ * `search_events` RPC (titles + checklist text); picking a result hands
  * its series id back to the view, which navigates to and opens it.
  */
 export function EventSearch({ onPick }: { onPick: (seriesId: string) => void }) {
@@ -69,7 +69,6 @@ export function EventSearch({ onPick }: { onPick: (seriesId: string) => void }) 
                 {r.dtstart && <span>{isoLabel(toISODate(new Date(r.dtstart)))}</span>}
                 {r.rrule && <span>· repeats</span>}
               </span>
-              {r.snippet && <span className={s.snippet}>{r.snippet}</span>}
             </button>
           ))}
         </SearchOverlay>

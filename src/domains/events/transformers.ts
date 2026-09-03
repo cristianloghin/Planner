@@ -16,10 +16,10 @@ const GROUP_STRIDE = 1000
 /**
  * Everything attached to a series, in display order.
  *
- * Checklists come back first, then notes, then reminders. The database does not
- * record the order the three kinds were written in, so that grouping is the
- * order — the contents survive a round trip, but interleaving a note between
- * two checklists does not.
+ * Checklists come back first, then reminders. The database does not record the
+ * order the two kinds were written in, so that grouping is the order — the
+ * contents survive a round trip, but interleaving a reminder between two
+ * checklists does not.
  *
  * Lines are sorted before grouping, because their position is what says which
  * checklist they belong to. Walking them in order reproduces the same
@@ -27,7 +27,7 @@ const GROUP_STRIDE = 1000
  */
 export function toAttachments(
   seriesId: string,
-  { checklist, notes, reminders }: Pick<Series, 'checklist' | 'notes' | 'reminders'>,
+  { checklist, reminders }: Pick<Series, 'checklist' | 'reminders'>,
 ): Attachment[] {
   const out: Attachment[] = []
 
@@ -49,7 +49,6 @@ export function toAttachments(
     })
   }
 
-  for (const n of notes) out.push({ id: n.id, kind: 'note', text: n.body })
   for (const r of reminders) out.push({ id: r.id, kind: 'reminder', offset: r.offset })
   return out
 }
@@ -63,7 +62,7 @@ export function toAttachments(
  */
 export function fromAttachments(
   attachments: Attachment[],
-): Pick<Series, 'checklist' | 'notes' | 'reminders'> {
+): Pick<Series, 'checklist' | 'reminders'> {
   const checklists = attachments.filter((a) => a.kind === 'checklist')
   return {
     checklist: checklists.flatMap((c, ci) =>
@@ -74,7 +73,6 @@ export function fromAttachments(
         sortOrder: ci * GROUP_STRIDE + idx,
       })),
     ),
-    notes: attachments.filter((a) => a.kind === 'note').map((n) => ({ id: n.id, body: n.text })),
     reminders: attachments
       .filter((a) => a.kind === 'reminder')
       .map((r) => ({ id: r.id, offset: r.offset })),

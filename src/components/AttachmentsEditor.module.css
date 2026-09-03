@@ -36,12 +36,6 @@
   padding: 0 4px;
 }
 
-.note {
-  width: 100%;
-  resize: vertical;
-  font: inherit;
-}
-
 .checklistTitle {
   flex: 1;
   font-weight: 600;
