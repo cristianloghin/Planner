@@ -4,7 +4,8 @@ Everything you need to change this codebase safely, in one place. Written to be
 read cold. If something here disagrees with the code, the code is right and this
 is a bug — fix it.
 
-- The layer pattern lives in [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+- The layer pattern lives in [`ARCHITECTURE.md`](./ARCHITECTURE.md), with open
+  questions in [`PATTERN_NOTES.md`](./PATTERN_NOTES.md).
 - How to run and deploy lives in the [README](../README.md).
 - Superseded docs are in [`archive/`](./archive/README.md) and are **not** current.
 

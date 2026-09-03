@@ -1,5 +1,9 @@
 # DRSp — the Domain / Route / Service pattern
 
+> Open questions and evidence from applying this to Planner are in
+> [`PATTERN_NOTES.md`](./PATTERN_NOTES.md) — in particular that §2 understates
+> layouts, which own interaction and not only presentation.
+
 A way of structuring React applications around **one direction of data flow**.
 
 This document defines the pattern itself: its primitives, the rules between them,
