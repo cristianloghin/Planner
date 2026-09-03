@@ -83,6 +83,9 @@ describe('parseRRule ≡ client encoding', () => {
       { freq: 'monthly', interval: 3 },
       { freq: 'weekly', interval: 1, until: '2026-06-17' },
       { freq: 'monthly', interval: 2, until: '2026-12-31' },
+      // COUNT rides in the string alongside UNTIL (§8).
+      { freq: 'daily', interval: 1, count: 5 },
+      { freq: 'weekly', interval: 2, count: 12 },
     ]
     for (const r of cases) {
       expect(parseRRule(recurrenceToRRule(r))).toEqual(r)
@@ -121,7 +124,6 @@ describe('computeDueReminders', () => {
     all_day: false,
     dtstart: '2026-07-09T06:00:00Z', // 09:00 +03
     rrule: 'FREQ=WEEKLY;INTERVAL=1',
-    repeat_count: null,
   }
   const reminder: SenderReminder = {
     id: 'r1',
@@ -286,13 +288,11 @@ describe('computeDueReminders', () => {
     ).toHaveLength(0)
   })
 
-  it('respects a repeat_count, which lives outside the rrule string', () => {
-    // The count reaches startsOn only through computeDueReminders joining the
-    // column onto the parsed rule. The cross-validation above calls startsOn
-    // with prebuilt Recurrence objects, so this one line is not covered there —
-    // and getting it wrong pushes a partner about a lesson the calendar has
-    // already stopped showing.
-    const counted: SenderSeries = { ...series, repeat_count: 1 }
+  it('respects a COUNT cap end to end', () => {
+    // The cross-validation above calls startsOn with prebuilt Recurrence
+    // objects, so it never exercises the parse. Getting COUNT wrong here pushes
+    // a partner about a lesson the calendar has already stopped showing.
+    const counted: SenderSeries = { ...series, rrule: 'FREQ=WEEKLY;COUNT=1' }
     expect(
       computeDueReminders({
         series: [counted],

@@ -131,27 +131,6 @@ drop table occurrence_item_state, occurrence_item_removed, checklist_item cascad
 drop table item_status;
 
 -- ---------------------------------------------------------------------------
--- §8. A user-facing end for a series — ADDED.
--- ---------------------------------------------------------------------------
-
--- "12 piano lessons every other Tuesday" and "every Monday until Christmas".
--- Neither was expressible: a series only ever ended by being split or deleted
--- forward, and `until` was a system-only cap the user never saw.
---
--- The count lives in a column rather than as COUNT= in the rrule. Decision 2
--- banned COUNT because a verbatim copy of the rule on a split would restart the
--- count on the new half; with the split gone (§9) either encoding would work,
--- and a column is chosen because it leaves everything at the string boundary
--- untouched — rruleToRecurrence / recurrenceToRRule on the client and the
--- sender's hand-rolled parseRRule — and lets SQL see the count without parsing.
--- The stored string stays UNTIL-or-infinite; a series ends at whichever of the
--- two comes first.
-alter table event_series
-  add column repeat_count integer check (repeat_count > 0),
-  add constraint repeat_count_needs_rule
-    check (repeat_count is null or rrule is not null);
-
--- ---------------------------------------------------------------------------
 -- §6c. Vestigial columns — each written by exactly one path, read by none.
 -- ---------------------------------------------------------------------------
 

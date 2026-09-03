@@ -30,11 +30,10 @@ export interface Recurrence {
   /**
    * Stop after this many occurrences. Absent means it is not count-bounded.
    *
-   * Kept beside the rrule rather than in it: DATA_MODEL Decision 2 keeps the
-   * stored string UNTIL-or-infinite, so nothing at the string boundary
-   * (`rruleToRecurrence`, `recurrenceToRRule`, the sender's hand-rolled
-   * `parseRRule`) has to learn about COUNT, and SQL can see the count without
-   * parsing anything. The editor sets exactly one of `until` / `count`.
+   * Stored in the rule string as RFC-5545 `COUNT`, alongside `UNTIL` — so a
+   * series has exactly one place its end can live, and a count with no rule to
+   * apply it to cannot be represented at all. The editor sets exactly one of
+   * `until` / `count`.
    */
   count?: number
 }
@@ -96,7 +95,6 @@ interface SeriesRow {
   dtstart: string | null
   duration: string | null
   rrule: string | null
-  repeat_count: number | null
   color_key: string | null
   event_person: { person_id: string }[]
   reminder: { id: string; offset_seconds: number }[]
@@ -108,22 +106,9 @@ interface SeriesRow {
  * also reachable through `occurrence_item_removed` and the request would fail
  * as ambiguous without them; they are merely explicit now.
  */
-const SERIES_SELECT = `id, title, all_day, dtstart, duration, rrule, repeat_count, color_key,
+const SERIES_SELECT = `id, title, all_day, dtstart, duration, rrule, color_key,
    event_person!series_id ( person_id ),
    reminder!series_id ( id, offset_seconds )`
-
-/**
- * The parsed rule plus its stored count.
- *
- * The count is dropped when the rule itself did not parse into something the
- * app models: a bare count with no recurrence to apply it to would be
- * meaningless, and `rruleToRecurrence` returns undefined for a one-off or an
- * unmodelled frequency.
- */
-function withCount(r: Recurrence | undefined, count: number | null): Recurrence | undefined {
-  if (!r) return undefined
-  return count == null ? r : { ...r, count }
-}
 
 /**
  * Every series in the account, dated ones or blueprints.
@@ -150,7 +135,7 @@ export async function fetchSeries(
     allDay: r.all_day,
     start: r.dtstart ? tsToStart(r.dtstart, r.all_day) : null,
     duration: intervalToDuration(r.duration, r.all_day),
-    recurrence: withCount(rruleToRecurrence(r.rrule), r.repeat_count),
+    recurrence: rruleToRecurrence(r.rrule),
     attendees: r.event_person.map((ep) => ep.person_id),
     colorKey: isColorKey(r.color_key) ? r.color_key : undefined,
     reminders: r.reminder.map((rem) => ({
@@ -181,7 +166,6 @@ export async function saveSeries(
     dtstart: series.start ? startToTs(series.start, series.allDay) : null,
     duration: durationToInterval(series.duration, series.allDay),
     rrule: recurrenceToRRule(series.recurrence),
-    repeat_count: series.recurrence?.count ?? null,
     color_key: series.colorKey ?? null,
     is_template: series.isTemplate,
     ...(isNew ? { created_by: userId } : {}),

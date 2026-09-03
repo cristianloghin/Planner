@@ -36,11 +36,7 @@ export interface Recurrence {
   interval: number
   /** Inclusive last occurrence date. */
   until?: string
-  /**
-   * Stop after this many occurrences. Not in the rrule string — it lives in
-   * `event_series.repeat_count`, so `parseRRule` never sees it and the join
-   * happens in `computeDueReminders`.
-   */
+  /** Stop after this many occurrences (RFC-5545 COUNT). */
   count?: number
 }
 
@@ -53,8 +49,8 @@ const FREQ_MAP: Record<string, Recurrence['freq'] | undefined> = {
 /**
  * Parse the stored bare RRULE. UNTIL decodes exactly like the client
  * (rruleToRecurrence): the UTC date of the instant, which is the intended date
- * because the only writer encodes the UTC end of the day. An unmodelled FREQ
- * returns undefined (one-off).
+ * because the only writer encodes the UTC end of the day. COUNT is read
+ * straight through. An unmodelled FREQ returns undefined (one-off).
  */
 export function parseRRule(rrule: string | null): Recurrence | undefined {
   if (!rrule) return undefined
@@ -70,6 +66,8 @@ export function parseRRule(rrule: string | null): Recurrence | undefined {
   const freq = FREQ_MAP[fields.get('FREQ') ?? '']
   if (!freq) return undefined
   const interval = Math.max(1, Number(fields.get('INTERVAL') ?? 1) || 1)
+  const countRaw = fields.get('COUNT')
+  const count = countRaw ? Number(countRaw) : undefined
   const untilRaw = fields.get('UNTIL')
   let until: string | undefined
   if (untilRaw) {
@@ -79,7 +77,12 @@ export function parseRRule(rrule: string | null): Recurrence | undefined {
       until = new Date(instant).toISOString().slice(0, 10)
     }
   }
-  return { freq, interval, ...(until ? { until } : {}) }
+  return {
+    freq,
+    interval,
+    ...(until ? { until } : {}),
+    ...(count != null && Number.isFinite(count) ? { count } : {}),
+  }
 }
 
 // ---- recurrence expansion (mirrors src/lib/recurrence.ts startsOn) ----------
@@ -198,7 +201,6 @@ export interface SenderSeries {
   all_day: boolean
   dtstart: string // timestamptz ISO
   rrule: string | null
-  repeat_count: number | null
 }
 
 export interface SenderReminder {
@@ -270,11 +272,7 @@ export function computeDueReminders(args: DueArgs): DueNotification[] {
     if (!reminders?.length || !s.dtstart) continue
 
     const anchor = wallParts(timeZone, Date.parse(s.dtstart))
-    // The count is not in the rrule string, so it is joined on here. This one
-    // line is what the cross-validation test does NOT cover (it calls startsOn
-    // with prebuilt Recurrence objects), which is why it has a case of its own.
-    const parsed = parseRRule(s.rrule)
-    const recurrence = parsed && { ...parsed, count: s.repeat_count ?? undefined }
+    const recurrence = parseRRule(s.rrule)
     const maxOffsetMs = Math.max(...reminders.map((r) => r.offset_seconds), 0) * 1000
 
     // Candidate occurrence dates: reminders fire BEFORE the start, so an
