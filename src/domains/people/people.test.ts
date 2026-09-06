@@ -5,8 +5,9 @@ import {
   attendeeLabelFor,
   byId,
   defaultAttendees,
-  eventColorKey,
+  eventColorIn,
   personColorKey,
+  personColorMap,
 } from './selectors'
 import type { Person } from './types'
 
@@ -76,18 +77,24 @@ describe('personColorKey', () => {
   })
 })
 
-describe('eventColorKey', () => {
+describe('personColorMap', () => {
+  it('resolves everyone once, with this user\'s overrides applied', () => {
+    expect(personColorMap(people, { a: '7' })).toEqual({ a: '7', b: '1', c: '1' })
+    expect(personColorMap([], {})).toEqual({})
+  })
+})
+
+describe('eventColorIn', () => {
   it('uses the event colour when it has one', () => {
-    expect(eventColorKey(people, { a: '7' }, 'a', '3')).toBe('3')
+    expect(eventColorIn('7', '3')).toBe('3')
   })
 
-  it('otherwise takes the colour of whoever it sits under', () => {
-    expect(eventColorKey(people, { a: '7' }, 'a', undefined)).toBe('7')
-    expect(eventColorKey(people, {}, 'a', undefined)).toBe('1')
+  it('otherwise takes the colour of the lane it sits in', () => {
+    expect(eventColorIn('7', undefined)).toBe('7')
   })
 
-  it('falls back to the default when it sits under nobody', () => {
-    expect(eventColorKey(people, {}, undefined, undefined)).toBe(personColorKey([], {}, 'nobody'))
+  it('falls back to the default when it sits in no lane', () => {
+    expect(eventColorIn(undefined, undefined)).toBe(DEFAULT_COLOR)
   })
 })
 

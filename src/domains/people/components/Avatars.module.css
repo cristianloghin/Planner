@@ -1,5 +1,4 @@
-/* Attendee avatars — small round initials in each person's solid color. */
-.avatars {
+.Avatars {
   display: inline-flex;
   gap: 2px;
 }

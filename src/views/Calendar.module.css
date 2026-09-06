@@ -1,0 +1,123 @@
+/*
+ * Layout contract for the calendar screens: the view fills the main area, its
+ * head (nav, lane names) stays put, and only `.body` scrolls.
+ */
+.CalendarView {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.head {
+  flex: none;
+  padding: 0 max(16px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--border);
+}
+
+/* Search | prev-title-next | today. Side slots hug the edges, nav stays centred. */
+.headRow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.headRow > :first-child {
+  justify-self: start;
+}
+
+.headRow > :last-child {
+  justify-self: end;
+}
+
+.headSide {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-size: var(--fs-xl);
+}
+
+/* Bare icon buttons — the calendar also swipes, so the arrows stay quiet. */
+.nav button,
+.todayBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--accent);
+}
+
+.todayBtn.todayActive {
+  color: var(--on-accent);
+  background: var(--accent);
+}
+
+/* Lane heads sit to the right of the time gutter, one equal column each. */
+.lanesRow {
+  display: grid;
+  grid-template-columns: var(--gutter-w) 1fr;
+}
+
+/* One column per Lane slot, from the template the view publishes on the
+   frame — so a fourth lane does not wrap, two do not leave an empty third,
+   and an expanded lane grows. Animate the change (a no-op where unsupported). */
+.lanes {
+  display: grid;
+  grid-template-columns: var(--lane-columns);
+  transition: grid-template-columns 0.25s ease;
+}
+
+/* ---- The deck ---- */
+
+/* One scrollbar per screen. The content slides sideways during a swipe, so
+   clip the overflow or the off-screen pages open a horizontal scrollbar. */
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 max(16px, env(safe-area-inset-left));
+  /* WebKit/iOS: establish the scroll region on first paint. */
+  transform: translateZ(0);
+}
+
+.grid {
+  display: flex;
+}
+
+/* The fixed column beside the pages (a time gutter). Its width is a token so
+   the header's lane row and the body agree without either knowing the other. */
+.gutter {
+  flex: none;
+  width: var(--gutter-w);
+}
+
+/* Clips the strip to its own column, so sliding pages can't paint over the
+   gutter. */
+.clip {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Three pages: previous | current | next, one container-width each, pulled
+   left one page so the middle shows. The gesture drags it sideways, so the
+   neighbour's real content follows the finger. */
+.strip {
+  width: 300%;
+  margin-left: -100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}

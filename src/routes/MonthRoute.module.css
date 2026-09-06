@@ -1,21 +1,20 @@
-/* Fixed-width leading column for the ISO week numbers, shared by the grid
-   and the weekday header so they stay aligned. */
-.monthGrid,
-.monthWeekdays {
-  --weeknum-w: 16px;
+/* Weekday label in the header's lane row, one per column of the grid. */
+.weekday {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  padding-bottom: 2px;
+}
+
+/* One month page: a leading week-number column sized by the gutter token so
+   it lines up under the header's lane row, then seven day columns. */
+.grid {
   display: grid;
-  grid-template-columns: var(--weeknum-w) repeat(7, minmax(0, 1fr));
+  grid-template-columns: var(--gutter-w) repeat(7, minmax(0, 1fr));
   gap: 5px;
-}
-
-.monthGrid {
   align-content: start;
-}
-
-/* The static weekday header row above the sliding month pages; its columns
-   mirror .monthGrid so the labels line up with the cells. */
-.monthWeekdays {
-  margin-bottom: 5px;
+  padding: 5px 0 16px;
 }
 
 .weekNum {
@@ -26,15 +25,7 @@
   color: var(--muted);
 }
 
-.monthWeekday {
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--muted);
-  text-align: center;
-  padding-bottom: 2px;
-}
-
-.monthCell {
+.cell {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -47,25 +38,25 @@
   color: var(--text);
 }
 
-.monthCell.dim {
+.cell.dim {
   opacity: 0.4;
 }
 
-.monthCell.today {
+.cell.today {
   border-color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
-.monthDate {
+.date {
   font-size: var(--fs-base);
   font-weight: 600;
 }
 
-.monthCell.today .monthDate {
+.cell.today .date {
   color: var(--accent);
 }
 
-.monthDots {
+.dots {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -73,14 +64,14 @@
   gap: 3px;
 }
 
-.monthDot {
+.dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--c);
 }
 
-.monthMore {
+.more {
   font-size: var(--fs-2xs);
   line-height: 1;
   color: var(--muted);

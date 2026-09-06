@@ -1,57 +1,60 @@
 ---
 name: architecture-open-findings
-description: Structural findings for Planner with disposition per item, last re-derived from code 2026-07-27; verify before restating
+description: Open structural findings for Planner with dispositions, updated 2026-09-06 from the `views` branch review; verify against code before restating
 metadata:
   type: project
 ---
 
-Findings re-derived from the whole `src/` tree on 2026-07-27 (previous pass 2026-07-26).
-Disposition for all items is **unknown** — nothing has been acted on or explicitly
-accepted, so none of these is a boundary. Re-verify against code before restating.
+**Updated 2026-09-06** (branch `views`, uncommitted calendar-view work). Each carried
+finding below names its disposition. Nothing here was retired on a change of judgement.
 
-Currently open (files as of 2026-07-27):
+## Carried from the 2026-09-04 review
 
-1. `src/store/supabaseStore.ts` (1239 lines) — one class owns row mapping for nine
-   tables, the 24-case `apply` write switch, the Query-owned completions + templates
-   reads/writes, a one-time legacy-list localStorage import, and the account-wide
-   realtime channel. `ScheduleStore` declares 3 methods; the class exposes 11.
-   `SupabaseStore` is constructed in three places (`store.ts` `createStore`,
-   `data/useAccountStore.ts`, `data/completions.ts` `resolveWriteStore`).
-   Recommended: move `loadCompletionsRange` + the four occurrence write methods out
-   as free functions in `src/data/` (verified: they use only module-level helpers and
-   `accountId`, sharing nothing with the event write path).
-2. `src/store/store.ts` — `LocalStorageStore`, `normalizeLists`, `createStore` and the
-   `ScheduleStore` interface are unreachable/single-implementation; `Root` gates
-   `AppProvider` on `accountId && session`, so `createStore()`'s no-arg branch is dead
-   and no test imports it. Recommended: delete all but `defaultState()`.
-3. `src/state.tsx` — routes `event_occurrence` / `occurrence_item_state` realtime
-   changes to a completions cache invalidation, while `data/templates.ts` owns its own
-   realtime channel. Recommended: move the completions routing into
-   `data/completions.ts`.
-4. `src/components/Lists.tsx` (714 lines) — `patchTitle` / `addWorkingItem` /
-   `patchItem` / `removeWorkingItem` each fork `if (draft) <local mutation> else
-   dispatch(...)`, giving list-item semantics a second implementation alongside
-   `store/reducer.ts`. Recommended: fold the draft over the exported `reducer`.
-5. `src/lib/search.ts` — Supabase RPC data access in `lib/`; `EventSearch` and
-   `ListSearch` thread `accountId` from `useAuth` into it. Recommended: move to
-   `src/data/search.ts`.
+1. **Leaf components fetching** — *partially acted on, code changed.* `Avatars` was
+   rewritten as `domains/people/components/Avatars.tsx`, props-only, taking
+   `{person, color}[]`; the old `src/components/Avatars.tsx` is deleted. **Still open
+   for `AttendeeChips`**: `src/components/AttendeeChips.tsx:20-22` calls `usePeople` +
+   `usePreferences` inside `EventEditor`, which already holds both at
+   `EventEditor.tsx:145-146`.
+2. **Day-override rules split across components** — *unknown; not re-derived in depth.*
+   Both writers now exist (`EventEditor.tsx:351`, `OccurrenceSheet.tsx:205`), so the
+   divergence may have closed; the read-through duplication was not re-checked. Outside
+   the `views` diff.
+3. **`domains/occurrences/selectors.ts` is dead** — *not acted on, still true.*
+   `stateFor` (:19) and `isCancelled` (:25) have zero callers including tests.
+4. **The calendar's position is not in the URL (invariant 10)** — *not acted on, and now
+   worse.* `DayRoute.tsx:73` and `WeekRoute.tsx:54` read `useCalendarNavigation()`;
+   `MonthRoute.tsx:52` keeps its own `useState` cursor instead. Two sources of truth for
+   "where the calendar is looking", none of them the URL.
+5. **The occurrence key format is written twice** — *not acted on, still true.*
+   `domains/occurrences/transformers.ts:11` (`occurrenceKey`) and
+   `services/recurrence/timing.ts` (`occKey`); `OccurrenceSheet.tsx:62` uses the
+   service's copy.
 
-Closed / no longer holds:
+## Reported 2026-09-06 (branch `views`), disposition unknown
 
-- (2026-07-26 item 4) "Swipe-strip scaffolding duplicated across DayView, WeekCalendar,
-  WeekTimeline, MonthView" — **re-verified false on 2026-07-27**. The gesture machine,
-  `pageInert` and the `swipeClip`/`swipeStrip` classes are centralised in
-  `src/lib/useSwipeGestures.ts` + `src/styles/shared.module.css`; each view now holds
-  only ~6 lines of strip JSX. Do not restate.
+6. **The colour join moved up rather than away.** Leaf components were fixed (see
+   boundaries note), but `DayPage.tsx:31`, `WeekPage.tsx:33` and `MonthRoute.tsx:131-133`
+   take `people: Person[]` + `overrides` purely to call `eventColorKey`/`personColorKey`
+   at render time — 8 call sites across 5 modules. `docs/PATTERN_NOTES.md` §2 measured
+   this on 2 components and concluded one resolved colour per lane is enough.
+7. **`ARCHITECTURE.md` §2's layer table contradicts `views/Calendar.tsx`.** The table
+   gives Layout "May import: Assets" and calls it presentational only; the file imports
+   values from `services/gestures` because PATTERN_NOTES §1 says it should. Also
+   `views/` is not a layer name under §11 "folders are layers". Doc-side fix.
+8. **The lane grid template is wired in three places** — `Calendar.tsx:88` (head, from
+   slot weights), `DayPage.tsx:45` and `WeekPage.tsx:62` (body, from a `weights` prop).
+   Head/body alignment holds only because each route passes the same array twice.
+9. **Dead code left by the deletions.** `assets/hooks/useMediaQuery.ts` (zero refs);
+   seven now-unreferenced classes in `assets/styles/shared.module.css` (`.headSide:41`,
+   `.todayBtn:48`, `.todayActive:59`, `.swipeBody:79`, `.swipeStrip:86`, `.swipeClip:95`,
+   `.empty:122`), five more with only `Settings.tsx:43-53` left as consumer; and the
+   week-layout preference (`Settings.tsx:24-27,137-147` writes it, no screen reads it).
 
-**Why:** so a later review does not re-derive the same list from scratch, and does not
-repeat a finding the code has already resolved.
+**Coverage gap, unchanged and acknowledged in `docs/ARCHITECTURE.md` §11 Enforcement:**
+Biome 1.9.4 only. No dead-export detection, no cycle detection, no import-boundary
+enforcement, nothing structural in `.github/workflows/`. Findings 3 and 9 were found by
+hand. The doc's own pick is `dependency-cruiser`; a dead-export tool (knip) would cover 9.
 
-**How to apply:** verify each still holds before restating. See
-[[architecture-boundaries]] for what is deliberately transitional.
-
-**Invocation log.** 2026-07-27, third invocation at `edb9478`: all three review targets
-(branch-vs-main, merge-base diff, uncommitted work) were empty — `main` is level with
-`origin/main` and the tree holds only untracked `.claude/` agent files. No review was
-produced and nothing above was re-derived. A further invocation at this commit will also
-be empty; ask the user to name a target or land a change first.
+**How to apply:** verify each against the code before restating. See
+[[architecture-boundaries]] for what is settled or transitional by declaration.

@@ -1,8 +1,8 @@
-.timeGutter {
+.TimeGutter {
   position: relative;
 }
 
-.gutterLabel {
+.label {
   position: absolute;
   right: 6px;
   transform: translateY(-50%);

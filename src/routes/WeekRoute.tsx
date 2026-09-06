@@ -1,18 +1,29 @@
 import { useMemo, useState } from "react";
 import { useAccount } from "../account";
 import { useNow } from "../assets/hooks/useNow";
+import { DayHead } from "../assets/ui/DayHead";
 import { LoadingPill } from "../assets/ui/Spinner";
 import { TimeGutter } from "../assets/ui/TimeGutter";
-import { addDays, isoLabel, toISODate } from "../assets/utils/dates";
+import {
+  DAY_NAMES,
+  addDays,
+  isoWeekNumber,
+  mondayOf,
+  toISODate,
+  weekRangeLabel,
+} from "../assets/utils/dates";
 import { EventSearch } from "../components/EventSearch";
 import { type EditorTarget, EventEditor } from "../components/EventEditor";
 import { OccurrenceSheet } from "../components/OccurrenceSheet";
 import { AllDayChip } from "../domains/events/components/AllDayChip";
 import { useEvents } from "../domains/events/queries";
 import { useCompletionsForRange } from "../domains/occurrences/queries";
-import { LaneHead } from "../domains/people/components/LaneHead";
 import { usePeople } from "../domains/people/queries";
-import { eventColorIn, personColorMap } from "../domains/people/selectors";
+import {
+  defaultAttendees,
+  eventColorIn,
+  personColorMap,
+} from "../domains/people/selectors";
 import { usePreferences } from "../domains/preferences/queries";
 import { personColors } from "../domains/preferences/selectors";
 import { useCalendarNavigation } from "../navigation";
@@ -22,33 +33,28 @@ import {
   nextRelevantDate,
   occurrencesOnDate,
 } from "../services/recurrence";
-import { DAY_MIN, type TimeBlock } from "../services/timeline-layout";
-import type { CalendarEvent, PersonId } from "../types";
+import { DAY_MIN } from "../services/timeline-layout";
+import type { CalendarEvent } from "../types";
 import { CalendarView } from "../views/Calendar";
-import { DayPage } from "./DayPage";
+import { WeekPage } from "./WeekPage";
 
-const ZOOM_KEY = "planner:hourH";
+// The Week grid keeps its own zoom level: a comfortable hour height for one
+// day (three lanes) is usually too tall for a seven-day overview.
+const ZOOM_KEY = "planner:weekHourH";
 const SNAP = 15;
 
-/** One page of the deck: a day, already expanded. */
-export interface DayPageData {
-  iso: string;
-  timedBlocks: TimeBlock[];
-  allDayOccs: DayOccurrence[];
+/** One visible day: its ISO date plus that day's expanded occurrences. */
+export interface WeekDay {
+  dateISO: string;
+  occs: DayOccurrence[];
 }
 
 /**
- * The Day screen, wired up.
- *
- * Reads the domains, feeds the recurrence service, and composes the calendar
- * view from slots: one lane per person in the header, and three day pages in
- * the deck. Every join between domains — which chips sit in which lane, what
- * colour a thing shows in — is made here.
- *
- * The editor and the occurrence sheet are opened from here rather than from
- * the view, because *how a thing is reached* is the shell's business.
+ * The Week screen, wired up: seven weekday lanes in the header, three week
+ * pages in the deck. Same shape as the Day screen with people swapped for
+ * weekdays — which is why the view can serve both.
  */
-export function DayRoute() {
+export function WeekRoute() {
   const nav = useCalendarNavigation();
   const { accountId, userId } = useAccount();
   const { data: events = [] } = useEvents(accountId);
@@ -64,52 +70,41 @@ export function DayRoute() {
     event: CalendarEvent;
     date: string;
   } | null>(null);
-  // Pixels-per-hour for the timeline. The view pinches it, the pages draw with
-  // it; the key is this screen's, which is why the route holds it.
   const [hourH, setHourH] = useState(() => loadZoom(ZOOM_KEY));
-  // The person whose lane is expanded, if any.
-  const [focusLane, setFocusLane] = useState<PersonId | null>(null);
-
-  const dateISO = addDays(nav.weekStart, nav.selectedDay);
-  const prevISO = addDays(dateISO, -1);
-  const nextISO = addDays(dateISO, 1);
+  // Weekday index (0 = Mon) whose column is expanded, if any.
+  const [focusDay, setFocusDay] = useState<number | null>(null);
 
   const now = useNow();
   const todayISO = toISODate(now);
   const nowMin = now.getHours() * 60 + now.getMinutes();
 
-  // Windowed per-occurrence state for the visible day and its swipe neighbours.
+  // Windowed per-occurrence state covering the visible week and its deck
+  // neighbours.
   const { completions, isLoading } = useCompletionsForRange(
     accountId,
-    prevISO,
-    nextISO,
+    addDays(nav.weekStart, -7),
+    addDays(nav.weekStart, 13),
   );
 
-  // One entry per deck page: yesterday, the visible day, tomorrow. This is the
-  // expensive part of a render (recurrence expansion), and none of it depends
-  // on zoom or gesture state — so it is computed once here, not per frame.
-  const pages = useMemo<DayPageData[]>(
+  // Expand the three pages' occurrences once per data/week change, not per
+  // render: [previous week, visible week, next week], seven days each.
+  const weeks = useMemo<WeekDay[][]>(
     () =>
-      [prevISO, dateISO, nextISO].map((iso) => {
-        const occs = occurrencesOnDate(events, iso, completions);
-        const timedBlocks: TimeBlock[] = occs
-          .filter((o) => !o.event.allDay)
-          .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end }));
-        return {
-          iso,
-          timedBlocks,
-          allDayOccs: occs.filter((o) => o.event.allDay),
-        };
-      }),
-    [events, completions, prevISO, dateISO, nextISO],
+      [-7, 0, 7].map((weekOffset) =>
+        DAY_NAMES.map((_, dayIdx) => {
+          const dateISO = addDays(nav.weekStart, weekOffset + dayIdx);
+          return { dateISO, occs: occurrencesOnDate(events, dateISO, completions) };
+        }),
+      ),
+    [nav.weekStart, events, completions],
   );
 
-  /** Open a search hit at the event's next upcoming occurrence. */
+  /** Open a search hit: jump the week to its next upcoming occurrence. */
   function openSearchHit(seriesId: string) {
     const event = events.find((e) => e.id === seriesId);
     if (!event) return;
     const date = nextRelevantDate(event);
-    nav.goToDate(date);
+    nav.setWeek(mondayOf(new Date(`${date}T00:00:00`)));
     setEditor({ mode: "edit", event, occurrenceDate: date });
   }
 
@@ -117,23 +112,23 @@ export function DayRoute() {
     setSheet({ event: occ.event, date: occ.start });
   }
 
-  /** Tap on empty lane: a new hour-long event for that person, snapped. */
-  function addAt(date: string, person: PersonId, minute: number) {
+  /** Tap on empty grid: a new hour-long event around that (snapped) time. */
+  function addAt(dateISO: string, minute: number) {
     const start = Math.min(
       Math.max(0, Math.round(minute / SNAP) * SNAP),
       DAY_MIN - SNAP,
     );
     setEditor({
       mode: "new",
-      date,
-      attendees: [person],
+      date: dateISO,
+      attendees: defaultAttendees(people),
       startMin: start,
       endMin: Math.min(start + 60, DAY_MIN),
     });
   }
 
-  function toggleLane(id: PersonId) {
-    setFocusLane((cur) => (cur === id ? null : id));
+  function toggleDay(idx: number) {
+    setFocusDay((cur) => (cur === idx ? null : idx));
   }
 
   // Everyone's colour, resolved once; the pages and the leaves only paint.
@@ -141,16 +136,18 @@ export function DayRoute() {
     () => personColorMap(people, overrides),
     [people, overrides],
   );
-  const { allDayOccs } = pages[1];
+  const thisWeek = nav.weekStart === mondayOf(now);
+  const visible = weeks[1];
 
-  const page = (p: DayPageData) => (
-    <DayPage
-      page={p}
-      people={people}
+  const page = (days: WeekDay[]) => (
+    <WeekPage
+      days={days}
       colors={colors}
+      focusDay={focusDay}
       pxPerMin={hourH / 60}
-      nowMin={p.iso === todayISO ? nowMin : undefined}
-      onAddAt={(person, minute) => addAt(p.iso, person, minute)}
+      todayISO={todayISO}
+      nowMin={nowMin}
+      onAddAt={addAt}
       onOpen={openOccurrence}
     />
   );
@@ -158,47 +155,54 @@ export function DayRoute() {
   return (
     <>
       <CalendarView
-        pageKey={dateISO}
-        onNavigate={nav.shiftDay}
-        onGoToday={() => nav.goToDate(todayISO)}
-        todayActive={dateISO === todayISO}
+        pageKey={nav.weekStart}
+        onNavigate={nav.shiftWeek}
+        onGoToday={() => nav.setWeek(mondayOf(now))}
+        todayActive={thisWeek}
+        gutterLabel={`W${isoWeekNumber(nav.weekStart)}`}
         zoom={{ hourH, setHourH, key: ZOOM_KEY }}
-        initialMinute={dateISO === todayISO ? nowMin : 7 * 60}
+        initialMinute={thisWeek ? nowMin : 7 * 60}
       >
         <CalendarView.Header.Search>
           <EventSearch onPick={openSearchHit} />
         </CalendarView.Header.Search>
-        <CalendarView.Header.Title>{isoLabel(dateISO)}</CalendarView.Header.Title>
-        {people.map((p) => (
+        <CalendarView.Header.Title>
+          {weekRangeLabel(nav.weekStart)}
+        </CalendarView.Header.Title>
+        {visible.map(({ dateISO, occs }, i) => (
           <CalendarView.Header.Lane
-            key={p.id}
-            weight={p.id === focusLane ? 4 : 1}
+            key={dateISO}
+            weight={i === focusDay ? 4 : 1}
           >
-            <LaneHead
-              person={p}
-              color={colors[p.id]}
-              isExpanded={focusLane === p.id}
-              onToggleLane={() => toggleLane(p.id)}
+            <DayHead
+              name={DAY_NAMES[i]}
+              number={Number(dateISO.slice(8, 10))}
+              isToday={dateISO === todayISO}
+              isExpanded={focusDay === i}
+              onToggle={() => toggleDay(i)}
             >
-              {allDayOccs
-                .filter((o) => o.attendees.includes(p.id))
+              {occs
+                .filter((o) => o.event.allDay)
                 .map((o) => (
                   <AllDayChip
                     key={`${o.event.id}:${o.start}`}
                     occ={o}
-                    color={eventColorIn(colors[p.id], o.event.colorKey)}
+                    color={eventColorIn(
+                      colors[o.attendees[0]],
+                      o.event.colorKey,
+                    )}
                     onClick={() => openOccurrence(o)}
                   />
                 ))}
-            </LaneHead>
+            </DayHead>
           </CalendarView.Header.Lane>
         ))}
         <CalendarView.Gutter>
           <TimeGutter hourH={hourH} />
         </CalendarView.Gutter>
-        <CalendarView.Previous>{page(pages[0])}</CalendarView.Previous>
-        <CalendarView.Current>{page(pages[1])}</CalendarView.Current>
-        <CalendarView.Next>{page(pages[2])}</CalendarView.Next>
+        <CalendarView.Previous>{page(weeks[0])}</CalendarView.Previous>
+        <CalendarView.Current>{page(weeks[1])}</CalendarView.Current>
+        <CalendarView.Next>{page(weeks[2])}</CalendarView.Next>
       </CalendarView>
 
       {isLoading && <LoadingPill />}

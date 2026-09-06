@@ -59,16 +59,29 @@ export function personColorKey(
 }
 
 /**
- * The colour an event shows in: its own if it has one, otherwise the person's
- * whose lane it is in. Matches how a shared calendar reads — an event with no
- * colour of its own belongs to whoever it is under.
+ * Everyone's colour at once, resolved. A screen calls this once and hands the
+ * map down, so the leaves that paint never see the people list or the
+ * overrides — only the colour they are to show.
  */
-export function eventColorKey(
+export function personColorMap(
   people: Person[],
   overrides: Record<PersonId, ColorKey>,
-  personId: PersonId | undefined,
+): Record<PersonId, ColorKey> {
+  const out: Record<PersonId, ColorKey> = {}
+  for (const p of people) out[p.id] = personColorKey(people, overrides, p.id)
+  return out
+}
+
+/**
+ * The colour an event shows in: its own if it has one, otherwise the colour
+ * of the lane it is in. Matches how a shared calendar reads — an event with no
+ * colour of its own belongs to whoever it is under. `laneColor` is undefined
+ * when there is no lane (no attendees), which falls back to the default.
+ */
+export function eventColorIn(
+  laneColor: ColorKey | undefined,
   eventColor: ColorKey | undefined,
 ): ColorKey {
   if (eventColor) return colorKey(eventColor)
-  return personId ? personColorKey(people, overrides, personId) : DEFAULT_COLOR
+  return laneColor ?? DEFAULT_COLOR
 }

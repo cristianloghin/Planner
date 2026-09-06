@@ -1,0 +1,61 @@
+.EventBlock {
+  position: absolute;
+  border: none;
+  border-left: var(--event-accent) solid var(--c);
+  border-radius: 7px;
+  padding: 3px 6px;
+  /* Tinted bg + solid coloured left border (see swatches.css). */
+  background: color-mix(in oklab, var(--c) var(--tint-strength), var(--surface));
+  color: var(--text);
+  text-align: left;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  box-shadow: 0 1px 3px var(--shadow);
+  line-height: 1.15;
+}
+
+.time {
+  font-size: var(--fs-xs);
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag {
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The week's bar: tighter, title only. */
+.dense {
+  border-radius: 4px;
+  padding: 1px 3px;
+  box-shadow: 0 1px 2px var(--shadow);
+}
+
+.dense .title {
+  display: block;
+  font-size: var(--fs-xs);
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+@media (max-width: 720px) {
+  .dense .title {
+    font-size: var(--fs-2xs);
+  }
+}

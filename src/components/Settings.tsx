@@ -40,17 +40,17 @@ export function Settings() {
     prefsWrite.mutate({ accountId: accountId, userId: userId as string, prefs: next })
 
   return (
-    <section className={cx(shared.view, s.settings)}>
-      <div className={shared.viewHead}>
-        <div className={shared.viewHeadContainer}>
+    <section className={cx(s.view, s.settings)}>
+      <div className={s.viewHead}>
+        <div className={s.viewHeadContainer}>
           <div />
-          <div className={shared.weekNav}>
+          <div className={s.nav}>
             <strong>Settings</strong>
           </div>
           <div />
         </div>
       </div>
-      <div className={shared.viewBody}>
+      <div className={s.viewBody}>
         <p className={s.hint}>
           Set up who's who. Names are shared with your partner; colours are yours — pick how each
           person looks on your own calendar.
