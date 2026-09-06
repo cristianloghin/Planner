@@ -2,6 +2,7 @@ import { defineRoutes } from '@mikrostack/router'
 import { isISODate, mondayOf, startOfMonth, toISODate } from '../assets/utils/dates'
 import { Settings } from '../components/Settings'
 import { DayRoute } from './DayRoute'
+import { EditEventRoute, NewEventRoute } from './EventRoute'
 import { MonthRoute } from './MonthRoute'
 import { WeekRoute } from './WeekRoute'
 
@@ -19,8 +20,9 @@ const today = () => toISODate(new Date())
  * The three calendar tabs read the domains and compose the calendar view from
  * slots (see `DayRoute`). `/settings` still orchestrates inside the component.
  *
- * The event editor and the occurrence sheet are still route-local state
- * rather than routes of their own.
+ * The event editor is a route (`/event/new`, `/event/:id`), so the back
+ * button closes it and a reload keeps it open. The occurrence sheet is a
+ * transient panel and stays route-local state.
  *
  * `/` exists because the PWA's `start_url` is the bare base, so every cold
  * launch lands there. Guards run on the initial match (router >= 0.9), which
@@ -49,6 +51,8 @@ export const routes = defineRoutes({
       return first === month || `/month/${first}`
     },
   },
+  '/event/new': { component: NewEventRoute },
+  '/event/:id': { component: EditEventRoute },
   '/settings': { component: Settings },
 })
 

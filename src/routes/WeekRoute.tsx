@@ -14,7 +14,6 @@ import {
   weekRangeLabel,
 } from "../assets/utils/dates";
 import { EventSearch } from "../components/EventSearch";
-import { type EditorTarget, EventEditor } from "../components/EventEditor";
 import { OccurrenceSheet } from "../components/OccurrenceSheet";
 import { AllDayChip } from "../domains/events/components/AllDayChip";
 import { EventBlock } from "../domains/events/components/EventBlock";
@@ -37,6 +36,7 @@ import {
 import { DAY_MIN, layoutBlocks } from "../services/timeline-layout";
 import type { CalendarEvent } from "../types";
 import { CalendarView } from "../views/Calendar";
+import { editEventPath, newEventPath } from "./EventRoute";
 import { TimelineView } from "../views/Timeline";
 
 // The Week grid keeps its own zoom level: a comfortable hour height for one
@@ -69,7 +69,6 @@ export function WeekRoute() {
     personColors,
   );
 
-  const [editor, setEditor] = useState<EditorTarget | null>(null);
   const [sheet, setSheet] = useState<{
     event: CalendarEvent;
     date: string;
@@ -109,7 +108,7 @@ export function WeekRoute() {
     if (!event) return;
     const date = nextRelevantDate(event);
     goToWeek(mondayOf(new Date(`${date}T00:00:00`)));
-    setEditor({ mode: "edit", event, occurrenceDate: date });
+    navigate(editEventPath(event.id, date));
   }
 
   function openOccurrence(occ: DayOccurrence) {
@@ -122,13 +121,14 @@ export function WeekRoute() {
       Math.max(0, Math.round(minute / SNAP) * SNAP),
       DAY_MIN - SNAP,
     );
-    setEditor({
-      mode: "new",
-      date: dateISO,
-      attendees: defaultAttendees(people),
-      startMin: start,
-      endMin: Math.min(start + 60, DAY_MIN),
-    });
+    navigate(
+      newEventPath({
+        date: dateISO,
+        attendees: defaultAttendees(people),
+        startMin: start,
+        endMin: Math.min(start + 60, DAY_MIN),
+      }),
+    );
   }
 
   function toggleDay(idx: number) {
@@ -234,20 +234,13 @@ export function WeekRoute() {
 
       {isLoading && <LoadingPill />}
 
-      {editor && (
-        <EventEditor target={editor} onClose={() => setEditor(null)} />
-      )}
       {sheet && (
         <OccurrenceSheet
           event={sheet.event}
           date={sheet.date}
           onEdit={() => {
-            setEditor({
-              mode: "edit",
-              event: sheet.event,
-              occurrenceDate: sheet.date,
-            });
             setSheet(null);
+            navigate(editEventPath(sheet.event.id, sheet.date));
           }}
           onClose={() => setSheet(null)}
         />

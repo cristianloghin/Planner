@@ -6,7 +6,6 @@ import { LoadingPill } from "../assets/ui/Spinner";
 import { TimeGutter } from "../assets/ui/TimeGutter";
 import { addDays, isoLabel, toISODate } from "../assets/utils/dates";
 import { EventSearch } from "../components/EventSearch";
-import { type EditorTarget, EventEditor } from "../components/EventEditor";
 import { OccurrenceSheet } from "../components/OccurrenceSheet";
 import { AllDayChip } from "../domains/events/components/AllDayChip";
 import { EventBlock } from "../domains/events/components/EventBlock";
@@ -31,6 +30,7 @@ import {
 } from "../services/timeline-layout";
 import type { CalendarEvent, PersonId } from "../types";
 import { CalendarView } from "../views/Calendar";
+import { editEventPath, newEventPath } from "./EventRoute";
 import { TimelineView } from "../views/Timeline";
 
 const ZOOM_KEY = "planner:hourH";
@@ -51,8 +51,9 @@ interface DayPage {
  * the deck. Every join between domains — which chips sit in which lane, what
  * colour a thing shows in — is made here.
  *
- * The editor and the occurrence sheet are opened from here rather than from
- * the view, because *how a thing is reached* is the shell's business.
+ * The editor is a route of its own, reached from here by URL; the occurrence
+ * sheet is opened from here too, because *how a thing is reached* is the
+ * shell's business.
  */
 export function DayRoute() {
   const { navigate } = useNavigation();
@@ -68,7 +69,6 @@ export function DayRoute() {
     personColors,
   );
 
-  const [editor, setEditor] = useState<EditorTarget | null>(null);
   const [sheet, setSheet] = useState<{
     event: CalendarEvent;
     date: string;
@@ -118,7 +118,7 @@ export function DayRoute() {
     if (!event) return;
     const date = nextRelevantDate(event);
     goToDate(date);
-    setEditor({ mode: "edit", event, occurrenceDate: date });
+    navigate(editEventPath(event.id, date));
   }
 
   function openOccurrence(occ: DayOccurrence) {
@@ -131,13 +131,14 @@ export function DayRoute() {
       Math.max(0, Math.round(minute / SNAP) * SNAP),
       DAY_MIN - SNAP,
     );
-    setEditor({
-      mode: "new",
-      date,
-      attendees: [person],
-      startMin: start,
-      endMin: Math.min(start + 60, DAY_MIN),
-    });
+    navigate(
+      newEventPath({
+        date,
+        attendees: [person],
+        startMin: start,
+        endMin: Math.min(start + 60, DAY_MIN),
+      }),
+    );
   }
 
   function toggleLane(id: PersonId) {
@@ -242,20 +243,13 @@ export function DayRoute() {
 
       {isLoading && <LoadingPill />}
 
-      {editor && (
-        <EventEditor target={editor} onClose={() => setEditor(null)} />
-      )}
       {sheet && (
         <OccurrenceSheet
           event={sheet.event}
           date={sheet.date}
           onEdit={() => {
-            setEditor({
-              mode: "edit",
-              event: sheet.event,
-              occurrenceDate: sheet.date,
-            });
             setSheet(null);
+            navigate(editEventPath(sheet.event.id, sheet.date));
           }}
           onClose={() => setSheet(null)}
         />
