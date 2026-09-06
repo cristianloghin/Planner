@@ -1,23 +1,12 @@
-/* Weekday label in the header's lane row, one per column of the grid. */
-.weekday {
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--muted);
-  text-align: center;
-  padding-bottom: 2px;
-}
-
-/* One month page: a leading week-number column sized by the gutter token so
-   it lines up under the header's lane row, then seven day columns. */
-.grid {
+.MonthGrid {
   display: grid;
   grid-template-columns: var(--gutter-w) repeat(7, minmax(0, 1fr));
   gap: 5px;
   align-content: start;
-  padding: 5px 0 16px;
+  padding-bottom: 16px;
 }
 
-.weekNum {
+.weekNumber {
   align-self: center;
   text-align: center;
   font-size: var(--fs-2xs);

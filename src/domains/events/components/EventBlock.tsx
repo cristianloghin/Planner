@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { type ColorKey, colorStyle } from "../../../assets/palette";
 import { cx } from "../../../assets/utils/cx";
 import { minutesToTime } from "../../../assets/utils/dates";
@@ -11,17 +11,20 @@ import styles from "./EventBlock.module.css";
 const TITLE_MIN_PX = 18;
 
 /**
- * One timed occurrence as a block on a timeline. Where it sits is the
- * caller's layout (`style`); its colour is resolved by the caller, because an
- * event with no colour of its own shows in its lane's.
+ * One timed occurrence as a block on a timeline. It places itself from its
+ * time and the column the layout gave it (`col` of `cols` side by side, for
+ * overlaps); its colour is resolved by the caller, because an event with no
+ * colour of its own shows in its lane's.
  *
- * `dense` is the week's look: title only, and only when the bar is tall
- * enough to fit one. Children (attendee avatars) render after the title.
+ * `dense` is the week's look: tighter, title only, and only when the bar is
+ * tall enough to fit one. Children (attendee avatars) render after the title.
  */
 export function EventBlock({
   occ,
   color,
-  style,
+  pxPerMin,
+  col = 0,
+  cols = 1,
   dense,
   showTitle = true,
   onClick,
@@ -29,7 +32,9 @@ export function EventBlock({
 }: {
   occ: DayOccurrence;
   color: ColorKey;
-  style: CSSProperties & { height: number };
+  pxPerMin: number;
+  col?: number;
+  cols?: number;
   dense?: boolean;
   showTitle?: boolean;
   onClick: () => void;
@@ -38,11 +43,20 @@ export function EventBlock({
   const { event } = occ;
   const { start, end } = occ.segment;
   const range = `${minutesToTime(start)}–${minutesToTime(end)}`;
+  // Never thinner than a legible line; dense bars hug their neighbours closer.
+  const height = Math.max((end - start) * pxPerMin, dense ? 12 : 16);
+  const inset = dense ? 1 : 2;
   return (
     <button
       type="button"
       className={cx(styles.EventBlock, dense && styles.dense)}
-      style={{ ...style, ...colorStyle(color) }}
+      style={{
+        top: start * pxPerMin,
+        height,
+        left: `calc(${(100 / cols) * col}% + ${inset}px)`,
+        width: `calc(${100 / cols}% - ${inset * 2}px)`,
+        ...colorStyle(color),
+      }}
       onClick={onClick}
       title={dense ? event.title : undefined}
       aria-label={dense ? `${event.title}, ${range}` : undefined}
@@ -59,7 +73,7 @@ export function EventBlock({
           <Badges event={event} />
         </span>
       )}
-      {showTitle && (!dense || style.height >= TITLE_MIN_PX) && (
+      {showTitle && (!dense || height >= TITLE_MIN_PX) && (
         <span className={styles.title}>{event.title}</span>
       )}
       {children}

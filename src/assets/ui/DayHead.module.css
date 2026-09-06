@@ -11,7 +11,7 @@
   border-right: 1px solid var(--border);
 }
 
-/* A button since tapping it expands/restores the day's column. */
+/* A button when tapping it expands/restores the day's column. */
 .label {
   display: flex;
   flex-direction: column;
@@ -22,6 +22,9 @@
   background: none;
   font: inherit;
   color: var(--muted);
+}
+
+button.label {
   cursor: pointer;
 }
 

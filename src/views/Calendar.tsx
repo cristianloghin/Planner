@@ -100,6 +100,9 @@ function Header({
  *
  * Zoom is lent by the route, because pinch and swipe share one gesture
  * binding but the zoom key is per screen and the month has none.
+ *
+ * A page is whatever the route drops in — a `TimelineView` of columns, a
+ * `MonthGridView` of cells. The lane template is inherited by anything inside.
  */
 export const CalendarView = createComponentWithSlots({
   "Header.Title": { isRequired: true },
@@ -194,9 +197,13 @@ export const CalendarView = createComponentWithSlots({
             {/* The gutter stays put; only the pages slide during a swipe. */}
             <div className={styles.clip}>
               <div className={styles.strip} ref={stripRef}>
-                <div {...pageInert(false)}>{slots.Previous}</div>
-                <div>{slots.Current}</div>
-                <div {...pageInert(false)}>{slots.Next}</div>
+                <div className={styles.page} {...pageInert(false)}>
+                  {slots.Previous}
+                </div>
+                <div className={styles.page}>{slots.Current}</div>
+                <div className={styles.page} {...pageInert(false)}>
+                  {slots.Next}
+                </div>
               </div>
             </div>
           </div>

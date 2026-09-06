@@ -95,6 +95,7 @@
 
 .grid {
   display: flex;
+  padding-top: 16px;
 }
 
 /* The fixed column beside the pages (a time gutter). Its width is a token so
@@ -120,4 +121,11 @@
   margin-left: -100%;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* ---- Pages ---- */
+
+.page {
+  position: relative;
+  min-width: 0;
 }

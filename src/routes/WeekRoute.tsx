@@ -16,6 +16,7 @@ import { EventSearch } from "../components/EventSearch";
 import { type EditorTarget, EventEditor } from "../components/EventEditor";
 import { OccurrenceSheet } from "../components/OccurrenceSheet";
 import { AllDayChip } from "../domains/events/components/AllDayChip";
+import { EventBlock } from "../domains/events/components/EventBlock";
 import { useEvents } from "../domains/events/queries";
 import { useCompletionsForRange } from "../domains/occurrences/queries";
 import { usePeople } from "../domains/people/queries";
@@ -33,10 +34,10 @@ import {
   nextRelevantDate,
   occurrencesOnDate,
 } from "../services/recurrence";
-import { DAY_MIN } from "../services/timeline-layout";
+import { DAY_MIN, layoutBlocks } from "../services/timeline-layout";
 import type { CalendarEvent } from "../types";
 import { CalendarView } from "../views/Calendar";
-import { WeekPage } from "./WeekPage";
+import { TimelineView } from "../views/Timeline";
 
 // The Week grid keeps its own zoom level: a comfortable hour height for one
 // day (three lanes) is usually too tall for a seven-day overview.
@@ -44,7 +45,7 @@ const ZOOM_KEY = "planner:weekHourH";
 const SNAP = 15;
 
 /** One visible day: its ISO date plus that day's expanded occurrences. */
-export interface WeekDay {
+interface WeekDay {
   dateISO: string;
   occs: DayOccurrence[];
 }
@@ -139,17 +140,40 @@ export function WeekRoute() {
   const thisWeek = nav.weekStart === mondayOf(now);
   const visible = weeks[1];
 
+  // A column per weekday, all attendees sharing it. With an expanded day the
+  // squeezed columns are too thin for text, so only that one keeps titles.
   const page = (days: WeekDay[]) => (
-    <WeekPage
-      days={days}
-      colors={colors}
-      focusDay={focusDay}
-      pxPerMin={hourH / 60}
-      todayISO={todayISO}
-      nowMin={nowMin}
-      onAddAt={addAt}
-      onOpen={openOccurrence}
-    />
+    <TimelineView pxPerMin={hourH / 60}>
+      {days.map(({ dateISO, occs }, dayIdx) => (
+        <TimelineView.Column
+          key={dateISO}
+          nowMin={dateISO === todayISO ? nowMin : undefined}
+          highlight={dateISO === todayISO}
+          onAddAt={(minute) => addAt(dateISO, minute)}
+        >
+          {layoutBlocks(
+            occs
+              .filter((o) => !o.event.allDay)
+              .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end })),
+          ).map(({ block, col, cols }) => (
+            <EventBlock
+              key={`${block.occ.event.id}:${block.occ.start}`}
+              occ={block.occ}
+              color={eventColorIn(
+                colors[block.occ.attendees[0]],
+                block.occ.event.colorKey,
+              )}
+              pxPerMin={hourH / 60}
+              col={col}
+              cols={cols}
+              dense
+              showTitle={focusDay == null || dayIdx === focusDay}
+              onClick={() => openOccurrence(block.occ)}
+            />
+          ))}
+        </TimelineView.Column>
+      ))}
+    </TimelineView>
   );
 
   return (

@@ -1,9 +1,9 @@
 import { useNavigation } from '@mikrostack/router'
-import { Fragment, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAccount } from '../account'
-import { type ColorKey, colorStyle } from '../assets/palette'
+import type { ColorKey } from '../assets/palette'
+import { DayHead } from '../assets/ui/DayHead'
 import { LoadingPill } from '../assets/ui/Spinner'
-import { cx } from '../assets/utils/cx'
 import {
   DAY_NAMES,
   addMonths,
@@ -26,11 +26,7 @@ import { nextRelevantDate, occurrencesOnDate } from '../services/recurrence/expa
 import { eventStartMinutes } from '../services/recurrence/timing'
 import type { CalendarEvent, CompletionsMap, PersonId } from '../types'
 import { CalendarView } from '../views/Calendar'
-
-import styles from './MonthRoute.module.css'
-
-// Up to this many event dots before collapsing the rest into a "+N".
-const MAX_DOTS = 4
+import { MonthGridView } from '../views/MonthGrid'
 
 /**
  * The Month screen, wired up.
@@ -102,7 +98,7 @@ export function MonthRoute() {
         <CalendarView.Header.Title>{monthLabel(cursor)}</CalendarView.Header.Title>
         {DAY_NAMES.map((name) => (
           <CalendarView.Header.Lane key={name}>
-            <div className={styles.weekday}>{name}</div>
+            <DayHead name={name} />
           </CalendarView.Header.Lane>
         ))}
         <CalendarView.Previous>{page(months[0])}</CalendarView.Previous>
@@ -152,48 +148,26 @@ function MonthPage({
   )
 
   return (
-    <div className={styles.grid}>
-      {days.map((iso, i) => {
+    <MonthGridView>
+      {days
+        .filter((_, i) => i % 7 === 0)
+        .map((monday) => (
+          <MonthGridView.WeekNumber key={monday} week={isoWeekNumber(monday)} />
+        ))}
+      {days.map((iso) => {
         const dayOccs = occurrencesByDay.get(iso) ?? []
-        const cell = (
-          <button
-            type="button"
+        return (
+          <MonthGridView.Cell
             key={iso}
-            className={cx(
-              styles.cell,
-              !isSameMonth(iso, month) && styles.dim,
-              iso === today && styles.today,
-            )}
+            date={Number(iso.slice(8, 10))}
+            dots={dayOccs.map((o) => eventColorIn(colors[o.attendees[0]], o.event.colorKey))}
+            dim={!isSameMonth(iso, month)}
+            isToday={iso === today}
+            label={`${monthLabel(iso)} ${Number(iso.slice(8, 10))}, ${dayOccs.length} plans`}
             onClick={() => onOpenDay(iso)}
-            aria-label={`${monthLabel(iso)} ${Number(iso.slice(8, 10))}, ${dayOccs.length} plans`}
-          >
-            <span className={styles.date}>{Number(iso.slice(8, 10))}</span>
-            {dayOccs.length > 0 && (
-              <span className={styles.dots}>
-                {dayOccs.slice(0, MAX_DOTS).map((o) => (
-                  <span
-                    key={`${o.event.id}:${o.start}`}
-                    className={styles.dot}
-                    style={colorStyle(eventColorIn(colors[o.attendees[0]], o.event.colorKey))}
-                  />
-                ))}
-                {dayOccs.length > MAX_DOTS && (
-                  <span className={styles.more}>+{dayOccs.length - MAX_DOTS}</span>
-                )}
-              </span>
-            )}
-          </button>
-        )
-        // Each Monday opens a grid row, prefixed with its ISO week number.
-        return i % 7 === 0 ? (
-          <Fragment key={iso}>
-            <span className={styles.weekNum}>{isoWeekNumber(iso)}</span>
-            {cell}
-          </Fragment>
-        ) : (
-          cell
+          />
         )
       })}
-    </div>
+    </MonthGridView>
   )
 }

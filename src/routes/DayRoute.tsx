@@ -8,8 +8,10 @@ import { EventSearch } from "../components/EventSearch";
 import { type EditorTarget, EventEditor } from "../components/EventEditor";
 import { OccurrenceSheet } from "../components/OccurrenceSheet";
 import { AllDayChip } from "../domains/events/components/AllDayChip";
+import { EventBlock } from "../domains/events/components/EventBlock";
 import { useEvents } from "../domains/events/queries";
 import { useCompletionsForRange } from "../domains/occurrences/queries";
+import { Avatars } from "../domains/people/components/Avatars";
 import { LaneHead } from "../domains/people/components/LaneHead";
 import { usePeople } from "../domains/people/queries";
 import { eventColorIn, personColorMap } from "../domains/people/selectors";
@@ -22,16 +24,20 @@ import {
   nextRelevantDate,
   occurrencesOnDate,
 } from "../services/recurrence";
-import { DAY_MIN, type TimeBlock } from "../services/timeline-layout";
+import {
+  DAY_MIN,
+  type TimeBlock,
+  layoutBlocks,
+} from "../services/timeline-layout";
 import type { CalendarEvent, PersonId } from "../types";
 import { CalendarView } from "../views/Calendar";
-import { DayPage } from "./DayPage";
+import { TimelineView } from "../views/Timeline";
 
 const ZOOM_KEY = "planner:hourH";
 const SNAP = 15;
 
 /** One page of the deck: a day, already expanded. */
-export interface DayPageData {
+interface DayPage {
   iso: string;
   timedBlocks: TimeBlock[];
   allDayOccs: DayOccurrence[];
@@ -88,7 +94,7 @@ export function DayRoute() {
   // One entry per deck page: yesterday, the visible day, tomorrow. This is the
   // expensive part of a render (recurrence expansion), and none of it depends
   // on zoom or gesture state — so it is computed once here, not per frame.
-  const pages = useMemo<DayPageData[]>(
+  const pages = useMemo<DayPage[]>(
     () =>
       [prevISO, dateISO, nextISO].map((iso) => {
         const occs = occurrencesOnDate(events, iso, completions);
@@ -143,16 +149,47 @@ export function DayRoute() {
   );
   const { allDayOccs } = pages[1];
 
-  const page = (p: DayPageData) => (
-    <DayPage
-      page={p}
-      people={people}
-      colors={colors}
-      pxPerMin={hourH / 60}
-      nowMin={p.iso === todayISO ? nowMin : undefined}
-      onAddAt={(person, minute) => addAt(p.iso, person, minute)}
-      onOpen={openOccurrence}
-    />
+  /** The people on an occurrence, with their colours, for its avatars. */
+  function avatarsFor(ids: PersonId[]) {
+    return ids.flatMap((id) => {
+      // A person not in the list yet (first fetch in flight, or one a partner
+      // just removed) must not crash the view.
+      const p = people.find((x) => x.id === id);
+      return p ? [{ person: p, color: colors[id] }] : [];
+    });
+  }
+
+  // A column per person, with every block that person is on. A shared event
+  // simply appears in each attendee's column, coloured by that lane.
+  const page = (p: DayPage) => (
+    <TimelineView pxPerMin={hourH / 60}>
+      {people.map((person) => (
+        <TimelineView.Column
+          key={person.id}
+          nowMin={p.iso === todayISO ? nowMin : undefined}
+          onAddAt={(minute) => addAt(p.iso, person.id, minute)}
+        >
+          {layoutBlocks(
+            p.timedBlocks.filter((b) => b.occ.attendees.includes(person.id)),
+          ).map(({ block, col, cols }) => (
+            <EventBlock
+              key={`${block.occ.event.id}:${block.occ.start}`}
+              occ={block.occ}
+              color={eventColorIn(colors[person.id], block.occ.event.colorKey)}
+              pxPerMin={hourH / 60}
+              col={col}
+              cols={cols}
+              onClick={() => openOccurrence(block.occ)}
+            >
+              {/* Who is on it THIS day — an override replaces the roster. */}
+              {block.occ.attendees.length > 1 && (
+                <Avatars attendees={avatarsFor(block.occ.attendees)} />
+              )}
+            </EventBlock>
+          ))}
+        </TimelineView.Column>
+      ))}
+    </TimelineView>
   );
 
   return (
