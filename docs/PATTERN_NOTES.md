@@ -6,11 +6,22 @@ and the open questions, written down while they are cheap to recover.
 
 Each finding says what was measured, so none of it has to be taken on trust.
 
+**Status, after the calendar screens moved onto one view (`da59b11`,
+`4dae750`):** §1, §2 and §5 are settled and written into
+[`ARCHITECTURE.md`](./ARCHITECTURE.md) §2, §6 and §11; they stay here as the
+evidence. §6 is still a hypothesis. §4 and §7 are still open.
+
 ---
 
 ## 1. Layouts own interaction, not just presentation
 
-**The doc is wrong about this, and it matters.** [`ARCHITECTURE.md`](./ARCHITECTURE.md)
+**Settled — now ARCHITECTURE §2 (Layout) and invariant 4.** The deck lives in
+`views/Calendar.tsx`: it owns the refs and the gesture, takes `pageKey` and one
+`onNavigate`, and is lent the zoom. The zoom question at the end of this section
+is answered the same way: the route owns it under a per-screen key, Week got its
+own, Month passes none.
+
+**The doc was wrong about this, and it mattered.** [`ARCHITECTURE.md`](./ARCHITECTURE.md)
 §2 calls layouts "presentational only". The evidence says a layout is the right
 home for an *interaction model* too.
 
@@ -66,6 +77,11 @@ inheriting.
 ---
 
 ## 2. Colour is a domain with no name
+
+**Settled — now ARCHITECTURE §2 (Route, "joins are made once") and §6.** The
+route calls `personColorMap` once and passes the resolved map; every leaf takes a
+`ColorKey`. Colour did not get a domain of its own; it got resolved before it
+reaches anything that paints, which was the actual problem.
 
 This is the thing that made "which domain does `DayView` belong to?" unanswerable.
 
@@ -137,15 +153,22 @@ derivation over domain data, needed at render time" — see §2 above.
 
 ---
 
-## 5. Unanswered: may a route hold view state?
+## 5. Settled: which state a route holds
+
+**Now ARCHITECTURE §2 (Route, "which state a route holds") and §6.** Per-screen
+or view-outliving state — zoom under its own key, the expanded lane, the open
+editor and sheet — is the route's, lent to the view. State that means nothing
+outside the view's DOM — scroll position, gesture, refs — is the view's.
 
 `DayRoute` holds the editor and occurrence-sheet state, on the reasoning that
 *how a thing is reached* is the shell's business — so when those become query
 state or routes, `DayView` does not notice. That felt right and it is the part of
 the split that paid immediately.
 
-But the pattern does not say whether routes may hold UI state, and the answer
-decides whether routes stay thin. Worth settling explicitly.
+The pattern did not say whether routes may hold UI state, and the answer decides
+whether routes stay thin. The line above is where it landed: the route holds what
+is per-screen, the view holds what is per-DOM, and nothing is read from anywhere
+else.
 
 ---
 

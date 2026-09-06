@@ -8,6 +8,13 @@ export function mondayOf(d: Date): string {
   return toISODate(date)
 }
 
+/** Is this a real calendar date in `yyyy-mm-dd` form? (`2026-02-30` is not.) */
+export function isISODate(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
+  const d = new Date(`${s}T00:00:00`)
+  return !Number.isNaN(d.getTime()) && toISODate(d) === s
+}
+
 export function toISODate(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')

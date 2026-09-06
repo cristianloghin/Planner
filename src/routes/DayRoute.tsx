@@ -1,3 +1,4 @@
+import { useNavigation, useParams } from "@mikrostack/router";
 import { useMemo, useState } from "react";
 import { useAccount } from "../account";
 import { useNow } from "../assets/hooks/useNow";
@@ -17,7 +18,6 @@ import { usePeople } from "../domains/people/queries";
 import { eventColorIn, personColorMap } from "../domains/people/selectors";
 import { usePreferences } from "../domains/preferences/queries";
 import { personColors } from "../domains/preferences/selectors";
-import { useCalendarNavigation } from "../navigation";
 import { loadZoom } from "../services/gestures";
 import {
   type DayOccurrence,
@@ -55,7 +55,10 @@ interface DayPage {
  * the view, because *how a thing is reached* is the shell's business.
  */
 export function DayRoute() {
-  const nav = useCalendarNavigation();
+  const { navigate } = useNavigation();
+  const { date: dateISO } = useParams("/day/:date");
+  const goToDate = (date: string) =>
+    navigate("/day/:date", { params: { date } });
   const { accountId, userId } = useAccount();
   const { data: events = [] } = useEvents(accountId);
   const { data: people = [] } = usePeople(accountId);
@@ -76,7 +79,6 @@ export function DayRoute() {
   // The person whose lane is expanded, if any.
   const [focusLane, setFocusLane] = useState<PersonId | null>(null);
 
-  const dateISO = addDays(nav.weekStart, nav.selectedDay);
   const prevISO = addDays(dateISO, -1);
   const nextISO = addDays(dateISO, 1);
 
@@ -115,7 +117,7 @@ export function DayRoute() {
     const event = events.find((e) => e.id === seriesId);
     if (!event) return;
     const date = nextRelevantDate(event);
-    nav.goToDate(date);
+    goToDate(date);
     setEditor({ mode: "edit", event, occurrenceDate: date });
   }
 
@@ -196,8 +198,8 @@ export function DayRoute() {
     <>
       <CalendarView
         pageKey={dateISO}
-        onNavigate={nav.shiftDay}
-        onGoToday={() => nav.goToDate(todayISO)}
+        onNavigate={(delta) => goToDate(addDays(dateISO, delta))}
+        onGoToday={() => goToDate(todayISO)}
         todayActive={dateISO === todayISO}
         zoom={{ hourH, setHourH, key: ZOOM_KEY }}
         initialMinute={dateISO === todayISO ? nowMin : 7 * 60}

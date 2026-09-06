@@ -1,5 +1,5 @@
-import { useNavigation } from '@mikrostack/router'
-import { useMemo, useState } from 'react'
+import { useNavigation, useParams } from '@mikrostack/router'
+import { useMemo } from 'react'
 import { useAccount } from '../account'
 import type { ColorKey } from '../assets/palette'
 import { DayHead } from '../assets/ui/DayHead'
@@ -21,7 +21,6 @@ import { usePeople } from '../domains/people/queries'
 import { eventColorIn, personColorMap } from '../domains/people/selectors'
 import { usePreferences } from '../domains/preferences/queries'
 import { personColors } from '../domains/preferences/selectors'
-import { useCalendarNavigation } from '../navigation'
 import { nextRelevantDate, occurrencesOnDate } from '../services/recurrence/expand'
 import { eventStartMinutes } from '../services/recurrence/timing'
 import type { CalendarEvent, CompletionsMap, PersonId } from '../types'
@@ -32,13 +31,12 @@ import { MonthGridView } from '../views/MonthGrid'
  * The Month screen, wired up.
  *
  * Reads the domains and drops three month grids into the calendar deck. The
- * visible month is this route's own cursor for now; opening a day is a
- * navigation-context update plus a route change, because the Day screen still
- * reads its date from the context rather than the URL.
+ * visible month is the URL's; opening a day is one navigation.
  */
 export function MonthRoute() {
-  const nav = useCalendarNavigation()
   const { navigate } = useNavigation()
+  const { month: cursor } = useParams('/month/:month')
+  const goToMonth = (month: string) => navigate('/month/:month', { params: { month } })
   const { accountId, userId } = useAccount()
   const { data: events = [] } = useEvents(accountId)
   const { data: people = [] } = usePeople(accountId)
@@ -48,7 +46,6 @@ export function MonthRoute() {
   const colors = useMemo(() => personColorMap(people, overrides), [people, overrides])
 
   const today = toISODate(new Date())
-  const [cursor, setCursor] = useState(() => startOfMonth(today))
   // Deck pages: [previous month, visible month, next month].
   const months = useMemo(() => [-1, 0, 1].map((d) => addMonths(cursor, d)), [cursor])
 
@@ -63,8 +60,7 @@ export function MonthRoute() {
   )
 
   function openDay(iso: string) {
-    nav.goToDate(iso)
-    navigate('/day')
+    navigate('/day/:date', { params: { date: iso } })
   }
 
   /** Open a search hit at the event's next upcoming occurrence, in the Day view. */
@@ -88,8 +84,8 @@ export function MonthRoute() {
     <>
       <CalendarView
         pageKey={cursor}
-        onNavigate={(delta) => setCursor((c) => addMonths(c, delta))}
-        onGoToday={() => setCursor(startOfMonth(today))}
+        onNavigate={(delta) => goToMonth(addMonths(cursor, delta))}
+        onGoToday={() => goToMonth(startOfMonth(today))}
         todayActive={isSameMonth(today, cursor)}
       >
         <CalendarView.Header.Search>

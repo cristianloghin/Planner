@@ -1,15 +1,23 @@
 import { defineRoutes } from '@mikrostack/router'
+import { isISODate, mondayOf, startOfMonth, toISODate } from '../assets/utils/dates'
 import { Settings } from '../components/Settings'
 import { DayRoute } from './DayRoute'
 import { MonthRoute } from './MonthRoute'
 import { WeekRoute } from './WeekRoute'
 
+const today = () => toISODate(new Date())
+
 /**
  * The four tabs, as routes.
  *
- * The three calendar tabs are routes in `routes/` that read the domains and
- * compose the calendar view from slots (see `DayRoute`). `/settings` still
- * orchestrates inside the component.
+ * Where the calendar is looking is in the URL — a day, a week's Monday, a
+ * month's first — so a screen can be linked to, the back button walks the
+ * dates, and the three calendar routes share no navigation state. Each guard
+ * normalises its param: a malformed date goes to today, a week that is not a
+ * Monday or a month that is not a first is redirected to the one it is in.
+ *
+ * The three calendar tabs read the domains and compose the calendar view from
+ * slots (see `DayRoute`). `/settings` still orchestrates inside the component.
  *
  * The event editor and the occurrence sheet are still route-local state
  * rather than routes of their own.
@@ -20,10 +28,27 @@ import { WeekRoute } from './WeekRoute'
  * an effect.
  */
 export const routes = defineRoutes({
-  '/': { component: () => null, guard: () => '/day' },
-  '/day': { component: DayRoute },
-  '/week': { component: WeekRoute },
-  '/month': { component: MonthRoute },
+  '/': { component: () => null, guard: () => `/day/${today()}` },
+  '/day/:date': {
+    component: DayRoute,
+    guard: ({ date }) => isISODate(date) || `/day/${today()}`,
+  },
+  '/week/:weekStart': {
+    component: WeekRoute,
+    guard: ({ weekStart }) => {
+      if (!isISODate(weekStart)) return `/week/${mondayOf(new Date())}`
+      const monday = mondayOf(new Date(`${weekStart}T00:00:00`))
+      return monday === weekStart || `/week/${monday}`
+    },
+  },
+  '/month/:month': {
+    component: MonthRoute,
+    guard: ({ month }) => {
+      if (!isISODate(month)) return `/month/${startOfMonth(today())}`
+      const first = startOfMonth(month)
+      return first === month || `/month/${first}`
+    },
+  },
   '/settings': { component: Settings },
 })
 

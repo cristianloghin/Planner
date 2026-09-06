@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isoWeekNumber } from './dates'
+import { isISODate, isoWeekNumber } from './dates'
 
 describe('isoWeekNumber', () => {
   it('numbers ordinary mid-year weeks', () => {
@@ -17,5 +17,15 @@ describe('isoWeekNumber', () => {
   it('handles 53-week years', () => {
     expect(isoWeekNumber('2026-12-28')).toBe(53) // 2026 has 53 ISO weeks
     expect(isoWeekNumber('2024-12-30')).toBe(1) // 2024 has 52 — Dec 30 rolls into 2025 W1
+  })
+})
+
+describe('isISODate', () => {
+  it('accepts a real calendar date and nothing else', () => {
+    expect(isISODate('2026-09-06')).toBe(true)
+    expect(isISODate('2026-02-30')).toBe(false)
+    expect(isISODate('2026-9-6')).toBe(false)
+    expect(isISODate('garbage')).toBe(false)
+    expect(isISODate('')).toBe(false)
   })
 })

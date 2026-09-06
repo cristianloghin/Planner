@@ -1,10 +1,11 @@
-import { Link, type RoutePath, AppProvider as RouterProvider, RouterView } from '@mikrostack/router'
+import { Link, AppProvider as RouterProvider, RouterView, useRoute } from '@mikrostack/router'
 import { onlineManager, useMutationState } from '@tanstack/react-query'
-import { type LucideIcon, Settings as SettingsIcon } from 'lucide-react'
+import { Settings as SettingsIcon } from 'lucide-react'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import s from './App.module.css'
 import { AccountProvider, useAccount } from './account'
 import { PageLoader } from './assets/ui/Spinner'
+import { isSameMonth, mondayOf, startOfMonth, toISODate } from './assets/utils/dates'
 import { subscribeToChanges } from './client/realtime'
 import { AlertHost } from './components/AlertHost'
 import { Login } from './components/Login'
@@ -15,19 +16,56 @@ import { usePreferencesWrite } from './domains/preferences/mutations'
 import { withTimezone } from './domains/preferences/patches'
 import { usePreferences } from './domains/preferences/queries'
 import { useRegisterDevice } from './domains/push/mutations'
-import { NavigationProvider } from './navigation'
 import { dismissWriteError, getWriteError, queryClient, subscribeWriteError } from './queryClient'
 import { routes } from './routes/routes'
 import { clearNotifications, readThisDevice } from './services/push'
 import { startRealtime } from './services/realtime'
 import { useSession } from './services/session'
 
-const TABS: { path: RoutePath; label: string; icon?: LucideIcon }[] = [
-  { path: '/day', label: 'Day' },
-  { path: '/week', label: 'Week' },
-  { path: '/month', label: 'Month' },
-  { path: '/settings', label: 'Settings', icon: SettingsIcon },
-]
+/**
+ * The date the calendar tabs keep when switching between them: the visible
+ * day; today when it falls inside the visible week or month, else that week's
+ * Monday or that month's first; off the calendar, today.
+ */
+function useVisibleDate(): string {
+  const day = useRoute('/day/:date')
+  const week = useRoute('/week/:weekStart')
+  const month = useRoute('/month/:month')
+  const today = toISODate(new Date())
+  if (day.matched) return day.params.date
+  if (week.matched) {
+    return mondayOf(new Date()) === week.params.weekStart ? today : week.params.weekStart
+  }
+  if (month.matched) return isSameMonth(today, month.params.month) ? today : month.params.month
+  return today
+}
+
+/** The tab bar: the three calendar tabs on the visible date, and settings. */
+function TabBar() {
+  const date = useVisibleDate()
+  const cls = { className: s.tab, activeClassName: s.active }
+  return (
+    <nav className={s.tabbar}>
+      <Link to="/day/:date" params={{ date }} aria-label="Day" {...cls}>
+        Day
+      </Link>
+      <Link
+        to="/week/:weekStart"
+        params={{ weekStart: mondayOf(new Date(`${date}T00:00:00`)) }}
+        aria-label="Week"
+        {...cls}
+      >
+        Week
+      </Link>
+      <Link to="/month/:month" params={{ month: startOfMonth(date) }} aria-label="Month" {...cls}>
+        Month
+      </Link>
+      <Link to="/settings" aria-label="Settings" {...cls}>
+        <SettingsIcon size={20} />
+      </Link>
+    </nav>
+  )
+}
 
 /**
  * Auth gate. Decides what to mount: a spinner while the session resolves, the
@@ -86,9 +124,7 @@ export function Root() {
       config={{ basePath: import.meta.env.BASE_URL, defaultLoading: <PageLoader /> }}
     >
       <AccountProvider accountId={account.data} userId={user.id} email={user.email}>
-        <NavigationProvider>
-          <AppShell />
-        </NavigationProvider>
+        <AppShell />
       </AccountProvider>
     </RouterProvider>
   )
@@ -210,19 +246,7 @@ function AppShell() {
         onDismissError={dismissWriteError}
       />
 
-      <nav className={s.tabbar}>
-        {TABS.map((t) => (
-          <Link
-            key={t.path}
-            to={t.path}
-            className={s.tab}
-            activeClassName={s.active}
-            aria-label={t.label}
-          >
-            {t.icon ? <t.icon size={20} /> : t.label}
-          </Link>
-        ))}
-      </nav>
+      <TabBar />
     </div>
   )
 }
@@ -232,7 +256,7 @@ function NotFound({ path }: { path: string }) {
   return (
     <div className={s.notFound}>
       <p>Nothing at {path}.</p>
-      <Link to="/day" className={s.notFoundLink}>
+      <Link to="/day/:date" params={{ date: toISODate(new Date()) }} className={s.notFoundLink}>
         Go to today
       </Link>
     </div>

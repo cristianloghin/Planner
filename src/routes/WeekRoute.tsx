@@ -1,3 +1,4 @@
+import { useNavigation, useParams } from "@mikrostack/router";
 import { useMemo, useState } from "react";
 import { useAccount } from "../account";
 import { useNow } from "../assets/hooks/useNow";
@@ -27,7 +28,6 @@ import {
 } from "../domains/people/selectors";
 import { usePreferences } from "../domains/preferences/queries";
 import { personColors } from "../domains/preferences/selectors";
-import { useCalendarNavigation } from "../navigation";
 import { loadZoom } from "../services/gestures";
 import {
   type DayOccurrence,
@@ -56,7 +56,10 @@ interface WeekDay {
  * weekdays — which is why the view can serve both.
  */
 export function WeekRoute() {
-  const nav = useCalendarNavigation();
+  const { navigate } = useNavigation();
+  const { weekStart } = useParams("/week/:weekStart");
+  const goToWeek = (monday: string) =>
+    navigate("/week/:weekStart", { params: { weekStart: monday } });
   const { accountId, userId } = useAccount();
   const { data: events = [] } = useEvents(accountId);
   const { data: people = [] } = usePeople(accountId);
@@ -83,8 +86,8 @@ export function WeekRoute() {
   // neighbours.
   const { completions, isLoading } = useCompletionsForRange(
     accountId,
-    addDays(nav.weekStart, -7),
-    addDays(nav.weekStart, 13),
+    addDays(weekStart, -7),
+    addDays(weekStart, 13),
   );
 
   // Expand the three pages' occurrences once per data/week change, not per
@@ -93,11 +96,11 @@ export function WeekRoute() {
     () =>
       [-7, 0, 7].map((weekOffset) =>
         DAY_NAMES.map((_, dayIdx) => {
-          const dateISO = addDays(nav.weekStart, weekOffset + dayIdx);
+          const dateISO = addDays(weekStart, weekOffset + dayIdx);
           return { dateISO, occs: occurrencesOnDate(events, dateISO, completions) };
         }),
       ),
-    [nav.weekStart, events, completions],
+    [weekStart, events, completions],
   );
 
   /** Open a search hit: jump the week to its next upcoming occurrence. */
@@ -105,7 +108,7 @@ export function WeekRoute() {
     const event = events.find((e) => e.id === seriesId);
     if (!event) return;
     const date = nextRelevantDate(event);
-    nav.setWeek(mondayOf(new Date(`${date}T00:00:00`)));
+    goToWeek(mondayOf(new Date(`${date}T00:00:00`)));
     setEditor({ mode: "edit", event, occurrenceDate: date });
   }
 
@@ -137,7 +140,7 @@ export function WeekRoute() {
     () => personColorMap(people, overrides),
     [people, overrides],
   );
-  const thisWeek = nav.weekStart === mondayOf(now);
+  const thisWeek = weekStart === mondayOf(now);
   const visible = weeks[1];
 
   // A column per weekday, all attendees sharing it. With an expanded day the
@@ -179,11 +182,11 @@ export function WeekRoute() {
   return (
     <>
       <CalendarView
-        pageKey={nav.weekStart}
-        onNavigate={nav.shiftWeek}
-        onGoToday={() => nav.setWeek(mondayOf(now))}
+        pageKey={weekStart}
+        onNavigate={(delta) => goToWeek(addDays(weekStart, 7 * delta))}
+        onGoToday={() => goToWeek(mondayOf(now))}
         todayActive={thisWeek}
-        gutterLabel={`W${isoWeekNumber(nav.weekStart)}`}
+        gutterLabel={`W${isoWeekNumber(weekStart)}`}
         zoom={{ hourH, setHourH, key: ZOOM_KEY }}
         initialMinute={thisWeek ? nowMin : 7 * 60}
       >
@@ -191,7 +194,7 @@ export function WeekRoute() {
           <EventSearch onPick={openSearchHit} />
         </CalendarView.Header.Search>
         <CalendarView.Header.Title>
-          {weekRangeLabel(nav.weekStart)}
+          {weekRangeLabel(weekStart)}
         </CalendarView.Header.Title>
         {visible.map(({ dateISO, occs }, i) => (
           <CalendarView.Header.Lane
