@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { OccurrenceRow } from '../../client/occurrences'
-import { patchCompletions, patchEntry } from './patches'
+import { patchCompletions, patchEntry, rosterChange } from './patches'
 import { occurrenceKey, toCompletions } from './transformers'
 
 const row = (over: Partial<OccurrenceRow> = {}): OccurrenceRow => ({
@@ -134,5 +134,12 @@ describe('patchCompletions', () => {
     const after = patchCompletions(before, key, { kind: 'cancel' })
     expect(after['S:2026-04-01']).toBe(before['S:2026-04-01'])
     expect(Object.keys(before)).toEqual(['S:2026-04-01'])
+  })
+})
+
+describe('rosterChange', () => {
+  it("back to the series' own people is a clear, not a matching override", () => {
+    expect(rosterChange(['b', 'a'], ['a', 'b'])).toEqual({ kind: 'clearAttendees' })
+    expect(rosterChange(['a'], ['a', 'b'])).toEqual({ kind: 'attendees', attendees: ['a'] })
   })
 })

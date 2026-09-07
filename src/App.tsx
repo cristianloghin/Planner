@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import s from './App.module.css'
 import { AccountProvider, useAccount } from './account'
 import { PageLoader } from './assets/ui/Spinner'
-import { isSameMonth, mondayOf, startOfMonth, toISODate } from './assets/utils/dates'
+import { isSameMonth, mondayOf, toISODate } from './assets/utils/dates'
 import { subscribeToChanges } from './client/realtime'
 import { AlertHost } from './components/AlertHost'
 import { Login } from './components/Login'
@@ -49,15 +49,11 @@ function TabBar() {
       <Link to="/day/:date" params={{ date }} aria-label="Day" {...cls}>
         Day
       </Link>
-      <Link
-        to="/week/:weekStart"
-        params={{ weekStart: mondayOf(new Date(`${date}T00:00:00`)) }}
-        aria-label="Week"
-        {...cls}
-      >
+      {/* The routes' guards normalise a day to its week or month. */}
+      <Link to="/week/:weekStart" params={{ weekStart: date }} aria-label="Week" {...cls}>
         Week
       </Link>
-      <Link to="/month/:month" params={{ month: startOfMonth(date) }} aria-label="Month" {...cls}>
+      <Link to="/month/:month" params={{ month: date }} aria-label="Month" {...cls}>
         Month
       </Link>
       <Link to="/settings" aria-label="Settings" {...cls}>

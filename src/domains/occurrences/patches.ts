@@ -18,6 +18,22 @@ export type OccurrenceChange =
   | { kind: 'clearAttendees' }
   | { kind: 'cancel' }
 
+/** The same people, whatever order the chips put them in. */
+export function samePeople(a: PersonId[], b: PersonId[]): boolean {
+  return a.length === b.length && new Set(a).size === new Set([...a, ...b]).size
+}
+
+/**
+ * What a day should record for its people: the series' own roster is a CLEAR
+ * rather than an override that happens to match, so the day stops carrying an
+ * override at all once it is back to normal.
+ */
+export function rosterChange(next: PersonId[], seriesRoster: PersonId[]): OccurrenceChange {
+  return samePeople(next, seriesRoster)
+    ? { kind: 'clearAttendees' }
+    : { kind: 'attendees', attendees: next }
+}
+
 /**
  * One day's state with `change` applied.
  *

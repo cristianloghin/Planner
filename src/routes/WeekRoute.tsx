@@ -20,11 +20,7 @@ import { EventBlock } from "../domains/events/components/EventBlock";
 import { useEvents } from "../domains/events/queries";
 import { useCompletionsForRange } from "../domains/occurrences/queries";
 import { usePeople } from "../domains/people/queries";
-import {
-  defaultAttendees,
-  eventColorIn,
-  personColorMap,
-} from "../domains/people/selectors";
+import { eventColorIn, personColorMap } from "../domains/people/selectors";
 import { usePreferences } from "../domains/preferences/queries";
 import { personColors } from "../domains/preferences/selectors";
 import { loadZoom } from "../services/gestures";
@@ -33,16 +29,15 @@ import {
   nextRelevantDate,
   occurrencesOnDate,
 } from "../services/recurrence";
-import { DAY_MIN, layoutBlocks } from "../services/timeline-layout";
+import { layoutBlocks } from "../services/timeline-layout";
 import type { CalendarEvent } from "../types";
 import { CalendarView } from "../views/Calendar";
-import { editEventPath, newEventPath } from "./EventRoute";
+import { editEventPath, newEventAtPath } from "./eventPaths";
 import { TimelineView } from "../views/Timeline";
 
 // The Week grid keeps its own zoom level: a comfortable hour height for one
 // day (three lanes) is usually too tall for a seven-day overview.
 const ZOOM_KEY = "planner:weekHourH";
-const SNAP = 15;
 
 /** One visible day: its ISO date plus that day's expanded occurrences. */
 interface WeekDay {
@@ -115,20 +110,9 @@ export function WeekRoute() {
     setSheet({ event: occ.event, date: occ.start });
   }
 
-  /** Tap on empty grid: a new hour-long event around that (snapped) time. */
+  /** Tap on empty grid: a new event around that time, for the default people. */
   function addAt(dateISO: string, minute: number) {
-    const start = Math.min(
-      Math.max(0, Math.round(minute / SNAP) * SNAP),
-      DAY_MIN - SNAP,
-    );
-    navigate(
-      newEventPath({
-        date: dateISO,
-        attendees: defaultAttendees(people),
-        startMin: start,
-        endMin: Math.min(start + 60, DAY_MIN),
-      }),
-    );
+    navigate(newEventAtPath(dateISO, minute));
   }
 
   function toggleDay(idx: number) {

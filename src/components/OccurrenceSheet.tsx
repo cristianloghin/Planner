@@ -6,14 +6,13 @@ import { ConfirmDialog } from '../assets/ui/ConfirmDialog'
 import { type ScopeChoice, ScopeSheet } from '../assets/ui/ScopeSheet'
 import { PageLoader } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
-import { isoLabel, minutesToTime } from '../assets/utils/dates'
+import { isoLabel, minutesToTime, offsetLabel } from '../assets/utils/dates'
 import { type EventsChange, useEventsWrite } from '../domains/events/mutations'
 import { reminderOffsets, timingOf } from '../domains/events/selectors'
 import { useOccurrencesWrite } from '../domains/occurrences/mutations'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { usePeople } from '../domains/people/queries'
 import { attendeeLabelFor } from '../domains/people/selectors'
-import { offsetLabel } from '../services/notifications/alerts'
 import { effectiveOccurrence, recurrenceLabel } from '../services/recurrence/expand'
 import {
   MINS_PER_DAY,
@@ -22,7 +21,11 @@ import {
   occKey,
 } from '../services/recurrence/timing'
 import type { CalendarEvent } from '../types'
-import { AttendeeChips } from './AttendeeChips'
+import { AttendeeChips } from '../domains/people/components/AttendeeChips'
+import { personColorMap } from '../domains/people/selectors'
+import { usePreferences } from '../domains/preferences/queries'
+import { personColors } from '../domains/preferences/selectors'
+import { EditorPageView } from '../views/EditorPage'
 import s from './OccurrenceSheet.module.css'
 
 /**
@@ -42,6 +45,9 @@ export function OccurrenceSheet({
 }) {
   const { accountId, userId } = useAccount()
   const { data: people = [] } = usePeople(accountId)
+  const { data: overrides = {} } = usePreferences(accountId, userId, personColors)
+  const colors = personColorMap(people, overrides)
+  const peopleWithColors = people.map((person) => ({ person, color: colors[person.id] }))
   const eventsWrite = useEventsWrite()
   const writeEvent = (change: EventsChange) =>
     eventsWrite.mutate({
@@ -120,40 +126,32 @@ export function OccurrenceSheet({
   // occurrence's real ticks/status are in, so a tap can't act on bare defaults.
   if (isLoading) {
     return (
-      <div className={shared.editorPage}>
-        <header className={shared.editorHead}>
-          <button type="button" className={shared.editorCancel} onClick={onClose}>
-            Close
+      <EditorPageView cancelLabel="Close" onCancel={onClose}>
+        <EditorPageView.Title>{null}</EditorPageView.Title>
+        <EditorPageView.Actions>
+          <button type="button" className={shared.primary} onClick={onEdit}>
+            Edit
           </button>
-          <div className={shared.editorActions}>
-            <button type="button" className={shared.primary} onClick={onEdit}>
-              Edit
-            </button>
-          </div>
-        </header>
-        <div className={shared.editorBody}>
+        </EditorPageView.Actions>
+        <EditorPageView.Body>
           <h1 className={shared.editorTitle}>{event.title}</h1>
           <PageLoader />
-        </div>
-      </div>
+        </EditorPageView.Body>
+      </EditorPageView>
     )
   }
 
   return (
-    <div className={shared.editorPage}>
-      <header className={shared.editorHead}>
-        <button type="button" className={shared.editorCancel} onClick={onClose}>
-          Close
-        </button>
-        <div className={shared.editorActions}>
+    <>
+      <EditorPageView cancelLabel="Close" onCancel={onClose}>
+        <EditorPageView.Title>{null}</EditorPageView.Title>
+        <EditorPageView.Actions>
           {deleteButton}
           <button type="button" className={shared.primary} onClick={onEdit}>
             Edit
           </button>
-        </div>
-      </header>
-
-      <div className={shared.editorBody}>
+        </EditorPageView.Actions>
+        <EditorPageView.Body>
         <h1 className={shared.editorTitle}>{event.title}</h1>
 
         <p className={s.meta}>
@@ -184,6 +182,7 @@ export function OccurrenceSheet({
 
         <label className={shared.label}>Who's involved?</label>
         <AttendeeChips
+          people={peopleWithColors}
           value={attendees}
           onChange={(next) =>
             occurrences.mutate({
@@ -220,7 +219,8 @@ export function OccurrenceSheet({
             ))}
           </div>
         )}
-      </div>
+        </EditorPageView.Body>
+      </EditorPageView>
 
       <ConfirmDialog
         open={confirmDelete}
@@ -239,6 +239,6 @@ export function OccurrenceSheet({
         choices={deleteChoices}
         destructive
       />
-    </div>
+    </>
   )
 }

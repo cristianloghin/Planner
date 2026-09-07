@@ -4,8 +4,13 @@ import shared from '../assets/styles/shared.module.css'
 import { NumberField } from '../assets/ui/NumberField'
 import { useEventsWrite } from '../domains/events/mutations'
 import type { EventReminder, EventTemplate, PersonId } from '../types'
-import { AttendeeChips } from './AttendeeChips'
-import { RemindersEditor } from './RemindersEditor'
+import { RemindersEditor } from '../domains/events/components/RemindersEditor'
+import { AttendeeChips } from '../domains/people/components/AttendeeChips'
+import { usePeople } from '../domains/people/queries'
+import { personColorMap } from '../domains/people/selectors'
+import { usePreferences } from '../domains/preferences/queries'
+import { personColors } from '../domains/preferences/selectors'
+import { EditorPageView } from '../views/EditorPage'
 
 const SNAP = 15
 
@@ -26,6 +31,10 @@ export function TemplateEditor({
 }) {
   const { accountId, userId } = useAccount()
   const events = useEventsWrite()
+  const { data: people = [] } = usePeople(accountId)
+  const { data: overrides = {} } = usePreferences(accountId, userId, personColors)
+  const colors = personColorMap(people, overrides)
+  const peopleWithColors = people.map((person) => ({ person, color: colors[person.id] }))
 
   // No reducer edit-guard here: templates are owned by TanStack Query, and this
   // draft lives in local state, so a background refetch can't disturb it.
@@ -48,8 +57,7 @@ export function TemplateEditor({
   }
 
   // Drop empty checklists so saving doesn't keep stubs around.
-  function submit(e: React.FormEvent) {
-    e.preventDefault()
+  function submit() {
     if (!title.trim()) return
     events.mutate({
       accountId: accountId,
@@ -71,18 +79,9 @@ export function TemplateEditor({
   }
 
   return (
-    <form className={shared.editorPage} onSubmit={submit}>
-      <header className={shared.editorHead}>
-        <button type="button" className={shared.editorCancel} onClick={onClose}>
-          Cancel
-        </button>
-        <strong>Edit template</strong>
-        <button type="submit" className={shared.primary}>
-          Save
-        </button>
-      </header>
-
-      <div className={shared.editorBody}>
+    <EditorPageView onCancel={onClose} onSubmit={submit} submitLabel="Save">
+      <EditorPageView.Title>Edit template</EditorPageView.Title>
+      <EditorPageView.Body>
         <input
           ref={titleRef}
           placeholder="Template name"
@@ -116,10 +115,10 @@ export function TemplateEditor({
         )}
 
         <label className={shared.label}>Who's involved?</label>
-        <AttendeeChips value={attendees} onChange={setAttendees} />
+        <AttendeeChips people={peopleWithColors} value={attendees} onChange={setAttendees} />
 
         <RemindersEditor reminders={reminders} onChange={setReminders} />
-      </div>
-    </form>
+      </EditorPageView.Body>
+    </EditorPageView>
   )
 }

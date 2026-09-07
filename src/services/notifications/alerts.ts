@@ -1,3 +1,4 @@
+import { offsetLabel } from '../../assets/utils/dates'
 import { addDays, diffDays, toISODate } from '../../assets/utils/dates'
 /**
  * Which reminders have come due.
@@ -22,22 +23,8 @@ function reminderOffsets(event: Pick<CalendarEvent, 'reminders'>): number[] {
   return event.reminders.map((a) => a.offset).sort((a, b) => a - b)
 }
 
-/** Reminder offsets (minutes before start) offered in the event editor. */
-export const REMINDER_OFFSETS = [0, 15, 30, 60, 120, 1440]
-
 /** All-day reminders have no clock time, so they anchor to this time of day. */
 const ALLDAY_REMINDER_MIN = 9 * 60
-
-export function offsetLabel(min: number): string {
-  if (min === 0) return 'At start'
-  if (min < 60) return `${min} min before`
-  if (min < 1440) {
-    const h = min / 60
-    return `${h} hour${h > 1 ? 's' : ''} before`
-  }
-  const d = min / 1440
-  return `${d} day${d > 1 ? 's' : ''} before`
-}
 
 /** Local epoch ms for ISO `date` at `minutes` past midnight. */
 function atMs(date: string, minutes: number): number {

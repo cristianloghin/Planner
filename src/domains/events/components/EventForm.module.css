@@ -17,6 +17,3 @@
 .saveTemplate:disabled {
   opacity: 0.5;
 }
-
-/* The save-scope chooser now lives in ScopeSheet — delete needs the same
-   three-way question, so its chrome moved to ScopeSheet.module.css. */

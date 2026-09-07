@@ -1,0 +1,66 @@
+.EditorPage {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* A fixed-height toolbar of ACTIONS. It never scrolls away, so nothing
+   variable-length belongs in it. */
+.head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: max(env(safe-area-inset-top), 16px) 16px 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Only ever a short, static label ("New event"). Clipped rather than
+   wrapped, so no caller can grow the header by passing something long. */
+.title {
+  font-size: var(--fs-lg);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The primary action carries the same 44pt target as its neighbours. */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.actions > :last-child {
+  min-height: 44px;
+}
+
+.cancel {
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: var(--fs-xl);
+  padding: 6px 2px;
+  min-height: 44px;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  padding-bottom: calc(28px + env(safe-area-inset-bottom));
+}

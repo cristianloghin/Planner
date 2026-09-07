@@ -44,13 +44,6 @@ export function isoLabel(iso: string): string {
   })
 }
 
-/** Human label like "Mon 16 Jun" for a given week start + day offset. */
-export function dayLabel(weekStart: string, dayOffset: number): string {
-  const d = new Date(`${weekStart}T00:00:00`)
-  d.setDate(d.getDate() + dayOffset)
-  return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
-}
-
 export function weekRangeLabel(weekStart: string): string {
   const start = new Date(`${weekStart}T00:00:00`)
   const end = new Date(`${weekStart}T00:00:00`)
@@ -119,12 +112,19 @@ export function minutesToTime(min: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-export function timeToMinutes(time: string): number {
-  const [h, m] = time.split(':').map(Number)
-  return h * 60 + m
-}
-
 /** A Date as a `yyyy-mm-ddThh:mm` local string for <input type="datetime-local">. */
 export function toDateTimeLocal(d: Date): string {
   return `${toISODate(d)}T${minutesToTime(d.getHours() * 60 + d.getMinutes())}`
+}
+
+/** "At start", "30 min before", "2 hours before", "1 day before". */
+export function offsetLabel(min: number): string {
+  if (min === 0) return 'At start'
+  if (min < 60) return `${min} min before`
+  if (min < 1440) {
+    const h = min / 60
+    return `${h} hour${h > 1 ? 's' : ''} before`
+  }
+  const d = min / 1440
+  return `${d} day${d > 1 ? 's' : ''} before`
 }

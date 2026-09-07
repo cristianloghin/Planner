@@ -23,18 +23,13 @@ import {
   nextRelevantDate,
   occurrencesOnDate,
 } from "../services/recurrence";
-import {
-  DAY_MIN,
-  type TimeBlock,
-  layoutBlocks,
-} from "../services/timeline-layout";
+import { type TimeBlock, layoutBlocks } from "../services/timeline-layout";
 import type { CalendarEvent, PersonId } from "../types";
 import { CalendarView } from "../views/Calendar";
-import { editEventPath, newEventPath } from "./EventRoute";
+import { editEventPath, newEventAtPath } from "./eventPaths";
 import { TimelineView } from "../views/Timeline";
 
 const ZOOM_KEY = "planner:hourH";
-const SNAP = 15;
 
 /** One page of the deck: a day, already expanded. */
 interface DayPage {
@@ -125,20 +120,9 @@ export function DayRoute() {
     setSheet({ event: occ.event, date: occ.start });
   }
 
-  /** Tap on empty lane: a new hour-long event for that person, snapped. */
+  /** Tap on empty lane: a new event for that person at that time. */
   function addAt(date: string, person: PersonId, minute: number) {
-    const start = Math.min(
-      Math.max(0, Math.round(minute / SNAP) * SNAP),
-      DAY_MIN - SNAP,
-    );
-    navigate(
-      newEventPath({
-        date,
-        attendees: [person],
-        startMin: start,
-        endMin: Math.min(start + 60, DAY_MIN),
-      }),
-    );
+    navigate(newEventAtPath(date, minute, [person]));
   }
 
   function toggleLane(id: PersonId) {
