@@ -13,10 +13,8 @@ import { useEvents } from "../domains/events/queries";
 import { useCompletionsForRange } from "../domains/occurrences/queries";
 import { Avatars } from "../domains/people/components/Avatars";
 import { LaneHead } from "../domains/people/components/LaneHead";
-import { usePeople } from "../domains/people/queries";
-import { eventColorIn, personColorMap } from "../domains/people/selectors";
-import { usePreferences } from "../domains/preferences/queries";
-import { personColors } from "../domains/preferences/selectors";
+import { usePeopleWithColors } from "../domains/people/queries";
+import { eventColorIn } from "../domains/people/selectors";
 import { loadZoom } from "../services/gestures";
 import {
   type DayOccurrence,
@@ -57,12 +55,7 @@ export function DayRoute() {
     navigate("/day/:date", { params: { date } });
   const { accountId, userId } = useAccount();
   const { data: events = [] } = useEvents(accountId);
-  const { data: people = [] } = usePeople(accountId);
-  const { data: overrides = {} } = usePreferences(
-    accountId,
-    userId,
-    personColors,
-  );
+  const { people, colors } = usePeopleWithColors(accountId, userId);
 
   const [sheet, setSheet] = useState<{
     event: CalendarEvent;
@@ -129,11 +122,6 @@ export function DayRoute() {
     setFocusLane((cur) => (cur === id ? null : id));
   }
 
-  // Everyone's colour, resolved once; the pages and the leaves only paint.
-  const colors = useMemo(
-    () => personColorMap(people, overrides),
-    [people, overrides],
-  );
   const { allDayOccs } = pages[1];
 
   /** The people on an occurrence, with their colours, for its avatars. */

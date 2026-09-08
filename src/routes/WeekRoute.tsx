@@ -19,10 +19,8 @@ import { AllDayChip } from "../domains/events/components/AllDayChip";
 import { EventBlock } from "../domains/events/components/EventBlock";
 import { useEvents } from "../domains/events/queries";
 import { useCompletionsForRange } from "../domains/occurrences/queries";
-import { usePeople } from "../domains/people/queries";
-import { eventColorIn, personColorMap } from "../domains/people/selectors";
-import { usePreferences } from "../domains/preferences/queries";
-import { personColors } from "../domains/preferences/selectors";
+import { usePeopleWithColors } from "../domains/people/queries";
+import { eventColorIn } from "../domains/people/selectors";
 import { loadZoom } from "../services/gestures";
 import {
   type DayOccurrence,
@@ -57,12 +55,7 @@ export function WeekRoute() {
     navigate("/week/:weekStart", { params: { weekStart: monday } });
   const { accountId, userId } = useAccount();
   const { data: events = [] } = useEvents(accountId);
-  const { data: people = [] } = usePeople(accountId);
-  const { data: overrides = {} } = usePreferences(
-    accountId,
-    userId,
-    personColors,
-  );
+  const { colors } = usePeopleWithColors(accountId, userId);
 
   const [sheet, setSheet] = useState<{
     event: CalendarEvent;
@@ -119,11 +112,6 @@ export function WeekRoute() {
     setFocusDay((cur) => (cur === idx ? null : idx));
   }
 
-  // Everyone's colour, resolved once; the pages and the leaves only paint.
-  const colors = useMemo(
-    () => personColorMap(people, overrides),
-    [people, overrides],
-  );
   const thisWeek = weekStart === mondayOf(now);
   const visible = weeks[1];
 

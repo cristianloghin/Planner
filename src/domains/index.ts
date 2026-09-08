@@ -17,15 +17,12 @@ import { eventsKey, templatesKey } from './events/queries'
 import { registerOccurrencesDefaults } from './occurrences/mutations'
 import { completionsPrefix } from './occurrences/queries'
 import { registerPeopleDefaults } from './people/mutations'
-import { peopleKey } from './people/queries'
-import { registerPreferencesDefaults } from './preferences/mutations'
-import { preferencesKey } from './preferences/queries'
+import { peopleKey, preferencesKey } from './people/queries'
 
 export function registerDomainDefaults(queryClient: QueryClient): void {
   registerEventsDefaults(queryClient)
   registerOccurrencesDefaults(queryClient)
   registerPeopleDefaults(queryClient)
-  registerPreferencesDefaults(queryClient)
 }
 
 /** Who the signed-in person is, as the query keys need it. */
@@ -56,6 +53,7 @@ export function queryKeysForTable(table: string, { accountId, userId }: Realtime
     // What happened on a day: moves and cancellations.
     case 'event_occurrence':
       return [completionsPrefix(accountId)]
+    // People, and how this user sees them: two tables, one domain.
     case 'person':
       return [peopleKey(accountId)]
     case 'user_preference':

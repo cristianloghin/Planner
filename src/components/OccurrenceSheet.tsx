@@ -11,7 +11,7 @@ import { type EventsChange, useEventsWrite } from '../domains/events/mutations'
 import { reminderOffsets, timingOf } from '../domains/events/selectors'
 import { useOccurrencesWrite } from '../domains/occurrences/mutations'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
-import { usePeople } from '../domains/people/queries'
+import { usePeopleWithColors } from '../domains/people/queries'
 import { attendeeLabelFor } from '../domains/people/selectors'
 import { effectiveOccurrence, recurrenceLabel } from '../services/recurrence/expand'
 import {
@@ -22,9 +22,6 @@ import {
 } from '../services/recurrence/timing'
 import type { CalendarEvent } from '../types'
 import { AttendeeChips } from '../domains/people/components/AttendeeChips'
-import { personColorMap } from '../domains/people/selectors'
-import { usePreferences } from '../domains/preferences/queries'
-import { personColors } from '../domains/preferences/selectors'
 import { EditorPageView } from '../views/EditorPage'
 import s from './OccurrenceSheet.module.css'
 
@@ -44,10 +41,7 @@ export function OccurrenceSheet({
   onClose: () => void
 }) {
   const { accountId, userId } = useAccount()
-  const { data: people = [] } = usePeople(accountId)
-  const { data: overrides = {} } = usePreferences(accountId, userId, personColors)
-  const colors = personColorMap(people, overrides)
-  const peopleWithColors = people.map((person) => ({ person, color: colors[person.id] }))
+  const { people, withColors: peopleWithColors } = usePeopleWithColors(accountId, userId)
   const eventsWrite = useEventsWrite()
   const writeEvent = (change: EventsChange) =>
     eventsWrite.mutate({

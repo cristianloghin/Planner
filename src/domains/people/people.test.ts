@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_COLOR } from '../../assets/palette'
-import { patchRecolor, patchRename } from './patches'
+import {
+  patchRecolor,
+  patchRename,
+  withPersonColor,
+  withTimezone,
+  withoutPersonColor,
+} from './patches'
 import {
   attendeeLabelFor,
   byId,
@@ -8,8 +14,10 @@ import {
   eventColorIn,
   personColorKey,
   personColorMap,
+  personColors,
+  timezone,
 } from './selectors'
-import type { Person } from './types'
+import type { Person, Preferences } from './types'
 
 const person = (id: string, name: string, sortOrder: number): Person => ({
   id,
@@ -123,5 +131,63 @@ describe('patchRecolor', () => {
   it('does not modify the list it was given', () => {
     patchRecolor(people, 'c', '9')
     expect(anna.color).toBe('1')
+  })
+})
+
+// ---- this user's settings ----
+
+const emptyPrefs: Preferences = { personColors: {} }
+const setPrefs: Preferences = {
+  personColors: { a: '3', b: '7' },
+  timezone: 'Europe/Amsterdam',
+}
+
+describe('settings selectors', () => {
+  it('reports no timezone rather than guessing one', () => {
+    expect(timezone(emptyPrefs)).toBeUndefined()
+    expect(timezone(setPrefs)).toBe('Europe/Amsterdam')
+  })
+
+  it('returns the colour overrides as stored', () => {
+    expect(personColors(emptyPrefs)).toEqual({})
+    expect(personColors(setPrefs)).toEqual({ a: '3', b: '7' })
+  })
+})
+
+describe('building the next settings document', () => {
+  it('sets one person’s colour, leaving the others', () => {
+    expect(withPersonColor(setPrefs, 'c', '9').personColors).toEqual({ a: '3', b: '7', c: '9' })
+  })
+
+  it('replaces a colour that was already set', () => {
+    expect(withPersonColor(setPrefs, 'a', '9').personColors).toEqual({ a: '9', b: '7' })
+  })
+
+  it('removes one colour so that person falls back to the shared one', () => {
+    expect(withoutPersonColor(setPrefs, 'a').personColors).toEqual({ b: '7' })
+  })
+
+  it('removing a colour nobody set changes nothing', () => {
+    expect(withoutPersonColor(setPrefs, 'zzz').personColors).toEqual({ a: '3', b: '7' })
+  })
+
+  it('keeps the other settings when changing one', () => {
+    const next = withTimezone(setPrefs, 'UTC')
+    expect(next.timezone).toBe('UTC')
+    expect(next.personColors).toEqual({ a: '3', b: '7' })
+  })
+
+  it('records the timezone on a document that had none', () => {
+    expect(withTimezone(emptyPrefs, 'Europe/Bucharest')).toEqual({
+      personColors: {},
+      timezone: 'Europe/Bucharest',
+    })
+  })
+
+  it('never modifies the document it was given', () => {
+    withPersonColor(setPrefs, 'c', '9')
+    withoutPersonColor(setPrefs, 'a')
+    withTimezone(setPrefs, 'UTC')
+    expect(setPrefs).toEqual({ personColors: { a: '3', b: '7' }, timezone: 'Europe/Amsterdam' })
   })
 })

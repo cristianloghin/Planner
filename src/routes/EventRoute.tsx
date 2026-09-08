@@ -27,12 +27,12 @@ import { timingOf } from "../domains/events/selectors";
 import { useOccurrencesWrite } from "../domains/occurrences/mutations";
 import { rosterChange } from "../domains/occurrences/patches";
 import { useCompletionsForRange } from "../domains/occurrences/queries";
+import { usePeopleWithColors } from "../domains/people/queries";
 import { defaultAttendees } from "../domains/people/selectors";
 import { effectiveOccurrence } from "../services/recurrence/expand";
 import { eventDate, eventStartMinutes } from "../services/recurrence/timing";
 import type { CalendarEvent } from "../types";
 import { EditorPageView } from "../views/EditorPage";
-import { usePeopleWithColors } from "./peopleWithColors";
 
 /**
  * The editor as a route: `/event/new` seeded from the query, `/event/:id`
@@ -58,7 +58,8 @@ function useClose(date: string) {
 }
 
 export function NewEventRoute() {
-  const { people, withColors, isPending } = usePeopleWithColors();
+  const { accountId, userId } = useAccount();
+  const { people, withColors, isPending } = usePeopleWithColors(accountId, userId);
   const [q] = useQueryState({
     date: { type: "string", default: () => toISODate(new Date()) },
     for: { type: "string[]" },
@@ -89,8 +90,8 @@ export function NewEventRoute() {
 
 export function EditEventRoute() {
   const { id } = useParams("/event/:id");
-  const { accountId } = useAccount();
-  const { withColors, isPending: peoplePending } = usePeopleWithColors();
+  const { accountId, userId } = useAccount();
+  const { withColors, isPending: peoplePending } = usePeopleWithColors(accountId, userId);
   const { data: events, isPending } = useEvents(accountId);
   const [{ date }] = useQueryState({ date: { type: "string" } });
   const event = events?.find((e) => e.id === id);

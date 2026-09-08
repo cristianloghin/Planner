@@ -78,10 +78,15 @@ inheriting.
 
 ## 2. Colour is a domain with no name
 
-**Settled — now ARCHITECTURE §2 (Route, "joins are made once") and §6.** The
-route calls `personColorMap` once and passes the resolved map; every leaf takes a
-`ColorKey`. Colour did not get a domain of its own; it got resolved before it
-reaches anything that paints, which was the actual problem.
+**Settled twice.** First the leaves were fixed: every route calls the join once
+and every leaf takes a `ColorKey`. Then the join itself, which eight screens
+were making, found its home: `people` and `preferences` were two tables and one
+concept — who is on this account, and how this user sees them — so they became
+one domain, and `usePeopleWithColors` is one of its queries. Colour never
+needed a domain of its own; it needed the two halves of one domain to be in the
+same folder. The timezone rides in that domain as the one field that is not
+about people, because the settings document is saved whole and cannot have two
+owners.
 
 This is the thing that made "which domain does `DayView` belong to?" unanswerable.
 

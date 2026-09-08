@@ -17,10 +17,8 @@ import {
 import { EventSearch } from '../components/EventSearch'
 import { useEvents } from '../domains/events/queries'
 import { useCompletionsForRange } from '../domains/occurrences/queries'
-import { usePeople } from '../domains/people/queries'
-import { eventColorIn, personColorMap } from '../domains/people/selectors'
-import { usePreferences } from '../domains/preferences/queries'
-import { personColors } from '../domains/preferences/selectors'
+import { usePeopleWithColors } from '../domains/people/queries'
+import { eventColorIn } from '../domains/people/selectors'
 import { nextRelevantDate, occurrencesOnDate } from '../services/recurrence/expand'
 import { eventStartMinutes } from '../services/recurrence/timing'
 import type { CalendarEvent, CompletionsMap, PersonId } from '../types'
@@ -39,11 +37,7 @@ export function MonthRoute() {
   const goToMonth = (month: string) => navigate('/month/:month', { params: { month } })
   const { accountId, userId } = useAccount()
   const { data: events = [] } = useEvents(accountId)
-  const { data: people = [] } = usePeople(accountId)
-  const { data: overrides = {} } = usePreferences(accountId, userId, personColors)
-
-  // Everyone's colour, resolved once; the pages only paint.
-  const colors = useMemo(() => personColorMap(people, overrides), [people, overrides])
+  const { colors } = usePeopleWithColors(accountId, userId)
 
   const today = toISODate(new Date())
   // Deck pages: [previous month, visible month, next month].

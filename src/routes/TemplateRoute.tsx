@@ -13,9 +13,9 @@ import {
 } from "../domains/events/draft";
 import { useEventsWrite } from "../domains/events/mutations";
 import { useTemplates } from "../domains/events/queries";
+import { usePeopleWithColors } from "../domains/people/queries";
 import { defaultAttendees } from "../domains/people/selectors";
 import { EditorPageView } from "../views/EditorPage";
-import { usePeopleWithColors } from "./peopleWithColors";
 
 /**
  * The template editor as a route: `/library/templates/new` and
@@ -34,7 +34,8 @@ function useClose() {
 }
 
 export function NewTemplateRoute() {
-  const { people, withColors, isPending } = usePeopleWithColors();
+  const { accountId, userId } = useAccount();
+  const { people, withColors, isPending } = usePeopleWithColors(accountId, userId);
   const close = useClose();
   if (isPending) return <PageLoader />;
   return (
@@ -49,8 +50,8 @@ export function NewTemplateRoute() {
 
 export function EditTemplateRoute() {
   const { id } = useParams("/library/templates/:id");
-  const { accountId } = useAccount();
-  const { withColors, isPending: peoplePending } = usePeopleWithColors();
+  const { accountId, userId } = useAccount();
+  const { withColors, isPending: peoplePending } = usePeopleWithColors(accountId, userId);
   const { data: templates, isPending } = useTemplates(accountId);
   const close = useClose();
   const template = templates?.find((t) => t.id === id);

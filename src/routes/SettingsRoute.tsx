@@ -3,12 +3,9 @@ import { useAccount } from "../account";
 import { AccountPanel } from "../domains/auth/components/AccountPanel";
 import { useSignOut, useUpdatePassword } from "../domains/auth/mutations";
 import { PeopleSettings } from "../domains/people/components/PeopleSettings";
-import { usePeopleWrite } from "../domains/people/mutations";
-import { usePeople } from "../domains/people/queries";
-import { personColorKey } from "../domains/people/selectors";
-import { withPersonColor, withoutPersonColor } from "../domains/preferences/patches";
-import { usePreferences } from "../domains/preferences/queries";
-import { usePreferencesWrite } from "../domains/preferences/mutations";
+import { usePeopleWrite, usePreferencesWrite } from "../domains/people/mutations";
+import { withPersonColor, withoutPersonColor } from "../domains/people/patches";
+import { usePeopleWithColors, usePreferences } from "../domains/people/queries";
 import {
   NotificationToggle,
   type PushStatus,
@@ -32,9 +29,8 @@ import { SectionView } from "../views/Section";
  */
 export function SettingsRoute() {
   const { accountId, userId, email } = useAccount();
-  const { data: people = [] } = usePeople(accountId);
+  const { withColors, overrides } = usePeopleWithColors(accountId, userId);
   const { data: prefs } = usePreferences(accountId, userId);
-  const overrides = prefs?.personColors ?? {};
   const peopleWrite = usePeopleWrite();
   const prefsWrite = usePreferencesWrite();
   const signOut = useSignOut();
@@ -45,10 +41,9 @@ export function SettingsRoute() {
   const savePrefs = (next: Preferences) =>
     prefsWrite.mutate({ accountId, userId: userId as string, prefs: next });
 
-  const rows = people.map((person) => ({
-    person,
-    color: personColorKey(people, overrides, person.id),
-    overridden: overrides[person.id] !== undefined,
+  const rows = withColors.map((row) => ({
+    ...row,
+    overridden: overrides[row.person.id] !== undefined,
   }));
 
   return (

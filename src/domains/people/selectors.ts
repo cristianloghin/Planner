@@ -13,7 +13,7 @@
  * `usePeople` at all. Call them directly with what they ask for.
  */
 import { type ColorKey, DEFAULT_COLOR, colorKey } from '../../assets/palette'
-import type { Person, PersonId } from './types'
+import type { Person, PersonId, Preferences } from './types'
 
 /** Everyone, by id — for screens that look people up rather than list them. */
 export function byId(people: Person[]): Record<PersonId, Person> {
@@ -84,4 +84,17 @@ export function eventColorIn(
 ): ColorKey {
   if (eventColor) return colorKey(eventColor)
   return laneColor ?? DEFAULT_COLOR
+}
+
+/** This user's own colour for each person. Empty when they have changed none. */
+export function personColors(prefs: Preferences): Record<PersonId, ColorKey> {
+  return prefs.personColors
+}
+
+/**
+ * The timezone reminders are timed against. Unset means UTC — which is what the
+ * sender assumes, not a guess made here.
+ */
+export function timezone(prefs: Preferences): string | undefined {
+  return prefs.timezone
 }

@@ -17,9 +17,10 @@ import { APP_SCOPE } from '../../assets/constants'
 import type { ColorKey } from '../../assets/palette'
 import { type Rollback, rollback } from '../../assets/rollback'
 import { recolorPerson, renamePerson } from '../../client/people'
+import { savePreferences } from '../../client/preferences'
 import { patchRecolor, patchRename } from './patches'
-import { peopleKey } from './queries'
-import type { Person, PersonId } from './types'
+import { peopleKey, preferencesKey } from './queries'
+import type { Person, PersonId, Preferences } from './types'
 
 /** Every change to a person, as one set of values that can be written down. */
 export type PeopleChange =
@@ -30,6 +31,21 @@ export type PeopleChange =
 export type PeopleWrite = { accountId: string; change: PeopleChange }
 
 const PEOPLE_WRITE_KEY = ['people-write'] as const
+
+/**
+ * What saving this user's settings takes: the whole document, plus who it
+ * belongs to. Settings are one document, saved whole, so the write carries the
+ * complete document rather than the one field that changed — build it with the
+ * helpers in ./patches. Two devices changing different settings at once means
+ * the last one to arrive wins for all of them.
+ */
+export type PreferencesWrite = {
+  accountId: string
+  userId: string
+  prefs: Preferences
+}
+
+const PREFERENCES_WRITE_KEY = ['preferences-write'] as const
 
 /**
  * Teach the query client how to run people writes.
@@ -64,6 +80,26 @@ export function registerPeopleDefaults(queryClient: QueryClient): void {
       void queryClient.invalidateQueries({ queryKey: peopleKey(accountId) })
     },
   })
+
+  queryClient.setMutationDefaults(PREFERENCES_WRITE_KEY, {
+    scope: { id: APP_SCOPE },
+    mutationFn: ({ accountId, userId, prefs }: PreferencesWrite) =>
+      savePreferences(accountId, userId, prefs),
+
+    // The document being saved is also exactly what to show, so there is
+    // nothing to work out here.
+    onMutate: async ({ accountId, userId, prefs }: PreferencesWrite): Promise<Rollback> => {
+      const key = preferencesKey(accountId, userId)
+      await queryClient.cancelQueries({ queryKey: key })
+      const previous = queryClient.getQueryData<Preferences>(key)
+      queryClient.setQueryData<Preferences>(key, prefs)
+      return { entries: previous ? [[key, previous]] : [] }
+    },
+    onError: (_err, _vars, ctx) => rollback(queryClient, ctx),
+    onSettled: (_data, _err, vars) => {
+      void queryClient.invalidateQueries({ queryKey: preferencesKey(vars.accountId, vars.userId) })
+    },
+  })
 }
 
 /**
@@ -75,4 +111,16 @@ export function registerPeopleDefaults(queryClient: QueryClient): void {
  */
 export function usePeopleWrite() {
   return useMutation<void, Error, PeopleWrite>({ mutationKey: [...PEOPLE_WRITE_KEY] })
+}
+
+/**
+ * Save this user's settings.
+ *
+ * `mutate({ accountId, userId, prefs: withTimezone(prefs, 'Europe/Amsterdam') })` —
+ * the whole document, with the one change made.
+ */
+export function usePreferencesWrite() {
+  return useMutation<void, Error, PreferencesWrite>({
+    mutationKey: [...PREFERENCES_WRITE_KEY],
+  })
 }
