@@ -17,8 +17,7 @@ import { EventSearch } from "../components/EventSearch";
 import { OccurrenceSheet } from "../components/OccurrenceSheet";
 import { AllDayChip } from "../domains/events/components/AllDayChip";
 import { EventBlock } from "../domains/events/components/EventBlock";
-import { useEvents } from "../domains/events/queries";
-import { useCompletionsForRange } from "../domains/occurrences/queries";
+import { useEvents, useOccurrencesForRange } from "../domains/events/queries";
 import { usePeopleWithColors } from "../domains/people/queries";
 import { eventColorIn } from "../domains/people/selectors";
 import { loadZoom } from "../services/gestures";
@@ -71,7 +70,7 @@ export function WeekRoute() {
 
   // Windowed per-occurrence state covering the visible week and its deck
   // neighbours.
-  const { completions, isLoading } = useCompletionsForRange(
+  const { occurrences, isLoading } = useOccurrencesForRange(
     accountId,
     addDays(weekStart, -7),
     addDays(weekStart, 13),
@@ -84,10 +83,10 @@ export function WeekRoute() {
       [-7, 0, 7].map((weekOffset) =>
         DAY_NAMES.map((_, dayIdx) => {
           const dateISO = addDays(weekStart, weekOffset + dayIdx);
-          return { dateISO, occs: occurrencesOnDate(events, dateISO, completions) };
+          return { dateISO, occs: occurrencesOnDate(events, dateISO, occurrences) };
         }),
       ),
-    [weekStart, events, completions],
+    [weekStart, events, occurrences],
   );
 
   /** Open a search hit: jump the week to its next upcoming occurrence. */

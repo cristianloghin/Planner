@@ -132,8 +132,11 @@ really a misplaced concern.
 The instinct that a domain need not be 1:1 with a backend model is already
 borne out here:
 
-- `domains/occurrences` is not the `event_occurrence` table — it is *what
-  happened on a day*, keyed `eventId:date`, a shape the database does not have.
+- What happened on a day is not the `event_occurrence` table — it is keyed
+  `eventId:date`, a shape the database does not have. It was its own domain
+  for a while; it turned out to be the events domain's second read, because
+  it cannot say what it is without an event (see §2's ending, and the merge
+  of people and preferences before it).
 - `domains/search` has no table at all; it wraps an RPC.
 - `domains/auth` is mutations only.
 

@@ -29,7 +29,7 @@ export interface EventReminder {
  *
  * Nothing here changes when you tick something off. `recurrence` repeats the
  * whole pattern from `start`, and what happened on any one day of it is kept
- * separately — see domains/occurrences.
+ * separately — see `OccurrenceState` below.
  */
 export interface CalendarEvent {
   id: string
@@ -61,4 +61,49 @@ export interface EventTemplate {
   duration: number
   attendees: PersonId[]
   reminders: EventReminder[]
+}
+
+/**
+ * What happened on one day of a repeating event.
+ *
+ * An event is a pattern; this is everything that makes one day of it differ —
+ * moved, taken out, or with different people on it. The database keeps that
+ * as sparse rows. The app wants one thing per day, looked up by day.
+ *
+ * Everything is optional and an absent field means "nothing recorded" — days
+ * that match their series have no entry at all.
+ */
+export interface OccurrenceState {
+  /**
+   * Moved to, for this day only, in the event's own units. The day itself does
+   * not change — only the time within it, and how long it runs.
+   */
+  start?: string
+  duration?: number
+  /** Taken out of the series. The pattern still produces it; it is not drawn. */
+  cancelled?: boolean
+  /**
+   * Exactly these people on this day. Absent means "as the series" — so a day
+   * that has never been overridden reads through to the series' own list.
+   */
+  attendees?: PersonId[]
+}
+
+/**
+ * Every day with something recorded, keyed by event and day. The key format
+ * is this domain's own — read it through an `OccurrenceIndex`, never by
+ * building keys.
+ */
+export type OccurrenceMap = Record<string, OccurrenceState>
+
+/**
+ * A window of recorded days, looked up by event and date. This is what the
+ * domain hands to screens and to the recurrence engine: a service may not
+ * import a domain's key builder, so it is given lookups instead of a map.
+ */
+export interface OccurrenceIndex {
+  /** One day's state, if anything is recorded on it. */
+  on(eventId: string, date: string): OccurrenceState | undefined
+  /** Every recorded day of one event, as `[date, state]` pairs. */
+  of(eventId: string): [string, OccurrenceState][]
 }

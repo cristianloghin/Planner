@@ -9,8 +9,7 @@ import { EventSearch } from "../components/EventSearch";
 import { OccurrenceSheet } from "../components/OccurrenceSheet";
 import { AllDayChip } from "../domains/events/components/AllDayChip";
 import { EventBlock } from "../domains/events/components/EventBlock";
-import { useEvents } from "../domains/events/queries";
-import { useCompletionsForRange } from "../domains/occurrences/queries";
+import { useEvents, useOccurrencesForRange } from "../domains/events/queries";
 import { Avatars } from "../domains/people/components/Avatars";
 import { LaneHead } from "../domains/people/components/LaneHead";
 import { usePeopleWithColors } from "../domains/people/queries";
@@ -75,7 +74,7 @@ export function DayRoute() {
   const nowMin = now.getHours() * 60 + now.getMinutes();
 
   // Windowed per-occurrence state for the visible day and its swipe neighbours.
-  const { completions, isLoading } = useCompletionsForRange(
+  const { occurrences, isLoading } = useOccurrencesForRange(
     accountId,
     prevISO,
     nextISO,
@@ -87,7 +86,7 @@ export function DayRoute() {
   const pages = useMemo<DayPage[]>(
     () =>
       [prevISO, dateISO, nextISO].map((iso) => {
-        const occs = occurrencesOnDate(events, iso, completions);
+        const occs = occurrencesOnDate(events, iso, occurrences);
         const timedBlocks: TimeBlock[] = occs
           .filter((o) => !o.event.allDay)
           .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end }));
@@ -97,7 +96,7 @@ export function DayRoute() {
           allDayOccs: occs.filter((o) => o.event.allDay),
         };
       }),
-    [events, completions, prevISO, dateISO, nextISO],
+    [events, occurrences, prevISO, dateISO, nextISO],
   );
 
   /** Open a search hit at the event's next upcoming occurrence. */

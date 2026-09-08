@@ -8,9 +8,8 @@ import { addDays, diffDays, toISODate } from '../../assets/utils/dates'
  * where the events came from.
  */
 import type { CalendarEvent } from '../../domains/events/types'
-import type { OccurrenceState } from '../../domains/occurrences/types'
+import type { OccurrenceIndex } from '../../domains/events/types'
 import { startsOn } from '../recurrence/expand'
-import { occKey } from '../recurrence/timing'
 import { eventStartMinutes } from '../recurrence/timing'
 
 /**
@@ -64,7 +63,7 @@ const RELOCATION_LOOKAROUND_DAYS = 31
  */
 export function dueAlerts(
   events: CalendarEvent[],
-  completions: Record<string, OccurrenceState>,
+  occurrences: OccurrenceIndex,
   fromMs: number,
   toMs: number,
 ): FiredAlert[] {
@@ -83,7 +82,7 @@ export function dueAlerts(
     const baseMin = e.allDay ? ALLDAY_REMINDER_MIN : eventStartMinutes(e)
     for (const d of dates) {
       if (!startsOn(e, d)) continue
-      const ov = completions[occKey(e.id, d)]
+      const ov = occurrences.on(e.id, d)
       if (ov?.cancelled) continue
       // A timing override moves the anchor: `start` is a full datetime (timed)
       // or a date (all-day, which keeps the fixed reminder time of day).

@@ -3,7 +3,7 @@ import { useAccount } from '../account'
 import { useLatest } from '../assets/hooks/useLatest'
 import { addDays, toISODate } from '../assets/utils/dates'
 import { useEvents } from '../domains/events/queries'
-import { useCompletionsForRange } from '../domains/occurrences/queries'
+import { useOccurrencesForRange } from '../domains/events/queries'
 import { type FiredAlert, dueAlerts } from '../services/notifications/alerts'
 import s from './AlertHost.module.css'
 
@@ -33,13 +33,13 @@ export function AlertHost() {
   // dueAlerts' relocation lookaround.
   const today = toISODate(new Date())
   const alertRange = useMemo(() => ({ from: addDays(today, -31), to: addDays(today, 31) }), [today])
-  const { completions } = useCompletionsForRange(accountId, alertRange.from, alertRange.to)
+  const { occurrences } = useOccurrencesForRange(accountId, alertRange.from, alertRange.to)
 
   useEffect(() => {
     function check() {
       const now = Date.now()
       const from = Math.max(seenRef.current, now - MAX_LOOKBACK_MS)
-      const due = dueAlerts(events, completions, from, now)
+      const due = dueAlerts(events, occurrences, from, now)
       seenRef.current = now
       localStorage.setItem(SEEN_KEY, String(now))
       if (due.length) {
@@ -57,7 +57,7 @@ export function AlertHost() {
       window.clearInterval(iv)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [events, completions])
+  }, [events, occurrences])
 
   function dismiss(id: string) {
     setActive((prev) => prev.filter((a) => a.id !== id))

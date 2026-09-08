@@ -13,15 +13,12 @@
 import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { accountKey } from './account/queries'
 import { registerEventsDefaults } from './events/mutations'
-import { eventsKey, templatesKey } from './events/queries'
-import { registerOccurrencesDefaults } from './occurrences/mutations'
-import { completionsPrefix } from './occurrences/queries'
+import { eventsKey, occurrencesPrefix, templatesKey } from './events/queries'
 import { registerPeopleDefaults } from './people/mutations'
 import { peopleKey, preferencesKey } from './people/queries'
 
 export function registerDomainDefaults(queryClient: QueryClient): void {
   registerEventsDefaults(queryClient)
-  registerOccurrencesDefaults(queryClient)
   registerPeopleDefaults(queryClient)
 }
 
@@ -50,9 +47,10 @@ export function queryKeysForTable(table: string, { accountId, userId }: Realtime
     case 'event_series':
     case 'reminder':
       return [eventsKey(accountId), templatesKey(accountId)]
-    // What happened on a day: moves and cancellations.
+    // What happened on a day: moves, cancellations, people — the events
+    // domain's windowed read.
     case 'event_occurrence':
-      return [completionsPrefix(accountId)]
+      return [occurrencesPrefix(accountId)]
     // People, and how this user sees them: two tables, one domain.
     case 'person':
       return [peopleKey(accountId)]

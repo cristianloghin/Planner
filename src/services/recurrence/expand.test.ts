@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { indexOccurrences } from '../../domains/events/transformers'
 import type { CalendarEvent, Recurrence } from '../../domains/events/types'
 import {
   effectiveOccurrence,
@@ -8,6 +9,9 @@ import {
   recurrenceLabel,
   startsOn,
 } from './expand'
+
+/** The engine takes lookups; the tests write maps and index them. */
+const idx = indexOccurrences
 
 /** Minimal all-day event factory; the recurrence math only reads start/recurrence. */
 function ev(
@@ -215,17 +219,17 @@ describe('effectiveOccurrence — people', () => {
     // test `attendees`, this override is written to the database and then
     // silently ignored on read — no error, nothing on screen to notice.
     const only = { 'e1:2026-06-15': { attendees: ['kid'] } }
-    expect(effectiveOccurrence(base, '2026-06-15', only).attendees).toEqual(['kid'])
+    expect(effectiveOccurrence(base, '2026-06-15', idx(only)).attendees).toEqual(['kid'])
   })
 
   it('falls through to the series when the day says nothing about people', () => {
     const timingOnly = { 'e1:2026-06-15': { start: '2026-06-15', duration: 2 } }
-    expect(effectiveOccurrence(base, '2026-06-15', timingOnly).attendees).toEqual(['dev', 'kid'])
-    expect(effectiveOccurrence(base, '2026-06-15', {}).attendees).toEqual(['dev', 'kid'])
+    expect(effectiveOccurrence(base, '2026-06-15', idx(timingOnly)).attendees).toEqual(['dev', 'kid'])
+    expect(effectiveOccurrence(base, '2026-06-15', idx({})).attendees).toEqual(['dev', 'kid'])
   })
 
   it('returns the very same object when there is no override at all', () => {
-    expect(effectiveOccurrence(base, '2026-06-15', {})).toBe(base)
+    expect(effectiveOccurrence(base, '2026-06-15', idx({}))).toBe(base)
   })
 })
 
@@ -240,17 +244,17 @@ describe('occurrencesOnDate', () => {
   it('hides a cancelled occurrence but keeps the others', () => {
     const e = ev('2026-06-15', { freq: 'weekly', interval: 1 })
     const completions = { 'e1:2026-06-22': { cancelled: true } }
-    expect(occurrencesOnDate([e], '2026-06-22', completions)).toHaveLength(0)
-    expect(occurrencesOnDate([e], '2026-06-15', completions)).toHaveLength(1)
+    expect(occurrencesOnDate([e], '2026-06-22', idx(completions))).toHaveLength(0)
+    expect(occurrencesOnDate([e], '2026-06-15', idx(completions))).toHaveLength(1)
   })
 
   it('renders a relocated occurrence on its new day with its original identity', () => {
     const e = ev('2026-06-15', { freq: 'weekly', interval: 1 })
     const completions = { 'e1:2026-06-15': { start: '2026-06-17' } }
     // Gone from its original day...
-    expect(occurrencesOnDate([e], '2026-06-15', completions)).toHaveLength(0)
+    expect(occurrencesOnDate([e], '2026-06-15', idx(completions))).toHaveLength(0)
     // ...present on the moved day, keyed by the original slot.
-    const moved = occurrencesOnDate([e], '2026-06-17', completions)
+    const moved = occurrencesOnDate([e], '2026-06-17', idx(completions))
     expect(moved).toHaveLength(1)
     expect(moved[0].start).toBe('2026-06-15')
     expect(moved[0].moved).toBe(true)
@@ -265,7 +269,7 @@ describe('occurrencesOnDate', () => {
       'e1:2026-06-15': { duration: 8 },
       'e1:2026-06-22': { cancelled: true },
     }
-    const occs = occurrencesOnDate([e], '2026-06-22', completions)
+    const occs = occurrencesOnDate([e], '2026-06-22', idx(completions))
     expect(occs).toHaveLength(1)
     expect(occs[0].start).toBe('2026-06-15')
     expect(occs[0].offset).toBe(7)
@@ -278,7 +282,7 @@ describe('occurrencesOnDate', () => {
       'e1:2026-06-15': { duration: 8 },
       'e1:2026-06-22': { start: '2026-06-25' }, // relocated off its slot
     }
-    const occs = occurrencesOnDate([e], '2026-06-22', completions)
+    const occs = occurrencesOnDate([e], '2026-06-22', idx(completions))
     expect(occs).toHaveLength(1)
     expect(occs[0].start).toBe('2026-06-15')
   })
@@ -292,7 +296,7 @@ describe('occurrencesOnDate', () => {
       { allDay: false, duration: 120 },
     )
     const completions = { 'e1:2026-06-15': { start: '2026-06-15T23:30' } }
-    const nextDay = occurrencesOnDate([e], '2026-06-16', completions)
+    const nextDay = occurrencesOnDate([e], '2026-06-16', idx(completions))
     expect(nextDay).toHaveLength(1)
     expect(nextDay[0].start).toBe('2026-06-15')
     expect(nextDay[0].segment).toEqual({ start: 0, end: 90 })
@@ -303,6 +307,6 @@ describe('occurrencesOnDate', () => {
     // 2026-06-16 is no longer a slot (weekly from 06-15).
     const e = ev('2026-06-15', { freq: 'weekly', interval: 1 })
     const completions = { 'e1:2026-06-16': { start: '2026-06-18' } }
-    expect(occurrencesOnDate([e], '2026-06-18', completions)).toHaveLength(0)
+    expect(occurrencesOnDate([e], '2026-06-18', idx(completions))).toHaveLength(0)
   })
 })

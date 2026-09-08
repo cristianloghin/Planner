@@ -7,10 +7,9 @@ import { type ScopeChoice, ScopeSheet } from '../assets/ui/ScopeSheet'
 import { PageLoader } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
 import { isoLabel, minutesToTime, offsetLabel } from '../assets/utils/dates'
-import { type EventsChange, useEventsWrite } from '../domains/events/mutations'
+import { type EventsChange, useEventsWrite, useOccurrencesWrite } from '../domains/events/mutations'
+import { useOccurrencesForRange } from '../domains/events/queries'
 import { reminderOffsets, timingOf } from '../domains/events/selectors'
-import { useOccurrencesWrite } from '../domains/occurrences/mutations'
-import { useCompletionsForRange } from '../domains/occurrences/queries'
 import { usePeopleWithColors } from '../domains/people/queries'
 import { attendeeLabelFor } from '../domains/people/selectors'
 import { effectiveOccurrence, recurrenceLabel } from '../services/recurrence/expand'
@@ -18,7 +17,6 @@ import {
   MINS_PER_DAY,
   eventSpanDays,
   eventStartMinutes,
-  occKey,
 } from '../services/recurrence/timing'
 import type { CalendarEvent } from '../types'
 import { AttendeeChips } from '../domains/people/components/AttendeeChips'
@@ -49,8 +47,8 @@ export function OccurrenceSheet({
       userId: userId,
       change,
     })
-  const { completions, isLoading } = useCompletionsForRange(accountId, date, date)
-  const occurrences = useOccurrencesWrite()
+  const { occurrences, isLoading } = useOccurrencesForRange(accountId, date, date)
+  const occurrencesWrite = useOccurrencesWrite()
 
   // Delete asks two different questions. A one-off just needs confirming; a
   // series needs to know how far the delete reaches, and that action sheet is
@@ -59,7 +57,7 @@ export function OccurrenceSheet({
   const [deleteScope, setDeleteScope] = useState(false)
   const isRecurring = !!event.recurrence
 
-  const occState = completions[occKey(event.id, date)]
+  const occState = occurrences.on(event.id, date)
   // A one-off override on this slot. `date` is the occurrence's identity (the day
   // the series would normally place it); if the override's start lands on another
   // day, it's been moved there.
@@ -78,7 +76,7 @@ export function OccurrenceSheet({
   }
   /** Remove just this slot: the rule still produces it, `cancelled` hides it. */
   function deleteThisEvent() {
-    occurrences.mutate({
+    occurrencesWrite.mutate({
       accountId: accountId,
       change: { kind: 'cancel', series: timingOf(event), date },
     })
@@ -103,7 +101,7 @@ export function OccurrenceSheet({
 
   // Show this occurrence's *effective* timing — a one-off override moves the time
   // and length for this date only, while `event` stays the series for editing.
-  const eff = effectiveOccurrence(event, date, completions)
+  const eff = effectiveOccurrence(event, date, occurrences)
   const startMin = eventStartMinutes(eff)
   const endMin = startMin + eff.duration
   const span = eventSpanDays(eff)
@@ -163,7 +161,7 @@ export function OccurrenceSheet({
               type="button"
               className={s.resetOverride}
               onClick={() =>
-                occurrences.mutate({
+                occurrencesWrite.mutate({
                   accountId: accountId,
                   change: { kind: 'clearOverride', series: timingOf(event), date },
                 })
@@ -179,7 +177,7 @@ export function OccurrenceSheet({
           people={peopleWithColors}
           value={attendees}
           onChange={(next) =>
-            occurrences.mutate({
+            occurrencesWrite.mutate({
               accountId: accountId,
               change: { kind: 'attendees', series: timingOf(event), date, attendees: next },
             })
@@ -193,7 +191,7 @@ export function OccurrenceSheet({
               type="button"
               className={s.resetOverride}
               onClick={() =>
-                occurrences.mutate({
+                occurrencesWrite.mutate({
                   accountId: accountId,
                   change: { kind: 'clearAttendees', series: timingOf(event), date },
                 })

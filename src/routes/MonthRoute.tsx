@@ -15,13 +15,12 @@ import {
   toISODate,
 } from '../assets/utils/dates'
 import { EventSearch } from '../components/EventSearch'
-import { useEvents } from '../domains/events/queries'
-import { useCompletionsForRange } from '../domains/occurrences/queries'
+import { useEvents, useOccurrencesForRange } from '../domains/events/queries'
 import { usePeopleWithColors } from '../domains/people/queries'
 import { eventColorIn } from '../domains/people/selectors'
 import { nextRelevantDate, occurrencesOnDate } from '../services/recurrence/expand'
 import { eventStartMinutes } from '../services/recurrence/timing'
-import type { CalendarEvent, CompletionsMap, PersonId } from '../types'
+import type { CalendarEvent, OccurrenceIndex, PersonId } from '../types'
 import { CalendarView } from '../views/Calendar'
 import { MonthGridView } from '../views/MonthGrid'
 
@@ -47,7 +46,7 @@ export function MonthRoute() {
   // pads to full weeks, so it can straddle two months).
   const prevGrid = monthGridDays(months[0])
   const nextGrid = monthGridDays(months[2])
-  const { completions, isLoading } = useCompletionsForRange(
+  const { occurrences, isLoading } = useOccurrencesForRange(
     accountId,
     prevGrid[0],
     nextGrid[nextGrid.length - 1],
@@ -67,7 +66,7 @@ export function MonthRoute() {
     <MonthPage
       month={month}
       today={today}
-      completions={completions}
+      occurrences={occurrences}
       onOpenDay={openDay}
       colors={colors}
       events={events}
@@ -105,14 +104,14 @@ export function MonthRoute() {
 function MonthPage({
   month,
   today,
-  completions,
+  occurrences,
   onOpenDay,
   colors,
   events,
 }: {
   month: string
   today: string
-  completions: CompletionsMap
+  occurrences: OccurrenceIndex
   onOpenDay: (iso: string) => void
   /** Everyone's colour, already resolved against this user's settings. */
   colors: Record<PersonId, ColorKey>
@@ -127,14 +126,14 @@ function MonthPage({
       new Map(
         days.map((iso) => [
           iso,
-          occurrencesOnDate(events, iso, completions).sort(
+          occurrencesOnDate(events, iso, occurrences).sort(
             (a, b) =>
               Number(b.event.allDay) - Number(a.event.allDay) ||
               eventStartMinutes(a.event) - eventStartMinutes(b.event),
           ),
         ]),
       ),
-    [days, events, completions],
+    [days, events, occurrences],
   )
 
   return (

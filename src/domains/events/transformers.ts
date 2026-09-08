@@ -7,8 +7,9 @@ import { toISODate } from '../../assets/utils/dates'
  * event/blueprint split and the missing-date rule.
  */
 import { uid } from '../../assets/utils/id'
+import type { OccurrenceRow } from '../../client/occurrences'
 import type { Series } from '../../client/series'
-import type { CalendarEvent, EventReminder, EventTemplate } from './types'
+import type { CalendarEvent, EventReminder, EventTemplate, OccurrenceIndex, OccurrenceMap, OccurrenceState } from './types'
 
 /**
  * Reminders copied with **fresh ids**, for the template ↔ event copy paths: the
@@ -84,5 +85,62 @@ export function fromTemplate(template: EventTemplate): Series {
     colorKey: undefined,
     reminders: template.reminders,
     isTemplate: true,
+  }
+}
+
+// ---- what happened on a day ----
+
+/** The key one day of one event is found under. This domain's own; see `OccurrenceIndex`. */
+export const occurrenceKey = (eventId: string, date: string): string => `${eventId}:${date}`
+
+/**
+ * Every day with something recorded.
+ *
+ * A row that carries nothing the app shows is left out entirely — clearing a
+ * timing override leaves an empty row behind, and an entry for it would read as
+ * "something happened here" on a day where nothing did.
+ *
+ * Two rows can land on the same day. A day's row is stored at the time of day
+ * the series had when it was written, so a row written before a time edit sits
+ * at the old time while later ones sit at the new one — and the key here is the
+ * day alone. Writes avoid making a second row (see `dayRange` in
+ * client/occurrences), but a pair written before that rule existed still reads
+ * back as two. They are layered rather than replaced, so a day that was
+ * cancelled by one row and moved by another keeps both.
+ */
+export function toOccurrences(rows: OccurrenceRow[]): OccurrenceMap {
+  const out: OccurrenceMap = {}
+
+  for (const o of rows) {
+    const key = occurrenceKey(o.seriesId, o.date)
+    const entry: OccurrenceState = { ...out[key] }
+    if (o.cancelled) entry.cancelled = true
+    if (o.start != null) entry.start = o.start
+    if (o.duration != null) entry.duration = o.duration
+    if (o.attendees != null) entry.attendees = o.attendees
+    if (Object.keys(entry).length) out[key] = entry
+  }
+
+  return out
+}
+
+/** The map as lookups, so nothing outside this domain needs its key format. */
+export function indexOccurrences(map: OccurrenceMap): OccurrenceIndex {
+  const byEvent = new Map<string, [string, OccurrenceState][]>()
+  for (const [key, state] of Object.entries(map)) {
+    const sep = key.indexOf(':')
+    if (sep < 0) continue
+    const id = key.slice(0, sep)
+    let days = byEvent.get(id)
+    if (!days) {
+      days = []
+      byEvent.set(id, days)
+    }
+    days.push([key.slice(sep + 1), state])
+  }
+  const none: [string, OccurrenceState][] = []
+  return {
+    on: (eventId, date) => map[occurrenceKey(eventId, date)],
+    of: (eventId) => byEvent.get(eventId) ?? none,
   }
 }

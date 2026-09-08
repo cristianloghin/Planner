@@ -21,12 +21,10 @@ import {
   eventFromDraft,
   templateFromDraft,
 } from "../domains/events/draft";
-import { useEventsWrite } from "../domains/events/mutations";
-import { useEvents, useTemplates } from "../domains/events/queries";
+import { useEventsWrite, useOccurrencesWrite } from "../domains/events/mutations";
+import { rosterChange } from "../domains/events/patches";
+import { useEvents, useOccurrencesForRange, useTemplates } from "../domains/events/queries";
 import { timingOf } from "../domains/events/selectors";
-import { useOccurrencesWrite } from "../domains/occurrences/mutations";
-import { rosterChange } from "../domains/occurrences/patches";
-import { useCompletionsForRange } from "../domains/occurrences/queries";
 import { usePeopleWithColors } from "../domains/people/queries";
 import { defaultAttendees } from "../domains/people/selectors";
 import { effectiveOccurrence } from "../services/recurrence/expand";
@@ -96,9 +94,9 @@ export function EditEventRoute() {
   const [{ date }] = useQueryState({ date: { type: "string" } });
   const event = events?.find((e) => e.id === id);
   // Opened on an occurrence, the form seeds from that occurrence's override —
-  // which lives in the windowed completions cache. Normally a warm hit: the
+  // which lives in the windowed occurrence cache. Normally a warm hit: the
   // view that opened the editor fetched the same window.
-  const { completions, isLoading: completionsLoading } = useCompletionsForRange(
+  const { occurrences, isLoading: occurrencesLoading } = useOccurrencesForRange(
     accountId,
     date ?? null,
   );
@@ -110,14 +108,14 @@ export function EditEventRoute() {
     if (isPending) return <PageLoader />;
     notFound();
   }
-  if (peoplePending || (date && completionsLoading)) return <PageLoader />;
+  if (peoplePending || (date && occurrencesLoading)) return <PageLoader />;
 
   // The occurrence as it currently stands (override applied), re-anchored on
   // its own date so the form shows the right day and time even for a
   // far-future instance.
   const seed: CalendarEvent = date
     ? (() => {
-        const eff = effectiveOccurrence(event, date, completions);
+        const eff = effectiveOccurrence(event, date, occurrences);
         return {
           ...eff,
           start: eff.allDay ? date : dtLocal(date, eventStartMinutes(eff)),

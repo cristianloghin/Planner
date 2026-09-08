@@ -10,6 +10,8 @@ export type {
   EventTemplate,
   Recurrence,
   RecurrenceFreq,
+  OccurrenceIndex,
+  OccurrenceMap,
+  OccurrenceState,
 } from './domains/events/types'
-export type { CompletionsMap, OccurrenceState } from './domains/occurrences/types'
 export type { Person, PersonId, Preferences } from './domains/people/types'

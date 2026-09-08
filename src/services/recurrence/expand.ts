@@ -8,10 +8,8 @@ import { DAY_NAMES, addDays, diffDays, toISODate, weekdayIndex } from '../../ass
  *
  * Fed events and per-day state; fetches nothing.
  */
-import type { CalendarEvent } from '../../domains/events/types'
-import type { OccurrenceState } from '../../domains/occurrences/types'
+import type { CalendarEvent, OccurrenceIndex, OccurrenceState } from '../../domains/events/types'
 import type { PersonId } from '../../domains/people/types'
-import { occKey } from './timing'
 import { eventDate, eventSpanDays, timedSegment } from './timing'
 
 /**
@@ -30,9 +28,9 @@ import { eventDate, eventSpanDays, timedSegment } from './timing'
 export function effectiveOccurrence(
   event: CalendarEvent,
   date: string,
-  completions: Record<string, OccurrenceState>,
+  occurrences: OccurrenceIndex,
 ): CalendarEvent {
-  const ov = completions[occKey(event.id, date)]
+  const ov = occurrences.on(event.id, date)
   if (!ov || (ov.start == null && ov.duration == null && ov.attendees == null)) return event
   return {
     ...event,
@@ -47,18 +45,18 @@ export function effectiveOccurrence(
  * timing overrides that stretch a single occurrence across midnight — a longer
  * duration, or a later start that pushes the end past midnight. Bounds how far
  * back the day-scan must look so an extended occurrence still renders on the
- * later days it now reaches. `overrides` is the event's own completion entries
- * as `[date, state]` pairs.
+ * later days it now reaches. `overrides` is the event's own recorded days as
+ * `[date, state]` pairs.
  */
 function maxEffectiveSpan(
   event: CalendarEvent,
   overrides: [string, OccurrenceState][],
-  completions: Record<string, OccurrenceState>,
+  occurrences: OccurrenceIndex,
 ): number {
   let max = eventSpanDays(event)
   for (const [date, st] of overrides) {
     if (st.duration == null && st.start == null) continue
-    max = Math.max(max, eventSpanDays(effectiveOccurrence(event, date, completions)))
+    max = Math.max(max, eventSpanDays(effectiveOccurrence(event, date, occurrences)))
   }
   return max
 }
@@ -179,6 +177,9 @@ export interface DayOccurrence {
   moved?: boolean
 }
 
+/** Nothing recorded on any day. */
+const NO_OCCURRENCES: OccurrenceIndex = { on: () => undefined, of: () => [] }
+
 /**
  * The ISO date a one-off override relocates an occurrence to, or null if it isn't
  * a relocation (no override, or it only changes time/length on the same day).
@@ -191,34 +192,19 @@ function relocatedTo(ov: OccurrenceState | undefined, originDate: string): strin
 }
 
 /**
- * Occurrences (timed blocks or all-day spans) that cover ISO `date`. Per-occurrence
- * timing overrides in `completions` reshape the geometry (`segment`/`span`) and a
- * `cancelled` override hides the occurrence; the returned `event` stays the
+ * Occurrences (timed blocks or all-day spans) that cover ISO `date`. Per-day
+ * timing overrides in `occurrences` reshape the geometry (`segment`/`span`) and
+ * a `cancelled` day hides the occurrence; the returned `event` stays the
  * original *series* so callers can still open the editor on it.
  */
 export function occurrencesOnDate(
   events: CalendarEvent[],
   date: string,
-  completions: Record<string, OccurrenceState> = {},
+  occurrences: OccurrenceIndex = NO_OCCURRENCES,
 ): DayOccurrence[] {
   const out: DayOccurrence[] = []
-  // Group completion entries by series id once: this function runs per day cell,
-  // and scanning the whole map per event made it O(events × completions).
-  const overridesByEvent = new Map<string, [string, OccurrenceState][]>()
-  for (const [k, st] of Object.entries(completions)) {
-    const sep = k.indexOf(':')
-    if (sep < 0) continue
-    const id = k.slice(0, sep)
-    let arr = overridesByEvent.get(id)
-    if (!arr) {
-      arr = []
-      overridesByEvent.set(id, arr)
-    }
-    arr.push([k.slice(sep + 1), st])
-  }
-  const NONE: [string, OccurrenceState][] = []
   for (const event of events) {
-    const overrides = overridesByEvent.get(event.id) ?? NONE
+    const overrides = occurrences.of(event.id)
     // 1. Occurrences RELOCATED onto `date` by a one-off override. Their identity
     //    stays the original day; only the rendered position moves here.
     for (const [origin, st] of overrides) {
@@ -227,7 +213,7 @@ export function occurrencesOnDate(
       // A stale override whose origin the rule no longer produces (e.g. the
       // series was edited after the move) must not ghost-render.
       if (!startsOn(event, origin)) continue
-      const eff = effectiveOccurrence(event, origin, completions)
+      const eff = effectiveOccurrence(event, origin, occurrences)
       const span = eventSpanDays(eff)
       const offset = diffDays(date, movedStart)
       if (offset < 0 || offset >= span) continue // this relocated span doesn't cover `date`
@@ -248,14 +234,14 @@ export function occurrencesOnDate(
     //    an override can stretch it further still. The smallest offset wins.
     // An occurrence that doesn't cover `date` (cancelled, moved away, shortened)
     // must not stop the scan: an EARLIER multi-day occurrence may still reach it.
-    const maxSpan = maxEffectiveSpan(event, overrides, completions)
+    const maxSpan = maxEffectiveSpan(event, overrides, occurrences)
     for (let back = 0; back < maxSpan; back++) {
       const start = addDays(date, -back)
       if (!startsOn(event, start)) continue
-      const ov = completions[occKey(event.id, start)]
+      const ov = occurrences.on(event.id, start)
       if (ov?.cancelled) continue // this occurrence was removed
       if (relocatedTo(ov, start) != null) continue // moved away to another day (rendered in pass 1)
-      const eff = effectiveOccurrence(event, start, completions)
+      const eff = effectiveOccurrence(event, start, occurrences)
       const span = eventSpanDays(eff)
       if (back >= span) continue // an override shortened it so it no longer reaches `date`
       out.push({

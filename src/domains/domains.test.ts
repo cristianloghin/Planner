@@ -18,8 +18,8 @@ describe('queryKeysForTable', () => {
     }
   })
 
-  it('routes what happened on a day to the completions windows', () => {
-    expect(queryKeysForTable('event_occurrence', ids)).toEqual([['completions', 'acc']])
+  it('routes what happened on a day to the occurrence windows', () => {
+    expect(queryKeysForTable('event_occurrence', ids)).toEqual([['occurrences', 'acc']])
   })
 
   it('keys preferences by user as well as account', () => {

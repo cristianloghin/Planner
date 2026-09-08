@@ -6,7 +6,7 @@ import { MutationCache, QueryClient } from '@tanstack/react-query'
  * or row mapping) — a mismatched buster discards the stored cache instead of
  * hydrating stale-shaped data into the new code.
  *
- * v2: occurrence writes moved to domains/occurrences and are registered under a
+ * v2: occurrence writes moved to the events domain and are registered under a
  * new mutation key with different values. A write queued offline under the old
  * key would come back with nothing registered to run it, and query-core drops
  * such a write silently rather than waiting. Discarding the stored cache loses

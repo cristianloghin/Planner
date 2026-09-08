@@ -11,7 +11,7 @@
  */
 import { useEffect, useState } from 'react'
 import type { CalendarEvent } from '../../domains/events/types'
-import type { CompletionsMap } from '../../domains/occurrences/types'
+import type { OccurrenceIndex } from '../../domains/events/types'
 import { type FiredAlert, dueAlerts } from './alerts'
 
 /** How far it has already looked. Survives a reload, so nothing repeats. */
@@ -49,7 +49,7 @@ function saveSeen(at: number): void {
  */
 export function useDueAlerts(
   events: CalendarEvent[],
-  completions: CompletionsMap,
+  occurrences: OccurrenceIndex,
 ): { active: FiredAlert[]; dismiss: (id: string) => void } {
   const [active, setActive] = useState<FiredAlert[]>([])
 
@@ -61,7 +61,7 @@ export function useDueAlerts(
     function check() {
       const now = Date.now()
       const from = Math.max(seen, now - MAX_LOOKBACK_MS)
-      const due = dueAlerts(events, completions, from, now)
+      const due = dueAlerts(events, occurrences, from, now)
       seen = now
       saveSeen(now)
       if (!due.length) return
@@ -82,7 +82,7 @@ export function useDueAlerts(
       window.clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [events, completions])
+  }, [events, occurrences])
 
   return {
     active,

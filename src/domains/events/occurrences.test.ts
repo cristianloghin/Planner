@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { OccurrenceRow } from '../../client/occurrences'
-import { patchCompletions, patchEntry, rosterChange } from './patches'
-import { occurrenceKey, toCompletions } from './transformers'
+import { patchEntry, patchOccurrences, rosterChange } from './patches'
+import { indexOccurrences, occurrenceKey, toOccurrences } from './transformers'
 
 const row = (over: Partial<OccurrenceRow> = {}): OccurrenceRow => ({
   seriesId: 'S',
@@ -13,9 +13,9 @@ const row = (over: Partial<OccurrenceRow> = {}): OccurrenceRow => ({
   ...over,
 })
 
-describe('toCompletions', () => {
+describe('toOccurrences', () => {
   it('keys each day under its event and date', () => {
-    expect(toCompletions([row({ cancelled: true })])).toEqual({
+    expect(toOccurrences([row({ cancelled: true })])).toEqual({
       'S:2026-04-07': { cancelled: true },
     })
   })
@@ -23,12 +23,12 @@ describe('toCompletions', () => {
   it('leaves out a row carrying nothing the app shows', () => {
     // Clearing a timing override leaves an empty row behind. An entry for it
     // would read as "something happened here" on a day where nothing did.
-    expect(toCompletions([row()])).toEqual({})
+    expect(toOccurrences([row()])).toEqual({})
   })
 
   it('carries a day that was moved, and one taken out', () => {
     expect(
-      toCompletions([
+      toOccurrences([
         row({ start: '2026-04-07T18:00', duration: 90 }),
         row({ date: '2026-04-08', cancelled: true }),
       ]),
@@ -44,7 +44,7 @@ describe('toCompletions', () => {
     // and one at the new — both on the same day, which is all this is keyed by.
     // Taking the last one alone would drop whatever the first recorded.
     expect(
-      toCompletions([row({ cancelled: true }), row({ start: '2026-04-07T18:00', duration: 90 })]),
+      toOccurrences([row({ cancelled: true }), row({ start: '2026-04-07T18:00', duration: 90 })]),
     ).toEqual({
       'S:2026-04-07': { cancelled: true, start: '2026-04-07T18:00', duration: 90 },
     })
@@ -52,25 +52,25 @@ describe('toCompletions', () => {
 
   it('lets a later row on the same day win a field they both set', () => {
     expect(
-      toCompletions([row({ start: '2026-04-07T18:00' }), row({ start: '2026-04-07T20:00' })]),
+      toOccurrences([row({ start: '2026-04-07T18:00' }), row({ start: '2026-04-07T20:00' })]),
     ).toEqual({ 'S:2026-04-07': { start: '2026-04-07T20:00' } })
   })
 
   it('keeps a day whose second row carries nothing', () => {
     // The empty one must not erase what the first row recorded.
-    expect(toCompletions([row({ cancelled: true }), row()])).toEqual({
+    expect(toOccurrences([row({ cancelled: true }), row()])).toEqual({
       'S:2026-04-07': { cancelled: true },
     })
   })
 
   it('carries a day that overrides who is on it, and leaves the rest alone', () => {
-    expect(toCompletions([row({ attendees: ['p1'] }), row({ date: '2026-04-08' })])).toEqual({
+    expect(toOccurrences([row({ attendees: ['p1'] }), row({ date: '2026-04-08' })])).toEqual({
       'S:2026-04-07': { attendees: ['p1'] },
     })
   })
 
   it('keeps different events and days apart', () => {
-    const out = toCompletions([row({ cancelled: true }), row({ seriesId: 'T', cancelled: true })])
+    const out = toOccurrences([row({ cancelled: true }), row({ seriesId: 'T', cancelled: true })])
     expect(Object.keys(out).sort()).toEqual(['S:2026-04-07', 'T:2026-04-07'])
   })
 })
@@ -108,12 +108,12 @@ describe('patchEntry — people', () => {
   })
 })
 
-describe('patchCompletions', () => {
+describe('patchOccurrences', () => {
   const key = occurrenceKey('S', '2026-04-07')
 
   it('drops a day patched back to nothing, matching the read', () => {
     expect(
-      patchCompletions({ [key]: { start: '2026-04-07T18:00', duration: 90 } }, key, {
+      patchOccurrences({ [key]: { start: '2026-04-07T18:00', duration: 90 } }, key, {
         kind: 'clearOverride',
       }),
     ).toEqual({})
@@ -121,17 +121,17 @@ describe('patchCompletions', () => {
 
   it('drops a day whose only override was its people, once cleared', () => {
     expect(
-      patchCompletions({ [key]: { attendees: ['p1'] } }, key, { kind: 'clearAttendees' }),
+      patchOccurrences({ [key]: { attendees: ['p1'] } }, key, { kind: 'clearAttendees' }),
     ).toEqual({})
   })
 
   it('records against a day nothing was on', () => {
-    expect(patchCompletions({}, key, { kind: 'cancel' })).toEqual({ [key]: { cancelled: true } })
+    expect(patchOccurrences({}, key, { kind: 'cancel' })).toEqual({ [key]: { cancelled: true } })
   })
 
   it('leaves other days alone and does not modify what it was given', () => {
     const before = { 'S:2026-04-01': { cancelled: true } }
-    const after = patchCompletions(before, key, { kind: 'cancel' })
+    const after = patchOccurrences(before, key, { kind: 'cancel' })
     expect(after['S:2026-04-01']).toBe(before['S:2026-04-01'])
     expect(Object.keys(before)).toEqual(['S:2026-04-01'])
   })
@@ -141,5 +141,17 @@ describe('rosterChange', () => {
   it("back to the series' own people is a clear, not a matching override", () => {
     expect(rosterChange(['b', 'a'], ['a', 'b'])).toEqual({ kind: 'clearAttendees' })
     expect(rosterChange(['a'], ['a', 'b'])).toEqual({ kind: 'attendees', attendees: ['a'] })
+  })
+})
+
+describe('indexOccurrences', () => {
+  it('looks a day up by event and date, and lists an event\'s recorded days', () => {
+    const idx = indexOccurrences(
+      toOccurrences([row({ cancelled: true }), row({ date: '2026-04-14', start: '2026-04-14T10:00' })]),
+    )
+    expect(idx.on('S', '2026-04-07')).toEqual({ cancelled: true })
+    expect(idx.on('S', '2026-04-08')).toBeUndefined()
+    expect(idx.of('S').map(([date]) => date)).toEqual(['2026-04-07', '2026-04-14'])
+    expect(idx.of('nobody')).toEqual([])
   })
 })
