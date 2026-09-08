@@ -6,20 +6,16 @@ import { ColorPicker } from '../assets/ui/ColorPicker'
 import { CommitTextInput } from '../assets/ui/CommitTextInput'
 import { cx } from '../assets/utils/cx'
 import { useSignOut, useUpdatePassword } from '../domains/auth/mutations'
-import { useEventsWrite } from '../domains/events/mutations'
-import { useTemplates } from '../domains/events/queries'
-import { reminderOffsets } from '../domains/events/selectors'
 import { usePeopleWrite } from '../domains/people/mutations'
 import { usePeople } from '../domains/people/queries'
-import { attendeeLabelFor, personColorKey } from '../domains/people/selectors'
+import { personColorKey } from '../domains/people/selectors'
 import { usePreferencesWrite } from '../domains/preferences/mutations'
 import { withPersonColor, withWeekLayout, withoutPersonColor } from '../domains/preferences/patches'
 import { usePreferences } from '../domains/preferences/queries'
 import { weekLayout } from '../domains/preferences/selectors'
-import type { EventTemplate, Preferences } from '../types'
+import type { Preferences } from '../types'
 import { NotificationSettings } from './NotificationSettings'
 import s from './Settings.module.css'
-import { TemplateEditor } from './TemplateEditor'
 
 const WEEK_LAYOUTS = [
   { value: 'list', label: 'List' },
@@ -97,7 +93,6 @@ export function Settings() {
 
         <WeekLayoutSection />
 
-        <TemplatesSection />
 
         <NotificationSettings />
 
@@ -146,68 +141,6 @@ function WeekLayoutSection() {
           </button>
         ))}
       </div>
-    </div>
-  )
-}
-
-/**
- * Manage saved event templates (DATA_MODEL Decision 10). Templates are *created*
- * from the event editor ("Save as template"); here you review, edit and delete
- * them. Clicking a row opens the full-page {@link TemplateEditor}.
- */
-function TemplatesSection() {
-  const { accountId, userId } = useAccount()
-  const { data: people = [] } = usePeople(accountId)
-  const { data: templates = [], isPending } = useTemplates(accountId)
-  const events = useEventsWrite()
-  const removeTemplate = (id: string) =>
-    events.mutate({
-      accountId: accountId,
-      userId: userId,
-      change: { kind: 'removeTemplate', id },
-    })
-  const [editing, setEditing] = useState<EventTemplate | null>(null)
-
-  return (
-    <div className={s.templates}>
-      <span className={cx(s.hint, s.small)}>
-        Event templates — reusable blueprints. Pick one when creating an event to prefill its people
-        and reminders. Save a new one from the event editor, or tap one here to edit it.
-      </span>
-      {isPending ? (
-        <p className={s.templatesEmpty}>Loading templates…</p>
-      ) : templates.length === 0 ? (
-        <p className={s.templatesEmpty}>No templates yet.</p>
-      ) : (
-        templates.map((t) => {
-          const bits: string[] = []
-          if (t.attendees.length) bits.push(attendeeLabelFor(t.attendees)(people))
-          const reminders = reminderOffsets(t).length
-          if (reminders) bits.push(`${reminders} reminder${reminders > 1 ? 's' : ''}`)
-          return (
-            <div className={s.templateRow} key={t.id}>
-              <button
-                type="button"
-                className={s.templateInfo}
-                onClick={() => setEditing(t)}
-                aria-label={`Edit template ${t.title || 'Untitled'}`}
-              >
-                <strong>{t.title || 'Untitled template'}</strong>
-                {bits.length > 0 && <span className={s.templateMeta}>{bits.join(' · ')}</span>}
-              </button>
-              <button
-                type="button"
-                className={s.resetColor}
-                onClick={() => removeTemplate(t.id)}
-                aria-label={`Delete template ${t.title || 'Untitled'}`}
-              >
-                Delete
-              </button>
-            </div>
-          )
-        })
-      )}
-      {editing && <TemplateEditor template={editing} onClose={() => setEditing(null)} />}
     </div>
   )
 }

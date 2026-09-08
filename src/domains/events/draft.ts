@@ -231,3 +231,56 @@ export function moveStart(d: EventDraft, startDT: string): EventDraft {
   end.setMinutes(end.getMinutes() + dur);
   return { ...d, startDT, endDT: toDateTimeLocal(end) };
 }
+
+/**
+ * What the template form holds. A template is a blueprint with no point in
+ * time, so a timed duration is entered as hours and minutes, an all-day one as
+ * whole days; both are kept so toggling all-day does not lose the other.
+ */
+export interface TemplateDraft {
+  title: string;
+  allDay: boolean;
+  days: number;
+  hours: number;
+  minutes: number;
+  attendees: PersonId[];
+  reminders: EventReminder[];
+}
+
+/** An empty template for `attendees`: an hour, timed. */
+export function templateDraftForNew(attendees: PersonId[]): TemplateDraft {
+  return { title: "", allDay: false, days: 1, hours: 1, minutes: 0, attendees, reminders: [] };
+}
+
+/** A draft describing `template` as it stands. */
+export function templateDraftFor(t: EventTemplate): TemplateDraft {
+  return {
+    title: t.title,
+    allDay: t.allDay,
+    days: t.allDay ? Math.max(1, t.duration) : 1,
+    hours: t.allDay ? 1 : Math.floor(t.duration / 60),
+    minutes: t.allDay ? 0 : t.duration % 60,
+    attendees: t.attendees,
+    reminders: t.reminders,
+  };
+}
+
+/** The duration the draft describes: whole days all-day, else minutes. */
+export function templateDraftDuration(d: TemplateDraft): number {
+  return d.allDay ? Math.max(1, d.days) : Math.max(SNAP, d.hours * 60 + d.minutes);
+}
+
+export function templateDraftValid(d: TemplateDraft): boolean {
+  return d.title.trim() !== "";
+}
+
+/** The template the draft describes (no id). */
+export function templateFromTemplateDraft(d: TemplateDraft): Omit<EventTemplate, "id"> {
+  return {
+    title: d.title.trim(),
+    allDay: d.allDay,
+    duration: templateDraftDuration(d),
+    attendees: d.attendees,
+    reminders: d.reminders,
+  };
+}

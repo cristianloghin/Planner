@@ -5,7 +5,7 @@ import {
   useParams,
   useQueryState,
 } from "@mikrostack/router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useAccount } from "../account";
 import { ScopeSheet } from "../assets/ui/ScopeSheet";
 import { PageLoader } from "../assets/ui/Spinner";
@@ -27,14 +27,12 @@ import { timingOf } from "../domains/events/selectors";
 import { useOccurrencesWrite } from "../domains/occurrences/mutations";
 import { rosterChange } from "../domains/occurrences/patches";
 import { useCompletionsForRange } from "../domains/occurrences/queries";
-import { usePeople } from "../domains/people/queries";
-import { defaultAttendees, personColorMap } from "../domains/people/selectors";
-import { usePreferences } from "../domains/preferences/queries";
-import { personColors } from "../domains/preferences/selectors";
+import { defaultAttendees } from "../domains/people/selectors";
 import { effectiveOccurrence } from "../services/recurrence/expand";
 import { eventDate, eventStartMinutes } from "../services/recurrence/timing";
 import type { CalendarEvent } from "../types";
 import { EditorPageView } from "../views/EditorPage";
+import { usePeopleWithColors } from "./peopleWithColors";
 
 /**
  * The editor as a route: `/event/new` seeded from the query, `/event/:id`
@@ -57,18 +55,6 @@ function useClose(date: string) {
     if (canGoBack) back();
     else navigate("/day/:date", { params: { date }, replace: true });
   };
-}
-
-/** Everyone with their colour resolved, for the chips and the colour default. */
-function usePeopleWithColors() {
-  const { accountId, userId } = useAccount();
-  const { data: people = [], isPending } = usePeople(accountId);
-  const { data: overrides = {} } = usePreferences(accountId, userId, personColors);
-  const withColors = useMemo(() => {
-    const colors = personColorMap(people, overrides);
-    return people.map((person) => ({ person, color: colors[person.id] }));
-  }, [people, overrides]);
-  return { people, withColors, isPending };
 }
 
 export function NewEventRoute() {

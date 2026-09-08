@@ -7,7 +7,11 @@ import {
   draftValid,
   eventFromDraft,
   moveStart,
+  templateDraftDuration,
+  templateDraftFor,
+  templateDraftForNew,
   templateFromDraft,
+  templateFromTemplateDraft,
 } from "./draft";
 import type { CalendarEvent, EventTemplate } from "./types";
 
@@ -91,5 +95,34 @@ describe("templates", () => {
     const tpl = templateFromDraft(draftForEvent(event));
     expect(tpl).toMatchObject({ title: "Swimming", duration: 60, attendees: ["p1"] });
     expect(tpl.reminders[0].id).not.toBe("r1");
+  });
+});
+
+describe("template drafts", () => {
+  const t: EventTemplate = {
+    id: "T",
+    title: "Dentist",
+    allDay: false,
+    duration: 90,
+    attendees: ["p2"],
+    reminders: [{ id: "r9", offset: 60 }],
+  };
+
+  it("round-trips a template through the form", () => {
+    const { id: _id, ...rest } = t;
+    expect(templateFromTemplateDraft(templateDraftFor(t))).toEqual(rest);
+    expect(templateDraftFor(t)).toMatchObject({ hours: 1, minutes: 30 });
+  });
+
+  it("an all-day template is whole days", () => {
+    const d = templateDraftFor({ ...t, allDay: true, duration: 3 });
+    expect(templateDraftDuration(d)).toBe(3);
+    expect(templateFromTemplateDraft(d)).toMatchObject({ allDay: true, duration: 3 });
+  });
+
+  it("a new template is an hour for the given people, and never shorter than the snap", () => {
+    const d = templateDraftForNew(["p1"]);
+    expect(templateDraftDuration(d)).toBe(60);
+    expect(templateDraftDuration({ ...d, hours: 0, minutes: 5 })).toBe(15);
   });
 });

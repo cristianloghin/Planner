@@ -1,6 +1,6 @@
 import { Link, AppProvider as RouterProvider, RouterView, useRoute } from '@mikrostack/router'
 import { onlineManager, useMutationState } from '@tanstack/react-query'
-import { Settings as SettingsIcon } from 'lucide-react'
+import { Settings as SettingsIcon, SquarePen } from 'lucide-react'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import s from './App.module.css'
 import { AccountProvider, useAccount } from './account'
@@ -46,6 +46,10 @@ function TabBar() {
   const cls = { className: s.tab, activeClassName: s.active }
   return (
     <nav className={s.tabbar}>
+      {/* The section root, so the tab stays lit for templates and notes alike. */}
+      <Link to="/library" aria-label="Library" {...cls}>
+        <SquarePen size={20} />
+      </Link>
       <Link to="/day/:date" params={{ date }} aria-label="Day" {...cls}>
         Day
       </Link>

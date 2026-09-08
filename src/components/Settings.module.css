@@ -133,58 +133,6 @@
   background: var(--accent);
 }
 
-.templates {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-
-.templates .hint.small {
-  margin-top: 0;
-}
-
-.templatesEmpty {
-  color: var(--muted);
-  font-size: var(--fs-md);
-  margin: 0;
-}
-
-.templateRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.templateInfo {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 4px 0;
-  background: none;
-  border: none;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.templateInfo strong {
-  font-size: var(--fs-base);
-}
-
-.templateInfo:hover strong {
-  text-decoration: underline;
-}
-
-.templateMeta {
-  color: var(--muted);
-  font-size: var(--fs-sm);
-}
-
 .account {
   display: flex;
   flex-direction: column;
