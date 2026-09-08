@@ -1,10 +1,10 @@
 import { defineRoutes } from '@mikrostack/router'
 import { isISODate, mondayOf, startOfMonth, toISODate } from '../assets/utils/dates'
-import { Settings } from '../components/Settings'
 import { DayRoute } from './DayRoute'
 import { EditEventRoute, NewEventRoute } from './EventRoute'
 import { LibraryRoute, NotesRoute, TemplatesRoute } from './LibraryRoute'
 import { MonthRoute } from './MonthRoute'
+import { SettingsRoute } from './SettingsRoute'
 import { EditTemplateRoute, NewTemplateRoute } from './TemplateRoute'
 import { WeekRoute } from './WeekRoute'
 
@@ -19,8 +19,8 @@ const today = () => toISODate(new Date())
  * normalises its param: a malformed date goes to today, a week that is not a
  * Monday or a month that is not a first is redirected to the one it is in.
  *
- * The three calendar tabs read the domains and compose the calendar view from
- * slots (see `DayRoute`). `/settings` still orchestrates inside the component.
+ * Every tab is a route that reads the domains and composes a view from slots
+ * (see `DayRoute`).
  *
  * The event editor is a route (`/event/new`, `/event/:id`), so the back
  * button closes it and a reload keeps it open. The occurrence sheet is a
@@ -65,7 +65,7 @@ export const routes = defineRoutes({
   '/library/notes': { component: NotesRoute },
   '/library/templates/new': { component: NewTemplateRoute, parent: null },
   '/library/templates/:id': { component: EditTemplateRoute, parent: null },
-  '/settings': { component: Settings },
+  '/settings': { component: SettingsRoute },
 })
 
 declare module '@mikrostack/router' {

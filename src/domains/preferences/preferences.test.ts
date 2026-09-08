@@ -1,21 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { withPersonColor, withTimezone, withWeekLayout, withoutPersonColor } from './patches'
-import { personColors, timezone, weekLayout } from './selectors'
+import { withPersonColor, withTimezone, withoutPersonColor } from './patches'
+import { personColors, timezone } from './selectors'
 import type { Preferences } from './types'
 
 const empty: Preferences = { personColors: {} }
 const set: Preferences = {
   personColors: { a: '3', b: '7' },
   timezone: 'Europe/Amsterdam',
-  weekLayout: 'timeline',
 }
 
 describe('selectors', () => {
-  it('falls back to stacked day cards when the layout was never chosen', () => {
-    expect(weekLayout(empty)).toBe('list')
-    expect(weekLayout(set)).toBe('timeline')
-  })
-
   it('reports no timezone rather than guessing one', () => {
     expect(timezone(empty)).toBeUndefined()
     expect(timezone(set)).toBe('Europe/Amsterdam')
@@ -45,9 +39,8 @@ describe('building the next document', () => {
   })
 
   it('keeps the other settings when changing one', () => {
-    const next = withWeekLayout(set, 'list')
-    expect(next.weekLayout).toBe('list')
-    expect(next.timezone).toBe('Europe/Amsterdam')
+    const next = withTimezone(set, 'UTC')
+    expect(next.timezone).toBe('UTC')
     expect(next.personColors).toEqual({ a: '3', b: '7' })
   })
 
@@ -62,11 +55,9 @@ describe('building the next document', () => {
     withPersonColor(set, 'c', '9')
     withoutPersonColor(set, 'a')
     withTimezone(set, 'UTC')
-    withWeekLayout(set, 'list')
     expect(set).toEqual({
       personColors: { a: '3', b: '7' },
       timezone: 'Europe/Amsterdam',
-      weekLayout: 'timeline',
     })
   })
 })

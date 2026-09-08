@@ -6,12 +6,8 @@
  */
 import type { ColorKey } from '../../assets/palette'
 import type { PersonId } from '../people/types'
-import type { Preferences, WeekLayout } from './types'
+import type { Preferences } from './types'
 
-/** How the Week tab lays out the seven days. Unset means stacked day cards. */
-export function weekLayout(prefs: Preferences): WeekLayout {
-  return prefs.weekLayout ?? 'list'
-}
 
 /** This user's own colour for each person. Empty when they have changed none. */
 export function personColors(prefs: Preferences): Record<PersonId, ColorKey> {

@@ -11,9 +11,6 @@ import type { Json } from './database.types'
 import type { PersonId } from './people'
 import { supabase } from './supabase'
 
-/** How the Week tab lays out the seven days. */
-export type WeekLayout = 'list' | 'timeline'
-
 /**
  * One user's settings for one account.
  *
@@ -32,8 +29,6 @@ export interface Preferences {
    * from it; absent means UTC.
    */
   timezone?: string
-  /** Week tab layout; absent means `list`. */
-  weekLayout?: WeekLayout
 }
 
 /** What a user with no settings row gets. */

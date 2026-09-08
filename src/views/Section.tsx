@@ -14,11 +14,13 @@ function Option({ to: _to, children: _children }: { to: RoutePath; children?: Re
 }
 
 /**
- * A plain screen whose title is a dropdown: it names what the body shows and
- * opens to the other things the section can show. Routes list the choices as
- * `Option`s and drop the matched child's content, or their own, in the body.
+ * A plain screen: a fixed head over a scrolling body. With `Option`s the
+ * title is a dropdown — it names what the body shows and opens to the other
+ * things the section can show; with a `Title` alone it is just the title.
+ * Routes drop the matched child's content, or their own, in the body.
  */
 export const SectionView = createComponentWithSlots({
+  Title: {},
   Option: { component: Option, multiple: true },
   Body: { isRequired: true },
 }).render(({ slots }) => {
@@ -28,6 +30,17 @@ export const SectionView = createComponentWithSlots({
   // The option the URL is under; the first one stands in for the bare section.
   const current =
     options.find((o) => path === o.to || path.startsWith(`${o.to}/`)) ?? options[0];
+
+  if (options.length === 0) {
+    return (
+      <section className={styles.Section}>
+        <div className={styles.head}>
+          <strong className={styles.title}>{slots.Title}</strong>
+        </div>
+        <div className={styles.body}>{slots.Body}</div>
+      </section>
+    );
+  }
 
   return (
     <section className={styles.Section}>

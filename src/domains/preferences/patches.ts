@@ -12,7 +12,7 @@
  */
 import type { ColorKey } from '../../assets/palette'
 import type { PersonId } from '../people/types'
-import type { Preferences, WeekLayout } from './types'
+import type { Preferences } from './types'
 
 /** With this user's own colour set for one person. */
 export function withPersonColor(prefs: Preferences, id: PersonId, color: ColorKey): Preferences {
@@ -30,7 +30,3 @@ export function withTimezone(prefs: Preferences, timezone: string): Preferences 
   return { ...prefs, timezone }
 }
 
-/** With the Week tab layout chosen. */
-export function withWeekLayout(prefs: Preferences, weekLayout: WeekLayout): Preferences {
-  return { ...prefs, weekLayout }
-}

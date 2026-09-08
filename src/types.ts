@@ -13,4 +13,4 @@ export type {
 } from './domains/events/types'
 export type { CompletionsMap, OccurrenceState } from './domains/occurrences/types'
 export type { Person, PersonId } from './domains/people/types'
-export type { Preferences, WeekLayout } from './domains/preferences/types'
+export type { Preferences } from './domains/preferences/types'

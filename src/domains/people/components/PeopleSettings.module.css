@@ -1,0 +1,41 @@
+.PeopleSettings {
+  max-width: 420px;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: var(--fs-lg);
+  margin: 0 0 16px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.name {
+  display: flex;
+  flex: 1;
+  gap: 10px;
+}
+
+.name input[type="text"] {
+  flex: 1;
+}
+
+.reset {
+  flex: none;
+  padding: 0 10px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.reset:hover {
+  color: var(--text);
+}

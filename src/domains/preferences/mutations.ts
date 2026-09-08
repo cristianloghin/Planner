@@ -53,7 +53,7 @@ export function registerPreferencesDefaults(queryClient: QueryClient): void {
 /**
  * Save the settings.
  *
- * `mutate({ accountId, userId, prefs: withWeekLayout(prefs, 'timeline') })` —
+ * `mutate({ accountId, userId, prefs: withTimezone(prefs, 'Europe/Amsterdam') })` —
  * the whole document, with the one change made.
  */
 export function usePreferencesWrite() {
