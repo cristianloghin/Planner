@@ -7,6 +7,7 @@ import { type ScopeChoice, ScopeSheet } from '../assets/ui/ScopeSheet'
 import { PageLoader } from '../assets/ui/Spinner'
 import { cx } from '../assets/utils/cx'
 import { isoLabel, minutesToTime, offsetLabel } from '../assets/utils/dates'
+import type { EditScope } from '../domains/events/draft'
 import { type EventsChange, useEventsWrite, useOccurrencesWrite } from '../domains/events/mutations'
 import { useOccurrencesForRange } from '../domains/events/queries'
 import { reminderOffsets, timingOf } from '../domains/events/selectors'
@@ -31,7 +32,8 @@ export function OccurrenceSheet({
 }: {
   event: CalendarEvent
   date: string
-  onEdit: () => void
+  /** Open the editor, on the whole series or on this one occurrence. */
+  onEdit: (scope: EditScope) => void
   onClose: () => void
 }) {
   const { accountId, userId } = useAccount()
@@ -51,6 +53,8 @@ export function OccurrenceSheet({
   // itself the confirmation (so the two are mutually exclusive, never stacked).
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteScope, setDeleteScope] = useState(false)
+  // Edit asks the same question of a series: this occurrence, or all of them.
+  const [editScope, setEditScope] = useState(false)
   const isRecurring = !!event.recurrence
 
   const occState = occurrences.on(event.id, date)
@@ -83,16 +87,27 @@ export function OccurrenceSheet({
     { label: 'All events', detail: 'The whole series', onSelect: deleteAllEvents },
   ]
 
-  /** Toolbar delete: actions only — the question itself lives in the sheet. */
+  /** Toolbar buttons: actions only — the questions themselves live in sheets. */
   const editButton = (
     <button
       type="button"
       className={cx(shared.iconBtn, shared.iconAccent)}
-      onClick={onEdit}
+      onClick={() => (isRecurring ? setEditScope(true) : onEdit('series'))}
       aria-label="Edit event"
     >
       <Pencil size={20} aria-hidden />
     </button>
+  )
+  const editScopeSheet = (
+    <ScopeSheet
+      open={editScope}
+      onOpenChange={setEditScope}
+      title="Edit recurring event"
+      choices={[
+        { label: 'This event only', detail: isoLabel(date), onSelect: () => onEdit('occurrence') },
+        { label: 'All events', detail: 'The whole series', onSelect: () => onEdit('series') },
+      ]}
+    />
   )
   const deleteButton = (
     <button
@@ -124,14 +139,17 @@ export function OccurrenceSheet({
   // occurrence's real ticks/status are in, so a tap can't act on bare defaults.
   if (isLoading) {
     return (
-      <EditorPageView cancelLabel="Close" onCancel={onClose}>
-        <EditorPageView.Title>{null}</EditorPageView.Title>
-        <EditorPageView.Actions>{editButton}</EditorPageView.Actions>
-        <EditorPageView.Body>
-          <h1 className={shared.editorTitle}>{event.title}</h1>
-          <PageLoader />
-        </EditorPageView.Body>
-      </EditorPageView>
+      <>
+        <EditorPageView cancelLabel="Close" onCancel={onClose}>
+          <EditorPageView.Title>{null}</EditorPageView.Title>
+          <EditorPageView.Actions>{editButton}</EditorPageView.Actions>
+          <EditorPageView.Body>
+            <h1 className={shared.editorTitle}>{event.title}</h1>
+            <PageLoader />
+          </EditorPageView.Body>
+        </EditorPageView>
+        {editScopeSheet}
+      </>
     )
   }
 
@@ -146,7 +164,7 @@ export function OccurrenceSheet({
         <EditorPageView.Body>
           <h1 className={shared.editorTitle}>{event.title}</h1>
 
-          <p className={s.meta}>
+          <p className={shared.editorMeta}>
             {timeLabel} · {attendeeLabelFor(attendees)(people)}
             {event.recurrence && ` · ${recurrenceLabel(event).toLowerCase()}`}
           </p>
@@ -231,6 +249,7 @@ export function OccurrenceSheet({
         choices={deleteChoices}
         destructive
       />
+      {editScopeSheet}
     </>
   )
 }

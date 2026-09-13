@@ -6,6 +6,13 @@ import type { CalendarEvent, EventReminder, EventTemplate, RecurrenceFreq } from
 
 /** Times snap to this many minutes; nothing timed is shorter than it. */
 export const SNAP = 15
+
+/**
+ * How far an edit of a recurring event reaches: the whole series, or one
+ * occurrence of it. An occurrence can only differ from its series in when it
+ * happens and who is on it; everything else is the series' alone.
+ */
+export type EditScope = 'series' | 'occurrence'
 const DAY_MIN = 24 * 60
 
 export type RepeatChoice = 'none' | RecurrenceFreq

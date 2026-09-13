@@ -14,7 +14,7 @@ export interface ScopeChoice {
  * Action sheet for choosing how far an operation on a recurring series reaches:
  * this one occurrence, or the whole series.
  *
- * Both saving and deleting ask the same question, so the chooser lives here
+ * Both editing and deleting ask the same question, so the chooser lives here
  * rather than inside either surface. `destructive` paints the options with
  * the danger token; such a sheet is itself the confirmation, so callers should
  * not stack a ConfirmDialog on top of it.

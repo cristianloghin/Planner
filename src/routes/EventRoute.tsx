@@ -1,12 +1,13 @@
 import { notFound, useLocation, useNavigation, useParams, useQueryState } from '@mikrostack/router'
 import { useState } from 'react'
 import { useAccount } from '../account'
-import { ScopeSheet } from '../assets/ui/ScopeSheet'
+import shared from '../assets/styles/shared.module.css'
 import { PageLoader } from '../assets/ui/Spinner'
 import { isoLabel, toISODate } from '../assets/utils/dates'
 import { uid } from '../assets/utils/id'
 import { EventForm } from '../domains/events/components/EventForm'
 import {
+  type EditScope,
   type EventDraft,
   draftForEvent,
   draftForNew,
@@ -28,7 +29,8 @@ import { EditorPageView } from '../views/EditorPage'
 
 /**
  * The editor as a route: `/event/new` seeded from the query, `/event/:id`
- * for an existing series, optionally on one of its occurrences.
+ * for an existing series, or with `scope=occurrence` for one occurrence of
+ * it — which day, what time, who is on it, and nothing the series owns.
  *
  * The routes load — people, colours, templates, the series, the occurrence
  * window — and hand the form a draft to show. The form only renders; what a
@@ -85,14 +87,19 @@ export function EditEventRoute() {
   const { accountId, userId } = useAccount()
   const { withColors, isPending: peoplePending } = usePeopleWithColors(accountId, userId)
   const { data: events, isPending } = useEvents(accountId)
-  const [{ date }] = useQueryState({ date: { type: 'string' } })
+  const [q] = useQueryState({ date: { type: 'string' }, scope: { type: 'string' } })
+  const { date } = q
   const event = events?.find((e) => e.id === id)
+  // One occurrence is only a thing to edit when there is a day and a series
+  // to pick it out of; anything else is the series.
+  const scope: EditScope =
+    q.scope === 'occurrence' && date && event?.recurrence ? 'occurrence' : 'series'
   // Opened on an occurrence, the form seeds from that occurrence's override —
   // which lives in the windowed occurrence cache. Normally a warm hit: the
   // view that opened the editor fetched the same window.
   const { occurrences, isLoading: occurrencesLoading } = useOccurrencesForRange(
     accountId,
-    date ?? null,
+    scope === 'occurrence' ? date : null,
   )
   const close = useClose(date ?? (event ? eventDate(event) : toISODate(new Date())))
 
@@ -102,27 +109,29 @@ export function EditEventRoute() {
     if (isPending) return <PageLoader />
     notFound()
   }
-  if (peoplePending || (date && occurrencesLoading)) return <PageLoader />
+  if (peoplePending || (scope === 'occurrence' && occurrencesLoading)) return <PageLoader />
 
   // The occurrence as it currently stands (override applied), re-anchored on
   // its own date so the form shows the right day and time even for a
-  // far-future instance.
-  const seed: CalendarEvent = date
-    ? (() => {
-        const eff = effectiveOccurrence(event, date, occurrences)
-        return {
-          ...eff,
-          start: eff.allDay ? date : dtLocal(date, eventStartMinutes(eff)),
-        }
-      })()
-    : event
+  // far-future instance. The series shows as itself, from its own first day.
+  const seed: CalendarEvent =
+    scope === 'occurrence'
+      ? (() => {
+          const eff = effectiveOccurrence(event, date!, occurrences)
+          return {
+            ...eff,
+            start: eff.allDay ? date! : dtLocal(date!, eventStartMinutes(eff)),
+          }
+        })()
+      : event
 
   return (
     <EditorSession
-      key={`${event.id}:${date ?? ''}`}
+      key={`${event.id}:${scope}:${date ?? ''}`}
       initial={draftForEvent(seed)}
       base={event}
-      occurrenceDate={date}
+      scope={scope}
+      occurrenceDate={scope === 'occurrence' ? date : undefined}
       people={withColors}
       onClose={close}
     />
@@ -137,6 +146,7 @@ export function EditEventRoute() {
 function EditorSession({
   initial,
   base,
+  scope = 'series',
   occurrenceDate,
   people,
   onClose,
@@ -144,6 +154,8 @@ function EditorSession({
   initial: EventDraft
   /** The series being edited; absent for a new event. */
   base?: CalendarEvent
+  /** What a save writes: the series, or one occurrence of it (`occurrenceDate`). */
+  scope?: EditScope
   occurrenceDate?: string
   people: Parameters<typeof EventForm>[0]['people']
   onClose: () => void
@@ -153,11 +165,9 @@ function EditorSession({
   const events = useEventsWrite()
   const occurrences = useOccurrencesWrite()
   const [draft, setDraft] = useState(initial)
-  // Save-scope chooser for editing one occurrence of a recurring series.
-  const [showScope, setShowScope] = useState(false)
 
   const isEdit = !!base
-  const isRecurringOccurrence = !!base?.recurrence && !!occurrenceDate
+  const isOccurrence = scope === 'occurrence' && !!base && !!occurrenceDate
 
   function saveSeries(event: Omit<CalendarEvent, 'id'>, isNew: boolean) {
     events.mutate({
@@ -175,16 +185,14 @@ function EditorSession({
 
   function submit() {
     if (!draftValid(draft)) return
-    // Editing one occurrence of a recurring series: ask for the save scope first.
-    if (isRecurringOccurrence) {
-      setShowScope(true)
-      return
+    if (isOccurrence) saveThisOccurrence()
+    else {
+      saveSeries(eventFromDraft(draft), !isEdit)
+      onClose()
     }
-    saveSeries(eventFromDraft(draft), !isEdit)
-    onClose()
   }
 
-  /** "This event only": the whole form, as a one-off override of that day. */
+  /** One occurrence: its day, times and people, as a one-off override of that slot. */
   function saveThisOccurrence() {
     const series = timingOf(base!)
     const date = occurrenceDate!
@@ -203,14 +211,6 @@ function EditorSession({
     onClose()
   }
 
-  /** "All events": the series keeps its anchor day; only time and shape change. */
-  function saveAllEvents() {
-    const event = eventFromDraft(draft)
-    const start = draft.allDay ? eventDate(base!) : `${eventDate(base!)}T${draft.startDT.slice(11)}`
-    saveSeries({ ...event, start }, false)
-    onClose()
-  }
-
   /** The current form as a reusable template; the event, if any, is untouched. */
   function saveAsTemplate() {
     if (!draft.title.trim()) return
@@ -226,35 +226,30 @@ function EditorSession({
   }
 
   return (
-    <>
-      <EditorPageView onCancel={onClose} onSubmit={submit} submitLabel="Save">
-        <EditorPageView.Title>{isEdit ? 'Edit event' : 'New event'}</EditorPageView.Title>
-        <EditorPageView.Body>
-          <EventForm
-            draft={draft}
-            onChange={setDraft}
-            isEdit={isEdit}
-            seriesStart={base ? eventDate(base) : undefined}
-            people={people}
-            templates={isEdit ? [] : templates}
-            onSaveAsTemplate={saveAsTemplate}
-          />
-        </EditorPageView.Body>
-      </EditorPageView>
-
-      <ScopeSheet
-        open={showScope}
-        onOpenChange={setShowScope}
-        title="Save changes to…"
-        choices={[
-          {
-            label: 'This event only',
-            detail: occurrenceDate ? isoLabel(occurrenceDate) : undefined,
-            onSelect: saveThisOccurrence,
-          },
-          { label: 'All events', detail: 'The whole series', onSelect: saveAllEvents },
-        ]}
-      />
-    </>
+    <EditorPageView onCancel={onClose} onSubmit={submit} submitLabel="Save">
+      {/* One occurrence is headed like the sheet that opened it: the event's
+          name in the body, the bar left plain. */}
+      <EditorPageView.Title>
+        {isOccurrence ? null : isEdit ? 'Edit event' : 'New event'}
+      </EditorPageView.Title>
+      <EditorPageView.Body>
+        {isOccurrence && (
+          <>
+            <h1 className={shared.editorTitle}>{base!.title}</h1>
+            <p className={shared.editorMeta}>Only on {isoLabel(occurrenceDate!)}</p>
+          </>
+        )}
+        <EventForm
+          draft={draft}
+          onChange={setDraft}
+          isEdit={isEdit}
+          scope={scope}
+          seriesStart={base ? eventDate(base) : undefined}
+          people={people}
+          templates={isEdit ? [] : templates}
+          onSaveAsTemplate={saveAsTemplate}
+        />
+      </EditorPageView.Body>
+    </EditorPageView>
   )
 }

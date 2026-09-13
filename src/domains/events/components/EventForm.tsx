@@ -15,6 +15,7 @@ import {
 import { AttendeeChips } from '../../people/components/AttendeeChips'
 import type { Person } from '../../people/types'
 import {
+  type EditScope,
   type EndsChoice,
   type EventDraft,
   type RepeatChoice,
@@ -33,11 +34,16 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
  * change through `onChange`; it never decides what a save means. What it does
  * own is the small UI state around the fields — which template was picked,
  * the "saved" flash — and the first focus.
+ *
+ * Editing one occurrence shows only what an occurrence can differ in — when
+ * it happens and who is on it. The title, repeat rule, colour and reminders
+ * are the series' and stay out of sight.
  */
 export function EventForm({
   draft,
   onChange,
   isEdit,
+  scope = 'series',
   seriesStart,
   people,
   templates,
@@ -46,6 +52,7 @@ export function EventForm({
   draft: EventDraft
   onChange: (next: EventDraft) => void
   isEdit: boolean
+  scope?: EditScope
   /** The series' own anchor day: a series may end before an opened occurrence. */
   seriesStart?: string
   people: { person: Person; color: ColorKey }[]
@@ -75,10 +82,11 @@ export function EventForm({
   const firstColor = people.find((p) => p.person.id === draft.attendees[0])?.color ?? DEFAULT_COLOR
   const unitLabel =
     draft.repeat === 'daily' ? 'days' : draft.repeat === 'weekly' ? 'weeks' : 'months'
+  const seriesOnly = scope === 'series'
 
   return (
     <>
-      {!isEdit && templates.length > 0 && (
+      {seriesOnly && !isEdit && templates.length > 0 && (
         <div className={shared.row}>
           <label className={shared.field}>
             Start from a template
@@ -101,21 +109,25 @@ export function EventForm({
         </div>
       )}
 
-      <input
-        ref={titleRef}
-        placeholder="What's the plan?"
-        value={draft.title}
-        onChange={(e) => set({ title: e.target.value })}
-      />
+      {seriesOnly && (
+        <>
+          <input
+            ref={titleRef}
+            placeholder="What's the plan?"
+            value={draft.title}
+            onChange={(e) => set({ title: e.target.value })}
+          />
 
-      <label className={shared.toggle}>
-        <input
-          type="checkbox"
-          checked={draft.allDay}
-          onChange={(e) => set({ allDay: e.target.checked })}
-        />
-        All-day
-      </label>
+          <label className={shared.toggle}>
+            <input
+              type="checkbox"
+              checked={draft.allDay}
+              onChange={(e) => set({ allDay: e.target.checked })}
+            />
+            All-day
+          </label>
+        </>
+      )}
 
       {draft.allDay ? (
         <div className={shared.row}>
@@ -157,35 +169,37 @@ export function EventForm({
         </>
       )}
 
-      <div className={shared.row}>
-        <label className={shared.field}>
-          Repeats
-          <select
-            value={draft.repeat}
-            onChange={(e) => set({ repeat: e.target.value as RepeatChoice })}
-          >
-            <option value="none">Does not repeat</option>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-          </select>
-        </label>
-        {draft.repeat !== 'none' && (
+      {seriesOnly && (
+        <div className={shared.row}>
           <label className={shared.field}>
-            Every
-            <div className={shared.interval}>
-              <NumberField
-                min={1}
-                value={draft.interval}
-                onChange={(interval) => set({ interval })}
-              />
-              <span>{unitLabel}</span>
-            </div>
+            Repeats
+            <select
+              value={draft.repeat}
+              onChange={(e) => set({ repeat: e.target.value as RepeatChoice })}
+            >
+              <option value="none">Does not repeat</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
           </label>
-        )}
-      </div>
+          {draft.repeat !== 'none' && (
+            <label className={shared.field}>
+              Every
+              <div className={shared.interval}>
+                <NumberField
+                  min={1}
+                  value={draft.interval}
+                  onChange={(interval) => set({ interval })}
+                />
+                <span>{unitLabel}</span>
+              </div>
+            </label>
+          )}
+        </div>
+      )}
 
-      {draft.repeat !== 'none' && (
+      {seriesOnly && draft.repeat !== 'none' && (
         <div className={shared.row}>
           <label className={shared.field}>
             Ends
@@ -232,27 +246,34 @@ export function EventForm({
         onChange={(attendees) => set({ attendees })}
       />
 
-      <label className={shared.label}>Color</label>
-      <ColorPicker
-        options={COLOR_OPTIONS}
-        value={draft.colorKey ?? null}
-        defaultValue={firstColor}
-        ariaLabel="Event color"
-        onChange={(colorKey) => set({ colorKey })}
-      />
+      {seriesOnly && (
+        <>
+          <label className={shared.label}>Color</label>
+          <ColorPicker
+            options={COLOR_OPTIONS}
+            value={draft.colorKey ?? null}
+            defaultValue={firstColor}
+            ariaLabel="Event color"
+            onChange={(colorKey) => set({ colorKey })}
+          />
 
-      <RemindersEditor reminders={draft.reminders} onChange={(reminders) => set({ reminders })} />
+          <RemindersEditor
+            reminders={draft.reminders}
+            onChange={(reminders) => set({ reminders })}
+          />
 
-      <div className={styles.templateBar}>
-        <button
-          type="button"
-          className={styles.saveTemplate}
-          onClick={saveAsTemplate}
-          disabled={!draft.title.trim()}
-        >
-          {savedTemplate ? 'Saved to templates ✓' : 'Save as template'}
-        </button>
-      </div>
+          <div className={styles.templateBar}>
+            <button
+              type="button"
+              className={styles.saveTemplate}
+              onClick={saveAsTemplate}
+              disabled={!draft.title.trim()}
+            >
+              {savedTemplate ? 'Saved to templates ✓' : 'Save as template'}
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Delete lives in the OccurrenceSheet toolbar — one tap from the event
           itself, rather than behind Edit and a full scroll of this form. */}

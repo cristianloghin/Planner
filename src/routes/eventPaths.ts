@@ -29,8 +29,16 @@ export function newEventAtPath(date: string, minute: number, attendees?: PersonI
   return newEventPath({ date, attendees, startMin, endMin: Math.min(startMin + 60, DAY_MIN) })
 }
 
-/** URL for editing a series, from one of its occurrences when `date` is given. */
+/**
+ * URL for editing a series. `date` is the day the editor was opened from,
+ * so closing can return there; the form itself shows the series.
+ */
 export function editEventPath(id: string, date?: string): string {
   const q = date ? `?${new URLSearchParams({ date })}` : ''
   return `/event/${encodeURIComponent(id)}${q}`
+}
+
+/** URL for editing one occurrence of a series: just its day, times and people. */
+export function editOccurrencePath(id: string, date: string): string {
+  return `/event/${encodeURIComponent(id)}?${new URLSearchParams({ date, scope: 'occurrence' })}`
 }

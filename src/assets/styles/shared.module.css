@@ -63,6 +63,13 @@
   overflow-wrap: anywhere;
 }
 
+/* The line under it: when, who, how often. */
+.editorMeta {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  margin: 0;
+}
+
 /* ---- Editor form primitives ---- */
 
 .label,
