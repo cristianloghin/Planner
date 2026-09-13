@@ -10,16 +10,12 @@ import { isoLabel, minutesToTime, offsetLabel } from '../assets/utils/dates'
 import { type EventsChange, useEventsWrite, useOccurrencesWrite } from '../domains/events/mutations'
 import { useOccurrencesForRange } from '../domains/events/queries'
 import { reminderOffsets, timingOf } from '../domains/events/selectors'
+import { AttendeeChips } from '../domains/people/components/AttendeeChips'
 import { usePeopleWithColors } from '../domains/people/queries'
 import { attendeeLabelFor } from '../domains/people/selectors'
 import { effectiveOccurrence, recurrenceLabel } from '../services/recurrence/expand'
-import {
-  MINS_PER_DAY,
-  eventSpanDays,
-  eventStartMinutes,
-} from '../services/recurrence/timing'
+import { MINS_PER_DAY, eventSpanDays, eventStartMinutes } from '../services/recurrence/timing'
 import type { CalendarEvent } from '../types'
-import { AttendeeChips } from '../domains/people/components/AttendeeChips'
 import { EditorPageView } from '../views/EditorPage'
 import s from './OccurrenceSheet.module.css'
 
@@ -144,73 +140,73 @@ export function OccurrenceSheet({
           </button>
         </EditorPageView.Actions>
         <EditorPageView.Body>
-        <h1 className={shared.editorTitle}>{event.title}</h1>
+          <h1 className={shared.editorTitle}>{event.title}</h1>
 
-        <p className={s.meta}>
-          {timeLabel} · {attendeeLabelFor(attendees)(people)}
-          {event.recurrence && ` · ${recurrenceLabel(event).toLowerCase()}`}
-        </p>
-
-        {hasTimingOverride && (
-          <p className={s.moved}>
-            {movedFromOrigin
-              ? `Moved from ${isoLabel(date)} — still part of this series`
-              : 'Rescheduled for this occurrence only'}
-            {' · '}
-            <button
-              type="button"
-              className={s.resetOverride}
-              onClick={() =>
-                occurrencesWrite.mutate({
-                  accountId: accountId,
-                  change: { kind: 'clearOverride', series: timingOf(event), date },
-                })
-              }
-            >
-              Reset to series time
-            </button>
+          <p className={s.meta}>
+            {timeLabel} · {attendeeLabelFor(attendees)(people)}
+            {event.recurrence && ` · ${recurrenceLabel(event).toLowerCase()}`}
           </p>
-        )}
 
-        <label className={shared.label}>Who's involved?</label>
-        <AttendeeChips
-          people={peopleWithColors}
-          value={attendees}
-          onChange={(next) =>
-            occurrencesWrite.mutate({
-              accountId: accountId,
-              change: { kind: 'attendees', series: timingOf(event), date, attendees: next },
-            })
-          }
-        />
-        {hasPeopleOverride && (
-          <p className={s.moved}>
-            Just these people on this day
-            {' · '}
-            <button
-              type="button"
-              className={s.resetOverride}
-              onClick={() =>
-                occurrencesWrite.mutate({
-                  accountId: accountId,
-                  change: { kind: 'clearAttendees', series: timingOf(event), date },
-                })
-              }
-            >
-              Reset to series people
-            </button>
-          </p>
-        )}
+          {hasTimingOverride && (
+            <p className={s.moved}>
+              {movedFromOrigin
+                ? `Moved from ${isoLabel(date)} — still part of this series`
+                : 'Rescheduled for this occurrence only'}
+              {' · '}
+              <button
+                type="button"
+                className={s.resetOverride}
+                onClick={() =>
+                  occurrencesWrite.mutate({
+                    accountId: accountId,
+                    change: { kind: 'clearOverride', series: timingOf(event), date },
+                  })
+                }
+              >
+                Reset to series time
+              </button>
+            </p>
+          )}
 
-        {reminderOffsets(event).length > 0 && (
-          <div className={s.reminders}>
-            {reminderOffsets(event).map((o) => (
-              <span key={o} className={s.reminderChip}>
-                🔔 {offsetLabel(o)}
-              </span>
-            ))}
-          </div>
-        )}
+          <label className={shared.label}>Who's involved?</label>
+          <AttendeeChips
+            people={peopleWithColors}
+            value={attendees}
+            onChange={(next) =>
+              occurrencesWrite.mutate({
+                accountId: accountId,
+                change: { kind: 'attendees', series: timingOf(event), date, attendees: next },
+              })
+            }
+          />
+          {hasPeopleOverride && (
+            <p className={s.moved}>
+              Just these people on this day
+              {' · '}
+              <button
+                type="button"
+                className={s.resetOverride}
+                onClick={() =>
+                  occurrencesWrite.mutate({
+                    accountId: accountId,
+                    change: { kind: 'clearAttendees', series: timingOf(event), date },
+                  })
+                }
+              >
+                Reset to series people
+              </button>
+            </p>
+          )}
+
+          {reminderOffsets(event).length > 0 && (
+            <div className={s.reminders}>
+              {reminderOffsets(event).map((o) => (
+                <span key={o} className={s.reminderChip}>
+                  🔔 {offsetLabel(o)}
+                </span>
+              ))}
+            </div>
+          )}
         </EditorPageView.Body>
       </EditorPageView>
 

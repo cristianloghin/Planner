@@ -86,7 +86,7 @@ describe('personColorKey', () => {
 })
 
 describe('personColorMap', () => {
-  it('resolves everyone once, with this user\'s overrides applied', () => {
+  it("resolves everyone once, with this user's overrides applied", () => {
     expect(personColorMap(people, { a: '7' })).toEqual({ a: '7', b: '1', c: '1' })
     expect(personColorMap([], {})).toEqual({})
   })

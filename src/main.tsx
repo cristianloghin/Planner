@@ -1,4 +1,4 @@
-import '@fontsource-variable/source-sans-3'
+import '@fontsource-variable/google-sans-flex/wdth.css'
 
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { StrictMode } from 'react'

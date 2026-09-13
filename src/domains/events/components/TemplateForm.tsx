@@ -1,11 +1,11 @@
-import { useEffect, useRef } from "react";
-import type { ColorKey } from "../../../assets/palette";
-import shared from "../../../assets/styles/shared.module.css";
-import { NumberField } from "../../../assets/ui/NumberField";
-import { AttendeeChips } from "../../people/components/AttendeeChips";
-import type { Person } from "../../people/types";
-import { SNAP, type TemplateDraft } from "../draft";
-import { RemindersEditor } from "./RemindersEditor";
+import { useEffect, useRef } from 'react'
+import type { ColorKey } from '../../../assets/palette'
+import shared from '../../../assets/styles/shared.module.css'
+import { NumberField } from '../../../assets/ui/NumberField'
+import { AttendeeChips } from '../../people/components/AttendeeChips'
+import type { Person } from '../../people/types'
+import { SNAP, type TemplateDraft } from '../draft'
+import { RemindersEditor } from './RemindersEditor'
 
 /**
  * The template form's fields: what a new event made from it inherits. A
@@ -17,13 +17,13 @@ export function TemplateForm({
   onChange,
   people,
 }: {
-  draft: TemplateDraft;
-  onChange: (next: TemplateDraft) => void;
-  people: { person: Person; color: ColorKey }[];
+  draft: TemplateDraft
+  onChange: (next: TemplateDraft) => void
+  people: { person: Person; color: ColorKey }[]
 }) {
-  const set = (patch: Partial<TemplateDraft>) => onChange({ ...draft, ...patch });
-  const titleRef = useRef<HTMLInputElement>(null);
-  useEffect(() => titleRef.current?.focus(), []);
+  const set = (patch: Partial<TemplateDraft>) => onChange({ ...draft, ...patch })
+  const titleRef = useRef<HTMLInputElement>(null)
+  useEffect(() => titleRef.current?.focus(), [])
 
   return (
     <>
@@ -76,10 +76,7 @@ export function TemplateForm({
         onChange={(attendees) => set({ attendees })}
       />
 
-      <RemindersEditor
-        reminders={draft.reminders}
-        onChange={(reminders) => set({ reminders })}
-      />
+      <RemindersEditor reminders={draft.reminders} onChange={(reminders) => set({ reminders })} />
     </>
-  );
+  )
 }

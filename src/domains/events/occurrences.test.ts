@@ -145,9 +145,12 @@ describe('rosterChange', () => {
 })
 
 describe('indexOccurrences', () => {
-  it('looks a day up by event and date, and lists an event\'s recorded days', () => {
+  it("looks a day up by event and date, and lists an event's recorded days", () => {
     const idx = indexOccurrences(
-      toOccurrences([row({ cancelled: true }), row({ date: '2026-04-14', start: '2026-04-14T10:00' })]),
+      toOccurrences([
+        row({ cancelled: true }),
+        row({ date: '2026-04-14', start: '2026-04-14T10:00' }),
+      ]),
     )
     expect(idx.on('S', '2026-04-07')).toEqual({ cancelled: true })
     expect(idx.on('S', '2026-04-08')).toBeUndefined()

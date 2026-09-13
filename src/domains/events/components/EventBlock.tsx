@@ -1,14 +1,14 @@
-import type { ReactNode } from "react";
-import { type ColorKey, colorStyle } from "../../../assets/palette";
-import { cx } from "../../../assets/utils/cx";
-import { minutesToTime } from "../../../assets/utils/dates";
-import type { DayOccurrence } from "../../../services/recurrence";
-import { Badges } from "./Badges";
+import type { ReactNode } from 'react'
+import { type ColorKey, colorStyle } from '../../../assets/palette'
+import { cx } from '../../../assets/utils/cx'
+import { minutesToTime } from '../../../assets/utils/dates'
+import type { DayOccurrence } from '../../../services/recurrence'
+import { Badges } from './Badges'
 
-import styles from "./EventBlock.module.css";
+import styles from './EventBlock.module.css'
 
 // A dense bar needs this many pixels before its title renders at all.
-const TITLE_MIN_PX = 18;
+const TITLE_MIN_PX = 18
 
 /**
  * One timed occurrence as a block on a timeline. It places itself from its
@@ -30,22 +30,22 @@ export function EventBlock({
   onClick,
   children,
 }: {
-  occ: DayOccurrence;
-  color: ColorKey;
-  pxPerMin: number;
-  col?: number;
-  cols?: number;
-  dense?: boolean;
-  showTitle?: boolean;
-  onClick: () => void;
-  children?: ReactNode;
+  occ: DayOccurrence
+  color: ColorKey
+  pxPerMin: number
+  col?: number
+  cols?: number
+  dense?: boolean
+  showTitle?: boolean
+  onClick: () => void
+  children?: ReactNode
 }) {
-  const { event } = occ;
-  const { start, end } = occ.segment;
-  const range = `${minutesToTime(start)}–${minutesToTime(end)}`;
+  const { event } = occ
+  const { start, end } = occ.segment
+  const range = `${minutesToTime(start)}–${minutesToTime(end)}`
   // Never thinner than a legible line; dense bars hug their neighbours closer.
-  const height = Math.max((end - start) * pxPerMin, dense ? 12 : 16);
-  const inset = dense ? 1 : 2;
+  const height = Math.max((end - start) * pxPerMin, dense ? 12 : 16)
+  const inset = dense ? 1 : 2
   return (
     <button
       type="button"
@@ -66,7 +66,7 @@ export function EventBlock({
           {range}
           {occ.moved && (
             <span className={styles.tag} aria-label="Moved from another day">
-              {" "}
+              {' '}
               ↔ moved
             </span>
           )}
@@ -78,5 +78,5 @@ export function EventBlock({
       )}
       {children}
     </button>
-  );
+  )
 }

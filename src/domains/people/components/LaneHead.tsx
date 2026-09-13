@@ -1,9 +1,9 @@
-import type { FC, PropsWithChildren } from "react";
-import { type ColorKey, colorStyle } from "../../../assets/palette";
-import type { Person } from "../types";
+import type { FC, PropsWithChildren } from 'react'
+import { type ColorKey, colorStyle } from '../../../assets/palette'
+import type { Person } from '../types'
 
-import { cx } from "../../../assets/utils/cx";
-import styles from "./LaneHead.module.css";
+import { cx } from '../../../assets/utils/cx'
+import styles from './LaneHead.module.css'
 
 /**
  * A person's column heading. Knows nothing about what fills it — the caller
@@ -12,12 +12,23 @@ import styles from "./LaneHead.module.css";
  */
 export const LaneHead: FC<
   PropsWithChildren<{
-    person: Person;
-    color: ColorKey;
-    isExpanded?: boolean;
-    onToggleLane?: () => void;
+    person: Person
+    color: ColorKey
+    isCollapsed?: boolean
+    isExpanded?: boolean
+    onToggleLane?: () => void
   }>
-> = ({ person, color, isExpanded, onToggleLane, children }) => {
+> = ({ person, color, isCollapsed, isExpanded, onToggleLane, children }) => {
+  if (isCollapsed) {
+    return (
+      <div className={cx(styles.LaneHead)} style={colorStyle(color)}>
+        <div className={styles.name}>
+          <span className={styles.dot} />
+        </div>
+        <div className={styles.chips}>{children}</div>
+      </div>
+    )
+  }
   return (
     <div className={cx(styles.LaneHead)} style={colorStyle(color)}>
       <div className={styles.name}>
@@ -28,11 +39,7 @@ export const LaneHead: FC<
             className={styles.toggle}
             onClick={onToggleLane}
             aria-pressed={isExpanded}
-            aria-label={
-              isExpanded
-                ? "Restore equal lanes"
-                : `Expand ${person.name}'s lane`
-            }
+            aria-label={isExpanded ? 'Restore equal lanes' : `Expand ${person.name}'s lane`}
           >
             {person.name}
           </button>
@@ -42,5 +49,5 @@ export const LaneHead: FC<
       </div>
       <div className={styles.chips}>{children}</div>
     </div>
-  );
-};
+  )
+}

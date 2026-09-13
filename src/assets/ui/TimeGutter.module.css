@@ -7,6 +7,7 @@
   right: 6px;
   transform: translateY(-50%);
   font-size: var(--fs-sm);
+  font-stretch: 75%;
   color: var(--muted);
   white-space: nowrap;
 }

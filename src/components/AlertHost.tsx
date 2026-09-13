@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '../account'
 import { useLatest } from '../assets/hooks/useLatest'
 import { addDays, toISODate } from '../assets/utils/dates'
-import { useEvents } from '../domains/events/queries'
-import { useOccurrencesForRange } from '../domains/events/queries'
+import { useEvents, useOccurrencesForRange } from '../domains/events/queries'
 import { type FiredAlert, dueAlerts } from '../services/notifications/alerts'
 import s from './AlertHost.module.css'
 
@@ -78,6 +77,7 @@ function AlertCard({ alert, onDismiss }: { alert: FiredAlert; onDismiss: () => v
   // parent render (any app dispatch), so depending on it would restart the timer
   // and keep a banner alive indefinitely while the user is active.
   const onDismissRef = useLatest(onDismiss)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
     const t = window.setTimeout(() => onDismissRef.current(), AUTO_DISMISS_MS)
     return () => window.clearTimeout(t)

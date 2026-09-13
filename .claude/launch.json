@@ -4,20 +4,14 @@
     {
       "name": "planner",
       "runtimeExecutable": "sh",
-      "runtimeArgs": [
-        "-c",
-        "npm run dev -- --port \"${PORT:-5173}\""
-      ],
+      "runtimeArgs": ["-c", "npm run dev -- --port \"${PORT:-5173}\""],
       "port": 5173,
       "autoPort": true
     },
     {
       "name": "planner-pages",
       "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "serve:pages"
-      ],
+      "runtimeArgs": ["run", "serve:pages"],
       "port": 4173
     }
   ]

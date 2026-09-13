@@ -1,27 +1,20 @@
-import {
-  createComponentWithSlots,
-  getSlotProps,
-} from "@mikrostack/rst";
-import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
-import { type CSSProperties, type ReactNode, useEffect, useRef } from "react";
-import { useLatest } from "../assets/hooks/useLatest";
-import { cx } from "../assets/utils/cx";
-import {
-  type SwipeZoom,
-  pageInert,
-  useSwipeGestures,
-} from "../services/gestures";
+import { createComponentWithSlots, getSlotProps } from '@mikrostack/rst'
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
+import { type CSSProperties, type ReactNode, useEffect, useRef } from 'react'
+import { useLatest } from '../assets/hooks/useLatest'
+import { cx } from '../assets/utils/cx'
+import { type SwipeZoom, pageInert, useSwipeGestures } from '../services/gestures'
 
-import styles from "./Calendar.module.css";
+import styles from './Calendar.module.css'
 
 /** The column template for lanes with the given relative widths. */
 function laneColumns(weights: number[]): string {
-  return weights.map((w) => `minmax(0, ${w}fr)`).join(" ");
+  return weights.map((w) => `minmax(0, ${w}fr)`).join(' ')
 }
 
 /** One lane head. `weight` is its relative width: an expanded lane is wider. */
 function LaneSlot({ children }: { weight?: number; children?: ReactNode }) {
-  return <>{children}</>;
+  return <>{children}</>
 }
 
 /**
@@ -37,24 +30,20 @@ function Header({
   onNavigate,
   onGoToday,
 }: {
-  search: ReactNode;
-  title: ReactNode;
-  lanes: ReactNode[];
-  todayActive?: boolean;
-  gutterLabel?: string;
-  onNavigate: (delta: 1 | -1) => void;
-  onGoToday: () => void;
+  search: ReactNode
+  title: ReactNode
+  lanes: ReactNode[]
+  todayActive?: boolean
+  gutterLabel?: string
+  onNavigate: (delta: 1 | -1) => void
+  onGoToday: () => void
 }) {
   return (
     <div className={styles.head}>
       <div className={styles.headRow}>
         <div className={styles.headSide}>{search}</div>
         <div className={styles.nav}>
-          <button
-            type="button"
-            onClick={() => onNavigate(-1)}
-            aria-label="Previous"
-          >
+          <button type="button" onClick={() => onNavigate(-1)} aria-label="Previous">
             <ChevronLeft size={20} />
           </button>
           <strong>{title}</strong>
@@ -80,7 +69,7 @@ function Header({
         </div>
       )}
     </div>
-  );
+  )
 }
 
 /**
@@ -105,110 +94,97 @@ function Header({
  * `MonthGridView` of cells. The lane template is inherited by anything inside.
  */
 export const CalendarView = createComponentWithSlots({
-  "Header.Title": { isRequired: true },
-  "Header.Search": {},
-  "Header.Lane": { component: LaneSlot, multiple: true },
+  'Header.Title': { isRequired: true },
+  'Header.Search': {},
+  'Header.Lane': { component: LaneSlot, multiple: true },
   Gutter: {},
   Previous: { isRequired: true },
   Current: { isRequired: true },
   Next: { isRequired: true },
 }).render<{
   /** Identity of the current page: an ISO date, a week start, a month cursor. */
-  pageKey: string;
-  onNavigate: (delta: 1 | -1) => void;
-  onGoToday: () => void;
-  todayActive?: boolean;
+  pageKey: string
+  onNavigate: (delta: 1 | -1) => void
+  onGoToday: () => void
+  todayActive?: boolean
   /** Text over the gutter, in the lane row (a week number). */
-  gutterLabel?: string;
-  zoom?: SwipeZoom;
+  gutterLabel?: string
+  zoom?: SwipeZoom
   /** Minute to scroll to on first mount; unset leaves the scroller at the top. */
-  initialMinute?: number;
-}>(
-  ({
-    slots,
+  initialMinute?: number
+}>(({ slots, pageKey, onNavigate, onGoToday, todayActive, gutterLabel, zoom, initialMinute }) => {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const stripRef = useRef<HTMLDivElement>(null)
+  // Mirror for scrollToMinute, which mount effects call with a stale closure.
+  const pxPerMinRef = useLatest((zoom?.hourH ?? 60) / 60)
+
+  const { onClickCapture } = useSwipeGestures({
+    scrollRef,
+    stripRef,
     pageKey,
     onNavigate,
-    onGoToday,
-    todayActive,
-    gutterLabel,
     zoom,
-    initialMinute,
-  }) => {
-    const scrollRef = useRef<HTMLDivElement>(null);
-    const stripRef = useRef<HTMLDivElement>(null);
-    // Mirror for scrollToMinute, which mount effects call with a stale closure.
-    const pxPerMinRef = useLatest((zoom?.hourH ?? 60) / 60);
+  })
 
-    const { onClickCapture } = useSwipeGestures({
-      scrollRef,
-      stripRef,
-      pageKey,
-      onNavigate,
-      zoom,
-    });
+  // Scroll the timeline so `minute` sits a little below the top edge.
+  function scrollToMinute(minute: number) {
+    const el = scrollRef.current
+    if (el) el.scrollTop = Math.max(0, minute * pxPerMinRef.current - 80)
+  }
 
-    // Scroll the timeline so `minute` sits a little below the top edge.
-    function scrollToMinute(minute: number) {
-      const el = scrollRef.current;
-      if (el) el.scrollTop = Math.max(0, minute * pxPerMinRef.current - 80);
-    }
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run on mount only
+  useEffect(() => {
+    if (initialMinute != null) scrollToMinute(initialMinute)
+  }, [])
 
-    // biome-ignore lint/correctness/useExhaustiveDependencies: run on mount only
-    useEffect(() => {
-      if (initialMinute != null) scrollToMinute(initialMinute);
-    }, []);
+  // The route changes the date; the view re-focuses the current time, because
+  // "take me to now" is an explicit intent and the scroll position is ours.
+  function goToday() {
+    onGoToday()
+    const min = new Date().getHours() * 60 + new Date().getMinutes()
+    requestAnimationFrame(() => scrollToMinute(min))
+  }
 
-    // The route changes the date; the view re-focuses the current time, because
-    // "take me to now" is an explicit intent and the scroll position is ours.
-    function goToday() {
-      onGoToday();
-      const min = new Date().getHours() * 60 + new Date().getMinutes();
-      requestAnimationFrame(() => scrollToMinute(min));
-    }
+  const lanes = slots['Header.Lane']
+  const weights = getSlotProps(lanes, (p) => p.weight ?? 1)
 
-    const lanes = slots["Header.Lane"];
-    const weights = getSlotProps(lanes, (p) => p.weight ?? 1);
-
-    return (
-      <section
-        className={styles.CalendarView}
-        style={{ "--lane-columns": laneColumns(weights) } as CSSProperties}
+  return (
+    <section
+      className={styles.CalendarView}
+      style={{ '--lane-columns': laneColumns(weights) } as CSSProperties}
+    >
+      <Header
+        search={slots['Header.Search']}
+        title={slots['Header.Title']}
+        lanes={lanes}
+        todayActive={todayActive}
+        gutterLabel={gutterLabel}
+        onNavigate={onNavigate}
+        onGoToday={goToday}
+      />
+      <div
+        className={styles.body}
+        ref={scrollRef}
+        // Browser owns vertical panning; we own horizontal swipe + pinch.
+        style={{ touchAction: 'pan-y' }}
+        onClickCapture={onClickCapture}
       >
-        <Header
-          search={slots["Header.Search"]}
-          title={slots["Header.Title"]}
-          lanes={lanes}
-          todayActive={todayActive}
-          gutterLabel={gutterLabel}
-          onNavigate={onNavigate}
-          onGoToday={goToday}
-        />
-        <div
-          className={styles.body}
-          ref={scrollRef}
-          // Browser owns vertical panning; we own horizontal swipe + pinch.
-          style={{ touchAction: "pan-y" }}
-          onClickCapture={onClickCapture}
-        >
-          <div className={styles.grid}>
-            {slots.Gutter && (
-              <div className={styles.gutter}>{slots.Gutter}</div>
-            )}
-            {/* The gutter stays put; only the pages slide during a swipe. */}
-            <div className={styles.clip}>
-              <div className={styles.strip} ref={stripRef}>
-                <div className={styles.page} {...pageInert(false)}>
-                  {slots.Previous}
-                </div>
-                <div className={styles.page}>{slots.Current}</div>
-                <div className={styles.page} {...pageInert(false)}>
-                  {slots.Next}
-                </div>
+        <div className={styles.grid}>
+          {slots.Gutter && <div className={styles.gutter}>{slots.Gutter}</div>}
+          {/* The gutter stays put; only the pages slide during a swipe. */}
+          <div className={styles.clip}>
+            <div className={styles.strip} ref={stripRef}>
+              <div className={styles.page} {...pageInert(false)}>
+                {slots.Previous}
+              </div>
+              <div className={styles.page}>{slots.Current}</div>
+              <div className={styles.page} {...pageInert(false)}>
+                {slots.Next}
               </div>
             </div>
           </div>
         </div>
-      </section>
-    );
-  },
-);
+      </div>
+    </section>
+  )
+})

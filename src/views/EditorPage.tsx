@@ -1,8 +1,8 @@
-import { createComponentWithSlots } from "@mikrostack/rst";
-import type { FormEvent, ReactNode } from "react";
-import shared from "../assets/styles/shared.module.css";
+import { createComponentWithSlots } from '@mikrostack/rst'
+import type { FormEvent, ReactNode } from 'react'
+import shared from '../assets/styles/shared.module.css'
 
-import styles from "./EditorPage.module.css";
+import styles from './EditorPage.module.css'
 
 /**
  * A full-page editor: a fixed toolbar of actions — Cancel, a short static
@@ -15,12 +15,12 @@ export const EditorPageView = createComponentWithSlots({
   Actions: {},
   Body: { isRequired: true },
 }).render<{
-  onCancel: () => void;
-  cancelLabel?: string;
-  onSubmit?: () => void;
+  onCancel: () => void
+  cancelLabel?: string
+  onSubmit?: () => void
   /** Label of the primary action; none means no primary action. */
-  submitLabel?: string;
-}>(({ slots, onCancel, cancelLabel = "Cancel", onSubmit, submitLabel }) => {
+  submitLabel?: string
+}>(({ slots, onCancel, cancelLabel = 'Cancel', onSubmit, submitLabel }) => {
   const content: ReactNode = (
     <>
       <header className={styles.head}>
@@ -32,7 +32,7 @@ export const EditorPageView = createComponentWithSlots({
           {slots.Actions}
           {submitLabel && (
             <button
-              type={onSubmit ? "submit" : "button"}
+              type={onSubmit ? 'submit' : 'button'}
               className={shared.primary}
               onClick={onSubmit ? undefined : onCancel}
             >
@@ -43,20 +43,20 @@ export const EditorPageView = createComponentWithSlots({
       </header>
       <div className={styles.body}>{slots.Body}</div>
     </>
-  );
+  )
 
   if (onSubmit) {
     return (
       <form
         className={styles.EditorPage}
         onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          onSubmit();
+          e.preventDefault()
+          onSubmit()
         }}
       >
         {content}
       </form>
-    );
+    )
   }
-  return <div className={styles.EditorPage}>{content}</div>;
-});
+  return <div className={styles.EditorPage}>{content}</div>
+})

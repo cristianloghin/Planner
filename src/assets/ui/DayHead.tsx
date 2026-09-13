@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
-import { cx } from "../utils/cx";
-import styles from "./DayHead.module.css";
+import type { ReactNode } from 'react'
+import { cx } from '../utils/cx'
+import styles from './DayHead.module.css'
 
 /**
  * A weekday's column heading: the day name, its number when given, today
@@ -16,19 +16,19 @@ export function DayHead({
   onToggle,
   children,
 }: {
-  name: string;
-  number?: number;
-  isToday?: boolean;
-  isExpanded?: boolean;
-  onToggle?: () => void;
-  children?: ReactNode;
+  name: string
+  number?: number
+  isToday?: boolean
+  isExpanded?: boolean
+  onToggle?: () => void
+  children?: ReactNode
 }) {
   const label = (
     <>
       <span className={styles.name}>{name}</span>
       {number != null && <span className={styles.number}>{number}</span>}
     </>
-  );
+  )
   return (
     <div className={cx(styles.DayHead, isToday && styles.today)}>
       {onToggle ? (
@@ -37,9 +37,7 @@ export function DayHead({
           className={styles.label}
           onClick={onToggle}
           aria-pressed={isExpanded}
-          aria-label={
-            isExpanded ? "Restore equal day columns" : `Expand ${name}'s column`
-          }
+          aria-label={isExpanded ? 'Restore equal day columns' : `Expand ${name}'s column`}
         >
           {label}
         </button>
@@ -48,5 +46,5 @@ export function DayHead({
       )}
       {children != null && <div className={styles.chips}>{children}</div>}
     </div>
-  );
+  )
 }

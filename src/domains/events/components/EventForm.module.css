@@ -17,3 +17,18 @@
 .saveTemplate:disabled {
   opacity: 0.5;
 }
+
+.dateField {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+
+  label {
+    flex: 0 0 100%;
+  }
+
+  input {
+    flex: 1;
+  }
+}

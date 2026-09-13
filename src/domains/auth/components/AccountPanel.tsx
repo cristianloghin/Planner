@@ -1,8 +1,8 @@
-import { type FormEvent, useState } from "react";
-import shared from "../../../assets/styles/shared.module.css";
-import { cx } from "../../../assets/utils/cx";
+import { type FormEvent, useState } from 'react'
+import shared from '../../../assets/styles/shared.module.css'
+import { cx } from '../../../assets/utils/cx'
 
-import styles from "./AccountPanel.module.css";
+import styles from './AccountPanel.module.css'
 
 /**
  * Who is signed in, a way to change the password, and the way out. The
@@ -14,26 +14,26 @@ export function AccountPanel({
   onChangePassword,
   onSignOut,
 }: {
-  email?: string | null;
-  onChangePassword: (password: string) => Promise<void>;
-  onSignOut: () => void;
+  email?: string | null
+  onChangePassword: (password: string) => Promise<void>
+  onSignOut: () => void
 }) {
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
 
   async function submit(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setStatus(null);
+    e.preventDefault()
+    setBusy(true)
+    setStatus(null)
     try {
-      await onChangePassword(password);
-      setStatus({ ok: true, text: "Password updated." });
-      setPassword("");
+      await onChangePassword(password)
+      setStatus({ ok: true, text: 'Password updated.' })
+      setPassword('')
     } catch (e) {
-      setStatus({ ok: false, text: e instanceof Error ? e.message : "Something went wrong." });
+      setStatus({ ok: false, text: e instanceof Error ? e.message : 'Something went wrong.' })
     } finally {
-      setBusy(false);
+      setBusy(false)
     }
   }
 
@@ -51,7 +51,7 @@ export function AccountPanel({
           onChange={(e) => setPassword(e.target.value)}
         />
         <button type="submit" className={shared.primary} disabled={busy || password.length < 6}>
-          {busy ? "…" : "Change"}
+          {busy ? '…' : 'Change'}
         </button>
         {status && (
           <span className={cx(styles.status, status.ok ? styles.ok : styles.err)}>
@@ -63,5 +63,5 @@ export function AccountPanel({
         Sign out
       </button>
     </div>
-  );
+  )
 }

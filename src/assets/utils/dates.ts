@@ -128,3 +128,26 @@ export function offsetLabel(min: number): string {
   const d = min / 1440
   return `${d} day${d > 1 ? 's' : ''} before`
 }
+
+/**
+ * The two halves of a `yyyy-mm-ddThh:mm` local string, the text a
+ * <input type="datetime-local"> produces. It is already in local time, so
+ * these are plain slices — going through `Date` would only add a timezone.
+ */
+export function getDate(dateTimeLocal: string): string {
+  return dateTimeLocal.slice(0, 10)
+}
+
+export function getTime(dateTimeLocal: string): string {
+  return dateTimeLocal.slice(11, 16)
+}
+
+/** Same time, on a different `yyyy-mm-dd`. */
+export function changeDate(current: string, date: string): string {
+  return `${date}T${getTime(current)}`
+}
+
+/** Same day, at a different `hh:mm`. */
+export function changeTime(current: string, time: string): string {
+  return `${getDate(current)}T${time}`
+}

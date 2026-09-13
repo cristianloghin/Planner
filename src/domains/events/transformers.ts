@@ -9,7 +9,14 @@ import { toISODate } from '../../assets/utils/dates'
 import { uid } from '../../assets/utils/id'
 import type { OccurrenceRow } from '../../client/occurrences'
 import type { Series } from '../../client/series'
-import type { CalendarEvent, EventReminder, EventTemplate, OccurrenceIndex, OccurrenceMap, OccurrenceState } from './types'
+import type {
+  CalendarEvent,
+  EventReminder,
+  EventTemplate,
+  OccurrenceIndex,
+  OccurrenceMap,
+  OccurrenceState,
+} from './types'
 
 /**
  * Reminders copied with **fresh ids**, for the template ↔ event copy paths: the

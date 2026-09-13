@@ -1,25 +1,32 @@
-import { useEffect, useRef, useState } from "react";
-import { COLOR_OPTIONS, type ColorKey, DEFAULT_COLOR } from "../../../assets/palette";
-import shared from "../../../assets/styles/shared.module.css";
-import { ColorPicker } from "../../../assets/ui/ColorPicker";
-import { NumberField } from "../../../assets/ui/NumberField";
-import { addDays, diffDays } from "../../../assets/utils/dates";
-import { AttendeeChips } from "../../people/components/AttendeeChips";
-import type { Person } from "../../people/types";
+import { type ChangeEvent, useEffect, useRef, useState } from 'react'
+
+import { COLOR_OPTIONS, type ColorKey, DEFAULT_COLOR } from '../../../assets/palette'
+import shared from '../../../assets/styles/shared.module.css'
+import { ColorPicker } from '../../../assets/ui/ColorPicker'
+import { NumberField } from '../../../assets/ui/NumberField'
+import {
+  addDays,
+  changeDate,
+  changeTime,
+  diffDays,
+  getDate,
+  getTime,
+} from '../../../assets/utils/dates'
+import { AttendeeChips } from '../../people/components/AttendeeChips'
+import type { Person } from '../../people/types'
 import {
   type EndsChoice,
   type EventDraft,
   type RepeatChoice,
-  SNAP,
   applyTemplate,
   moveStart,
-} from "../draft";
-import type { EventTemplate } from "../types";
-import { RemindersEditor } from "./RemindersEditor";
+} from '../draft'
+import type { EventTemplate } from '../types'
+import { RemindersEditor } from './RemindersEditor'
 
-import styles from "./EventForm.module.css";
+import styles from './EventForm.module.css'
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /**
  * The event form's fields. Controlled: it shows `draft` and reports every
@@ -36,39 +43,38 @@ export function EventForm({
   templates,
   onSaveAsTemplate,
 }: {
-  draft: EventDraft;
-  onChange: (next: EventDraft) => void;
-  isEdit: boolean;
+  draft: EventDraft
+  onChange: (next: EventDraft) => void
+  isEdit: boolean
   /** The series' own anchor day: a series may end before an opened occurrence. */
-  seriesStart?: string;
-  people: { person: Person; color: ColorKey }[];
-  templates: EventTemplate[];
-  onSaveAsTemplate: () => void;
+  seriesStart?: string
+  people: { person: Person; color: ColorKey }[]
+  templates: EventTemplate[]
+  onSaveAsTemplate: () => void
 }) {
-  const set = (patch: Partial<EventDraft>) => onChange({ ...draft, ...patch });
+  const set = (patch: Partial<EventDraft>) => onChange({ ...draft, ...patch })
 
   // Which template a *new* event was started from. Nothing is stored about
   // it; it only drives the select.
-  const [templateId, setTemplateId] = useState<string | null>(null);
+  const [templateId, setTemplateId] = useState<string | null>(null)
   // Transient "Saved to templates" confirmation.
-  const [savedTemplate, setSavedTemplate] = useState(false);
-  const savedTimer = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => () => clearTimeout(savedTimer.current), []);
+  const [savedTemplate, setSavedTemplate] = useState(false)
+  const savedTimer = useRef<ReturnType<typeof setTimeout>>()
+  useEffect(() => () => clearTimeout(savedTimer.current), [])
 
-  const titleRef = useRef<HTMLInputElement>(null);
-  useEffect(() => titleRef.current?.focus(), []);
+  const titleRef = useRef<HTMLInputElement>(null)
+  useEffect(() => titleRef.current?.focus(), [])
 
   function saveAsTemplate() {
-    onSaveAsTemplate();
-    setSavedTemplate(true);
-    clearTimeout(savedTimer.current);
-    savedTimer.current = setTimeout(() => setSavedTemplate(false), 2000);
+    onSaveAsTemplate()
+    setSavedTemplate(true)
+    clearTimeout(savedTimer.current)
+    savedTimer.current = setTimeout(() => setSavedTemplate(false), 2000)
   }
 
-  const firstColor =
-    people.find((p) => p.person.id === draft.attendees[0])?.color ?? DEFAULT_COLOR;
+  const firstColor = people.find((p) => p.person.id === draft.attendees[0])?.color ?? DEFAULT_COLOR
   const unitLabel =
-    draft.repeat === "daily" ? "days" : draft.repeat === "weekly" ? "weeks" : "months";
+    draft.repeat === 'daily' ? 'days' : draft.repeat === 'weekly' ? 'weeks' : 'months'
 
   return (
     <>
@@ -77,17 +83,17 @@ export function EventForm({
           <label className={shared.field}>
             Start from a template
             <select
-              value={templateId ?? ""}
+              value={templateId ?? ''}
               onChange={(e) => {
-                const t = templates.find((x) => x.id === e.target.value);
-                setTemplateId(t ? t.id : null);
-                if (t) onChange(applyTemplate(draft, t));
+                const t = templates.find((x) => x.id === e.target.value)
+                setTemplateId(t ? t.id : null)
+                if (t) onChange(applyTemplate(draft, t))
               }}
             >
               <option value="">Blank event</option>
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.title || "Untitled template"}
+                  {t.title || 'Untitled template'}
                 </option>
               ))}
             </select>
@@ -115,11 +121,7 @@ export function EventForm({
         <div className={shared.row}>
           <label className={shared.field}>
             Date
-            <input
-              type="date"
-              value={draft.date}
-              onChange={(e) => set({ date: e.target.value })}
-            />
+            <input type="date" value={draft.date} onChange={(e) => set({ date: e.target.value })} />
           </label>
           <label className={shared.field}>
             Ends
@@ -132,33 +134,27 @@ export function EventForm({
               onChange={(e) => {
                 // A cleared/incomplete picker emits "" — ignore it rather
                 // than compute NaN days.
-                if (!ISO_DATE_RE.test(e.target.value)) return;
-                set({ days: Math.max(1, diffDays(e.target.value, draft.date) + 1) });
+                if (!ISO_DATE_RE.test(e.target.value)) return
+                set({
+                  days: Math.max(1, diffDays(e.target.value, draft.date) + 1),
+                })
               }}
             />
           </label>
         </div>
       ) : (
-        <div className={shared.row}>
-          <label className={shared.field}>
-            Starts
-            <input
-              type="datetime-local"
-              step={SNAP * 60}
-              value={draft.startDT}
-              onChange={(e) => onChange(moveStart(draft, e.target.value))}
+        <>
+          <div className={shared.row}>
+            <DateInput
+              label="Starts"
+              dateString={draft.startDT}
+              onChange={(d) => onChange(moveStart(draft, d))}
             />
-          </label>
-          <label className={shared.field}>
-            Ends
-            <input
-              type="datetime-local"
-              step={SNAP * 60}
-              value={draft.endDT}
-              onChange={(e) => set({ endDT: e.target.value })}
-            />
-          </label>
-        </div>
+          </div>
+          <div className={shared.row}>
+            <DateInput label="Ends" dateString={draft.endDT} onChange={(d) => set({ endDT: d })} />
+          </div>
+        </>
       )}
 
       <div className={shared.row}>
@@ -174,7 +170,7 @@ export function EventForm({
             <option value="monthly">Monthly</option>
           </select>
         </label>
-        {draft.repeat !== "none" && (
+        {draft.repeat !== 'none' && (
           <label className={shared.field}>
             Every
             <div className={shared.interval}>
@@ -189,7 +185,7 @@ export function EventForm({
         )}
       </div>
 
-      {draft.repeat !== "none" && (
+      {draft.repeat !== 'none' && (
         <div className={shared.row}>
           <label className={shared.field}>
             Ends
@@ -202,7 +198,7 @@ export function EventForm({
               <option value="on">On…</option>
             </select>
           </label>
-          {draft.ends === "after" && (
+          {draft.ends === 'after' && (
             <label className={shared.field}>
               Occurrences
               <div className={shared.interval}>
@@ -215,7 +211,7 @@ export function EventForm({
               </div>
             </label>
           )}
-          {draft.ends === "on" && (
+          {draft.ends === 'on' && (
             <label className={shared.field}>
               Last day
               <input
@@ -245,10 +241,7 @@ export function EventForm({
         onChange={(colorKey) => set({ colorKey })}
       />
 
-      <RemindersEditor
-        reminders={draft.reminders}
-        onChange={(reminders) => set({ reminders })}
-      />
+      <RemindersEditor reminders={draft.reminders} onChange={(reminders) => set({ reminders })} />
 
       <div className={styles.templateBar}>
         <button
@@ -257,12 +250,38 @@ export function EventForm({
           onClick={saveAsTemplate}
           disabled={!draft.title.trim()}
         >
-          {savedTemplate ? "Saved to templates ✓" : "Save as template"}
+          {savedTemplate ? 'Saved to templates ✓' : 'Save as template'}
         </button>
       </div>
 
       {/* Delete lives in the OccurrenceSheet toolbar — one tap from the event
           itself, rather than behind Edit and a full scroll of this form. */}
     </>
-  );
+  )
+}
+
+function DateInput({
+  label,
+  dateString,
+  onChange,
+}: {
+  label: string
+  dateString: string
+  onChange: (dateString: string) => void
+}) {
+  const date = getDate(dateString)
+  const time = getTime(dateString)
+
+  const handleChange = (e: ChangeEvent<HTMLInputElement>, type: 'date' | 'time') => {
+    const d = e.target.value
+    onChange(type === 'date' ? changeDate(dateString, d) : changeTime(dateString, d))
+  }
+
+  return (
+    <div className={styles.dateField}>
+      <label>{label}</label>
+      <input type="date" value={date} onChange={(e) => handleChange(e, 'date')} />
+      <input type="time" value={time} onChange={(e) => handleChange(e, 'time')} />
+    </div>
+  )
 }

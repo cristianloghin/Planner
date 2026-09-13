@@ -224,7 +224,10 @@ describe('effectiveOccurrence — people', () => {
 
   it('falls through to the series when the day says nothing about people', () => {
     const timingOnly = { 'e1:2026-06-15': { start: '2026-06-15', duration: 2 } }
-    expect(effectiveOccurrence(base, '2026-06-15', idx(timingOnly)).attendees).toEqual(['dev', 'kid'])
+    expect(effectiveOccurrence(base, '2026-06-15', idx(timingOnly)).attendees).toEqual([
+      'dev',
+      'kid',
+    ])
     expect(effectiveOccurrence(base, '2026-06-15', idx({})).attendees).toEqual(['dev', 'kid'])
   })
 

@@ -1,7 +1,7 @@
-import { type ColorKey, colorStyle } from "../../../assets/palette";
-import type { Person } from "../types";
+import { type ColorKey, colorStyle } from '../../../assets/palette'
+import type { Person } from '../types'
 
-import styles from "./Avatars.module.css";
+import styles from './Avatars.module.css'
 
 /**
  * A row of small round initials, one per attendee, in each person's colour.
@@ -10,9 +10,9 @@ import styles from "./Avatars.module.css";
 export function Avatars({
   attendees,
 }: {
-  attendees: { person: Person; color: ColorKey }[];
+  attendees: { person: Person; color: ColorKey }[]
 }) {
-  if (attendees.length === 0) return null;
+  if (attendees.length === 0) return null
   return (
     <span className={styles.Avatars}>
       {attendees.map(({ person, color }) => (
@@ -26,5 +26,5 @@ export function Avatars({
         </span>
       ))}
     </span>
-  );
+  )
 }

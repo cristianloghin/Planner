@@ -1,0 +1,79 @@
+.head {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  padding: 0 max(16px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+}
+
+/* The title is the switch: what is shown, with an arrow saying it can change. */
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 8px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: var(--fs-xl);
+  font-weight: 700;
+}
+
+.chevron {
+  color: var(--muted);
+}
+
+/* Radix portals the menu to <body>; it sits above the calendar, below sheets. */
+.menu {
+  z-index: 1000;
+  min-width: 180px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px var(--shadow);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
+}
+
+.item[data-highlighted] {
+  background: var(--surface-2);
+}
+
+.item[data-state="checked"] {
+  color: var(--accent);
+}
+
+.LeftSlot {
+  flex: 0 0 48px;
+}
+
+.CenterSlot {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.RightSlot {
+  flex: 0 0 48px;
+}

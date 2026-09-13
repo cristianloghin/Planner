@@ -1,25 +1,15 @@
-import type { ColorKey } from "../../assets/palette";
-import {
-  addDays,
-  diffDays,
-  minutesToTime,
-  toDateTimeLocal,
-} from "../../assets/utils/dates";
-import type { PersonId } from "../people/types";
-import { cloneReminders } from "./transformers";
-import type {
-  CalendarEvent,
-  EventReminder,
-  EventTemplate,
-  RecurrenceFreq,
-} from "./types";
+import type { ColorKey } from '../../assets/palette'
+import { addDays, diffDays, minutesToTime, toDateTimeLocal } from '../../assets/utils/dates'
+import type { PersonId } from '../people/types'
+import { cloneReminders } from './transformers'
+import type { CalendarEvent, EventReminder, EventTemplate, RecurrenceFreq } from './types'
 
 /** Times snap to this many minutes; nothing timed is shorter than it. */
-export const SNAP = 15;
-const DAY_MIN = 24 * 60;
+export const SNAP = 15
+const DAY_MIN = 24 * 60
 
-export type RepeatChoice = "none" | RecurrenceFreq;
-export type EndsChoice = "never" | "after" | "on";
+export type RepeatChoice = 'none' | RecurrenceFreq
+export type EndsChoice = 'never' | 'after' | 'on'
 
 /**
  * What the editor form holds: every field as the input shows it, so a
@@ -28,24 +18,24 @@ export type EndsChoice = "never" | "after" | "on";
  * toggling all-day does not lose the other.
  */
 export interface EventDraft {
-  title: string;
-  allDay: boolean;
-  date: string;
-  days: number;
-  startDT: string;
-  endDT: string;
-  attendees: PersonId[];
-  colorKey?: ColorKey;
-  repeat: RepeatChoice;
-  interval: number;
+  title: string
+  allDay: boolean
+  date: string
+  days: number
+  startDT: string
+  endDT: string
+  attendees: PersonId[]
+  colorKey?: ColorKey
+  repeat: RepeatChoice
+  interval: number
   /** Exactly one of count / until is ever written; the choice is the state. */
-  ends: EndsChoice;
-  endCount: number;
-  endDate: string;
-  reminders: EventReminder[];
+  ends: EndsChoice
+  endCount: number
+  endDate: string
+  reminders: EventReminder[]
 }
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
 /**
  * datetime-local value for a date + minutes-from-midnight. Minutes past the
@@ -54,14 +44,14 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
  */
 export function dtLocal(date: string, minute: number): string {
   if (minute >= DAY_MIN) {
-    return `${addDays(date, Math.floor(minute / DAY_MIN))}T${minutesToTime(minute % DAY_MIN)}`;
+    return `${addDays(date, Math.floor(minute / DAY_MIN))}T${minutesToTime(minute % DAY_MIN)}`
   }
-  return `${date}T${minutesToTime(minute)}`;
+  return `${date}T${minutesToTime(minute)}`
 }
 
 function clockMinutes(dt: string): number {
-  const [h, m] = dt.slice(11).split(":").map(Number);
-  return h * 60 + m;
+  const [h, m] = dt.slice(11).split(':').map(Number)
+  return h * 60 + m
 }
 
 /**
@@ -70,10 +60,7 @@ function clockMinutes(dt: string): number {
  * would shift durations by ±60 min across a DST transition.
  */
 export function minutesBetween(a: string, b: string): number {
-  return (
-    diffDays(b.slice(0, 10), a.slice(0, 10)) * DAY_MIN +
-    (clockMinutes(b) - clockMinutes(a))
-  );
+  return diffDays(b.slice(0, 10), a.slice(0, 10)) * DAY_MIN + (clockMinutes(b) - clockMinutes(a))
 }
 
 /**
@@ -81,38 +68,34 @@ export function minutesBetween(a: string, b: string): number {
  * or half-typed picker emits "" — saving that would persist NaN durations.
  */
 export function isCompleteDT(v: string): boolean {
-  return (
-    v.length >= 16 &&
-    ISO_DATE_RE.test(v.slice(0, 10)) &&
-    !Number.isNaN(new Date(v).getTime())
-  );
+  return v.length >= 16 && ISO_DATE_RE.test(v.slice(0, 10)) && !Number.isNaN(new Date(v).getTime())
 }
 
 /** An empty draft on `date`, at nine unless the seed says otherwise. */
 export function draftForNew(seed: {
-  date: string;
-  attendees: PersonId[];
-  allDay?: boolean;
-  startMin?: number;
-  endMin?: number;
+  date: string
+  attendees: PersonId[]
+  allDay?: boolean
+  startMin?: number
+  endMin?: number
 }): EventDraft {
-  const startMin = seed.startMin ?? 9 * 60;
-  const endMin = seed.endMin ?? Math.min(startMin + 60, DAY_MIN);
+  const startMin = seed.startMin ?? 9 * 60
+  const endMin = seed.endMin ?? Math.min(startMin + 60, DAY_MIN)
   return {
-    title: "",
+    title: '',
     allDay: seed.allDay ?? false,
     date: seed.date,
     days: 1,
     startDT: dtLocal(seed.date, startMin),
     endDT: dtLocal(seed.date, endMin),
     attendees: seed.attendees,
-    repeat: "none",
+    repeat: 'none',
     interval: 1,
-    ends: "never",
+    ends: 'never',
     endCount: 12,
-    endDate: "",
+    endDate: '',
     reminders: [],
-  };
+  }
 }
 
 /**
@@ -121,9 +104,9 @@ export function draftForNew(seed: {
  * one-off override rather than the series' first instance.
  */
 export function draftForEvent(event: CalendarEvent): EventDraft {
-  const date = event.start.slice(0, 10);
-  const end = new Date(event.start);
-  end.setMinutes(end.getMinutes() + event.duration);
+  const date = event.start.slice(0, 10)
+  const end = new Date(event.start)
+  end.setMinutes(end.getMinutes() + event.duration)
   return {
     title: event.title,
     allDay: event.allDay,
@@ -133,48 +116,41 @@ export function draftForEvent(event: CalendarEvent): EventDraft {
     endDT: event.allDay ? dtLocal(date, 10 * 60) : toDateTimeLocal(end),
     attendees: event.attendees,
     ...(event.colorKey ? { colorKey: event.colorKey } : {}),
-    repeat: event.recurrence?.freq ?? "none",
+    repeat: event.recurrence?.freq ?? 'none',
     interval: event.recurrence?.interval ?? 1,
-    ends:
-      event.recurrence?.count != null
-        ? "after"
-        : event.recurrence?.until
-          ? "on"
-          : "never",
+    ends: event.recurrence?.count != null ? 'after' : event.recurrence?.until ? 'on' : 'never',
     endCount: event.recurrence?.count ?? 12,
-    endDate: event.recurrence?.until ?? "",
+    endDate: event.recurrence?.until ?? '',
     reminders: event.reminders,
-  };
+  }
 }
 
 /** The duration the draft describes: whole days all-day, else minutes. */
 export function draftDuration(d: EventDraft): number {
-  return d.allDay
-    ? Math.max(1, d.days)
-    : Math.max(SNAP, minutesBetween(d.startDT, d.endDT));
+  return d.allDay ? Math.max(1, d.days) : Math.max(SNAP, minutesBetween(d.startDT, d.endDT))
 }
 
 /** Timing the draft can actually save: complete pickers and finite numbers. */
 export function draftTimingValid(d: EventDraft): boolean {
   return d.allDay
     ? ISO_DATE_RE.test(d.date) && Number.isFinite(d.days)
-    : isCompleteDT(d.startDT) && isCompleteDT(d.endDT);
+    : isCompleteDT(d.startDT) && isCompleteDT(d.endDT)
 }
 
 /** Whether the draft is something that can be saved at all. */
 export function draftValid(d: EventDraft): boolean {
-  return d.title.trim() !== "" && draftTimingValid(d);
+  return d.title.trim() !== '' && draftTimingValid(d)
 }
 
 /** The event the draft describes (no id). */
-export function eventFromDraft(d: EventDraft): Omit<CalendarEvent, "id"> {
+export function eventFromDraft(d: EventDraft): Omit<CalendarEvent, 'id'> {
   return {
     title: d.title.trim(),
     start: d.allDay ? d.date : d.startDT,
     allDay: d.allDay,
     duration: draftDuration(d),
     recurrence:
-      d.repeat === "none"
+      d.repeat === 'none'
         ? undefined
         : {
             freq: d.repeat,
@@ -182,24 +158,24 @@ export function eventFromDraft(d: EventDraft): Omit<CalendarEvent, "id"> {
             // Exactly one end, or neither. Writing both would leave the two
             // racing, and clearing the other is what makes switching between
             // them actually take effect.
-            ...(d.ends === "after" ? { count: Math.max(1, d.endCount) } : {}),
-            ...(d.ends === "on" && d.endDate ? { until: d.endDate } : {}),
+            ...(d.ends === 'after' ? { count: Math.max(1, d.endCount) } : {}),
+            ...(d.ends === 'on' && d.endDate ? { until: d.endDate } : {}),
           },
     attendees: d.attendees,
     ...(d.colorKey ? { colorKey: d.colorKey } : {}),
     reminders: d.reminders,
-  };
+  }
 }
 
 /** The draft as a reusable template (no id); reminders get fresh ids. */
-export function templateFromDraft(d: EventDraft): Omit<EventTemplate, "id"> {
+export function templateFromDraft(d: EventDraft): Omit<EventTemplate, 'id'> {
   return {
     title: d.title.trim(),
     allDay: d.allDay,
     duration: draftDuration(d),
     attendees: d.attendees,
     reminders: cloneReminders(d.reminders),
-  };
+  }
 }
 
 /**
@@ -214,22 +190,22 @@ export function applyTemplate(d: EventDraft, t: EventTemplate): EventDraft {
     attendees: t.attendees,
     reminders: cloneReminders(t.reminders),
     allDay: t.allDay,
-  };
-  if (t.allDay) return { ...next, days: Math.max(1, t.duration) };
-  const end = new Date(d.startDT);
-  end.setMinutes(end.getMinutes() + Math.max(SNAP, t.duration));
-  return { ...next, endDT: toDateTimeLocal(end) };
+  }
+  if (t.allDay) return { ...next, days: Math.max(1, t.duration) }
+  const end = new Date(d.startDT)
+  end.setMinutes(end.getMinutes() + Math.max(SNAP, t.duration))
+  return { ...next, endDT: toDateTimeLocal(end) }
 }
 
 /** A moved start keeps the draft's duration, once both pickers are settled. */
 export function moveStart(d: EventDraft, startDT: string): EventDraft {
   if (!isCompleteDT(startDT) || !isCompleteDT(d.startDT) || !isCompleteDT(d.endDT)) {
-    return { ...d, startDT };
+    return { ...d, startDT }
   }
-  const dur = Math.max(SNAP, minutesBetween(d.startDT, d.endDT));
-  const end = new Date(startDT);
-  end.setMinutes(end.getMinutes() + dur);
-  return { ...d, startDT, endDT: toDateTimeLocal(end) };
+  const dur = Math.max(SNAP, minutesBetween(d.startDT, d.endDT))
+  const end = new Date(startDT)
+  end.setMinutes(end.getMinutes() + dur)
+  return { ...d, startDT, endDT: toDateTimeLocal(end) }
 }
 
 /**
@@ -238,18 +214,18 @@ export function moveStart(d: EventDraft, startDT: string): EventDraft {
  * whole days; both are kept so toggling all-day does not lose the other.
  */
 export interface TemplateDraft {
-  title: string;
-  allDay: boolean;
-  days: number;
-  hours: number;
-  minutes: number;
-  attendees: PersonId[];
-  reminders: EventReminder[];
+  title: string
+  allDay: boolean
+  days: number
+  hours: number
+  minutes: number
+  attendees: PersonId[]
+  reminders: EventReminder[]
 }
 
 /** An empty template for `attendees`: an hour, timed. */
 export function templateDraftForNew(attendees: PersonId[]): TemplateDraft {
-  return { title: "", allDay: false, days: 1, hours: 1, minutes: 0, attendees, reminders: [] };
+  return { title: '', allDay: false, days: 1, hours: 1, minutes: 0, attendees, reminders: [] }
 }
 
 /** A draft describing `template` as it stands. */
@@ -262,25 +238,25 @@ export function templateDraftFor(t: EventTemplate): TemplateDraft {
     minutes: t.allDay ? 0 : t.duration % 60,
     attendees: t.attendees,
     reminders: t.reminders,
-  };
+  }
 }
 
 /** The duration the draft describes: whole days all-day, else minutes. */
 export function templateDraftDuration(d: TemplateDraft): number {
-  return d.allDay ? Math.max(1, d.days) : Math.max(SNAP, d.hours * 60 + d.minutes);
+  return d.allDay ? Math.max(1, d.days) : Math.max(SNAP, d.hours * 60 + d.minutes)
 }
 
 export function templateDraftValid(d: TemplateDraft): boolean {
-  return d.title.trim() !== "";
+  return d.title.trim() !== ''
 }
 
 /** The template the draft describes (no id). */
-export function templateFromTemplateDraft(d: TemplateDraft): Omit<EventTemplate, "id"> {
+export function templateFromTemplateDraft(d: TemplateDraft): Omit<EventTemplate, 'id'> {
   return {
     title: d.title.trim(),
     allDay: d.allDay,
     duration: templateDraftDuration(d),
     attendees: d.attendees,
     reminders: d.reminders,
-  };
+  }
 }

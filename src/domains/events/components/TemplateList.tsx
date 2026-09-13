@@ -1,11 +1,11 @@
-import styles from "./TemplateList.module.css";
+import styles from './TemplateList.module.css'
 
 /** One row of the list: a template, described. */
 export interface TemplateItem {
-  id: string;
-  title: string;
+  id: string
+  title: string
   /** "Kid · 2 reminders" — the caller joins the names in. */
-  meta: string;
+  meta: string
 }
 
 /**
@@ -20,17 +20,17 @@ export function TemplateList({
   onDelete,
   onNew,
 }: {
-  items: TemplateItem[];
-  loading?: boolean;
-  onOpen: (id: string) => void;
-  onDelete: (id: string) => void;
-  onNew: () => void;
+  items: TemplateItem[]
+  loading?: boolean
+  onOpen: (id: string) => void
+  onDelete: (id: string) => void
+  onNew: () => void
 }) {
   return (
     <div className={styles.TemplateList}>
       <p className={styles.hint}>
-        Reusable blueprints. Pick one when creating an event to prefill its
-        people and reminders. Save one from the event editor, or start one here.
+        Reusable blueprints. Pick one when creating an event to prefill its people and reminders.
+        Save one from the event editor, or start one here.
       </p>
       {loading ? (
         <p className={styles.empty}>Loading templates…</p>
@@ -43,16 +43,16 @@ export function TemplateList({
               type="button"
               className={styles.info}
               onClick={() => onOpen(t.id)}
-              aria-label={`Edit template ${t.title || "Untitled"}`}
+              aria-label={`Edit template ${t.title || 'Untitled'}`}
             >
-              <strong>{t.title || "Untitled template"}</strong>
+              <strong>{t.title || 'Untitled template'}</strong>
               {t.meta && <span className={styles.meta}>{t.meta}</span>}
             </button>
             <button
               type="button"
               className={styles.delete}
               onClick={() => onDelete(t.id)}
-              aria-label={`Delete template ${t.title || "Untitled"}`}
+              aria-label={`Delete template ${t.title || 'Untitled'}`}
             >
               Delete
             </button>
@@ -63,5 +63,5 @@ export function TemplateList({
         + New template
       </button>
     </div>
-  );
+  )
 }

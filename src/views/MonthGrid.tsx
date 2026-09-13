@@ -1,13 +1,13 @@
-import { createComponentWithSlots } from "@mikrostack/rst";
-import { Fragment } from "react";
-import { type ColorKey, colorStyle } from "../assets/palette";
-import { cx } from "../assets/utils/cx";
+import { createComponentWithSlots } from '@mikrostack/rst'
+import { Fragment } from 'react'
+import { type ColorKey, colorStyle } from '../assets/palette'
+import { cx } from '../assets/utils/cx'
 
-import styles from "./MonthGrid.module.css";
+import styles from './MonthGrid.module.css'
 
 /** The week-number badge that leads each row. */
 function WeekNumber({ week }: { week: number }) {
-  return <span className={styles.weekNumber}>{week}</span>;
+  return <span className={styles.weekNumber}>{week}</span>
 }
 
 /**
@@ -23,13 +23,13 @@ function Cell({
   label,
   onClick,
 }: {
-  date: number;
-  dots: ColorKey[];
-  maxDots?: number;
-  dim?: boolean;
-  isToday?: boolean;
-  label: string;
-  onClick: () => void;
+  date: number
+  dots: ColorKey[]
+  maxDots?: number
+  dim?: boolean
+  isToday?: boolean
+  label: string
+  onClick: () => void
 }) {
   return (
     <button
@@ -49,13 +49,11 @@ function Cell({
               style={colorStyle(color)}
             />
           ))}
-          {dots.length > maxDots && (
-            <span className={styles.more}>+{dots.length - maxDots}</span>
-          )}
+          {dots.length > maxDots && <span className={styles.more}>+{dots.length - maxDots}</span>}
         </span>
       )}
     </button>
-  );
+  )
 }
 
 /**
@@ -69,9 +67,9 @@ export const MonthGridView = createComponentWithSlots({
   WeekNumber: { component: WeekNumber, multiple: true },
   Cell: { component: Cell, multiple: true },
 }).render(({ slots }) => {
-  const rows: (typeof slots.Cell)[] = [];
+  const rows: (typeof slots.Cell)[] = []
   for (let i = 0; i < slots.Cell.length; i += 7) {
-    rows.push(slots.Cell.slice(i, i + 7));
+    rows.push(slots.Cell.slice(i, i + 7))
   }
   return (
     <div className={styles.MonthGrid}>
@@ -83,5 +81,5 @@ export const MonthGridView = createComponentWithSlots({
         </Fragment>
       ))}
     </div>
-  );
-});
+  )
+})

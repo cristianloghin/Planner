@@ -1,9 +1,9 @@
-import { COLOR_OPTIONS, type ColorKey } from "../../../assets/palette";
-import { ColorPicker } from "../../../assets/ui/ColorPicker";
-import { CommitTextInput } from "../../../assets/ui/CommitTextInput";
-import type { Person, PersonId } from "../types";
+import { COLOR_OPTIONS, type ColorKey } from '../../../assets/palette'
+import { ColorPicker } from '../../../assets/ui/ColorPicker'
+import { CommitTextInput } from '../../../assets/ui/CommitTextInput'
+import type { Person, PersonId } from '../types'
 
-import styles from "./PeopleSettings.module.css";
+import styles from './PeopleSettings.module.css'
 
 /**
  * Everyone in the account, each with a name to edit and the colour this user
@@ -16,16 +16,16 @@ export function PeopleSettings({
   onRecolor,
   onResetColor,
 }: {
-  people: { person: Person; color: ColorKey; overridden: boolean }[];
-  onRename: (id: PersonId, name: string) => void;
-  onRecolor: (id: PersonId, color: ColorKey) => void;
-  onResetColor: (id: PersonId) => void;
+  people: { person: Person; color: ColorKey; overridden: boolean }[]
+  onRename: (id: PersonId, name: string) => void
+  onRecolor: (id: PersonId, color: ColorKey) => void
+  onResetColor: (id: PersonId) => void
 }) {
   return (
     <div className={styles.PeopleSettings}>
       <p className={styles.hint}>
-        Set up who's who. Names are shared with your partner; colours are yours —
-        pick how each person looks on your own calendar.
+        Set up who's who. Names are shared with your partner; colours are yours — pick how each
+        person looks on your own calendar.
       </p>
       {people.map(({ person, color, overridden }) => (
         <div className={styles.row} key={person.id}>
@@ -56,5 +56,5 @@ export function PeopleSettings({
         </div>
       ))}
     </div>
-  );
+  )
 }

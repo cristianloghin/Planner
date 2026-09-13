@@ -1,9 +1,9 @@
-import shared from "../../../assets/styles/shared.module.css";
-import { cx } from "../../../assets/utils/cx";
-import { offsetLabel } from "../../../assets/utils/dates";
-import { uid } from "../../../assets/utils/id";
-import { REMINDER_OFFSETS } from "../reminders";
-import type { EventReminder } from "../types";
+import shared from '../../../assets/styles/shared.module.css'
+import { cx } from '../../../assets/utils/cx'
+import { offsetLabel } from '../../../assets/utils/dates'
+import { uid } from '../../../assets/utils/id'
+import { REMINDER_OFFSETS } from '../reminders'
+import type { EventReminder } from '../types'
 
 /**
  * The reminders an event or template carries. Owns no state of its own — it
@@ -14,17 +14,17 @@ export function RemindersEditor({
   reminders,
   onChange,
 }: {
-  reminders: EventReminder[];
-  onChange: (next: EventReminder[]) => void;
+  reminders: EventReminder[]
+  onChange: (next: EventReminder[]) => void
 }) {
-  const chosen = new Set(reminders.map((r) => r.offset));
+  const chosen = new Set(reminders.map((r) => r.offset))
 
   function toggle(offset: number) {
     onChange(
       chosen.has(offset)
         ? reminders.filter((r) => r.offset !== offset)
         : [...reminders, { id: uid(), offset }],
-    );
+    )
   }
 
   return (
@@ -32,24 +32,20 @@ export function RemindersEditor({
       <label className={shared.label}>Remind me</label>
       <div className={shared.chips}>
         {REMINDER_OFFSETS.map((o) => {
-          const on = chosen.has(o);
+          const on = chosen.has(o)
           return (
             <button
               type="button"
               key={o}
               className={cx(shared.chip, on && shared.on)}
-              style={
-                on
-                  ? { background: "var(--accent)", borderColor: "var(--accent)" }
-                  : undefined
-              }
+              style={on ? { background: 'var(--accent)', borderColor: 'var(--accent)' } : undefined}
               onClick={() => toggle(o)}
             >
               {offsetLabel(o)}
             </button>
-          );
+          )
         })}
       </div>
     </>
-  );
+  )
 }

@@ -25,7 +25,7 @@ export default defineConfig({
       filename: 'sw.ts',
       injectManifest: {
         // Default Workbox glob omits fonts; add woff2 so the self-hosted
-        // Source Sans 3 files are precached and work offline.
+        // Google Sans Flex files are precached and work offline.
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
       },
       // Generate PNG/apple-touch/favicon assets from the SVG source and
