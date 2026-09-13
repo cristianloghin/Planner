@@ -7,6 +7,7 @@ import {
   draftValid,
   eventFromDraft,
   moveStart,
+  templateDraftChanged,
   templateDraftDuration,
   templateDraftFor,
   templateDraftForNew,
@@ -127,6 +128,16 @@ describe('template drafts', () => {
     const { id: _id, ...rest } = t
     expect(templateFromTemplateDraft(templateDraftFor(t))).toEqual(rest)
     expect(templateDraftFor(t)).toMatchObject({ hours: 1, minutes: 30 })
+  })
+
+  it('a draft has changed when it would save something different', () => {
+    const initial = templateDraftForNew(['a'])
+    expect(templateDraftChanged(initial, initial)).toBe(false)
+    expect(templateDraftChanged({ ...initial, title: 'Dentist' }, initial)).toBe(true)
+    expect(templateDraftChanged({ ...initial, minutes: 30 }, initial)).toBe(true)
+    // Hours are not part of an all-day template, so editing them changes nothing.
+    const allDay = { ...initial, allDay: true }
+    expect(templateDraftChanged({ ...allDay, hours: 5 }, allDay)).toBe(false)
   })
 
   it('an all-day template is whole days', () => {

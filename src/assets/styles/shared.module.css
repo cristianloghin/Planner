@@ -35,6 +35,11 @@
   color: var(--muted);
 }
 
+.iconBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .iconBtn.iconDanger {
   color: var(--danger);
 }

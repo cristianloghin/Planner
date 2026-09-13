@@ -6,6 +6,7 @@ import { uid } from '../assets/utils/id'
 import { TemplateForm } from '../domains/events/components/TemplateForm'
 import {
   type TemplateDraft,
+  templateDraftChanged,
   templateDraftFor,
   templateDraftForNew,
   templateDraftValid,
@@ -105,7 +106,14 @@ function TemplateSession({
   }
 
   return (
-    <EditorPageView onCancel={onClose} onSubmit={submit} submitLabel="Save">
+    <EditorPageView
+      onCancel={onClose}
+      onSubmit={submit}
+      submitLabel="Save"
+      // Nothing to save until the form names a template and differs from
+      // what was opened.
+      submitDisabled={!templateDraftValid(draft) || !templateDraftChanged(draft, initial)}
+    >
       <EditorPageView.Title>{id ? 'Edit template' : 'New template'}</EditorPageView.Title>
       <EditorPageView.Body>
         <TemplateForm draft={draft} onChange={setDraft} people={people} />

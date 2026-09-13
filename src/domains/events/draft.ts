@@ -250,6 +250,18 @@ export function templateDraftValid(d: TemplateDraft): boolean {
   return d.title.trim() !== ''
 }
 
+/**
+ * Whether saving `draft` would write something other than `initial` would.
+ * Compares the templates the two describe, not the form fields, so typing
+ * hours into an all-day template (which saves whole days) is not a change.
+ */
+export function templateDraftChanged(draft: TemplateDraft, initial: TemplateDraft): boolean {
+  return (
+    JSON.stringify(templateFromTemplateDraft(draft)) !==
+    JSON.stringify(templateFromTemplateDraft(initial))
+  )
+}
+
 /** The template the draft describes (no id). */
 export function templateFromTemplateDraft(d: TemplateDraft): Omit<EventTemplate, 'id'> {
   return {

@@ -25,7 +25,9 @@ export const EditorPageView = createComponentWithSlots({
   onSubmit?: () => void
   /** Label of the primary action; none means no primary action. */
   submitLabel?: string
-}>(({ slots, onCancel, cancelLabel = 'Cancel', onSubmit, submitLabel }) => {
+  /** The primary action is shown but cannot be taken (nothing to save yet). */
+  submitDisabled?: boolean
+}>(({ slots, onCancel, cancelLabel = 'Cancel', onSubmit, submitLabel, submitDisabled }) => {
   const content: ReactNode = (
     <>
       <Header className={styles.head}>
@@ -47,6 +49,7 @@ export const EditorPageView = createComponentWithSlots({
               type={onSubmit ? 'submit' : 'button'}
               className={cx(shared.iconBtn, shared.iconAccent)}
               onClick={onSubmit ? undefined : onCancel}
+              disabled={submitDisabled}
               aria-label={submitLabel}
             >
               <Save size={22} aria-hidden />
