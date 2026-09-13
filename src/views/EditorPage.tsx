@@ -1,14 +1,19 @@
 import { createComponentWithSlots } from '@mikrostack/rst'
+import { ArrowLeft, Save } from 'lucide-react'
 import type { FormEvent, ReactNode } from 'react'
 import shared from '../assets/styles/shared.module.css'
+import { cx } from '../assets/utils/cx'
 
 import styles from './EditorPage.module.css'
+import { Header } from './header/Header'
 
 /**
- * A full-page editor: a fixed toolbar of actions — Cancel, a short static
- * title, whatever the route adds, and the primary action — over a scrolling
- * body. With `onSubmit` the page is a form and the primary action submits it;
- * without, it is a plain page (a sheet that saves as it goes).
+ * A full-page editor: a fixed bar of actions — a back arrow on the left, a
+ * short static title in the middle, whatever the route adds plus the primary
+ * action (a save icon) on the right — over a scrolling body. With `onSubmit` the
+ * page is a form and the save icon submits it; without, it is a plain page (a
+ * sheet that saves as it goes). The labels are what a screen reader says for
+ * the two icons.
  */
 export const EditorPageView = createComponentWithSlots({
   Title: { isRequired: true },
@@ -23,24 +28,32 @@ export const EditorPageView = createComponentWithSlots({
 }>(({ slots, onCancel, cancelLabel = 'Cancel', onSubmit, submitLabel }) => {
   const content: ReactNode = (
     <>
-      <header className={styles.head}>
-        <button type="button" className={styles.cancel} onClick={onCancel}>
-          {cancelLabel}
-        </button>
-        <strong className={styles.title}>{slots.Title}</strong>
-        <div className={styles.actions}>
+      <Header className={styles.head}>
+        <Header.Left>
+          <button
+            type="button"
+            className={shared.iconBtn}
+            onClick={onCancel}
+            aria-label={cancelLabel}
+          >
+            <ArrowLeft size={22} aria-hidden />
+          </button>
+        </Header.Left>
+        <Header.Center.Title>{slots.Title}</Header.Center.Title>
+        <Header.Right>
           {slots.Actions}
           {submitLabel && (
             <button
               type={onSubmit ? 'submit' : 'button'}
-              className={shared.primary}
+              className={cx(shared.iconBtn, shared.iconAccent)}
               onClick={onSubmit ? undefined : onCancel}
+              aria-label={submitLabel}
             >
-              {submitLabel}
+              <Save size={22} aria-hidden />
             </button>
           )}
-        </div>
-      </header>
+        </Header.Right>
+      </Header>
       <div className={styles.body}>{slots.Body}</div>
     </>
   )

@@ -39,6 +39,12 @@
   color: var(--danger);
 }
 
+/* The one filled icon in a bar: the primary action. */
+.iconBtn.iconAccent {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
 /* Large title at the top of a scrolling editor body (see views/EditorPage).
    The toolbar holds the actions; the name lives here so it can wrap freely and
    scroll away instead of inflating a header that's pinned for the life of the

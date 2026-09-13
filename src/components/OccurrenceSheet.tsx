@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useAccount } from '../account'
 import shared from '../assets/styles/shared.module.css'
@@ -84,6 +84,16 @@ export function OccurrenceSheet({
   ]
 
   /** Toolbar delete: actions only — the question itself lives in the sheet. */
+  const editButton = (
+    <button
+      type="button"
+      className={cx(shared.iconBtn, shared.iconAccent)}
+      onClick={onEdit}
+      aria-label="Edit event"
+    >
+      <Pencil size={20} aria-hidden />
+    </button>
+  )
   const deleteButton = (
     <button
       type="button"
@@ -116,11 +126,7 @@ export function OccurrenceSheet({
     return (
       <EditorPageView cancelLabel="Close" onCancel={onClose}>
         <EditorPageView.Title>{null}</EditorPageView.Title>
-        <EditorPageView.Actions>
-          <button type="button" className={shared.primary} onClick={onEdit}>
-            Edit
-          </button>
-        </EditorPageView.Actions>
+        <EditorPageView.Actions>{editButton}</EditorPageView.Actions>
         <EditorPageView.Body>
           <h1 className={shared.editorTitle}>{event.title}</h1>
           <PageLoader />
@@ -135,9 +141,7 @@ export function OccurrenceSheet({
         <EditorPageView.Title>{null}</EditorPageView.Title>
         <EditorPageView.Actions>
           {deleteButton}
-          <button type="button" className={shared.primary} onClick={onEdit}>
-            Edit
-          </button>
+          {editButton}
         </EditorPageView.Actions>
         <EditorPageView.Body>
           <h1 className={shared.editorTitle}>{event.title}</h1>
