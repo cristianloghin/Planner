@@ -1,5 +1,5 @@
 import { useNavigation, useParams } from '@mikrostack/router'
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useAccount } from '../account'
 import { useNow } from '../assets/hooks/useNow'
 import { LoadingPill } from '../assets/ui/Spinner'
@@ -102,6 +102,9 @@ export function DayRoute() {
     setSheet({ event: occ.event, date: occ.start })
   }
 
+  /** Whether a lane other than this person's is expanded. */
+  const collapsed = (person: PersonId) => !!focusLane && focusLane !== person
+
   /** Tap on empty lane: a new event for that person at that time. */
   function addAt(date: string, person: PersonId, minute: number) {
     navigate(newEventAtPath(date, minute, [person]))
@@ -110,8 +113,6 @@ export function DayRoute() {
   function toggleLane(id: PersonId) {
     setFocusLane((cur) => (cur === id ? null : id))
   }
-
-  const { allDayOccs } = pages[1]
 
   // A column per person, with every block that person is on. A shared event
   // simply appears in each attendee's column, coloured by that lane.
@@ -160,30 +161,42 @@ export function DayRoute() {
             <LaneHead
               person={p}
               color={colors[p.id]}
-              isCollapsed={!!focusLane && focusLane !== p.id}
+              isCollapsed={collapsed(p.id)}
               isExpanded={focusLane === p.id}
               onToggleLane={() => toggleLane(p.id)}
-            >
-              {allDayOccs
-                .filter((o) => o.attendees.includes(p.id))
-                .map((o) => (
-                  <AllDayChip
-                    key={`${o.event.id}:${o.start}`}
-                    occ={o}
-                    color={eventColorIn(colors[p.id], o.event.colorKey)}
-                    isCollapsed={!!focusLane && focusLane !== p.id}
-                    onClick={() => openOccurrence(o)}
-                  />
-                ))}
-            </LaneHead>
+            />
           </CalendarView.Header.Lane>
         ))}
         <CalendarView.Gutter>
           <TimeGutter hourH={hourH} />
         </CalendarView.Gutter>
-        <CalendarView.Previous>{page(pages[0])}</CalendarView.Previous>
-        <CalendarView.Current>{page(pages[1])}</CalendarView.Current>
-        <CalendarView.Next>{page(pages[2])}</CalendarView.Next>
+        {/* Each deck page: a cell of all-day chips per person, then the day. */}
+        {(
+          [
+            [CalendarView.Previous, pages[0]],
+            [CalendarView.Current, pages[1]],
+            [CalendarView.Next, pages[2]],
+          ] as const
+        ).map(([deckPage, p]) => (
+          <Fragment key={p.iso}>
+            {people.map((person) => (
+              <deckPage.AllDay key={person.id}>
+                {p.allDayOccs
+                  .filter((o) => o.attendees.includes(person.id))
+                  .map((o) => (
+                    <AllDayChip
+                      key={`${o.event.id}:${o.start}`}
+                      occ={o}
+                      color={eventColorIn(colors[person.id], o.event.colorKey)}
+                      isCollapsed={collapsed(person.id)}
+                      onClick={() => openOccurrence(o)}
+                    />
+                  ))}
+              </deckPage.AllDay>
+            ))}
+            <deckPage.Body>{page(p)}</deckPage.Body>
+          </Fragment>
+        ))}
       </CalendarView>
 
       {isLoading && <LoadingPill />}

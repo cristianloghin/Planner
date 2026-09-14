@@ -1,32 +1,32 @@
-import type { ReactNode } from 'react'
 import { cx } from '../utils/cx'
 import styles from './DayHead.module.css'
 
 /**
  * A weekday's column heading: the day name, its number when given, today
- * ringed in accent, with whatever the caller drops underneath (all-day
- * chips). With `onToggle` the label is a button that expands that column, or
- * restores equal columns if it already is; without it, a plain label.
+ * ringed in accent. Collapsed (another column is expanded) the name shrinks
+ * to its initial. With `onToggle` the label is a button that expands that
+ * column, or restores equal columns if it already is; without it, a plain
+ * label.
  */
 export function DayHead({
   name,
   number,
   isToday,
+  isCollapsed,
   isExpanded,
   onToggle,
-  children,
 }: {
   name: string
   number?: number
   isToday?: boolean
+  isCollapsed?: boolean
   isExpanded?: boolean
   onToggle?: () => void
-  children?: ReactNode
 }) {
   const containerClass = cx(styles.container, isToday && styles.today)
   const label = (
     <>
-      <span className={styles.name}>{name}</span>
+      <span className={styles.name}>{isCollapsed ? name.charAt(0) : name}</span>
       {number != null && <span className={styles.number}>{number}</span>}
     </>
   )
@@ -46,7 +46,6 @@ export function DayHead({
         ) : (
           <div className={styles.label}>{label}</div>
         )}
-        {children != null && <div className={styles.chips}>{children}</div>}
       </div>
     </div>
   )

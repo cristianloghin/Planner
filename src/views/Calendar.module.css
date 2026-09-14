@@ -150,3 +150,65 @@
   position: relative;
   min-width: 0;
 }
+
+/* ---- The all-day band ---- */
+
+/* Pinned to the top of the scroller, over the pages, with the same gutter +
+   clip shape as the grid below so its cells sit exactly over the lanes. The
+   band itself is transparent: the day stays visible around the chips, which
+   carry their own surface. */
+.allDay {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+}
+
+/* Three pages like the deck's strip, but only the current one is in flow, so
+   the band is as tall as that page's chips. The neighbours are laid over the
+   same positions and clipped, and slide in with the deck. */
+.allDayStrip {
+  position: relative;
+  width: 300%;
+  margin-left: -100%;
+}
+
+/* The vertical padding sits here, inside the clip, so a chip's drop shadow
+   has room above and below instead of being cut off at the band's edge. */
+.allDayPage {
+  display: grid;
+  grid-template-columns: var(--lane-columns);
+  transition: grid-template-columns 0.25s ease;
+  width: calc(100% / 3);
+  margin-left: calc(100% / 3);
+  padding-block: 6px;
+}
+
+/* Nothing on the current page: no padding, so no height. */
+.allDay[data-empty] .allDayPage {
+  padding-block: 0;
+}
+
+.allDayPrev,
+.allDayNext {
+  position: absolute;
+  top: 0;
+  margin-left: 0;
+}
+
+.allDayPrev {
+  left: 0;
+}
+
+.allDayNext {
+  left: calc(100% / 3 * 2);
+}
+
+/* Side padding wide enough for the chip shadow's blur at the clip's edges. */
+.allDayCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 0 3px;
+}

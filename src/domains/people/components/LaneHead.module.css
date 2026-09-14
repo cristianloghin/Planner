@@ -1,4 +1,4 @@
-/* A person's column heading: coloured name on top, that day's chips below. */
+/* A person's column heading: the coloured name. */
 .LaneHead {
   display: flex;
   flex-direction: column;
@@ -26,12 +26,6 @@
 
 .LaneHead[data-expanded="true"] .name .toggle {
   color: white;
-}
-
-.chips {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 
 /* The name doubles as the expand toggle; keep the heading's look. */

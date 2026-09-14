@@ -90,9 +90,9 @@ export function MonthRoute() {
             <DayHead name={name} />
           </CalendarView.Header.Lane>
         ))}
-        <CalendarView.Previous>{page(months[0])}</CalendarView.Previous>
-        <CalendarView.Current>{page(months[1])}</CalendarView.Current>
-        <CalendarView.Next>{page(months[2])}</CalendarView.Next>
+        <CalendarView.Previous.Body>{page(months[0])}</CalendarView.Previous.Body>
+        <CalendarView.Current.Body>{page(months[1])}</CalendarView.Current.Body>
+        <CalendarView.Next.Body>{page(months[2])}</CalendarView.Next.Body>
       </CalendarView>
 
       {isLoading && <LoadingPill />}

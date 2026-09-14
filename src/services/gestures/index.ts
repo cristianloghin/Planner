@@ -49,6 +49,18 @@ export function pageInert(active: boolean): HTMLAttributes<HTMLElement> {
   return active ? {} : ({ inert: '', 'aria-hidden': true } as HTMLAttributes<HTMLElement>)
 }
 
+/**
+ * Where `content` starts inside `scroller`, in scroll coordinates: the
+ * scrollTop at which the content's top edge meets the scroller's top edge.
+ * Anything in flow above the content (a sticky band, padding) moves it, so
+ * minute-to-pixel maths must be offset by it rather than assume zero.
+ */
+export function scrollOrigin(scroller: HTMLElement, content: HTMLElement): number {
+  return (
+    content.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
+  )
+}
+
 /** Pinch-to-zoom wiring for a timeline's user-zoomable hour height. */
 export interface SwipeZoom {
   hourH: number
@@ -65,8 +77,10 @@ export interface SwipeZoom {
  *
  * `scrollRef` is the vertical scroll container the listeners bind to.
  * `stripRef` is a three-page strip (previous | current | next, one
- * container-width each — the shared `swipeStrip` class) that a drag slides
- * sideways, so the neighbor's real content follows the finger. When a swipe
+ * container-width each) that a drag slides sideways, so the neighbor's real
+ * content follows the finger. `followRefs` are further strips laid out the
+ * same way (a sticky all-day band above the pages) that get every transform
+ * the main strip gets, so they move as one. When a swipe
  * commits, the strip animates one page over, `onNavigate` fires (+1 =
  * forward, -1 = back), and once the caller has re-rendered — detected by
  * `pageKey` changing — a layout effect recenters the strip before paint. The
@@ -79,12 +93,14 @@ export interface SwipeZoom {
 export function useSwipeGestures({
   scrollRef,
   stripRef,
+  followRefs,
   pageKey,
   onNavigate,
   zoom,
 }: {
   scrollRef: RefObject<HTMLDivElement>
   stripRef: RefObject<HTMLDivElement>
+  followRefs?: RefObject<HTMLElement>[]
   /** Identifies the current page (ISO date, week start, month cursor). */
   pageKey: string
   onNavigate: (delta: 1 | -1) => void
@@ -94,6 +110,21 @@ export function useSwipeGestures({
   // otherwise close over stale values mid-gesture.
   const zoomRef = useLatest(zoom)
   const onNavigateRef = useLatest(onNavigate)
+  const followRef = useLatest(followRefs)
+
+  /** Every strip that slides: the main one plus any followers mounted now. */
+  function strips(main: HTMLElement): HTMLElement[] {
+    const followers = (followRef.current ?? []).flatMap((r) => (r.current ? [r.current] : []))
+    return [main, ...followers]
+  }
+
+  /** Put every strip in the same place at once. */
+  function slide(main: HTMLElement, transition: string, transform: string) {
+    for (const el of strips(main)) {
+      el.style.transition = transition
+      el.style.transform = transform
+    }
+  }
 
   const g = useRef({
     mode: 'none' as 'none' | 'decide' | 'swipe' | 'pinch',
@@ -123,8 +154,7 @@ export function useSwipeGestures({
     pendingRecenter.current = false
     const strip = stripRef.current
     if (!strip) return
-    strip.style.transition = 'none'
-    strip.style.transform = 'translateX(0)'
+    slide(strip, 'none', 'translateX(0)')
   }, [pageKey])
 
   // Keep the focal point fixed while a pinch changes the timeline height. Runs
@@ -133,8 +163,9 @@ export function useSwipeGestures({
   useLayoutEffect(() => {
     const a = pinchAnchor.current
     const el = scrollRef.current
-    if (!a || !el || !zoom) return
-    el.scrollTop = a.focalMin * (zoom.hourH / 60) - a.focalOff
+    const strip = stripRef.current
+    if (!a || !el || !strip || !zoom) return
+    el.scrollTop = scrollOrigin(el, strip) + a.focalMin * (zoom.hourH / 60) - a.focalOff
   }, [zoom?.hourH])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the listeners bind once and read live values through refs (hourHRef, onNavigateRef, g)
@@ -161,9 +192,8 @@ export function useSwipeGestures({
         st.dist0 = dist(e.touches)
         st.hour0 = z.hourH
         st.focalOff = midY - rect.top
-        st.focalMin = (el.scrollTop + st.focalOff) / (z.hourH / 60)
-        grid.style.transition = 'none'
-        grid.style.transform = ''
+        st.focalMin = (el.scrollTop + st.focalOff - scrollOrigin(el, grid)) / (z.hourH / 60)
+        slide(grid, 'none', '')
       } else if (e.touches.length === 1) {
         st.mode = 'decide'
         st.x0 = e.touches[0].clientX
@@ -195,8 +225,7 @@ export function useSwipeGestures({
         e.preventDefault()
         st.dx = e.touches[0].clientX - st.x0
         st.moved = true
-        grid.style.transition = 'none'
-        grid.style.transform = `translateX(${st.dx}px)`
+        slide(grid, 'none', `translateX(${st.dx}px)`)
       }
     }
 
@@ -218,15 +247,13 @@ export function useSwipeGestures({
           // Finish sliding the neighbor into place, then navigate; the layout
           // effect above recenters the strip once the new page has rendered.
           const dir = st.dx < 0 ? -1 : 1
-          grid.style.transition = `transform ${SWIPE_SLIDE_MS}ms ease`
-          grid.style.transform = `translateX(${dir * w}px)`
+          slide(grid, `transform ${SWIPE_SLIDE_MS}ms ease`, `translateX(${dir * w}px)`)
           window.setTimeout(() => {
             pendingRecenter.current = true
             onNavigateRef.current(-dir as 1 | -1)
           }, SWIPE_SLIDE_MS)
         } else {
-          grid.style.transition = `transform ${SWIPE_SLIDE_MS}ms ease`
-          grid.style.transform = 'translateX(0)'
+          slide(grid, `transform ${SWIPE_SLIDE_MS}ms ease`, 'translateX(0)')
         }
       }
       st.mode = 'none'

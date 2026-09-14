@@ -54,10 +54,3 @@ button.label {
 .today .number {
   color: var(--accent);
 }
-
-.chips {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 2px;
-}

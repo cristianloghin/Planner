@@ -1,5 +1,5 @@
 import { useNavigation, useParams } from '@mikrostack/router'
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useAccount } from '../account'
 import { useNow } from '../assets/hooks/useNow'
 import { DayHead } from '../assets/ui/DayHead'
@@ -172,34 +172,48 @@ export function WeekRoute() {
           <EventSearch onPick={openSearchHit} />
         </CalendarView.Header.Search>
         <CalendarView.Header.Title>{weekRangeLabel(weekStart)}</CalendarView.Header.Title>
-        {visible.map(({ dateISO, occs }, i) => (
+        {visible.map(({ dateISO }, i) => (
           <CalendarView.Header.Lane key={dateISO} weight={i === focusDay ? 4 : 1}>
             <DayHead
               name={DAY_NAMES[i]}
               number={Number(dateISO.slice(8, 10))}
               isToday={dateISO === todayISO}
+              isCollapsed={focusDay != null && focusDay !== i}
               isExpanded={focusDay === i}
               onToggle={() => toggleDay(i)}
-            >
-              {occs
-                .filter((o) => o.event.allDay)
-                .map((o) => (
-                  <AllDayChip
-                    key={`${o.event.id}:${o.start}`}
-                    occ={o}
-                    color={eventColorIn(colors[o.attendees[0]], o.event.colorKey)}
-                    onClick={() => openOccurrence(o)}
-                  />
-                ))}
-            </DayHead>
+            />
           </CalendarView.Header.Lane>
         ))}
         <CalendarView.Gutter>
           <TimeGutter hourH={hourH} />
         </CalendarView.Gutter>
-        <CalendarView.Previous>{page(weeks[0])}</CalendarView.Previous>
-        <CalendarView.Current>{page(weeks[1])}</CalendarView.Current>
-        <CalendarView.Next>{page(weeks[2])}</CalendarView.Next>
+        {/* Each deck page: a cell of all-day chips per weekday, then the week. */}
+        {(
+          [
+            [CalendarView.Previous, weeks[0]],
+            [CalendarView.Current, weeks[1]],
+            [CalendarView.Next, weeks[2]],
+          ] as const
+        ).map(([deckPage, days]) => (
+          <Fragment key={days[0].dateISO}>
+            {days.map(({ dateISO, occs }, dayIdx) => (
+              <deckPage.AllDay key={dateISO}>
+                {occs
+                  .filter((o) => o.event.allDay)
+                  .map((o) => (
+                    <AllDayChip
+                      key={`${o.event.id}:${o.start}`}
+                      occ={o}
+                      color={eventColorIn(colors[o.attendees[0]], o.event.colorKey)}
+                      isCollapsed={focusDay != null && dayIdx !== focusDay}
+                      onClick={() => openOccurrence(o)}
+                    />
+                  ))}
+              </deckPage.AllDay>
+            ))}
+            <deckPage.Body>{page(days)}</deckPage.Body>
+          </Fragment>
+        ))}
       </CalendarView>
 
       {isLoading && <LoadingPill />}

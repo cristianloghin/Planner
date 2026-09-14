@@ -5,12 +5,11 @@
   gap: 2px;
   height: 20px;
   border: none;
-  border-left: var(--event-accent) solid var(--c);
   border-radius: 10px;
-  /* Soft tint of the event's colour over the surface; text stays --text for
-     readable contrast. (Inlined, not a wrapper var — WebKit.) */
-  background: color-mix(in oklab, var(--c) var(--tint-strength), var(--surface));
-  color: var(--text);
+  /* Solid, unlike a timed block's tint: an all-day chip reads as a label,
+     not a span of the day. The swatches keep white text AA on every colour. */
+  background: var(--c);
+  color: white;
   text-align: left;
   box-shadow: 0 1px 3px var(--shadow);
   overflow: hidden;
