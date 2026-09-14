@@ -188,7 +188,7 @@ export const CalendarView = createLayout(
           onClickCapture={onClickCapture}
         >
           <div className={styles.grid}>
-            {slots.Gutter && <div className={styles.gutter}>{slots.Gutter}</div>}
+            {slots.Gutter.filled && <div className={styles.gutter}>{slots.Gutter}</div>}
             {/* The gutter stays put; only the pages slide during a swipe. */}
             <div className={styles.clip}>
               <div className={styles.strip} ref={stripRef}>

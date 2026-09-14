@@ -99,7 +99,7 @@ export function EditEventRoute() {
   // view that opened the editor fetched the same window.
   const { occurrences, isLoading: occurrencesLoading } = useOccurrencesForRange(
     accountId,
-    scope === 'occurrence' ? date : null,
+    scope === 'occurrence' ? (date ?? null) : null,
   )
   const close = useClose(date ?? (event ? eventDate(event) : toISODate(new Date())))
 

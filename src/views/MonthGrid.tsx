@@ -77,7 +77,7 @@ export const MonthGridView = createLayout(
     return (
       <div className={styles.MonthGrid}>
         {rows.map((cells, r) => (
-          <Fragment key={`week-${slots.WeekNumber.elements[r]}`}>
+          <Fragment key={slots.WeekNumber.props[r].week}>
             {slots.WeekNumber.elements[r]}
             {cells}
           </Fragment>
