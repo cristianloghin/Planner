@@ -1,4 +1,4 @@
-import { createComponentWithSlots } from '@mikrostack/rst'
+import { createLayout, slot } from '@mikrostack/rst'
 import { Fragment } from 'react'
 import { type ColorKey, colorStyle } from '../assets/palette'
 import { cx } from '../assets/utils/cx'
@@ -63,23 +63,26 @@ function Cell({
  * leading column is the gutter token wide, so it lines up under the calendar
  * view's lane row.
  */
-export const MonthGridView = createComponentWithSlots({
-  WeekNumber: { component: WeekNumber, multiple: true },
-  Cell: { component: Cell, multiple: true },
-}).render(({ slots }) => {
-  const rows: (typeof slots.Cell)[] = []
-  for (let i = 0; i < slots.Cell.length; i += 7) {
-    rows.push(slots.Cell.slice(i, i + 7))
-  }
-  return (
-    <div className={styles.MonthGrid}>
-      {rows.map((cells, r) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: a row has no identity beyond its position; the cells inside carry their own
-        <Fragment key={r}>
-          {slots.WeekNumber[r]}
-          {cells}
-        </Fragment>
-      ))}
-    </div>
-  )
-})
+export const MonthGridView = createLayout(
+  {
+    WeekNumber: slot({ component: WeekNumber, multiple: true }),
+    Cell: slot({ component: Cell, multiple: true }),
+  },
+  (_, { slots }) => {
+    const rows: (typeof slots.Cell.elements)[] = []
+    for (let i = 0; i < slots.Cell.elements.length; i += 7) {
+      rows.push(slots.Cell.elements.slice(i, i + 7))
+    }
+
+    return (
+      <div className={styles.MonthGrid}>
+        {rows.map((cells, r) => (
+          <Fragment key={`week-${slots.WeekNumber.elements[r]}`}>
+            {slots.WeekNumber.elements[r]}
+            {cells}
+          </Fragment>
+        ))}
+      </div>
+    )
+  },
+)

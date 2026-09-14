@@ -1,4 +1,4 @@
-import { createComponentWithSlots } from '@mikrostack/rst'
+import { createLayout, slot } from '@mikrostack/rst'
 
 import styles from './Section.module.css'
 import { Header } from './header/Header'
@@ -9,14 +9,15 @@ import { Header } from './header/Header'
  * things the section can show; with a `Title` alone it is just the title.
  * Routes drop the matched child's content, or their own, in the body.
  */
-export const SectionView = createComponentWithSlots({
-  Header: { component: Header },
-  Body: { isRequired: true },
-}).render(({ slots }) => {
-  return (
+export const SectionView = createLayout(
+  {
+    Header: slot({ component: Header }),
+    Body: slot({ required: true }),
+  },
+  (_, { slots }) => (
     <section className={styles.Section}>
       {slots.Header}
       <div className={styles.body}>{slots.Body}</div>
     </section>
-  )
-})
+  ),
+)

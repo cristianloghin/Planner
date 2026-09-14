@@ -1,8 +1,12 @@
-import { createComponentWithSlots } from '@mikrostack/rst'
+import { createLayout, slot } from '@mikrostack/rst'
 import type { CSSProperties, MouseEvent, ReactNode } from 'react'
 import { cx } from '../assets/utils/cx'
 
 import styles from './Timeline.module.css'
+
+interface TimelineViewProps {
+  pxPerMin: number
+}
 
 const DAY_MIN = 24 * 60
 
@@ -52,22 +56,25 @@ function Column({
  * publishes, sizes the day from the zoom, and draws the hour lines. Routes
  * fill each `Column` with blocks.
  */
-export const TimelineView = createComponentWithSlots({
-  Column: { component: Column, multiple: true },
-}).render<{ pxPerMin: number }>(({ slots, pxPerMin }) => {
-  const hourH = pxPerMin * 60
-  return (
-    <div
-      className={styles.Timeline}
-      style={
-        {
-          height: DAY_MIN * pxPerMin,
-          '--hour-h': `${hourH}px`,
-          '--quarter-h': `${hourH / 4}px`,
-        } as CSSProperties
-      }
-    >
-      {slots.Column}
-    </div>
-  )
-})
+export const TimelineView = createLayout(
+  {
+    Column: slot({ component: Column, multiple: true }),
+  },
+  ({ pxPerMin }: TimelineViewProps, { slots }) => {
+    const hourH = pxPerMin * 60
+    return (
+      <div
+        className={styles.Timeline}
+        style={
+          {
+            height: DAY_MIN * pxPerMin,
+            '--hour-h': `${hourH}px`,
+            '--quarter-h': `${hourH / 4}px`,
+          } as CSSProperties
+        }
+      >
+        {slots.Column}
+      </div>
+    )
+  },
+)

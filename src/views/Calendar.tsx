@@ -1,4 +1,4 @@
-import { createComponentWithSlots, getSlotProps } from '@mikrostack/rst'
+import { createLayout, slot } from '@mikrostack/rst'
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 import { type CSSProperties, type ReactNode, useEffect, useRef } from 'react'
 import { useLatest } from '../assets/hooks/useLatest'
@@ -6,6 +6,19 @@ import { cx } from '../assets/utils/cx'
 import { type SwipeZoom, pageInert, useSwipeGestures } from '../services/gestures'
 
 import styles from './Calendar.module.css'
+
+interface CalendarViewProps {
+  /** Identity of the current page: an ISO date, a week start, a month cursor. */
+  pageKey: string
+  onNavigate: (delta: 1 | -1) => void
+  onGoToday: () => void
+  todayActive?: boolean
+  /** Text over the gutter, in the lane row (a week number). */
+  gutterLabel?: string
+  zoom?: SwipeZoom
+  /** Minute to scroll to on first mount; unset leaves the scroller at the top. */
+  initialMinute?: number
+}
 
 /** The column template for lanes with the given relative widths. */
 function laneColumns(weights: number[]): string {
@@ -93,98 +106,104 @@ function Header({
  * A page is whatever the route drops in — a `TimelineView` of columns, a
  * `MonthGridView` of cells. The lane template is inherited by anything inside.
  */
-export const CalendarView = createComponentWithSlots({
-  'Header.Title': { isRequired: true },
-  'Header.Search': {},
-  'Header.Lane': { component: LaneSlot, multiple: true },
-  Gutter: {},
-  Previous: { isRequired: true },
-  Current: { isRequired: true },
-  Next: { isRequired: true },
-}).render<{
-  /** Identity of the current page: an ISO date, a week start, a month cursor. */
-  pageKey: string
-  onNavigate: (delta: 1 | -1) => void
-  onGoToday: () => void
-  todayActive?: boolean
-  /** Text over the gutter, in the lane row (a week number). */
-  gutterLabel?: string
-  zoom?: SwipeZoom
-  /** Minute to scroll to on first mount; unset leaves the scroller at the top. */
-  initialMinute?: number
-}>(({ slots, pageKey, onNavigate, onGoToday, todayActive, gutterLabel, zoom, initialMinute }) => {
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const stripRef = useRef<HTMLDivElement>(null)
-  // Mirror for scrollToMinute, which mount effects call with a stale closure.
-  const pxPerMinRef = useLatest((zoom?.hourH ?? 60) / 60)
+export const CalendarView = createLayout(
+  {
+    Header: {
+      Title: slot({ required: true }),
+      Search: slot(),
+      Lane: slot({ component: LaneSlot, multiple: true }),
+    },
 
-  const { onClickCapture } = useSwipeGestures({
-    scrollRef,
-    stripRef,
-    pageKey,
-    onNavigate,
-    zoom,
-  })
+    Gutter: slot(),
+    Previous: slot({ required: true }),
+    Current: slot({ required: true }),
+    Next: slot({ required: true }),
+  },
+  (
+    {
+      pageKey,
+      onNavigate,
+      onGoToday,
+      todayActive,
+      gutterLabel,
+      zoom,
+      initialMinute,
+    }: CalendarViewProps,
+    { slots },
+  ) => {
+    const scrollRef = useRef<HTMLDivElement>(null)
+    const stripRef = useRef<HTMLDivElement>(null)
+    // Mirror for scrollToMinute, which mount effects call with a stale closure.
+    const pxPerMinRef = useLatest((zoom?.hourH ?? 60) / 60)
 
-  // Scroll the timeline so `minute` sits a little below the top edge.
-  function scrollToMinute(minute: number) {
-    const el = scrollRef.current
-    if (el) el.scrollTop = Math.max(0, minute * pxPerMinRef.current - 80)
-  }
+    const { onClickCapture } = useSwipeGestures({
+      scrollRef,
+      stripRef,
+      pageKey,
+      onNavigate,
+      zoom,
+    })
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: run on mount only
-  useEffect(() => {
-    if (initialMinute != null) scrollToMinute(initialMinute)
-  }, [])
+    // Scroll the timeline so `minute` sits a little below the top edge.
+    function scrollToMinute(minute: number) {
+      const el = scrollRef.current
+      if (el) el.scrollTop = Math.max(0, minute * pxPerMinRef.current - 80)
+    }
 
-  // The route changes the date; the view re-focuses the current time, because
-  // "take me to now" is an explicit intent and the scroll position is ours.
-  function goToday() {
-    onGoToday()
-    const min = new Date().getHours() * 60 + new Date().getMinutes()
-    requestAnimationFrame(() => scrollToMinute(min))
-  }
+    // biome-ignore lint/correctness/useExhaustiveDependencies: run on mount only
+    useEffect(() => {
+      if (initialMinute != null) scrollToMinute(initialMinute)
+    }, [])
 
-  const lanes = slots['Header.Lane']
-  const weights = getSlotProps(lanes, (p) => p.weight ?? 1)
+    // The route changes the date; the view re-focuses the current time, because
+    // "take me to now" is an explicit intent and the scroll position is ours.
+    function goToday() {
+      onGoToday()
+      const min = new Date().getHours() * 60 + new Date().getMinutes()
+      requestAnimationFrame(() => scrollToMinute(min))
+    }
 
-  return (
-    <section
-      className={styles.CalendarView}
-      style={{ '--lane-columns': laneColumns(weights) } as CSSProperties}
-    >
-      <Header
-        search={slots['Header.Search']}
-        title={slots['Header.Title']}
-        lanes={lanes}
-        todayActive={todayActive}
-        gutterLabel={gutterLabel}
-        onNavigate={onNavigate}
-        onGoToday={goToday}
-      />
-      <div
-        className={styles.body}
-        ref={scrollRef}
-        // Browser owns vertical panning; we own horizontal swipe + pinch.
-        style={{ touchAction: 'pan-y' }}
-        onClickCapture={onClickCapture}
+    const lanes = slots.Header.Lane.elements
+    const weights = slots.Header.Lane.props.map((p) => p.weight ?? 1)
+
+    return (
+      <section
+        className={styles.CalendarView}
+        style={{ '--lane-columns': laneColumns(weights) } as CSSProperties}
       >
-        <div className={styles.grid}>
-          {slots.Gutter && <div className={styles.gutter}>{slots.Gutter}</div>}
-          {/* The gutter stays put; only the pages slide during a swipe. */}
-          <div className={styles.clip}>
-            <div className={styles.strip} ref={stripRef}>
-              <div className={styles.page} {...pageInert(false)}>
-                {slots.Previous}
-              </div>
-              <div className={styles.page}>{slots.Current}</div>
-              <div className={styles.page} {...pageInert(false)}>
-                {slots.Next}
+        <Header
+          search={slots.Header.Search}
+          title={slots.Header.Title}
+          lanes={lanes}
+          todayActive={todayActive}
+          gutterLabel={gutterLabel}
+          onNavigate={onNavigate}
+          onGoToday={goToday}
+        />
+        <div
+          className={styles.body}
+          ref={scrollRef}
+          // Browser owns vertical panning; we own horizontal swipe + pinch.
+          style={{ touchAction: 'pan-y' }}
+          onClickCapture={onClickCapture}
+        >
+          <div className={styles.grid}>
+            {slots.Gutter && <div className={styles.gutter}>{slots.Gutter}</div>}
+            {/* The gutter stays put; only the pages slide during a swipe. */}
+            <div className={styles.clip}>
+              <div className={styles.strip} ref={stripRef}>
+                <div className={styles.page} {...pageInert(false)}>
+                  {slots.Previous}
+                </div>
+                <div className={styles.page}>{slots.Current}</div>
+                <div className={styles.page} {...pageInert(false)}>
+                  {slots.Next}
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
-  )
-})
+      </section>
+    )
+  },
+)
