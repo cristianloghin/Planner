@@ -10,7 +10,6 @@ import { OccurrenceSheet } from '../components/OccurrenceSheet'
 import { AllDayChip } from '../domains/events/components/AllDayChip'
 import { EventBlock } from '../domains/events/components/EventBlock'
 import { useEvents, useOccurrencesForRange } from '../domains/events/queries'
-import { Avatars } from '../domains/people/components/Avatars'
 import { LaneHead } from '../domains/people/components/LaneHead'
 import { usePeopleWithColors } from '../domains/people/queries'
 import { eventColorIn } from '../domains/people/selectors'
@@ -114,16 +113,6 @@ export function DayRoute() {
 
   const { allDayOccs } = pages[1]
 
-  /** The people on an occurrence, with their colours, for its avatars. */
-  function avatarsFor(ids: PersonId[]) {
-    return ids.flatMap((id) => {
-      // A person not in the list yet (first fetch in flight, or one a partner
-      // just removed) must not crash the view.
-      const p = people.find((x) => x.id === id)
-      return p ? [{ person: p, color: colors[id] }] : []
-    })
-  }
-
   // A column per person, with every block that person is on. A shared event
   // simply appears in each attendee's column, coloured by that lane.
   const page = (p: DayPage) => (
@@ -144,12 +133,7 @@ export function DayRoute() {
                 col={col}
                 cols={cols}
                 onClick={() => openOccurrence(block.occ)}
-              >
-                {/* Who is on it THIS day — an override replaces the roster. */}
-                {block.occ.attendees.length > 1 && (
-                  <Avatars attendees={avatarsFor(block.occ.attendees)} />
-                )}
-              </EventBlock>
+              />
             ),
           )}
         </TimelineView.Column>

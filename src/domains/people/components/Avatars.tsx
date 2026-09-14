@@ -21,9 +21,7 @@ export function Avatars({
           className={styles.avatar}
           style={colorStyle(color)}
           title={person.name}
-        >
-          {person.name.slice(0, 1).toUpperCase()}
-        </span>
+        />
       ))}
     </span>
   )

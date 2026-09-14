@@ -46,6 +46,7 @@ export function EventBlock({
   // Never thinner than a legible line; dense bars hug their neighbours closer.
   const height = Math.max((end - start) * pxPerMin, dense ? 12 : 16)
   const inset = dense ? 1 : 2
+
   return (
     <button
       type="button"
@@ -61,6 +62,10 @@ export function EventBlock({
       title={dense ? event.title : undefined}
       aria-label={dense ? `${event.title}, ${range}` : undefined}
     >
+      <span className={styles.overlay} style={{ top: height - 12, ...colorStyle(color) }} />
+      {showTitle && (!dense || height >= TITLE_MIN_PX) && (
+        <span className={styles.title}>{event.title}</span>
+      )}
       {!dense && (
         <span className={styles.time}>
           {range}
@@ -72,9 +77,6 @@ export function EventBlock({
           )}
           <Badges event={event} />
         </span>
-      )}
-      {showTitle && (!dense || height >= TITLE_MIN_PX) && (
-        <span className={styles.title}>{event.title}</span>
       )}
       {children}
     </button>

@@ -18,12 +18,13 @@ import { OccurrenceSheet } from '../components/OccurrenceSheet'
 import { AllDayChip } from '../domains/events/components/AllDayChip'
 import { EventBlock } from '../domains/events/components/EventBlock'
 import { useEvents, useOccurrencesForRange } from '../domains/events/queries'
+import { Avatars } from '../domains/people/components/Avatars'
 import { usePeopleWithColors } from '../domains/people/queries'
 import { eventColorIn } from '../domains/people/selectors'
 import { loadZoom } from '../services/gestures'
 import { type DayOccurrence, nextRelevantDate, occurrencesOnDate } from '../services/recurrence'
 import { layoutBlocks } from '../services/timeline-layout'
-import type { CalendarEvent } from '../types'
+import type { CalendarEvent, PersonId } from '../types'
 import { CalendarView } from '../views/Calendar'
 import { TimelineView } from '../views/Timeline'
 import { editEventPath, editOccurrencePath, newEventAtPath } from './eventPaths'
@@ -50,7 +51,7 @@ export function WeekRoute() {
     navigate('/week/:weekStart', { params: { weekStart: monday } })
   const { accountId, userId } = useAccount()
   const { data: events = [] } = useEvents(accountId)
-  const { colors } = usePeopleWithColors(accountId, userId)
+  const { people, colors } = usePeopleWithColors(accountId, userId)
 
   const [sheet, setSheet] = useState<{
     event: CalendarEvent
@@ -110,6 +111,16 @@ export function WeekRoute() {
   const thisWeek = weekStart === mondayOf(now)
   const visible = weeks[1]
 
+  /** The people on an occurrence, with their colours, for its avatars. */
+  function avatarsFor(ids: PersonId[]) {
+    return ids.flatMap((id) => {
+      // A person not in the list yet (first fetch in flight, or one a partner
+      // just removed) must not crash the view.
+      const p = people.find((x) => x.id === id)
+      return p ? [{ person: p, color: colors[id] }] : []
+    })
+  }
+
   // A column per weekday, all attendees sharing it. With an expanded day the
   // squeezed columns are too thin for text, so only that one keeps titles.
   const page = (days: WeekDay[]) => (
@@ -136,7 +147,10 @@ export function WeekRoute() {
               dense
               showTitle={focusDay == null || dayIdx === focusDay}
               onClick={() => openOccurrence(block.occ)}
-            />
+            >
+              {/* Who is on it THIS day — an override replaces the roster. */}
+              <Avatars attendees={avatarsFor(block.occ.attendees)} />
+            </EventBlock>
           ))}
         </TimelineView.Column>
       ))}
