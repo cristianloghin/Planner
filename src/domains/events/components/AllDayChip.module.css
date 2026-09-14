@@ -1,11 +1,12 @@
 .AllDayChip {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 2px;
-  height: 16px;
+  height: 20px;
   border: none;
   border-left: var(--event-accent) solid var(--c);
-  border-radius: 8px;
+  border-radius: 10px;
   /* Soft tint of the event's colour over the surface; text stays --text for
      readable contrast. (Inlined, not a wrapper var — WebKit.) */
   background: color-mix(in oklab, var(--c) var(--tint-strength), var(--surface));
@@ -15,10 +16,6 @@
   overflow: hidden;
 
   font-stretch: 75%;
-}
-
-.meta {
-  flex: 0;
 }
 
 .title {

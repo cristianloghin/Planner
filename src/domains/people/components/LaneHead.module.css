@@ -5,29 +5,27 @@
   align-items: stretch;
   gap: 8px;
   color: var(--c);
-  padding: 8px 4px 4px 4px;
-  border-left: 1px solid var(--border);
+  padding: 4px 4px 8px;
 }
 
-.LaneHead:last-child {
-  border-right: 1px solid var(--border);
+.LaneHead[data-expanded="true"] .name {
+  background-color: currentColor;
+  border-color: currentColor;
 }
 
 .name {
   display: flex;
+  height: 32px;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  font-size: var(--fs-lg);
+  font-size: var(--fs-base);
   font-weight: 700;
+  border: 2px solid currentColor;
+  border-radius: 9999px;
 }
 
-.dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  display: inline-block;
-  background: var(--c);
+.LaneHead[data-expanded="true"] .name .toggle {
+  color: white;
 }
 
 .chips {
@@ -38,6 +36,7 @@
 
 /* The name doubles as the expand toggle; keep the heading's look. */
 .toggle {
+  flex: 1 1 100%;
   background: none;
   border: none;
   padding: 0;

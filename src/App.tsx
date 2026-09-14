@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import s from './App.module.css'
 import { AccountProvider, useAccount } from './account'
 import { PageLoader } from './assets/ui/Spinner'
+import { cx } from './assets/utils/cx'
 import { isSameMonth, mondayOf, toISODate } from './assets/utils/dates'
 import { subscribeToChanges } from './client/realtime'
 import { AlertHost } from './components/AlertHost'
@@ -43,24 +44,26 @@ function useVisibleDate(): string {
 /** The tab bar: the three calendar tabs on the visible date, and settings. */
 function TabBar() {
   const date = useVisibleDate()
-  const cls = { className: s.tab, activeClassName: s.active }
+  const cls = (cls?: string) => ({ className: cx(s.tab, cls), activeClassName: s.active })
   return (
     <nav className={s.tabbar}>
       {/* The section root, so the tab stays lit for templates and notes alike. */}
-      <Link to="/library" aria-label="Library" {...cls}>
+      <Link to="/library" aria-label="Library" {...cls(s.iconTab)}>
         <SquarePen size={20} />
       </Link>
-      <Link to="/day/:date" params={{ date }} aria-label="Day" {...cls}>
-        Day
-      </Link>
-      {/* The routes' guards normalise a day to its week or month. */}
-      <Link to="/week/:weekStart" params={{ weekStart: date }} aria-label="Week" {...cls}>
-        Week
-      </Link>
-      <Link to="/month/:month" params={{ month: date }} aria-label="Month" {...cls}>
-        Month
-      </Link>
-      <Link to="/settings" aria-label="Settings" {...cls}>
+      <div className={s.calendarTabs}>
+        <Link to="/day/:date" params={{ date }} aria-label="Day" {...cls()}>
+          Day
+        </Link>
+        {/* The routes' guards normalise a day to its week or month. */}
+        <Link to="/week/:weekStart" params={{ weekStart: date }} aria-label="Week" {...cls()}>
+          Week
+        </Link>
+        <Link to="/month/:month" params={{ month: date }} aria-label="Month" {...cls()}>
+          Month
+        </Link>
+      </div>
+      <Link to="/settings" aria-label="Settings" {...cls(s.iconTab)}>
         <SettingsIcon size={20} />
       </Link>
     </nav>

@@ -176,7 +176,7 @@ export function DayRoute() {
             <LaneHead
               person={p}
               color={colors[p.id]}
-              isCollapsed={focusLane && focusLane !== p.id}
+              isCollapsed={!!focusLane && focusLane !== p.id}
               isExpanded={focusLane === p.id}
               onToggleLane={() => toggleLane(p.id)}
             >
@@ -187,6 +187,7 @@ export function DayRoute() {
                     key={`${o.event.id}:${o.start}`}
                     occ={o}
                     color={eventColorIn(colors[p.id], o.event.colorKey)}
+                    isCollapsed={!!focusLane && focusLane !== p.id}
                     onClick={() => openOccurrence(o)}
                   />
                 ))}

@@ -1,4 +1,4 @@
-import type { FC, PropsWithChildren } from 'react'
+import { Children, type FC, type PropsWithChildren } from 'react'
 import { type ColorKey, colorStyle } from '../../../assets/palette'
 import type { Person } from '../types'
 
@@ -19,20 +19,34 @@ export const LaneHead: FC<
     onToggleLane?: () => void
   }>
 > = ({ person, color, isCollapsed, isExpanded, onToggleLane, children }) => {
-  if (isCollapsed) {
-    return (
-      <div className={cx(styles.LaneHead)} style={colorStyle(color)}>
-        <div className={styles.name}>
-          <span className={styles.dot} />
-        </div>
-        <div className={styles.chips}>{children}</div>
-      </div>
-    )
-  }
+  // if (isCollapsed) {
+  //   return (
+  //     <div className={cx(styles.LaneHead)} style={colorStyle(color)}>
+  //       <div className={styles.name}>
+  //         {onToggleLane ? (
+  //           <button
+  //             type="button"
+  //             className={styles.toggle}
+  //             onClick={onToggleLane}
+  //             aria-pressed={isExpanded}
+  //             aria-label={isExpanded ? 'Restore equal lanes' : `Expand ${person.name}'s lane`}
+  //           >
+  //             {person.name.charAt(0).toUpperCase()}
+  //           </button>
+  //         ) : (
+  //           person.name.charAt(0).toUpperCase()
+  //         )}
+  //       </div>
+  //       <div className={styles.chips}>{children}</div>
+  //     </div>
+  //   )
+  // }
+
+  const name = isCollapsed ? person.name.charAt(0).toUpperCase() : person.name
+
   return (
-    <div className={cx(styles.LaneHead)} style={colorStyle(color)}>
+    <div className={cx(styles.LaneHead)} style={colorStyle(color)} data-expanded={isExpanded}>
       <div className={styles.name}>
-        <span className={styles.dot} />
         {onToggleLane ? (
           <button
             type="button"
@@ -41,13 +55,13 @@ export const LaneHead: FC<
             aria-pressed={isExpanded}
             aria-label={isExpanded ? 'Restore equal lanes' : `Expand ${person.name}'s lane`}
           >
-            {person.name}
+            {name}
           </button>
         ) : (
-          person.name
+          name
         )}
       </div>
-      <div className={styles.chips}>{children}</div>
+      {Children.count(children) > 0 && <div className={styles.chips}>{children}</div>}
     </div>
   )
 }
