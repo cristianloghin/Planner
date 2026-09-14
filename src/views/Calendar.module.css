@@ -9,10 +9,18 @@
   flex-direction: column;
 }
 
+/* Flush with the page at the top; an edge and a shadow once content has
+   scrolled under it (the frame's `data-scrolled`). */
 .head {
   flex: none;
   padding: 0 max(16px, env(safe-area-inset-left));
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid transparent;
+  box-shadow: 0px 2px 12px 0px transparent;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.CalendarView[data-scrolled] .head {
+  border-bottom-color: var(--border);
   box-shadow: 0px 2px 12px 0px var(--shadow);
 }
 
@@ -149,6 +157,14 @@
 .page {
   position: relative;
   min-width: 0;
+}
+
+/* The scrolled-away sentinel. One pixel tall, because a zero-height box can
+   report as intersecting either way. It also stands in for the grid's own top
+   padding, so the layout is unchanged. */
+.top {
+  height: 1px;
+  margin-bottom: -1px;
 }
 
 /* ---- The all-day band ---- */

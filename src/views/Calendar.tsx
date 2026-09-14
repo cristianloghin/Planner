@@ -1,6 +1,6 @@
 import { createLayout, slot } from '@mikrostack/rst'
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
-import { type CSSProperties, Children, type ReactNode, useEffect, useRef } from 'react'
+import { type CSSProperties, Children, type ReactNode, useEffect, useRef, useState } from 'react'
 import { useLatest } from '../assets/hooks/useLatest'
 import { cx } from '../assets/utils/cx'
 import { type SwipeZoom, pageInert, scrollOrigin, useSwipeGestures } from '../services/gestures'
@@ -158,6 +158,12 @@ export const CalendarView = createLayout(
     const stripRef = useRef<HTMLDivElement>(null)
     const bandRef = useRef<HTMLDivElement>(null)
     const bandStripRef = useRef<HTMLDivElement>(null)
+    const topRef = useRef<HTMLDivElement>(null)
+    // Whether the page has scrolled away from the top: the head shows an edge
+    // only once content slides under it. Known from a sentinel at the top of
+    // the scroller, so the browser tells us when it changes and nothing
+    // reads scroll positions per frame.
+    const [scrolled, setScrolled] = useState(false)
     // Mirror for scrollToMinute, which mount effects call with a stale closure.
     const pxPerMinRef = useLatest((zoom?.hourH ?? 60) / 60)
 
@@ -186,6 +192,19 @@ export const CalendarView = createLayout(
       if (initialMinute != null) scrollToMinute(initialMinute)
     }, [])
 
+    useEffect(() => {
+      const el = scrollRef.current
+      const top = topRef.current
+      if (!el || !top) return
+      // Several records can arrive in one callback; the last one is the truth.
+      const observer = new IntersectionObserver(
+        (entries) => setScrolled(!entries[entries.length - 1].isIntersecting),
+        { root: el },
+      )
+      observer.observe(top)
+      return () => observer.disconnect()
+    }, [])
+
     // The route changes the date; the view re-focuses the current time, because
     // "take me to now" is an explicit intent and the scroll position is ours.
     function goToday() {
@@ -210,6 +229,7 @@ export const CalendarView = createLayout(
       <section
         className={styles.CalendarView}
         style={{ '--lane-columns': laneColumns(weights) } as CSSProperties}
+        data-scrolled={scrolled || undefined}
       >
         <Header
           search={slots.Header.Search}
@@ -227,6 +247,7 @@ export const CalendarView = createLayout(
           style={{ touchAction: 'pan-y' }}
           onClickCapture={onClickCapture}
         >
+          <div className={styles.top} ref={topRef} />
           {hasAllDay && (
             <div
               className={styles.allDay}
