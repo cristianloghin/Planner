@@ -127,7 +127,8 @@ function Header({
  *
  * A page body is whatever the route drops in — a `TimelineView` of columns,
  * a `MonthGridView` of cells. The lane template is inherited by anything
- * inside.
+ * inside. `Footer` sits under the deck, in the same scroller, and does not
+ * slide with it: a swipe changes the pages, the footer stays.
  */
 export const CalendarView = createLayout(
   {
@@ -141,6 +142,7 @@ export const CalendarView = createLayout(
     Previous: page,
     Current: page,
     Next: page,
+    Footer: slot(),
   },
   (
     {
@@ -283,6 +285,7 @@ export const CalendarView = createLayout(
               </div>
             </div>
           </div>
+          {slots.Footer}
         </div>
       </section>
     )

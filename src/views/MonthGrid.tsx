@@ -11,34 +11,59 @@ function WeekNumber({ week }: { week: number }) {
 }
 
 /**
- * One day of the grid: the date, a dot per thing on that day in its colour,
- * and "+N" past `maxDots`. Dimmed outside the visible month, ringed on today.
+ * One day of the grid: the date, a full-width bar per all-day thing in its
+ * colour, then a dot per timed thing and "+N" past `maxDots`. Dimmed outside
+ * the visible month, ringed on today, filled when selected.
  */
 function Cell({
   date,
+  bars = [],
   dots,
   maxDots = 4,
   dim,
   isToday,
+  selected,
   label,
   onClick,
 }: {
   date: number
+  /** Colours of the day's all-day occurrences, drawn as bars. */
+  bars?: ColorKey[]
+  /** Colours of the day's timed occurrences, drawn as dots. */
   dots: ColorKey[]
   maxDots?: number
   dim?: boolean
   isToday?: boolean
+  selected?: boolean
   label: string
   onClick: () => void
 }) {
   return (
     <button
       type="button"
-      className={cx(styles.cell, dim && styles.dim, isToday && styles.today)}
+      className={cx(
+        styles.cell,
+        dim && styles.dim,
+        isToday && styles.today,
+        selected && styles.selected,
+      )}
       onClick={onClick}
+      aria-pressed={selected}
       aria-label={label}
     >
       <span className={styles.date}>{date}</span>
+      {bars.length > 0 && (
+        <span className={styles.bars}>
+          {bars.map((color, i) => (
+            <span
+              // Bars have no identity beyond their position.
+              key={`${i}:${color}`}
+              className={styles.bar}
+              style={colorStyle(color)}
+            />
+          ))}
+        </span>
+      )}
       {dots.length > 0 && (
         <span className={styles.dots}>
           {dots.slice(0, maxDots).map((color, i) => (

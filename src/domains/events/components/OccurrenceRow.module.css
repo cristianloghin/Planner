@@ -1,0 +1,35 @@
+/* A list row: colour on the left edge, when, title, then the caller's extras. */
+.OccurrenceRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 6px 10px;
+  border: none;
+  border-left: var(--event-accent) solid var(--c);
+  border-radius: 8px;
+  /* Same tint as a timed block on the timeline. (Inlined — WebKit.) */
+  background: color-mix(in oklab, var(--c) var(--tint-strength), var(--surface));
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  box-shadow: 0 1px 3px var(--shadow);
+}
+
+.when {
+  flex: none;
+  min-width: 6.5em;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
