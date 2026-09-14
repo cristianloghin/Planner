@@ -64,7 +64,7 @@ function Header({
       </div>
       {lanes.length > 0 && (
         <div className={styles.lanesRow}>
-          <div>{gutterLabel}</div>
+          <div className={styles.gutterLabel}>{gutterLabel && <span>{gutterLabel}</span>}</div>
           <div className={styles.lanes}>{lanes}</div>
         </div>
       )}

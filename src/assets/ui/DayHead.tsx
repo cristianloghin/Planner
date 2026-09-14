@@ -23,6 +23,7 @@ export function DayHead({
   onToggle?: () => void
   children?: ReactNode
 }) {
+  const containerClass = cx(styles.container, isToday && styles.today)
   const label = (
     <>
       <span className={styles.name}>{name}</span>
@@ -30,21 +31,23 @@ export function DayHead({
     </>
   )
   return (
-    <div className={cx(styles.DayHead, isToday && styles.today)}>
-      {onToggle ? (
-        <button
-          type="button"
-          className={styles.label}
-          onClick={onToggle}
-          aria-pressed={isExpanded}
-          aria-label={isExpanded ? 'Restore equal day columns' : `Expand ${name}'s column`}
-        >
-          {label}
-        </button>
-      ) : (
-        <div className={styles.label}>{label}</div>
-      )}
-      {children != null && <div className={styles.chips}>{children}</div>}
+    <div className={cx(styles.DayHead)}>
+      <div className={containerClass}>
+        {onToggle ? (
+          <button
+            type="button"
+            className={styles.label}
+            onClick={onToggle}
+            aria-pressed={isExpanded}
+            aria-label={isExpanded ? 'Restore equal day columns' : `Expand ${name}'s column`}
+          >
+            {label}
+          </button>
+        ) : (
+          <div className={styles.label}>{label}</div>
+        )}
+        {children != null && <div className={styles.chips}>{children}</div>}
+      </div>
     </div>
   )
 }

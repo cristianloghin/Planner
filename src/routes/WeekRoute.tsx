@@ -164,7 +164,7 @@ export function WeekRoute() {
         onNavigate={(delta) => goToWeek(addDays(weekStart, 7 * delta))}
         onGoToday={() => goToWeek(mondayOf(now))}
         todayActive={thisWeek}
-        gutterLabel={`W${isoWeekNumber(weekStart)}`}
+        gutterLabel={isoWeekNumber(weekStart).toString()}
         zoom={{ hourH, setHourH, key: ZOOM_KEY }}
         initialMinute={thisWeek ? nowMin : 7 * 60}
       >

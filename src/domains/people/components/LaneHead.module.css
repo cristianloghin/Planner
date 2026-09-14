@@ -3,9 +3,9 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
+  gap: 6px;
   color: var(--c);
-  padding: 4px 4px 8px;
+  padding: 3px 3px 0;
 }
 
 .LaneHead[data-expanded="true"] .name {

@@ -65,10 +65,30 @@
   background: var(--accent);
 }
 
+.gutterLabel {
+  display: flex;
+  flex-direction: column;
+  margin-left: calc(0px - max(16px, env(safe-area-inset-left)));
+  padding: 0 6px;
+
+  span {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: hsl(from var(--muted) h s l / 0.2);
+    color: var(--muted);
+    font-stretch: 75%;
+    font-size: var(--fs-lg);
+    border-radius: 8px;
+  }
+}
+
 /* Lane heads sit to the right of the time gutter, one equal column each. */
 .lanesRow {
   display: grid;
   grid-template-columns: var(--gutter-w) 1fr;
+  padding-bottom: 6px;
 }
 
 /* One column per Lane slot, from the template the view publishes on the
