@@ -28,9 +28,9 @@ const today = () => toISODate(new Date())
  *
  * `/library` is a section whose title switches between templates and notes.
  * Each of the two draws the frame itself, since the buttons beside the title
- * are its own; the bare `/library` is the templates. The template editors are
- * top-level (`parent: null`): they are full-page, so there is nothing to draw
- * beneath them.
+ * are its own, and the bare `/library` is the templates. Everything under it
+ * is top-level (`parent: null`): the two screens because nothing draws them an
+ * outlet, the template editors because they are full-page.
  *
  * `/` exists because the PWA's `start_url` is the bare base, so every cold
  * launch lands there. Guards run on the initial match (router >= 0.9), which
@@ -62,8 +62,8 @@ export const routes = defineRoutes({
   '/event/new': { component: NewEventRoute },
   '/event/:id': { component: EditEventRoute },
   '/library': { component: TemplatesRoute },
-  '/library/templates': { component: TemplatesRoute },
-  '/library/notes': { component: NotesRoute },
+  '/library/templates': { component: TemplatesRoute, parent: null },
+  '/library/notes': { component: NotesRoute, parent: null },
   '/library/templates/new': { component: NewTemplateRoute, parent: null },
   '/library/templates/:id': { component: EditTemplateRoute, parent: null },
   '/settings': { component: SettingsRoute },
