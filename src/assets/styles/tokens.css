@@ -14,7 +14,7 @@
   color-scheme: light dark;
 
   /* ---- Brand & status (theme-independent) ---- */
-  --accent: light-dark(hsl(240 50% 50%), hsl(240 50% 75%));
+  --accent: light-dark(hsl(240 50% 50%), hsl(240 75% 75%));
   --on-accent: light-dark(hsl(240 50% 93%), hsl(240 50% 15%)); /* text/icons on a coloured block or accent button */
   --danger: light-dark(hsl(350 80% 50%), hsl(350 80% 75%));
   --now: light-dark(hsl(350, 75%, 45%), hsl(350, 75%, 60%)); /* current-time line */
