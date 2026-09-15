@@ -1,0 +1,153 @@
+export const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+/** ISO date string (yyyy-mm-dd) for the Monday of the week containing `d`. */
+export function mondayOf(d: Date): string {
+  const date = new Date(d)
+  const day = (date.getDay() + 6) % 7 // 0 = Monday
+  date.setDate(date.getDate() - day)
+  return toISODate(date)
+}
+
+/** Is this a real calendar date in `yyyy-mm-dd` form? (`2026-02-30` is not.) */
+export function isISODate(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false
+  const d = new Date(`${s}T00:00:00`)
+  return !Number.isNaN(d.getTime()) && toISODate(d) === s
+}
+
+export function toISODate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+export function addDays(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00`)
+  d.setDate(d.getDate() + days)
+  return toISODate(d)
+}
+
+/** Whole days between two ISO dates (a - b); positive when `a` is later. */
+export function diffDays(a: string, b: string): number {
+  return Math.round(
+    (new Date(`${a}T00:00:00`).getTime() - new Date(`${b}T00:00:00`).getTime()) / 86_400_000,
+  )
+}
+
+/** Short date label like "Mon 16 Jun" for an ISO date. */
+export function isoLabel(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
+export function weekRangeLabel(weekStart: string): string {
+  const start = new Date(`${weekStart}T00:00:00`)
+  const end = new Date(`${weekStart}T00:00:00`)
+  end.setDate(end.getDate() + 6)
+  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }
+  return `${start.toLocaleDateString(undefined, opts)} – ${end.toLocaleDateString(undefined, opts)}`
+}
+
+/** 0 = Monday ... 6 = Sunday for an ISO date. */
+export function weekdayIndex(iso: string): number {
+  return (new Date(`${iso}T00:00:00`).getDay() + 6) % 7
+}
+
+/**
+ * ISO 8601 week number (1–53) of the week containing `iso` — the numbering
+ * that matches this app's Monday-start weeks: week 1 is the week holding the
+ * year's first Thursday, so the number keys off this week's Thursday.
+ */
+export function isoWeekNumber(iso: string): number {
+  const d = new Date(`${iso}T00:00:00`)
+  d.setDate(d.getDate() + 3 - weekdayIndex(toISODate(d)))
+  // Jan 4 is always in week 1; count whole weeks between the two Thursdays.
+  const week1 = new Date(d.getFullYear(), 0, 4)
+  week1.setDate(week1.getDate() + 3 - ((week1.getDay() + 6) % 7))
+  return 1 + Math.round((d.getTime() - week1.getTime()) / (7 * 86_400_000))
+}
+
+/** ISO date of the first day of the month containing `iso`. */
+export function startOfMonth(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`)
+  d.setDate(1)
+  return toISODate(d)
+}
+
+/** Shift by whole months, pinned to the 1st so day-of-month never overflows. */
+export function addMonths(iso: string, delta: number): string {
+  const d = new Date(`${iso}T00:00:00`)
+  d.setDate(1)
+  d.setMonth(d.getMonth() + delta)
+  return toISODate(d)
+}
+
+/** Human label like "June 2026". */
+export function monthLabel(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+/** Whether an ISO date is in the same calendar month as `anchor`. */
+export function isSameMonth(iso: string, anchor: string): boolean {
+  return iso.slice(0, 7) === anchor.slice(0, 7)
+}
+
+/** The 42 days (six Monday-start weeks) covering the month that contains `iso`. */
+export function monthGridDays(iso: string): string[] {
+  const start = mondayOf(new Date(`${startOfMonth(iso)}T00:00:00`))
+  return Array.from({ length: 42 }, (_, i) => addDays(start, i))
+}
+
+/** "08:30" <-> minutes from midnight. */
+export function minutesToTime(min: number): string {
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+/** A Date as a `yyyy-mm-ddThh:mm` local string for <input type="datetime-local">. */
+export function toDateTimeLocal(d: Date): string {
+  return `${toISODate(d)}T${minutesToTime(d.getHours() * 60 + d.getMinutes())}`
+}
+
+/** "At start", "30 min before", "2 hours before", "1 day before". */
+export function offsetLabel(min: number): string {
+  if (min === 0) return 'At start'
+  if (min < 60) return `${min} min before`
+  if (min < 1440) {
+    const h = min / 60
+    return `${h} hour${h > 1 ? 's' : ''} before`
+  }
+  const d = min / 1440
+  return `${d} day${d > 1 ? 's' : ''} before`
+}
+
+/**
+ * The two halves of a `yyyy-mm-ddThh:mm` local string, the text a
+ * <input type="datetime-local"> produces. It is already in local time, so
+ * these are plain slices — going through `Date` would only add a timezone.
+ */
+export function getDate(dateTimeLocal: string): string {
+  return dateTimeLocal.slice(0, 10)
+}
+
+export function getTime(dateTimeLocal: string): string {
+  return dateTimeLocal.slice(11, 16)
+}
+
+/** Same time, on a different `yyyy-mm-dd`. */
+export function changeDate(current: string, date: string): string {
+  return `${date}T${getTime(current)}`
+}
+
+/** Same day, at a different `hh:mm`. */
+export function changeTime(current: string, time: string): string {
+  return `${getDate(current)}T${time}`
+}

@@ -1,0 +1,11 @@
+.Badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+}
+
+.icon {
+  width: 0.825rem;
+  height: 0.825rem;
+  flex-shrink: 0;
+}

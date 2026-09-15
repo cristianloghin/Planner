@@ -9,7 +9,7 @@
  *
  * Everything in this file is pure — no client, no network. See mappers.test.ts.
  */
-import { toDateTimeLocal, toISODate } from '../lib/dates'
+import { toDateTimeLocal, toISODate } from '../assets/utils/dates'
 
 const MINS_PER_DAY = 24 * 60
 
@@ -56,6 +56,26 @@ export function intervalToDuration(iv: string | null, allDay: boolean): number {
 /** The app's occurrence key date (local ISO) for a stored occurrence_start. */
 export function tsToDateKey(ts: string): string {
   return toISODate(new Date(ts))
+}
+
+/**
+ * The timestamp a series' occurrence on local ISO `date` is stored under.
+ *
+ * An occurrence keeps the time of day its series had, on the day asked for. An
+ * all-day series sits at local midnight. A series with no start of its own is
+ * treated as midnight too.
+ *
+ * This computes where a NEW row goes. It is not a way to find an existing row —
+ * a row written before the series' time was edited still carries the old time of
+ * day, so look those up with {@link dayRange} instead.
+ */
+export function occurrenceTs(
+  series: { allDay: boolean; start: string | null },
+  date: string,
+): string {
+  if (series.allDay) return new Date(`${date}T00:00:00`).toISOString()
+  const timeOfDay = series.start?.slice(11) || '00:00'
+  return new Date(`${date}T${timeOfDay}`).toISOString()
 }
 
 /**

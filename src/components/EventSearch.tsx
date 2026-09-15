@@ -1,28 +1,28 @@
 import { Search as SearchIcon } from 'lucide-react'
-import { useCallback, useState } from 'react'
-import { useAuth } from '../auth'
-import { cx } from '../lib/cx'
-import { isoLabel, toISODate } from '../lib/dates'
-import { searchEvents } from '../lib/search'
-import { useSearch } from '../lib/useSearch'
-import s from './Search.module.css'
-import { SearchOverlay } from './SearchOverlay'
+import { useState } from 'react'
+import { useAccount } from '../account'
+import { useDebouncedValue } from '../assets/hooks/useDebouncedValue'
+import s from '../assets/ui/Search.module.css'
+import { SearchOverlay } from '../assets/ui/SearchOverlay'
+import { cx } from '../assets/utils/cx'
+import { isoLabel, toISODate } from '../assets/utils/dates'
+import { useEventSearch } from '../domains/search/queries'
 
 /**
  * Event search in the shared view header (Day / Week / Month). Hits the
- * `search_events` RPC (titles + note and checklist text); picking a result hands
+ * `search_events` RPC (titles + checklist text); picking a result hands
  * its series id back to the view, which navigates to and opens it.
  */
 export function EventSearch({ onPick }: { onPick: (seriesId: string) => void }) {
-  const { accountId } = useAuth()
+  const { accountId } = useAccount()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
 
-  const run = useCallback(
-    (q: string) => (accountId ? searchEvents(accountId, q) : Promise.resolve([])),
-    [accountId],
-  )
-  const { results, loading, error } = useSearch(query, run)
+  // The search fires on a settled term, not on every keystroke.
+  const settled = useDebouncedValue(query)
+  const { data: results = [], isFetching, error: searchError } = useEventSearch(accountId, settled)
+  const loading = query.trim() !== '' && (query.trim() !== settled.trim() || isFetching)
+  const error = searchError ? searchError.message : null
 
   function close() {
     setOpen(false)
@@ -69,7 +69,6 @@ export function EventSearch({ onPick }: { onPick: (seriesId: string) => void }) 
                 {r.dtstart && <span>{isoLabel(toISODate(new Date(r.dtstart)))}</span>}
                 {r.rrule && <span>· repeats</span>}
               </span>
-              {r.snippet && <span className={s.snippet}>{r.snippet}</span>}
             </button>
           ))}
         </SearchOverlay>

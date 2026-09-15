@@ -19,14 +19,28 @@
   overflow: hidden;
 }
 
+/* RouterView wraps the matched route in a plain <div> it does not expose a
+   class for, which would otherwise sit between .appMain and the view and break
+   the flex chain every screen relies on. Pass the sizing through it. */
+.appMain > div {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 /* ---- Tab bar ---- */
 .tabbar {
   flex: none;
   display: flex;
+  justify-content: space-between;
   z-index: 1000;
-  /* border-top: 1px solid var(--border); */
   box-shadow: 0px -2px 12px 0px var(--shadow);
   padding: 8px max(16px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-bottom));
+}
+
+.calendarTabs {
+  display: flex;
 }
 
 .tab {
@@ -38,13 +52,42 @@
   background: transparent;
   border: none;
   color: var(--muted);
-  padding: 10px;
-  font-size: var(--fs-lg);
+  padding: .5rem 1rem;
+  font-size: var(--fs-base);
   font-weight: 600;
   border-radius: 8px;
+  text-decoration: none;
 }
 
 .tab.active {
   color: var(--on-accent);
   background: var(--accent);
+}
+
+.iconTab {
+  flex: 0;
+  aspect-ratio: 1 / 1;
+  padding: .5rem;
+}
+
+/* ---- Unmatched route ---- */
+.notFound {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--muted);
+  padding: 16px;
+  text-align: center;
+}
+
+.notFoundLink {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: 8px;
+  padding: 8px 14px;
+  text-decoration: none;
+  font-weight: 600;
 }

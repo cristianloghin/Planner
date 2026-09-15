@@ -1,0 +1,62 @@
+/* One column per Column slot, on the lane template the calendar view
+   publishes — so an expanded lane grows here and in the header at once. */
+.Timeline {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--lane-columns);
+  transition: grid-template-columns 0.25s ease;
+}
+
+.column {
+  position: relative;
+  /* Stacked blocks set their own z-index; keep those inside the column so
+     they never rise over the sticky all-day band above. */
+  isolation: isolate;
+  min-width: 0;
+  border-left: 1px solid var(--border);
+  cursor: copy;
+  /* Faint 15-min lines + stronger hour lines. */
+  background-image: repeating-linear-gradient(
+      to bottom,
+      var(--grid-line) 0,
+      var(--grid-line) 1px,
+      transparent 1px,
+      transparent var(--quarter-h)
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--grid-line-strong) 0,
+      var(--grid-line-strong) 1px,
+      transparent 1px,
+      transparent var(--hour-h)
+    );
+}
+
+.column:last-child {
+  border-right: 1px solid var(--border);
+}
+
+.highlight {
+  background-color: color-mix(in oklab, var(--accent) 5%, transparent);
+}
+
+.nowLine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px solid var(--now);
+  /* Above any stack of blocks, however deep. */
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.nowDot {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--now);
+}

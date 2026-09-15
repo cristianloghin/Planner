@@ -1,9 +1,10 @@
 import s from './SyncBanners.module.css'
 
 /**
- * The sync-status surfaces AppProvider floats over the app: an offline /
+ * The sync-status surfaces the shell floats over the app: an offline /
  * "changes pending" pill, and a dismissable error banner for a write the
- * server rejected. Pure presentation — all state lives in the provider.
+ * server rejected. Pure presentation — the shell reads the state off the
+ * query client.
  */
 export function SyncBanners({
   offline,
@@ -44,17 +45,5 @@ export function SyncBanners({
         </div>
       )}
     </>
-  )
-}
-
-/** First launch with no snapshot and no network: a retry beats an eternal spinner. */
-export function LoadFailedScreen({ offline, onRetry }: { offline: boolean; onRetry: () => void }) {
-  return (
-    <div className={s.loadFailed}>
-      <p>Couldn&apos;t load your planner{offline ? ' — you appear to be offline.' : '.'}</p>
-      <button type="button" className={s.retry} onClick={onRetry}>
-        Retry
-      </button>
-    </div>
   )
 }

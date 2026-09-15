@@ -1,0 +1,17 @@
+.Avatars {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px 0;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c);
+  color: var(--on-accent);
+  flex: none;
+}

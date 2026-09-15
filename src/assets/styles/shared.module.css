@@ -1,0 +1,139 @@
+/*
+ * Cross-cutting primitives used by more than one component: buttons, and the
+ * editor/form/chip kit shared by EventEditor, OccurrenceSheet and
+ * AttendeeChips. Screen layout lives with the screen (see views/ and each
+ * route's own module).
+ */
+
+/* ---- Buttons ---- */
+.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+}
+
+.danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+/* Bare icon button at the iOS 44pt minimum touch target. */
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+.iconBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.iconBtn.iconDanger {
+  color: var(--danger);
+}
+
+/* The one filled icon in a bar: the primary action. */
+.iconBtn.iconAccent {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* Large title at the top of a scrolling editor body (see views/EditorPage).
+   The toolbar holds the actions; the name lives here so it can wrap freely and
+   scroll away instead of inflating a header that's pinned for the life of the
+   screen. `anywhere` so a single long unbroken word wraps rather than
+   overflowing sideways. */
+.editorTitle {
+  margin: 0;
+  font-size: var(--fs-2xl);
+  line-height: 1.15;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* The line under it: when, who, how often. */
+.editorMeta {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  margin: 0;
+}
+
+/* ---- Editor form primitives ---- */
+
+.label,
+.field {
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
+.field {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-lg);
+}
+
+.toggle input {
+  width: 18px;
+  height: 18px;
+}
+
+.interval {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.interval input {
+  width: 64px;
+}
+
+.interval span {
+  font-size: var(--fs-base);
+  color: var(--muted);
+}
+
+/* ---- Attendee / reminder-offset chips ---- */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  background: transparent;
+  border: 1.5px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: var(--fs-base);
+  font-weight: 600;
+}
+
+.chip.on {
+  color: var(--on-accent);
+}

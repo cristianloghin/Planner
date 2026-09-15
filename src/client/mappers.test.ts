@@ -4,6 +4,7 @@ import {
   durationToInterval,
   intervalToDuration,
   intervalToMinutes,
+  occurrenceTs,
   startToTs,
   tsToDateKey,
   tsToStart,
@@ -113,5 +114,34 @@ describe('dayRange', () => {
     const after = new Date('2026-03-15T00:00:00').toISOString()
     expect(before < from).toBe(true)
     expect(after >= to).toBe(true)
+  })
+})
+
+describe('occurrenceTs', () => {
+  const at = (start: string | null, allDay: boolean, date: string) =>
+    occurrenceTs({ allDay, start }, date)
+
+  it('keeps the series time of day, on the day asked for', () => {
+    // 09:30 on a different day than the series' own start.
+    expect(at('2026-03-02T09:30', false, '2026-03-16')).toBe(
+      new Date('2026-03-16T09:30').toISOString(),
+    )
+  })
+
+  it('puts an all-day series at local midnight', () => {
+    expect(at('2026-03-02', true, '2026-03-16')).toBe(new Date('2026-03-16T00:00:00').toISOString())
+  })
+
+  it('falls back to midnight when the start carries no time of day', () => {
+    const midnight = new Date('2026-03-16T00:00').toISOString()
+    // A date-only start on a timed series, and a series with no start at all.
+    expect(at('2026-03-02', false, '2026-03-16')).toBe(midnight)
+    expect(at(null, false, '2026-03-16')).toBe(midnight)
+  })
+
+  it('round-trips back to the date it was asked for', () => {
+    for (const date of ['2026-01-01', '2026-03-29', '2026-10-25', '2026-12-31']) {
+      expect(tsToDateKey(at('2026-01-05T23:30', false, date))).toBe(date)
+    }
   })
 })

@@ -1,11 +1,16 @@
 # DRSp — the Domain / Route / Service pattern
 
+> Evidence from applying this to Planner, and the questions still open, are in
+> [`PATTERN_NOTES.md`](./PATTERN_NOTES.md). What the calendar screens settled —
+> layouts own interaction, routes never style, one view per repeated shape — is
+> folded into §2, §6 and §11 below.
+
 A way of structuring React applications around **one direction of data flow**.
 
 This document defines the pattern itself: its primitives, the rules between them,
 and how to decide where a given piece of code belongs. It is project-agnostic —
 Planner is the reference implementation, and
-[`RESTRUCTURE_PLAN.md`](./RESTRUCTURE_PLAN.md) is where the pattern is applied to
+[`RESTRUCTURE_PLAN.md`](./archive/RESTRUCTURE_PLAN.md) is where the pattern is applied to
 this codebase specifically.
 
 ---
@@ -48,9 +53,9 @@ calls — the answer becomes derivable from what a piece of code is allowed to t
 |---|---|---|---|
 | **Client** | The network boundary | *nothing* | Know about React, or about any layer above it |
 | **Domain** | Data for one slice: fetching, mutations, selectors, plus dumb domain-specific UI | Client, Assets | Have its components call its own data functions |
-| **Route** | Orchestration | Domain, Service, Layout, Assets | Contain reusable UI or data logic worth extracting |
+| **Route** | Orchestration | Domain, Service, Layout, Assets | Contain reusable UI or data logic worth extracting, or apply any styling |
 | **Service** | A self-contained capability: a store, a hook, an engine | Assets | Reach into a Domain or the Client |
-| **Layout** | Repeatable page structure | Assets | Receive or touch data |
+| **Layout** (`views/`) | Repeatable page structure and the interaction that comes with it | Assets, and Services that produce interaction rather than data | Receive data or domain objects, or read where the app is |
 | **Assets** | Truly shared UI, styles, generic utilities | *nothing* | Know any domain type |
 
 ### Client
@@ -130,6 +135,31 @@ view testable, and it means changing *how* a view is reached — a different rou
 modal, a panel, a multi-instance workspace — is a change to the shell, not to the
 view.
 
+**Routes compose; they never style.** A route has no stylesheet, no class name and
+no `style` attribute. It fills a layout's slots with domain components and assets,
+and it passes plain data. When a route needs something to *look* different, that is
+a prop or a slot on the layout, and the layout switches the CSS. The test is
+mechanical: `grep` the routes folder for `module.css`, `className` and `style=` and
+expect nothing.
+
+**Two routes drawing the same shape is a layout, not a helper.** Wiring may be
+duplicated between routes — the same five hooks, the same editor trailer — because
+extracting it upward creates a fake abstraction. Structure may not. The moment a
+second route draws the same arrangement of things (columns of blocks, rows of
+cells), that arrangement is a slotted layout, and both routes fill it. A `*Page`
+component sitting in `routes/` is the usual sign this was missed.
+
+**Which state a route holds.** State that is keyed per screen or outlives the view
+lives in the route: a zoom level under this screen's storage key, the expanded
+lane, the editor and sheet that are open. State that means nothing outside the view
+lives in the view: scroll position, the gesture in progress, DOM refs. The route
+*lends* the former to the view as props; the view never reads it from anywhere else.
+
+**Joins are made once, in the route.** A value that needs two domains to compute —
+a person's colour given this user's overrides, a label given the roster — is
+resolved in the route, once, and passed down resolved. A leaf takes a `ColorKey`,
+never the people list plus the overrides it would need to work one out.
+
 ### Service
 
 A self-contained capability that a route calls. A service can be:
@@ -149,13 +179,38 @@ Call it one.
 
 ### Layout
 
-Repeatable page structure. Presentational only, and normally **slotted**, so routes
-pass different content into the same frame.
+Repeatable page structure **and the interaction that comes with it**. Normally
+**slotted**, so routes pass different content into the same frame. In this repo the
+layer lives in `views/`, and a layout is called a *view*.
 
-A layout receives `ReactNode`s and structural flags. It does not receive domain
-objects, and it does not call hooks that produce data. If a layout needs to know
-what it's rendering, it isn't a layout — it's a component, or the route's own
-markup.
+A layout receives `ReactNode`s, structural flags, plain callbacks, and identity as a
+plain string. It does not receive domain objects, and it does not call hooks that
+produce data. If a layout needs to know what it's rendering, it isn't a layout —
+it's a component, or the route's own markup.
+
+**Presentation is not the whole job.** A swipe deck owns its scroller, its strip,
+the refs and the gesture hook, because the gesture binds to DOM the layout owns and
+every route using the deck would otherwise repeat the wiring. So a layout may
+import a service that produces *interaction* — gestures, media queries, timers.
+The rule is about data, and it has not moved: no hook that produces data, no
+domain value, no reading of ambient app state.
+
+**Identity in, intent out.** A layout that pages between things takes the current
+page's identity as a plain key (`pageKey`), so it can tell when the route has
+landed on a new page, and reports movement through one callback (`onNavigate`) that
+the route wires to its own state or the URL. The layout never reads the URL, the
+navigation context, or the date. Header arrows and a swipe fire the same callback;
+the route names the intent once.
+
+**A layout publishes shared layout facts once.** When the header and the body must
+agree on something — the column template, a gutter width — the layout derives it
+from its slots, sets it once as a CSS custom property on its root, and every nested
+view reads it from CSS. Nothing is told twice, and no route carries the number.
+
+**Layouts nest.** A calendar frame holds a deck; a deck page holds a timeline of
+columns; a column holds blocks. Each is its own slotted view with its own
+stylesheet, and the inner ones inherit the outer's published properties. The route
+composes the whole tree from slots and never styles any level of it.
 
 Nested routing gives layouts for free: a parent route renders structure and slots
 its matched child in as an outlet, without remounting when the child changes.
@@ -245,13 +300,15 @@ The rules worth enforcing rather than remembering:
 1. Only the Client imports the network SDK or generated API types.
 2. Domain components never call domain data functions.
 3. Services never import **values** from Domains or the Client. Types are exempt (§3).
-4. Layouts receive no data — only slots and structural props.
+4. Layouts receive no data — only slots, structural props, callbacks, and identity
+   as a plain key.
 5. Assets import nothing from the app.
 6. Routes are the only orchestrators.
 7. Every mutation's variables are self-sufficient and serializable.
 8. Optimistic logic is a pure, exported, tested function.
 9. Selectors derive from the cache; they never duplicate it.
 10. URL params carry identity, not view state.
+11. Routes never style. Every stylesheet belongs to a layout or a component.
 
 Rules 7 and 8 look like implementation details and are not. Self-sufficient
 variables are what make a write replayable — after a retry, after an offline pause,
@@ -311,11 +368,30 @@ it encode rules specific to this business? → **Service.** `debounce` is an ass
 "expand a recurrence rule into occurrences" is a service.
 
 **Route or Layout?**
-Does it take data as props? Then it is not a layout. Layouts take slots.
+Does it take data as props? Then it is not a layout. Layouts take slots. Would a
+second route draw the same shape with different contents? Then it is a layout,
+however small — not a page helper next to the route.
+
+**Route or Layout, for state?**
+Is it keyed per screen, or would it survive the view being swapped for another
+(zoom level, expanded lane, open editor)? → **Route**, lent to the layout as a
+prop. Does it mean nothing outside the DOM the layout owns (scroll position, a
+gesture in flight, a ref)? → **Layout**.
+
+**Where is a join resolved?**
+Does computing it need two domains (a colour from a person and this user's
+overrides)? → **Route**, once, with a selector that returns the resolved value.
+Leaves take the result and never the inputs.
 
 **Domain component or Assets UI?**
 Does its prop types mention a domain type? → **Domain.** `<Button variant>` is an
-asset; `<EventCard event>` is not.
+asset; `<EventCard event>` is not. A day heading that takes a name and a number is
+an asset; a lane heading that takes a `Person` is the people domain's.
+
+**Where does the CSS go?**
+With the thing it styles: a module beside the component or the layout, named after
+it. A value two files must agree on is a token. The shared stylesheet holds
+primitives only. A route has none (invariant 11).
 
 **Domain or Route?**
 Is it reusable across screens? → **Domain.** Is it the specific wiring of one
@@ -349,6 +425,22 @@ repeats the same defaulting and parsing. *Fix: convert once at the client bounda
 shared stylesheet, and there is no rule for which. The stylesheet becomes an
 un-componentized second component library that nothing can typecheck. *Fix: pick
 one; keep the stylesheet for tokens and primitives only.*
+
+**The styled route.** A route grows a stylesheet "for the page grid", and now how
+the screen looks is split between the layout and the shell, with the route owning
+the half nothing else can reuse. *Fix: a prop or slot on the layout; the route
+passes nothing but content (invariant 11).*
+
+**The page helper.** Two routes each get a `*Page` component that draws the same
+structure — columns, a grid — with different data. It lives in `routes/` because
+it takes domain props, so it cannot be a layout, and it is duplicated because it
+cannot be shared. *Fix: the structure is a slotted layout; the domain props are
+what the routes drop into its slots.*
+
+**The self-locating layout.** A layout reads the navigation context or the URL to
+know what it is showing, so two screens now own "where the app is", and the layout
+cannot be rendered anywhere else. *Fix: identity in as a plain key, intent out
+through a callback.*
 
 **The remounting provider.** A provider holds mutable identity, so the only safe way
 to change that identity is `key={id}` — which destroys all state below it. *Fix:
@@ -421,6 +513,10 @@ giving ordered dependent writes; and **paused-mutation dehydration** plus a cach
 persister gives durable offline writes across restarts — provided invariants 7 and 8
 hold.
 
+**Slot library (`@mikrostack/rst`).** Layouts are built with it; the conventions
+are in §11. It is the layout layer's concern only: a route sees slot components
+and props, never the library.
+
 **Router.** Owns Route composition, and provides Layouts natively through nested
 routes and outlets. URL state belongs to the router; view state does not
 (invariant 10). Guards belong to the router, backed by a session service.
@@ -452,8 +548,9 @@ That is a more reliable structural smell than any lint rule.
 
 ## 11. Conventions
 
-- **Folders are layers**, then domains inside `domains/`. Never `components/` or
-  `utils/` at the top level — those are kinds, not layers.
+- **Folders are layers**, then domains inside `domains/`: `client/`, `domains/`,
+  `routes/`, `services/`, `views/` (the Layout layer), `assets/`. Never
+  `components/` or `utils/` at the top level — those are kinds, not layers.
 - **A domain folder is self-contained**: queries, mutations, patches, selectors,
   types, and a `components/` subfolder.
 - **Query keys**: `[domain, scope, …specifics]`.
@@ -461,6 +558,46 @@ That is a more reliable structural smell than any lint rule.
   belongs below both — usually in Assets, occasionally in a shared domain.
 - **Barrels are optional and cheap to get wrong**; if used, one per layer or domain,
   never a global one.
+
+### Views
+
+How a layout is written with the slot library, so every view reads the same way:
+
+- **One slot per hole, one `multiple` slot per repeated thing.** A header has
+  `Title` and `Search`; a row of lanes is `Lane: { multiple: true }`; a timeline
+  is `Column: { multiple: true }`. The view sizes itself from how many it was
+  given — it never counts people or days.
+- **A slot that carries props gets a component.** When each instance needs to say
+  something about itself (a lane's `weight`), declare the slot with a small
+  component whose props are exactly that; the view reads them back with
+  `getSlotProps`. When the slot is also the styled thing (a column, a cell), that
+  component *is* the styled thing and lives in the view file.
+- **Dot-path keys group a region.** `"Header.Title"`, `"Header.Lane"` give the
+  route `View.Header.Title` without the header being a separate component that
+  would hide its slots from the view.
+- **Runtime callbacks are injected, not threaded.** A callback the view composes
+  (go-today plus a scroll) reaches a nested region through `injectSlotProps` or a
+  plain prop on a private component — never by asking the route to pass it twice.
+- **Shared layout facts are published as CSS custom properties** on the view's
+  root, derived from its slots once. Nested views read them from their own CSS.
+- **Mapped slot elements still need a React `key`.** The library keys static
+  siblings for you, but React validates an array of children when the route's
+  `.map` builds it, before the library sees them. Key them by identity as usual;
+  only wrappers the view itself creates around position-only things (a row of a
+  grid) may use the index, with a comment saying why.
+- **A view exports one thing**: the view. Slot components, the header, helpers
+  stay private.
+
+### Styles
+
+- **A stylesheet sits next to what it styles**, named after it: `Calendar.module.css`
+  beside `Calendar.tsx`, `LaneHead.module.css` beside `LaneHead.tsx`. The root
+  class carries the component's name; inner classes are short and local.
+- **Values two files must agree on are tokens** in `assets/styles/tokens.css` —
+  the gutter width the header's lane row and the body's gutter both use.
+- **The shared stylesheet is primitives only**: buttons and the form kit. Screen
+  frames, decks, grids and chips belong to their view or component.
+- **Routes have none.** No module, no class, no `style` attribute (invariant 11).
 
 ### Enforcement
 
@@ -480,9 +617,11 @@ map of exact module specifiers — no globs, and no scoping by importing file �
 - **A newer Biome**, if its restricted-import support has grown pattern matching by
   the time this is picked up.
 
-Whatever the tool, the rules to encode are the ten in §4 — and the highest-value
-three are: nothing above `client/` imports the SDK or generated types, `services/`
-imports no domain, and `assets/` imports nothing.
+Whatever the tool, the rules to encode are the eleven in §4 — and the highest-value
+four are: nothing above `client/` imports the SDK or generated types, `services/`
+imports no domain, `assets/` imports nothing, and `routes/` imports no stylesheet.
+The last one is a file-pattern rule (`routes/**` may not import `*.css`) and is
+the cheapest of the four to hold.
 
 Encode them against **value** imports, and configure the tool to ignore type-only
 edges (§3). That works only if type-only imports are written as `import type`, so

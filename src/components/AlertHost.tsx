@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useCompletionsForRange } from '../data/completions'
-import { addDays, toISODate } from '../lib/dates'
-import { type FiredAlert, dueAlerts } from '../lib/notifications'
-import { useLatest } from '../lib/useLatest'
-import { useApp } from '../state'
+import { useAccount } from '../account'
+import { useLatest } from '../assets/hooks/useLatest'
+import { addDays, toISODate } from '../assets/utils/dates'
+import { useEvents, useOccurrencesForRange } from '../domains/events/queries'
+import { type FiredAlert, dueAlerts } from '../services/notifications/alerts'
 import s from './AlertHost.module.css'
 
 const SEEN_KEY = 'planner.alertsSeen'
@@ -22,7 +22,8 @@ function loadSeen(): number {
  * Fires only while the app is open (no background/push yet).
  */
 export function AlertHost() {
-  const { state } = useApp()
+  const { accountId } = useAccount()
+  const { data: events = [] } = useEvents(accountId)
   const [active, setActive] = useState<FiredAlert[]>([])
   const seenRef = useRef(loadSeen())
 
@@ -31,13 +32,13 @@ export function AlertHost() {
   // dueAlerts' relocation lookaround.
   const today = toISODate(new Date())
   const alertRange = useMemo(() => ({ from: addDays(today, -31), to: addDays(today, 31) }), [today])
-  const { completions } = useCompletionsForRange(alertRange.from, alertRange.to)
+  const { occurrences } = useOccurrencesForRange(accountId, alertRange.from, alertRange.to)
 
   useEffect(() => {
     function check() {
       const now = Date.now()
       const from = Math.max(seenRef.current, now - MAX_LOOKBACK_MS)
-      const due = dueAlerts(state.events, completions, from, now)
+      const due = dueAlerts(events, occurrences, from, now)
       seenRef.current = now
       localStorage.setItem(SEEN_KEY, String(now))
       if (due.length) {
@@ -55,7 +56,7 @@ export function AlertHost() {
       window.clearInterval(iv)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [state.events, completions])
+  }, [events, occurrences])
 
   function dismiss(id: string) {
     setActive((prev) => prev.filter((a) => a.id !== id))
@@ -76,6 +77,7 @@ function AlertCard({ alert, onDismiss }: { alert: FiredAlert; onDismiss: () => v
   // parent render (any app dispatch), so depending on it would restart the timer
   // and keep a banner alive indefinitely while the user is active.
   const onDismissRef = useLatest(onDismiss)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: <explanation>
   useEffect(() => {
     const t = window.setTimeout(() => onDismissRef.current(), AUTO_DISMISS_MS)
     return () => window.clearTimeout(t)

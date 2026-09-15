@@ -1,91 +1,137 @@
 # Planner
 
-A small PWA for two people to plan and coordinate their week — a shared weekly
-calendar, to-do lists, and per-person colours. Installable, works offline.
+A small PWA for a household to plan and coordinate their week — a shared weekly
+calendar with a lane per person. Installable, works offline.
 
-**Phase 1:** ran entirely in the browser, persisted to `localStorage` — single
-device, no accounts.
+Sign-in is required. Everything is scoped to an **account**, which is the sharing
+boundary: people, events and preferences belong to one, and a partner's change
+appears live.
 
-**Phase 2 (shipped):** the app runs on a real backend (Supabase) with accounts,
-auth, and cross-device sync. Sign-in is required; calendar data (people, events,
-attendees, reminders, completions) is stored per account and shared between
-partners.
+**What it does**
 
-People are **data**: one calendar lane per `person` row (`adult`/`child`,
-optional login link), so the app works for any number of people.
+- Day / Week / Month views, one calendar lane per person
+- Repeating events, with a user-set end — *after N times* or *on a date*
+- Per-occurrence overrides: move a single day, cancel it, or change who is on it
+  without touching the rest of the series
+- Event templates, to start a new event from a saved shape
+- Reminders: in-app while the tab is open, Web Push while it is closed
+- Full-text search over event titles
+- A twelve-colour palette shared by people and events, with per-user overrides
 
-Built and live: auth + account bootstrap, **realtime sync** (a partner's change
-appears live, deferred while you're mid-edit), **occurrence dependencies** (link
-an occurrence to a concrete occurrence of another event), **standalone Lists**
-(named account-scoped lists with in-list headers, per-item deadlines, and to-dos
-linkable to an occurrence so ticking in either place is one write), **event
-templates** (reusable series shells you save from the editor and start a new
-event from), a **unified 12-colour palette** shared by people and events with
-per-user overrides, **full-text search** over events and to-dos, and **Web Push
-reminders** that arrive while the app is closed.
+People are **data**: one lane per `person` row. There is no kind of person and
+nothing follows from who is on an event — it is just who is on it.
 
-The data layer is mid-migration: most slices still flow through the
-`ScheduleStore` interface in [`src/store/store.ts`](src/store/store.ts), while
-templates and per-occurrence state are owned by TanStack Query, and a `client/`
-layer holds the Supabase SDK and the DB↔app conversions. See
-[`docs/STATUS.md`](docs/STATUS.md).
+## Docs
 
-- [`docs/STATUS.md`](docs/STATUS.md) — what's built, how the data layer stands today, and the gotchas.
-- [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md) — the schema and the reasoning behind every decision.
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the DRSp pattern: layers, rules, and where new code goes.
-- [`docs/RESTRUCTURE_PLAN.md`](docs/RESTRUCTURE_PLAN.md) — DRSp applied to this codebase (target state, in progress).
-- [`docs/PLANNED.md`](docs/PLANNED.md) — designed but not built: shares & pins, private lists, the note model.
-- [`docs/PUSH_NOTIFICATIONS.md`](docs/PUSH_NOTIFICATIONS.md) — Web Push setup, verification, and failure modes.
-- [`docs/NOTE_MODEL.md`](docs/NOTE_MODEL.md) — a richer note/document model (design only).
-- [`supabase/migrations/`](supabase/migrations) — schema, RLS, functions, grants, and the `person` model.
+- [`docs/DEV.md`](docs/DEV.md) — the schema, how data moves, the gotchas,
+  testing, push setup, and what is safe to run. **Start here.**
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the DRSp pattern: layers,
+  rules, where new code goes.
+- [`docs/NOTE_MODEL.md`](docs/NOTE_MODEL.md) — a richer note/document model
+  (design only, next up).
+- [`docs/archive/`](docs/archive/README.md) — superseded docs, kept for their
+  reasoning. Not current.
+- [`supabase/migrations/`](supabase/migrations) — schema, RLS, functions, grants.
 
 ## Tech
 
 - Vite + React + TypeScript
-- `vite-plugin-pwa` for the manifest + offline service worker
+- TanStack Query for reads, writes and the offline queue
+- Supabase for auth, data, realtime and the reminder sender (a Deno edge function)
+- `vite-plugin-pwa` for the manifest and offline service worker
 - Deployed to GitHub Pages via GitHub Actions
 
 ## Develop
 
-Create `.env.local` (gitignored) with your Supabase project credentials:
+There are two backends you can run against, and it matters which one you pick.
+
+### Against a local backend — do this by default
+
+The whole backend runs in Docker, from the same images as the hosted project.
+Nothing you do here can reach production.
 
 ```bash
-VITE_SUPABASE_URL=https://<project-ref>.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
-# Optional — Web Push. Generate a key pair once with
-# `npx web-push generate-vapid-keys`; the PUBLIC key goes here (and in the
-# repo's Actions variables as VITE_VAPID_PUBLIC_KEY for deploys), the private
-# key stays with the reminder sender. Unset = the notifications section in
-# Settings doesn't render.
-VITE_VAPID_PUBLIC_KEY=B...
+supabase start
 ```
+
+That applies the migrations to a fresh database and then
+[`supabase/seed.sql`](supabase/seed.sql), which creates an account with three
+people and enough events that every screen has something on it: a weekly event,
+a one-off spanning two days, a series that ends after five times, one that ends
+on a date, a template, and one day whose people differ from its series.
+
+Put what `supabase status` prints into `.env.local`:
+
+```bash
+VITE_SUPABASE_URL=http://127.0.0.1:54321
+VITE_SUPABASE_PUBLISHABLE_KEY=<the publishable key from `supabase status`>
+```
+
+Then `npm run dev` and sign in as **dev@planner.test** / **password123**.
+
+- **Studio** on `:54323` — browse and edit the data directly.
+- **Inbucket** on `:54324` — auth email goes there, not to a real inbox.
+- `supabase db reset` re-applies migrations and the seed. Note this signs you
+  out: the auth user is recreated, so the session token stops matching.
+- `supabase stop` when you are done.
+
+### Against the hosted project — only when you mean it
+
+Point `.env.local` at the project ref and publishable key. Everything you then
+do is real: **there is no staging project, and the app has no undo.** Deleting
+something deletes it for your partner too.
+
+**Check which backend you are on before clicking anything destructive.** The app
+gives no visual clue. `grep VITE_SUPABASE_URL .env.local` is the whole check.
+
+**Clear site data when you switch.** The query cache and offline snapshot are
+per-origin, so the same origin pointed at a different database shows the previous
+account's data until the first fetch lands. It looks like data loss and is not.
+
+The commands that act on the **linked** project — and migration `0022`, which has
+not been applied there yet — are in
+[`docs/DEV.md` §10](docs/DEV.md#10-local-vs-production--read-before-running-anything).
+Read it before running any `supabase db` command.
+
+### Testing what actually gets deployed
+
+`npm run dev` is not a rehearsal. The base path (`/Planner/`), the service worker
+from `src/sw.ts`, and the generated icons only exist in a real build:
+
+```bash
+npm run build && npm run serve:pages
+```
+
+`serve:pages` serves `dist/` the way GitHub Pages does, and specifically does
+**not** rewrite unknown paths to `index.html` — which is the failure worth
+catching. Pages serves `404.html` for any path it has no file for, and the build
+copies `index.html` there so a cold visit to a deep link still boots the app.
+
+### Everything else
 
 ```bash
 npm install
-npm run dev      # local dev server
-npm run build    # type-check + production build to dist/
-npm run preview  # preview the production build
-npm test         # run the unit suite (vitest, no backend needed)
-npm run test:watch
+npm run dev         # dev server
+npm run build       # type-check + production build to dist/ (+ 404.html)
+npm run serve:pages # serves dist/ as GitHub Pages does
+npm test            # the unit suite (vitest, no backend needed)
+npm run typecheck
+npm run lint
+npm run gen:types   # regenerate client/database.types.ts from the LOCAL database
 ```
 
-`npm test` covers the pure, backend-free logic — recurrence expansion
-(`src/lib/recurrence.ts`), the RRULE round-trip (`src/lib/rrule.ts`), occurrence
-completion/dependency gating (`src/lib/occurrences.ts`), the Lists helpers
-(`src/lib/lists.ts`), date math, the reducer's optimistic application, the
-offline write queue, the DB↔app conversions (`src/client/mappers.ts`), and a
-cross-validation of the reminder sender's recurrence logic against the client's.
-These run without Supabase, so they guard the trickiest hand-rolled date math on
-every change.
+`npm test` is 170 tests and needs no backend. What it does **not** cover is any
+round trip to the database — that still needs a click-test against the local
+stack. See [`docs/DEV.md` §6](docs/DEV.md#6-tests).
 
 ## Deploy
 
 Pushing to `main` builds and publishes to GitHub Pages via
-`.github/workflows/deploy.yml`.
+`.github/workflows/deploy.yml`, and deploys the reminder function.
 
-One-time setup in the repo: **Settings → Pages → Build and deployment →
-Source: GitHub Actions**.
+One-time setup: **Settings → Pages → Build and deployment → Source: GitHub
+Actions**. Push notifications need their own one-time setup — see
+[`docs/DEV.md` §7](docs/DEV.md#7-push-notifications).
 
-The app is served from `https://<user>.github.io/Planner/`. That subpath is set
-as `base` in [`vite.config.ts`](vite.config.ts) — keep it in sync with the repo
-name if the repo is ever renamed.
+The app is served from `https://<user>.github.io/Planner/`. That subpath is
+`base` in [`vite.config.ts`](vite.config.ts) — keep it in sync with the repo name.

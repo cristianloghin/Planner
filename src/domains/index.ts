@@ -1,0 +1,65 @@
+/**
+ * The one place every domain's write behaviour is registered.
+ *
+ * Call `registerDomainDefaults` at start-up, before anything is read back out
+ * of storage. A write paused offline is saved with only its key and its
+ * values; on restart the runtime looks the key up here to find out how to run
+ * it, and a domain that never registered would have its write dropped without
+ * a word. Registering asks nothing of the session, so this can — and should —
+ * run before React does.
+ *
+ * A new domain with writes gets a line here.
+ */
+import type { QueryClient, QueryKey } from '@tanstack/react-query'
+import { accountKey } from './account/queries'
+import { registerEventsDefaults } from './events/mutations'
+import { eventsKey, occurrencesPrefix, templatesKey } from './events/queries'
+import { registerPeopleDefaults } from './people/mutations'
+import { peopleKey, preferencesKey } from './people/queries'
+
+export function registerDomainDefaults(queryClient: QueryClient): void {
+  registerEventsDefaults(queryClient)
+  registerPeopleDefaults(queryClient)
+}
+
+/** Who the signed-in person is, as the query keys need it. */
+export interface RealtimeIds {
+  accountId: string | null
+  userId: string | null
+}
+
+/**
+ * Which cached reads a change to one database table makes stale.
+ *
+ * This is the other half of the realtime wiring: the client says which table
+ * changed, and this says what to re-read because of it. It is the one place
+ * that knows every domain's keys, which is why it sits here rather than in a
+ * domain. A table that no domain reads gets an empty list.
+ *
+ * Invalidating a key nothing is subscribed to does nothing, so this can name
+ * every domain today and each entry starts mattering as its domain is adopted.
+ */
+export function queryKeysForTable(table: string, { accountId, userId }: RealtimeIds): QueryKey[] {
+  switch (table) {
+    // Events and blueprints are one table, told apart by whether they have a
+    // date. Attendees are a column on it and reminders are read alongside it,
+    // so a change to either is a change to the event.
+    case 'event_series':
+    case 'reminder':
+      return [eventsKey(accountId), templatesKey(accountId)]
+    // What happened on a day: moves, cancellations, people — the events
+    // domain's windowed read.
+    case 'event_occurrence':
+      return [occurrencesPrefix(accountId)]
+    // People, and how this user sees them: two tables, one domain.
+    case 'person':
+      return [peopleKey(accountId)]
+    case 'user_preference':
+      return [preferencesKey(accountId, userId)]
+    case 'account_member':
+      return [accountKey(userId)]
+    default:
+      // push_subscription, and anything added later: nothing cached reads it.
+      return []
+  }
+}

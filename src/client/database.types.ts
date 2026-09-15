@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -36,19 +56,16 @@ export type Database = {
         Row: {
           account_id: string
           created_at: string
-          role: string
           user_id: string
         }
         Insert: {
           account_id: string
           created_at?: string
-          role?: string
           user_id: string
         }
         Update: {
           account_id?: string
           created_at?: string
-          role?: string
           user_id?: string
         }
         Relationships: [
@@ -71,184 +88,49 @@ export type Database = {
       app_user: {
         Row: {
           created_at: string
-          display_name: string
           id: string
         }
         Insert: {
           created_at?: string
-          display_name?: string
           id: string
         }
         Update: {
           created_at?: string
-          display_name?: string
           id?: string
         }
         Relationships: []
       }
-      checklist_item: {
-        Row: {
-          group_label: string | null
-          id: string
-          label: string
-          occurrence_start: string | null
-          owner_series_id: string
-          required: boolean
-          sort_order: number
-        }
-        Insert: {
-          group_label?: string | null
-          id?: string
-          label: string
-          occurrence_start?: string | null
-          owner_series_id: string
-          required?: boolean
-          sort_order?: number
-        }
-        Update: {
-          group_label?: string | null
-          id?: string
-          label?: string
-          occurrence_start?: string | null
-          owner_series_id?: string
-          required?: boolean
-          sort_order?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "checklist_item_owner_series_id_fkey"
-            columns: ["owner_series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       event_occurrence: {
         Row: {
+          attendees: string[] | null
           cancelled: boolean
+          metadata: Json
           occurrence_start: string
           rescheduled_duration: string | null
           rescheduled_to: string | null
           series_id: string
-          status: string | null
         }
         Insert: {
+          attendees?: string[] | null
           cancelled?: boolean
+          metadata?: Json
           occurrence_start: string
           rescheduled_duration?: string | null
           rescheduled_to?: string | null
           series_id: string
-          status?: string | null
         }
         Update: {
+          attendees?: string[] | null
           cancelled?: boolean
+          metadata?: Json
           occurrence_start?: string
           rescheduled_duration?: string | null
           rescheduled_to?: string | null
           series_id?: string
-          status?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "event_occurrence_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_occurrence_status_fkey"
-            columns: ["status"]
-            isOneToOne: false
-            referencedRelation: "occurrence_status"
-            referencedColumns: ["code"]
-          },
-        ]
-      }
-      event_participant: {
-        Row: {
-          invited_by: string | null
-          role: string
-          rsvp: string
-          series_id: string
-          user_id: string
-        }
-        Insert: {
-          invited_by?: string | null
-          role: string
-          rsvp?: string
-          series_id: string
-          user_id: string
-        }
-        Update: {
-          invited_by?: string | null
-          role?: string
-          rsvp?: string
-          series_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "event_participant_invited_by_fkey"
-            columns: ["invited_by"]
-            isOneToOne: false
-            referencedRelation: "app_user"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_participant_role_fkey"
-            columns: ["role"]
-            isOneToOne: false
-            referencedRelation: "participant_role"
-            referencedColumns: ["code"]
-          },
-          {
-            foreignKeyName: "event_participant_rsvp_fkey"
-            columns: ["rsvp"]
-            isOneToOne: false
-            referencedRelation: "rsvp_status"
-            referencedColumns: ["code"]
-          },
-          {
-            foreignKeyName: "event_participant_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_participant_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "app_user"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      event_person: {
-        Row: {
-          person_id: string
-          series_id: string
-        }
-        Insert: {
-          person_id: string
-          series_id: string
-        }
-        Update: {
-          person_id?: string
-          series_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "event_person_person_id_fkey"
-            columns: ["person_id"]
-            isOneToOne: false
-            referencedRelation: "person"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_person_series_id_fkey"
             columns: ["series_id"]
             isOneToOne: false
             referencedRelation: "event_series"
@@ -260,54 +142,48 @@ export type Database = {
         Row: {
           account_id: string
           all_day: boolean
+          attendees: string[]
           color_key: string | null
           created_at: string
           created_by: string | null
-          default_status: string | null
           dtstart: string | null
           duration: string
           id: string
           is_template: boolean
+          metadata: Json
           rrule: string | null
-          split_from_id: string | null
-          template_id: string | null
-          timezone: string
           title: string
           updated_at: string
         }
         Insert: {
           account_id: string
           all_day?: boolean
+          attendees?: string[]
           color_key?: string | null
           created_at?: string
           created_by?: string | null
-          default_status?: string | null
           dtstart?: string | null
           duration?: string
           id?: string
           is_template?: boolean
+          metadata?: Json
           rrule?: string | null
-          split_from_id?: string | null
-          template_id?: string | null
-          timezone?: string
           title?: string
           updated_at?: string
         }
         Update: {
           account_id?: string
           all_day?: boolean
+          attendees?: string[]
           color_key?: string | null
           created_at?: string
           created_by?: string | null
-          default_status?: string | null
           dtstart?: string | null
           duration?: string
           id?: string
           is_template?: boolean
+          metadata?: Json
           rrule?: string | null
-          split_from_id?: string | null
-          template_id?: string | null
-          timezone?: string
           title?: string
           updated_at?: string
         }
@@ -326,208 +202,10 @@ export type Database = {
             referencedRelation: "app_user"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "event_series_default_status_fkey"
-            columns: ["default_status"]
-            isOneToOne: false
-            referencedRelation: "occurrence_status"
-            referencedColumns: ["code"]
-          },
-          {
-            foreignKeyName: "event_series_split_from_id_fkey"
-            columns: ["split_from_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_series_template_id_fkey"
-            columns: ["template_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      item_status: {
-        Row: {
-          code: string
-        }
-        Insert: {
-          code: string
-        }
-        Update: {
-          code?: string
-        }
-        Relationships: []
-      }
-      list: {
-        Row: {
-          account_id: string
-          created_at: string
-          id: string
-          sort_order: number
-          title: string
-        }
-        Insert: {
-          account_id: string
-          created_at?: string
-          id?: string
-          sort_order?: number
-          title: string
-        }
-        Update: {
-          account_id?: string
-          created_at?: string
-          id?: string
-          sort_order?: number
-          title?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "list_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "account"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      list_item: {
-        Row: {
-          created_at: string
-          done: boolean
-          due_on: string | null
-          group_label: string | null
-          id: string
-          list_id: string
-          person_id: string | null
-          sort_order: number
-          title: string
-        }
-        Insert: {
-          created_at?: string
-          done?: boolean
-          due_on?: string | null
-          group_label?: string | null
-          id?: string
-          list_id: string
-          person_id?: string | null
-          sort_order?: number
-          title: string
-        }
-        Update: {
-          created_at?: string
-          done?: boolean
-          due_on?: string | null
-          group_label?: string | null
-          id?: string
-          list_id?: string
-          person_id?: string | null
-          sort_order?: number
-          title?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "list_item_list_id_fkey"
-            columns: ["list_id"]
-            isOneToOne: false
-            referencedRelation: "list"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "list_item_person_id_fkey"
-            columns: ["person_id"]
-            isOneToOne: false
-            referencedRelation: "person"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      list_item_event_link: {
-        Row: {
-          created_at: string
-          list_item_id: string
-          occurrence_start: string
-          series_id: string
-        }
-        Insert: {
-          created_at?: string
-          list_item_id: string
-          occurrence_start: string
-          series_id: string
-        }
-        Update: {
-          created_at?: string
-          list_item_id?: string
-          occurrence_start?: string
-          series_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "list_item_event_link_list_item_id_fkey"
-            columns: ["list_item_id"]
-            isOneToOne: false
-            referencedRelation: "list_item"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "list_item_event_link_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      note: {
-        Row: {
-          author_id: string | null
-          body: string
-          created_at: string
-          id: string
-          metadata: Json
-          owner_series_id: string
-          updated_at: string
-        }
-        Insert: {
-          author_id?: string | null
-          body?: string
-          created_at?: string
-          id?: string
-          metadata?: Json
-          owner_series_id: string
-          updated_at?: string
-        }
-        Update: {
-          author_id?: string | null
-          body?: string
-          created_at?: string
-          id?: string
-          metadata?: Json
-          owner_series_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "note_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "app_user"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "note_owner_series_id_fkey"
-            columns: ["owner_series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
         ]
       }
       notification_log: {
         Row: {
-          dismissed_at: string | null
           occurrence_start: string
           reminder_id: string
           sent_at: string
@@ -535,7 +213,6 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          dismissed_at?: string | null
           occurrence_start: string
           reminder_id: string
           sent_at?: string
@@ -543,7 +220,6 @@ export type Database = {
           user_id: string
         }
         Update: {
-          dismissed_at?: string | null
           occurrence_start?: string
           reminder_id?: string
           sent_at?: string
@@ -574,267 +250,30 @@ export type Database = {
           },
         ]
       }
-      occurrence_dependency: {
-        Row: {
-          created_at: string
-          dependent_occurrence: string
-          dependent_series: string
-          prerequisite_occurrence: string
-          prerequisite_series: string
-          required_status: string
-        }
-        Insert: {
-          created_at?: string
-          dependent_occurrence: string
-          dependent_series: string
-          prerequisite_occurrence: string
-          prerequisite_series: string
-          required_status?: string
-        }
-        Update: {
-          created_at?: string
-          dependent_occurrence?: string
-          dependent_series?: string
-          prerequisite_occurrence?: string
-          prerequisite_series?: string
-          required_status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "occurrence_dependency_dependent_series_fkey"
-            columns: ["dependent_series"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "occurrence_dependency_prerequisite_series_fkey"
-            columns: ["prerequisite_series"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "occurrence_dependency_required_status_fkey"
-            columns: ["required_status"]
-            isOneToOne: false
-            referencedRelation: "occurrence_status"
-            referencedColumns: ["code"]
-          },
-        ]
-      }
-      occurrence_item_removed: {
-        Row: {
-          item_id: string
-          occurrence_start: string
-          series_id: string
-        }
-        Insert: {
-          item_id: string
-          occurrence_start: string
-          series_id: string
-        }
-        Update: {
-          item_id?: string
-          occurrence_start?: string
-          series_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "occurrence_item_removed_item_id_fkey"
-            columns: ["item_id"]
-            isOneToOne: false
-            referencedRelation: "checklist_item"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "occurrence_item_removed_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      occurrence_item_state: {
-        Row: {
-          completed_at: string
-          item_id: string
-          occurrence_start: string
-          series_id: string
-          status: string
-        }
-        Insert: {
-          completed_at?: string
-          item_id: string
-          occurrence_start: string
-          series_id: string
-          status: string
-        }
-        Update: {
-          completed_at?: string
-          item_id?: string
-          occurrence_start?: string
-          series_id?: string
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "occurrence_item_state_item_id_fkey"
-            columns: ["item_id"]
-            isOneToOne: false
-            referencedRelation: "checklist_item"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "occurrence_item_state_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "occurrence_item_state_status_fkey"
-            columns: ["status"]
-            isOneToOne: false
-            referencedRelation: "item_status"
-            referencedColumns: ["code"]
-          },
-        ]
-      }
-      occurrence_participant_override: {
-        Row: {
-          occurrence_start: string
-          removed: boolean
-          rsvp: string | null
-          series_id: string
-          user_id: string
-        }
-        Insert: {
-          occurrence_start: string
-          removed?: boolean
-          rsvp?: string | null
-          series_id: string
-          user_id: string
-        }
-        Update: {
-          occurrence_start?: string
-          removed?: boolean
-          rsvp?: string | null
-          series_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "occurrence_participant_override_rsvp_fkey"
-            columns: ["rsvp"]
-            isOneToOne: false
-            referencedRelation: "rsvp_status"
-            referencedColumns: ["code"]
-          },
-          {
-            foreignKeyName: "occurrence_participant_override_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "occurrence_participant_override_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "app_user"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      occurrence_status: {
-        Row: {
-          code: string
-        }
-        Insert: {
-          code: string
-        }
-        Update: {
-          code?: string
-        }
-        Relationships: []
-      }
-      participant_role: {
-        Row: {
-          code: string
-        }
-        Insert: {
-          code: string
-        }
-        Update: {
-          code?: string
-        }
-        Relationships: []
-      }
-      participation_requirement: {
-        Row: {
-          id: string
-          min_count: number
-          role: string
-          series_id: string
-        }
-        Insert: {
-          id?: string
-          min_count?: number
-          role: string
-          series_id: string
-        }
-        Update: {
-          id?: string
-          min_count?: number
-          role?: string
-          series_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "participation_requirement_role_fkey"
-            columns: ["role"]
-            isOneToOne: false
-            referencedRelation: "participant_role"
-            referencedColumns: ["code"]
-          },
-          {
-            foreignKeyName: "participation_requirement_series_id_fkey"
-            columns: ["series_id"]
-            isOneToOne: false
-            referencedRelation: "event_series"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       person: {
         Row: {
           account_id: string
-          color: string
+          color_key: string
           created_at: string
           id: string
-          kind: string
           name: string
           sort_order: number
           user_id: string | null
         }
         Insert: {
           account_id: string
-          color?: string
+          color_key?: string
           created_at?: string
           id?: string
-          kind?: string
           name: string
           sort_order?: number
           user_id?: string | null
         }
         Update: {
           account_id?: string
-          color?: string
+          color_key?: string
           created_at?: string
           id?: string
-          kind?: string
           name?: string
           sort_order?: number
           user_id?: string | null
@@ -897,33 +336,23 @@ export type Database = {
       reminder: {
         Row: {
           id: string
-          method: string
           offset_seconds: number
           series_id: string
           user_id: string
         }
         Insert: {
           id?: string
-          method?: string
           offset_seconds: number
           series_id: string
           user_id: string
         }
         Update: {
           id?: string
-          method?: string
           offset_seconds?: number
           series_id?: string
           user_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "reminder_method_fkey"
-            columns: ["method"]
-            isOneToOne: false
-            referencedRelation: "reminder_method"
-            referencedColumns: ["code"]
-          },
           {
             foreignKeyName: "reminder_series_id_fkey"
             columns: ["series_id"]
@@ -939,30 +368,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      reminder_method: {
-        Row: {
-          code: string
-        }
-        Insert: {
-          code: string
-        }
-        Update: {
-          code?: string
-        }
-        Relationships: []
-      }
-      rsvp_status: {
-        Row: {
-          code: string
-        }
-        Insert: {
-          code: string
-        }
-        Update: {
-          code?: string
-        }
-        Relationships: []
       }
       user_preference: {
         Row: {
@@ -998,41 +403,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      can_access_list: { Args: { p_list: string }; Returns: boolean }
-      can_access_list_item: { Args: { p_item: string }; Returns: boolean }
       can_access_series: { Args: { p_series: string }; Returns: boolean }
       create_account: { Args: { p_name: string }; Returns: string }
       is_account_member: { Args: { p_account: string }; Returns: boolean }
+      schedule_reminder_sender: {
+        Args: {
+          p_cron_secret: string
+          p_function_url: string
+          p_schedule?: string
+        }
+        Returns: undefined
+      }
       search_events: {
         Args: { p_account: string; p_query: string }
         Returns: {
+          all_day: boolean
+          dtstart: string
+          rank: number
+          rrule: string
           series_id: string
           title: string
-          dtstart: string | null
-          all_day: boolean
-          rrule: string | null
-          snippet: string | null
-          rank: number
         }[]
       }
-      search_list_items: {
-        Args: { p_account: string; p_query: string }
-        Returns: {
-          item_id: string
-          list_id: string
-          list_title: string
-          title: string
-          group_label: string | null
-          done: boolean
-          due_on: string | null
-          person_id: string | null
-          rank: number
-        }[]
-      }
-      split_series: {
-        Args: { p_cutover: string; p_series: string; p_truncated_rrule: string }
-        Returns: string
-      }
+      unschedule_reminder_sender: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
@@ -1161,7 +554,11 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
 } as const
+

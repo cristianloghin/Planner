@@ -1,0 +1,56 @@
+.DayHead {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* A button when tapping it expands/restores the day's column. */
+.label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--muted);
+}
+
+button.label {
+  cursor: pointer;
+}
+
+.name {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  border: 2px solid transparent;
+}
+
+.container.today {
+  border-color: var(--accent);
+}
+
+.today .name,
+.today .number {
+  color: var(--accent);
+}
+
+.container.expanded {
+  background-color: var(--surface);
+}

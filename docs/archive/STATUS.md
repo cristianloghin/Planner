@@ -1,0 +1,321 @@
+# Status
+
+Where the app actually is, and the gotchas worth knowing before editing.
+
+For the *why* behind the schema see [`DATA_MODEL.md`](./DATA_MODEL.md); for where
+the code is going see [`RESTRUCTURE_PLAN.md`](./RESTRUCTURE_PLAN.md); for what is
+designed but unbuilt see [`PLANNED.md`](./PLANNED.md).
+
+---
+
+## Built and live
+
+Phase 2 is done: the app runs on Supabase with accounts, auth and cross-device
+sync. Migrations `0001`–`0021` are applied.
+
+- **Auth + account bootstrap** — email/password sign-in, `create_account`, the
+  new-user mirror trigger. Sign-out lives in Settings.
+- **People as data** (`0005`) — one calendar lane per `person` row
+  (`adult`/`child`, optional login link). The frontend is generic over N people.
+- **Events, occurrences, checklists, notes, reminders** — the full series /
+  occurrence model, with `split_series` for "this and following".
+- **Realtime sync** (`0006`, `0008`, `0011`, `0016`) — a partner's change appears
+  live, deferred while you are mid-edit. `REPLICA IDENTITY FULL` on the RLS-gated
+  tables so DELETEs propagate.
+- **Occurrence dependencies** — link an occurrence to a concrete occurrence of
+  another event via `occurrence_dependency`.
+- **Standalone Lists** (`0009`) — named account-scoped lists with in-list
+  headers, per-item deadlines, and to-dos linkable to a calendar occurrence;
+  ticking in either place is the same write.
+- **Event templates** — reusable series shells (`is_template = true`), saved from
+  the editor and deep-copied into new events.
+- **Unified colour palette** (`0015`) — one 12-colour set keyed `'1'`–`'12'` for
+  both people and events, with values in CSS (`src/styles/swatches.css`) and
+  per-user overrides in `user_preference`.
+- **Full-text search** (`0014`, recreated in `0017`) — `search_events` /
+  `search_list_items`, `SECURITY INVOKER` so RLS scopes results.
+- **Web Push reminders** (`0018`–`0021`) — reminders delivered while the app is
+  closed, via the `send-reminders` edge function on a pg_cron beat. Setup,
+  verification and field-tested failure modes are in
+  [`PUSH_NOTIFICATIONS.md`](./PUSH_NOTIFICATIONS.md).
+- **Routes** — the five tabs are real URLs (`/day`, `/week`, `/month`, `/lists`,
+  `/settings`) over `@mikrostack/router`, with `/` guarded to redirect to
+  `/day`. The editors and the occurrence sheet are still their own local
+  state, and the auth gate is still imperative rather than a route guard; the
+  session service now has the non-React accessor a guard needs, so that is a
+  routes-step change.
+
+## The data layer, as it stands
+
+**The reducer is gone.** Every slice reads and writes through `client/` and
+`domains/` over TanStack Query. `state.tsx`, `store/` (the reducer, the actions,
+`SupabaseStore`, the write queue and the offline snapshot) and the `AppState`
+type are deleted. What the provider used to do now lives in:
+
+- **`navigation.tsx`** — the visible week and day, a small context with the
+  reducer's exact rules (a day step rolls into the neighbouring week). Not a URL
+  yet; the routes work moves it there.
+- **`App.tsx`'s shell** — the realtime wiring (client channel → service →
+  `queryKeysForTable`), and the sync banners read off the query client:
+  `onlineManager` for offline, paused mutations for "changes pending", and a
+  hook on the mutation cache in `src/queryClient.ts` for a write the server
+  rejected (the domain has already rolled its optimistic patch back).
+- **Query itself** — ordering (one mutation scope), offline durability (the
+  persister), and the cold-start refetch in `main.tsx`.
+
+Worth knowing before adding a slice:
+
+- **`occurrences` is adopted** — the first slice to run through `client/` and
+  `domains/` for real. Reads and writes both go through the domain, and
+  `data/completions.ts` is gone. Six screens call `useCompletionsForRange` from
+  `domains/occurrences/queries`, passing `accountId`; the sheet and the editor
+  write through one `useOccurrencesWrite`.
+- **Templates** now read and write through `domains/events` (`useTemplates`
+  and the `saveTemplate` / `removeTemplate` changes of `useEventsWrite`).
+  `data/templates.ts` and `data/useAccountStore.ts` are gone.
+- **People and preferences** read through `usePeople` / `usePreferences` with
+  the domain selectors; Settings writes through `usePeopleWrite` /
+  `usePreferencesWrite`. The timezone stamp is an effect in the app shell over
+  the preferences query, guarded to fire once per zone per session. One thing
+  worth knowing: `user_preference` is **not in the realtime publication**, so
+  another device's change only arrives on a refetch.
+- **Cold starts read fresh.** Every Query slice starts from the persisted
+  cache with a five-minute stale time, which alone would let a change made
+  while the app was closed sit unseen for up to five minutes. So `main.tsx`
+  treats a launch like a reconnection: once the saved cache lands and any
+  paused writes have gone out, the whole cache is invalidated once. The
+  cached data still paints instantly; what a screen is showing refetches
+  right away and the rest refetch when first read. Offline, the resume waits
+  for the network and the refetch waits with it.
+- **Lists** read through `useLists` / `useListLinks` and write through
+  `useListsWrite`, from the Lists screen and the sheet's linked to-dos. No edit
+  guard: every write patches the cache first, so a refetch mid-edit shows the
+  user's own latest change.
+- **Events and dependencies** read through `useEvents` / `useDependencies`
+  and write through `useEventsWrite` (save, remove, split) and
+  `useOccurrencesWrite` (dependency edges). The editor holds its own draft, so
+  it needs no guard either.
+- **Realtime** runs through `services/realtime` over `client/realtime.ts`,
+  wired in the app shell: one folded report per burst, `queryKeysForTable` in
+  `domains/index.ts` turns each table into the Query keys to invalidate, and a
+  reconnection invalidates the whole cache.
+- **Push** is the three pieces the plan describes: `services/push` does the
+  browser side, `domains/push` stores the row, and the Settings toggle and the
+  shell's start-up re-registration pair them at the call site.
+- **Session and auth.** `services/session` holds who is signed in, fed from
+  `client/auth` by `src/session.ts` at the root. The gate in `App.tsx` reads
+  it, finds or creates the account through `domains/account`, and hands both
+  ids down through `src/account.tsx` — a synchronous context, mounted only
+  once both are known, so screens never wait on it (R8). Sign-in, sign-up,
+  sign-out and password changes go through `domains/auth`; the gate clears the
+  query cache when the session becomes empty. `auth.tsx` is deleted.
+  Everything in `client/` and `domains/` is live.
+- **`lib/` is gone.** The service forwarders are deleted and their consumers
+  import `services/` directly; `rrule` and the reminder-sender cross-check live
+  in `client/`, the attachment helpers in `domains/events/attachments.ts`, the
+  query client next to `main.tsx`, and search runs through `domains/search`.
+
+Each slice has exactly one owner. `RESTRUCTURE_PLAN.md` is where this ends up.
+
+**Nothing in `client/` or `domains/` duplicates a live path any more.** Every
+slice has one owner.
+
+### Adopting a slice
+
+`occurrences` went first and is done, so `client/` and `domains/` are no longer
+untried against a real database. What that took, for the next one:
+
+- **The cache key does not change.** Same key, same windows, so it is a swap
+  rather than a migration — and `src/types.ts` already re-exports the domain
+  types, so screens are typed against the new shapes before they call them.
+- **`accountId` becomes an argument.** Domains take it rather than reading it
+  ambiently (R8). Until a slice's screens are routes, they read it from
+  `useAccount` themselves; the route supplies it later.
+- **The mutation key changes, and queued writes do not survive that.** A write
+  paused offline is stored under its key; if nothing is registered for that key
+  when it resumes, query-core rejects it, `resumePausedMutations` swallows the
+  rejection, and it is gone without a word. Bump `CACHE_BUSTER` in
+  `src/queryClient.ts` in the same change — the write is lost either way, but
+  visibly and once.
+- **Verify against the local stack, not the type checker.** The useful check is
+  that a cold cache fetches and a warm one does not, which is what proves the
+  domain reads the key the old path wrote.
+
+Registration itself is settled: `registerDomainDefaults(queryClient)` in
+`domains/index.ts` is called once in `main.tsx` before `createRoot`, and a new
+domain with writes gets a line there. It asks nothing of the session, because
+the account rides in each write's values rather than being handed to the
+register function — see [Decision: the account is a value, not a
+closure](#the-account-is-a-value-not-a-closure) below.
+
+Every slice is adopted; nothing is left to move onto `client/` and `domains/`.
+
+### The account is a value, not a closure
+
+Registration takes only the query client. It used to take `accountId`, which
+meant it could not run until the session had resolved — but `main.tsx` resumes
+paused writes as soon as the saved cache is read out of localStorage, which is
+well before that. Every domain write in the queue was dropped before its
+behaviour existed.
+
+The account was never needed that early. Reads need it, and an insert that sets
+`account_id` needs it, but RLS scopes an update by row id: `renamePerson` does
+not need to know the account. So it rides in the write's values (R9), which is
+also what makes a resumed write self-sufficient.
+
+## Tests
+
+`npm test` — 219 tests, no backend needed. Recurrence expansion and the RRULE
+round-trip, occurrence completion and dependency gating, date math, the visible
+date's navigation rules, the client-layer conversions
+(`src/client/mappers.test.ts`), each domain's transformers, selectors and
+optimistic patches, the table-to-keys map, and a cross-validation of the edge
+function's recurrence logic against the client's.
+
+169 of them now live under `client/`, `domains/` and `services/`, but only 116 are
+*new* — the recurrence and occurrence-status tests moved there with their code.
+The new ones cover: the client's conversions
+(`mappers.test.ts`, including `occurrenceTs` across both clock changes) and each
+domain's transformers, selectors and optimistic patches. The most valuable are the
+checklist round-trip in `domains/events` — grouping flat rows into checklists and
+back, which could not be tested at all while it lived inside a database call — and
+`domains/occurrences`, which pins the rule that a day carrying nothing the app
+shows gets no entry, on both the read and the optimistic update.
+
+The two service stores add 17 more, and are worth knowing about because they
+needed no network at all: both `session` and `realtime` are handed their source
+as an argument, so a stub drives them. That is the practical dividend of "a
+service is fed, not self-serving" — the rule pays for itself in tests before it
+pays for itself in structure.
+
+`domains/occurrences` gained three more with the occurrences adoption, pinning
+what happens when two rows land on the same day — see the gotcha below. Only one
+of the three fails without the fix; the other two guard the neighbouring cases.
+
+The remaining gap is every DB round-trip, which needs a click-test rather than a
+unit test. Every adopted slice has had one against the local stack — reads,
+writes and a partner-style change arriving over realtime — as it was adopted.
+
+---
+
+## Gotchas — read before editing `client/`
+
+These are the rules the client functions encode. Breaking one is silent.
+
+- PostgREST embeds need FK hints `table!fk_col` or you get `PGRST201` (ambiguous
+  — e.g. `checklist_item` also links many-to-many via `occurrence_item_removed`).
+- Occurrence rows stay sparse: done → upsert, undone → delete.
+- Two occurrence rows can land on the same **day**, because a row is stored at
+  the time of day the series had when it was written and a later time edit does
+  not move it. `toCompletions` layers them rather than letting the last win, or
+  a day marked done by one row and moved by another comes back missing the tick.
+  Writes avoid making a second row (see `dayRange`), but a pair written before
+  that rule existed reads back as two forever.
+- Children sync is upsert + delete-missing, **not** delete-all — otherwise the
+  cascade wipes `occurrence_item_state` ticks on every edit.
+- Attachment display order is lossy on round-trip (the DB has no polymorphic
+  order). Content round-trips; interleaving does not.
+- Occurrence rows are matched by a **day range**, never an exact timestamp: the
+  stored `occurrence_start` carries the time-of-day the series had when the row
+  was written, so an exact match silently misses every row written before a
+  series time edit. See `dayRange` in `src/client/mappers.ts`. Writing a *new*
+  row is the other half — `occurrenceTs` in the same file — and the two must not
+  be swapped: match by range, insert by timestamp.
+- Notes keep their original `author_id`, and reminder deletes are scoped to
+  `user_id`. Both stop one partner's edit from taking over or removing the
+  other's rows.
+- Events and templates are one table (`event_series`). `client/series.ts` treats
+  them as one.
+
+Two rules that are easy to break and live in `DATA_MODEL.md`:
+
+- **Never store a `COUNT` rrule** — convert to `UNTIL` at the app boundary
+  ([Decision 2](./DATA_MODEL.md#2-recurrence--rfc5545-rrule-strings-never-count)).
+- **`split_series`' cutover must be a real `occurrence_start`**, computed by the
+  calendar library — never `now()`. Passing an arbitrary instant silently
+  reschedules the event and re-orphans its rows
+  ([Decision 3](./DATA_MODEL.md#3-edit-this-and-following--series-split-not-temporal-versioning)).
+
+---
+
+## Running it locally
+
+The whole backend runs in Docker, from the same images as the hosted project:
+
+```bash
+supabase start
+```
+
+That applies `0001`–`0021` to a fresh database and then `supabase/seed.sql`,
+which creates one account with two adults, a child, a few events (one weekly with
+two checklists), two lists and a blueprint — enough that every screen has
+something on it.
+
+Sign in as **dev@planner.test / password123**. Auth email goes to Inbucket on
+`:54324`, not to a real inbox — that is where the confirmation link lands if you
+sign up through the app instead. Studio is on `:54323`.
+
+Point `.env.local` at what `supabase start` prints (`VITE_SUPABASE_URL` and the
+publishable key). **Clear site data when you switch backends**: the query cache
+lives in localStorage under `planner.queryCache.v1` (the `v2` buster discards
+its contents, not the key) and the offline snapshot is
+keyed by account id, so the same origin pointed at a different database will
+render the previous account's data before the first fetch lands.
+
+The reminder sender is a separate process:
+
+```bash
+supabase functions serve send-reminders
+```
+
+Two things localhost cannot reproduce: the `pg_cron` beat from `0019` that
+triggers that function on a schedule, and iOS push, which needs the app added to
+the Home Screen. Invoke the function by hand instead.
+
+### Testing what the deployment actually does
+
+`npm run dev` is not a rehearsal. The base path (`/Planner/`), the service worker
+built from `src/sw.ts`, and the generated icons only exist in a real build:
+
+```bash
+npm run build && npm run serve:pages
+```
+
+`serve:pages` serves `dist/` the way GitHub Pages does — and specifically **does
+not** rewrite unknown paths to `index.html`. `vite preview` does, which hides the
+one failure worth catching: Pages serves `404.html` for any path it has no file
+for. `npm run build` copies the built `index.html` to `404.html` so a cold visit
+to a deep link still boots the app. Open one in a fresh tab; the response is a
+404 and the app renders anyway, which is exactly what a real visitor gets.
+
+Routes have landed, so this is live rather than theoretical. All three paths
+were checked once against the built app: the dev server under the base, a cold
+visit through `404.html` (a 404 response with the app rendering), and the
+service worker's own navigation fallback serving from cache. None of them had
+ever run before, because until routes there were no deep links.
+
+---
+
+## Standing up a fresh backend
+
+```bash
+npm i -g supabase                 # or: brew install supabase/tap/supabase
+supabase link --project-ref <ref> # from the dashboard URL
+supabase db push                  # applies 0001 -> 0021 in order
+```
+
+Then: Authentication → URL Configuration → **Site URL** = the deployed URL (it
+defaults to `localhost:3000`, which breaks auth emails), and the Web Push setup
+in [`PUSH_NOTIFICATIONS.md`](./PUSH_NOTIFICATIONS.md).
+
+Applying migrations by hand instead? Paste them **in numeric order** — `0004`
+in particular is not optional: `0001`–`0003` enable RLS but never grant table
+privileges, and without it every authenticated query fails `42501 permission
+denied`.
+
+**Smoke test:** sign up → an `app_user` row appears. `create_account('Home')` →
+you are an `owner` member. Create a weekly series, tick an item on one
+occurrence → exactly one `occurrence_item_state` row, other weeks unaffected.
+`split_series` at a real future slot → new series id, future ticks/participants/
+notes moved onto it, the old series' `rrule` now `UNTIL`-bounded. As a
+non-member, confirm RLS hides all of it.

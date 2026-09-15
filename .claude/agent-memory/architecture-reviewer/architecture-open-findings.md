@@ -1,57 +1,73 @@
 ---
 name: architecture-open-findings
-description: Structural findings for Planner with disposition per item, last re-derived from code 2026-07-27; verify before restating
+description: Open structural findings for Planner with dispositions, updated 2026-09-06 after the routes review on branch `views` (ba2515b, edc5f42); verify against code before restating
 metadata:
   type: project
 ---
 
-Findings re-derived from the whole `src/` tree on 2026-07-27 (previous pass 2026-07-26).
-Disposition for all items is **unknown** — nothing has been acted on or explicitly
-accepted, so none of these is a boundary. Re-verify against code before restating.
+**Updated 2026-09-06** after reviewing `4dae750~1..HEAD` on branch `views`. Each finding
+names its disposition. Retirements below are code changes, not changes of judgement.
 
-Currently open (files as of 2026-07-27):
+## Retired — the code changed
 
-1. `src/store/supabaseStore.ts` (1239 lines) — one class owns row mapping for nine
-   tables, the 24-case `apply` write switch, the Query-owned completions + templates
-   reads/writes, a one-time legacy-list localStorage import, and the account-wide
-   realtime channel. `ScheduleStore` declares 3 methods; the class exposes 11.
-   `SupabaseStore` is constructed in three places (`store.ts` `createStore`,
-   `data/useAccountStore.ts`, `data/completions.ts` `resolveWriteStore`).
-   Recommended: move `loadCompletionsRange` + the four occurrence write methods out
-   as free functions in `src/data/` (verified: they use only module-level helpers and
-   `accountId`, sharing nothing with the event write path).
-2. `src/store/store.ts` — `LocalStorageStore`, `normalizeLists`, `createStore` and the
-   `ScheduleStore` interface are unreachable/single-implementation; `Root` gates
-   `AppProvider` on `accountId && session`, so `createStore()`'s no-arg branch is dead
-   and no test imports it. Recommended: delete all but `defaultState()`.
-3. `src/state.tsx` — routes `event_occurrence` / `occurrence_item_state` realtime
-   changes to a completions cache invalidation, while `data/templates.ts` owns its own
-   realtime channel. Recommended: move the completions routing into
-   `data/completions.ts`.
-4. `src/components/Lists.tsx` (714 lines) — `patchTitle` / `addWorkingItem` /
-   `patchItem` / `removeWorkingItem` each fork `if (draft) <local mutation> else
-   dispatch(...)`, giving list-item semantics a second implementation alongside
-   `store/reducer.ts`. Recommended: fold the draft over the exported `reducer`.
-5. `src/lib/search.ts` — Supabase RPC data access in `lib/`; `EventSearch` and
-   `ListSearch` thread `accountId` from `useAuth` into it. Recommended: move to
-   `src/data/search.ts`.
+- **"The calendar's position is not in the URL (invariant 10)"** — closed by `ba2515b`.
+  `src/navigation.tsx` and `navigation.test.ts` are deleted; `routes.tsx:34-53` declares
+  `/day/:date`, `/week/:weekStart`, `/month/:month` with normalising guards;
+  `MonthRoute.tsx:38` reads `useParams` where it held a `useState` cursor.
+- **"`ARCHITECTURE.md` §2's layer table contradicts `views/Calendar.tsx`"** — closed by
+  the doc update in `ba2515b`: the Layout row now reads "(`views/`) … Assets, and Services
+  that produce interaction rather than data", and §11 lists `views/` as the Layout layer.
+- **"The lane grid template is wired in three places"** — closed by `4dae750`:
+  `Calendar.tsx:175` publishes `--lane-columns`, `Timeline.module.css:6` reads it,
+  `DayPage.tsx`/`WeekPage.tsx` are gone.
+- **"`domains/occurrences/selectors.ts` is dead"** — the file is deleted.
+- **"Dead code left by the deletions"** (partly) — `assets/hooks/useMediaQuery.ts` is
+  deleted and every remaining class in `assets/styles/shared.module.css` has at least one
+  consumer (re-scanned by hand 2026-09-06).
+- **"The colour join moved up rather than away"** — routes now call `personColorMap` once
+  and pass resolved `ColorKey`s; `DayPage`/`WeekPage` are gone and `MonthPage` takes the
+  resolved `colors` map.
 
-Closed / no longer holds:
+## Open
 
-- (2026-07-26 item 4) "Swipe-strip scaffolding duplicated across DayView, WeekCalendar,
-  WeekTimeline, MonthView" — **re-verified false on 2026-07-27**. The gesture machine,
-  `pageInert` and the `swipeClip`/`swipeStrip` classes are centralised in
-  `src/lib/useSwipeGestures.ts` + `src/styles/shared.module.css`; each view now holds
-  only ~6 lines of strip JSX. Do not restate.
+1. **`EventEditor` orchestrates from `src/components/`.** *Reported 2026-09-06,
+   disposition unknown.* `components/EventEditor.tsx` is 577 lines calling 7 domain hooks
+   (`:112-113`, `:144-149`); `routes/EventRoute.tsx` is a ~20-line adapter that already
+   re-reads `usePeople` (`:61`) the editor reads again (`:145`). Invariant 6 / §2 "thin
+   shells over props-only views".
+2. **The `/event` URL contract lives in a route component module.** *Reported 2026-09-06.*
+   `EventRoute.tsx` exports `newEventPath` (:28) and `editEventPath` (:44) alongside its
+   two route components; `DayRoute.tsx:33` and `WeekRoute.tsx:39` import them, an edge
+   §2's table does not grant, and pull the editor's module graph with them. Moving them
+   into `routes.tsx` would cycle (it imports the route components), so a sibling module is
+   the fix.
+3. **The week/month URL normalisation is written twice.** *Reported 2026-09-06.*
+   `routes.tsx:41-43,49-51` (guards) and `App.tsx:54,60` (tab links). Verified in the
+   router source that a guard redirect reuses the original `replace` flag (one history
+   entry) and that `Link`'s active class matches the *pattern*, not the params — so the
+   links do not need to normalise.
+4. **The tap-to-create rule is duplicated.** *Reported 2026-09-06.* `DayRoute.tsx:129-142`
+   and `WeekRoute.tsx:119-132` are the same snap-to-15 / one-hour / clamp-to-day rule;
+   `SNAP = 15` is declared at `DayRoute.tsx:37`, `WeekRoute.tsx:45` and (for a different
+   job) `EventEditor.tsx:36`.
+5. **`AttendeeChips` fetches.** *Carried, not acted on.* `components/AttendeeChips.tsx:20-22`
+   calls `usePeople` + `usePreferences` inside `EventEditor`, which holds both at `:145-146`.
+6. **The occurrence key format is written twice.** *Carried, not acted on.*
+   `domains/occurrences/transformers.ts:11` and `services/recurrence/timing.ts:21`;
+   `OccurrenceSheet.tsx:62` uses the service's copy. `timing.ts:16` documents the choice.
+7. **The week-layout preference has no consumer.** *Carried, not acted on.*
+   `Settings.tsx:121,141` read and write it; no calendar screen renders differently.
+8. **Two dead exports in `assets/utils/dates.ts`** — `dayLabel` (:48), `timeToMinutes`
+   (:122), zero references including tests. *Reported 2026-09-06.*
+9. **Day-override rules split across components** — *unknown, not re-derived.* Both writers
+   exist (`EventEditor.tsx`, `OccurrenceSheet.tsx`); the read-through duplication was never
+   re-checked. Re-derive before restating.
 
-**Why:** so a later review does not re-derive the same list from scratch, and does not
-repeat a finding the code has already resolved.
+**Coverage gap, unchanged and acknowledged in `docs/ARCHITECTURE.md` §11 Enforcement:**
+Biome 1.9.4 only; `.github/workflows/` has `deploy.yml` and `test.yml` and nothing
+structural. No dead-export, cycle or import-boundary tool. Findings 8 and the retired
+dead-code items were found by hand. The doc's own pick is `dependency-cruiser`; knip would
+cover dead exports.
 
-**How to apply:** verify each still holds before restating. See
-[[architecture-boundaries]] for what is deliberately transitional.
-
-**Invocation log.** 2026-07-27, third invocation at `edb9478`: all three review targets
-(branch-vs-main, merge-base diff, uncommitted work) were empty — `main` is level with
-`origin/main` and the tree holds only untracked `.claude/` agent files. No review was
-produced and nothing above was re-derived. A further invocation at this commit will also
-be empty; ask the user to name a target or land a change first.
+**How to apply:** verify each against the code before restating. See
+[[architecture-boundaries]] for what is settled or transitional by declaration.

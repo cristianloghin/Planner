@@ -1,0 +1,72 @@
+.TemplateList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  margin: 0 0 8px;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  margin: 0;
+}
+
+/* Painted like an event block: `--c` is set on the row, the tinted background
+   and solid coloured left border derive from it (see swatches.css). */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-left: var(--event-accent) solid var(--c);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: color-mix(in oklab, var(--c) var(--tint-strength), var(--surface));
+}
+
+.info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.info strong {
+  font-size: var(--fs-base);
+}
+
+.meta {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.button {
+  flex: none;
+  display: flex;
+  padding: 6px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.button.delete {
+  color: var(--danger);
+}
+
+.button:active {
+  color: var(--text);
+}

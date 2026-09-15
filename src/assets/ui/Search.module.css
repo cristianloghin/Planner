@@ -1,0 +1,132 @@
+/* The header trigger that opens a search overlay. Sits in a view header's side
+   slot; styled like the (unselected) Today button — a bare accent icon, not a
+   bordered chevron control. */
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  border-radius: 8px;
+}
+
+/* Full-screen search surface, layered above the view (matches the editor shell). */
+.overlay {
+  position: fixed;
+  inset: 0;
+  /* Match the app's centered column so the bar lines up with the view header
+     it covers (the app is max-width 1100px, centered). */
+  max-width: 1100px;
+  margin: 0 auto;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Left/right padding matches the view header so the leading icon lands on the
+     trigger button it replaces — opening search shouldn't make it jump. */
+  padding: max(env(safe-area-inset-top), 16px) max(16px, env(safe-area-inset-left)) 12px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Mirrors the 36×36 trigger button (accent icon centered) so its position and
+   look are unchanged when the overlay opens over it. */
+.barIcon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: var(--accent);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: var(--fs-xl);
+  /* Pin to 36px so the bar row matches the trigger button it replaces — WebKit's
+     default input height (~40px) would otherwise tug the leading icon down. */
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0;
+}
+
+.input:focus {
+  outline: none;
+}
+
+.close {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+}
+
+.results {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 16px calc(28px + env(safe-area-inset-bottom));
+}
+
+.hint {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  text-align: center;
+  margin: 16px 0;
+}
+
+.error {
+  color: var(--danger);
+}
+
+/* ---- Result rows ---- */
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  padding: 12px 4px;
+}
+
+.rowTitle {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+
+.rowTitle.done {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.rowMeta {
+  font-size: var(--fs-base);
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}

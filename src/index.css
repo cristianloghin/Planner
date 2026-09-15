@@ -1,26 +1,12 @@
 /*
- * Global base only. Design tokens live in styles/tokens.css; component styles
+ * Global base only. Design tokens live in assets/styles/tokens.css; component styles
  * live in co-located *.module.css files; cross-cutting class styles live in
- * styles/shared.module.css.
+ * assets/styles/shared.module.css.
  */
-
-/* Digits only (unicode-range): Roboto Mono layered in front of Source Sans 3
-   in --font, so every number in the app renders monospaced — compact, screen-
-   legible forms — while all other text falls through to the body font.
-   size-adjust renders digits a touch larger without touching any font-size. */
-@font-face {
-  font-family: "Planner Digits";
-  src: url("../node_modules/@fontsource-variable/roboto-mono/files/roboto-mono-latin-wght-normal.woff2")
-    format("woff2-variations");
-  font-weight: 100 700;
-  font-style: normal;
-  font-display: swap;
-  size-adjust: 108%;
-  unicode-range: U+0030-0039;
-}
 
 :root {
   font-family: var(--font);
+  font-weight: 500;
 }
 
 * {
@@ -48,6 +34,11 @@ button {
   cursor: pointer;
 }
 
+label {
+  font-size: var(--fs-md);
+  color: var(--muted);
+}
+
 input,
 select {
   font: inherit;
@@ -63,4 +54,11 @@ input[type="color"] {
   padding: 2px;
   width: 44px;
   height: 38px;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
 }

@@ -1,0 +1,33 @@
+.AllDayChip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 20px;
+  border: none;
+  border-radius: 10px;
+  /* Solid, unlike a timed block's tint: an all-day chip reads as a label,
+     not a span of the day. The swatches keep white text AA on every colour. */
+  background: var(--c);
+  color: white;
+  text-align: left;
+  box-shadow: 0 1px 3px var(--shadow);
+  overflow: hidden;
+
+  font-stretch: 75%;
+}
+
+.title {
+  flex: 1;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.offset {
+  flex: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}

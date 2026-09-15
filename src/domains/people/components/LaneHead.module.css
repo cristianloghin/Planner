@@ -1,0 +1,40 @@
+/* A person's column heading: the coloured name. */
+.LaneHead {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  color: var(--c);
+  padding: 3px 3px 0;
+}
+
+.LaneHead[data-expanded="true"] .name {
+  background-color: currentColor;
+  border-color: currentColor;
+}
+
+.name {
+  display: flex;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  border: 2px solid currentColor;
+  border-radius: 9999px;
+}
+
+.LaneHead[data-expanded="true"] .name .toggle {
+  color: var(--reversed);
+}
+
+/* The name doubles as the expand toggle; keep the heading's look. */
+.toggle {
+  flex: 1 1 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}

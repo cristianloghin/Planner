@@ -1,0 +1,106 @@
+/* Three cells: the outer two share the leftover width equally, so whatever
+   is in the middle sits at the centre of the screen, not between the sides.
+   Only the horizontal padding is set here — a caller that needs top padding
+   (a full-screen editor under the notch) adds it with padding-block, which
+   does not collide with this. */
+.Header {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding-inline: max(16px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-right));
+  border-bottom: 1px solid var(--border);
+}
+
+.left,
+.right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.left {
+  justify-self: start;
+}
+
+.right {
+  justify-self: end;
+}
+
+/* Anything that sits in the bar is a 44pt target, whatever it is styled as. */
+.left > *,
+.right > * {
+  min-height: 44px;
+}
+
+.center {
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+
+/* Only ever a short label ("New event", "Settings"). Clipped rather than
+   wrapped, so no caller can grow the bar by passing something long. */
+.title {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--fs-xl);
+  font-weight: 600;
+}
+
+/* The title is the switch: what is shown, with an arrow saying it can change. */
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 8px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+}
+
+.chevron {
+  color: var(--muted);
+}
+
+/* Radix portals the menu to <body>; it sits above the calendar, below sheets. */
+.menu {
+  z-index: 1000;
+  min-width: 180px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px var(--shadow);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
+}
+
+.item[data-highlighted] {
+  background: var(--surface-2);
+}
+
+.item[data-state="checked"] {
+  color: var(--accent);
+}

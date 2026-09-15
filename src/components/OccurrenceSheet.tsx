@@ -1,44 +1,28 @@
-import { Trash2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
-import {
-  useCancelOccurrence,
-  useClearOccurrenceOverride,
-  useCompletionsForRange,
-  useSetChecklistEntry,
-  useSetOccurrenceStatus,
-} from '../data/completions'
-import { checklists, notes, reminderOffsets } from '../lib/attachments'
-import { cx } from '../lib/cx'
-import { addDays, isoLabel, minutesToTime } from '../lib/dates'
-import { findListItem, isOverdue } from '../lib/lists'
-import { offsetLabel } from '../lib/notifications'
-import {
-  blockingPrerequisites,
-  isOccurrenceDone,
-  occKey,
-  occurrenceEffectiveStatus,
-} from '../lib/occurrences'
-import { attendeeLabel } from '../lib/people'
-import {
-  effectiveOccurrence,
-  recurrenceLabel,
-  seriesOccurrenceDatesInRange,
-} from '../lib/recurrence'
-import { MINS_PER_DAY, eventDate, eventSpanDays, eventStartMinutes } from '../lib/timing'
-import { useApp } from '../state'
-import shared from '../styles/shared.module.css'
-import type { CalendarEvent, CompletionsMap, OccurrenceStatusCode } from '../types'
-import { ConfirmDialog } from './ConfirmDialog'
+import { Pencil, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { useAccount } from '../account'
+import shared from '../assets/styles/shared.module.css'
+import { ConfirmDialog } from '../assets/ui/ConfirmDialog'
+import { type ScopeChoice, ScopeSheet } from '../assets/ui/ScopeSheet'
+import { PageLoader } from '../assets/ui/Spinner'
+import { cx } from '../assets/utils/cx'
+import { isoLabel, minutesToTime, offsetLabel } from '../assets/utils/dates'
+import type { EditScope } from '../domains/events/draft'
+import { type EventsChange, useEventsWrite, useOccurrencesWrite } from '../domains/events/mutations'
+import { useOccurrencesForRange } from '../domains/events/queries'
+import { reminderOffsets, timingOf } from '../domains/events/selectors'
+import { AttendeeChips } from '../domains/people/components/AttendeeChips'
+import { usePeopleWithColors } from '../domains/people/queries'
+import { attendeeLabelFor } from '../domains/people/selectors'
+import { effectiveOccurrence, recurrenceLabel } from '../services/recurrence/expand'
+import { MINS_PER_DAY, eventSpanDays, eventStartMinutes } from '../services/recurrence/timing'
+import type { CalendarEvent } from '../types'
+import { EditorPageView } from '../views/EditorPage'
 import s from './OccurrenceSheet.module.css'
-import { type ScopeChoice, ScopeSheet } from './ScopeSheet'
-import { PageLoader } from './Spinner'
-
-const STATUSES: OccurrenceStatusCode[] = ['done', 'skipped', 'blocked']
 
 /**
- * A single occurrence of an event on a date: the place to tick it off, work its
- * checklist, set its status, and manage what it waits on. Editing the *template*
- * hands off to the EventEditor.
+ * A single occurrence of an event on a date: the place to move, cancel or
+ * delete the day. Editing the *series* hands off to the EventEditor.
  */
 export function OccurrenceSheet({
   event,
@@ -48,97 +32,83 @@ export function OccurrenceSheet({
 }: {
   event: CalendarEvent
   date: string
-  onEdit: () => void
+  /** Open the editor, on the whole series or on this one occurrence. */
+  onEdit: (scope: EditScope) => void
   onClose: () => void
 }) {
-  const { state, dispatch } = useApp()
-  // Windowed per-occurrence state: this occurrence's month, plus the dates of
-  // any prerequisites it waits on (they may live outside the window).
-  const edges = state.dependencies[occKey(event.id, date)] ?? []
-  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the joined dates so the memo survives `edges` getting a fresh identity with unchanged contents
-  const prereqDates = useMemo(
-    () => [...new Set(edges.map((e) => e.prerequisiteDate))].sort(),
-    [edges.map((e) => e.prerequisiteDate).join(',')],
-  )
-  const { completions, isLoading } = useCompletionsForRange(date, date, prereqDates)
-  const setOccurrenceStatus = useSetOccurrenceStatus()
-  const setChecklistEntry = useSetChecklistEntry()
-  const clearOverride = useClearOccurrenceOverride()
-  const cancelOccurrence = useCancelOccurrence()
+  const { accountId, userId } = useAccount()
+  const { people, withColors: peopleWithColors } = usePeopleWithColors(accountId, userId)
+  const eventsWrite = useEventsWrite()
+  const writeEvent = (change: EventsChange) =>
+    eventsWrite.mutate({
+      accountId: accountId,
+      userId: userId,
+      change,
+    })
+  const { occurrences, isLoading } = useOccurrencesForRange(accountId, date, date)
+  const occurrencesWrite = useOccurrencesWrite()
 
   // Delete asks two different questions. A one-off just needs confirming; a
   // series needs to know how far the delete reaches, and that action sheet is
   // itself the confirmation (so the two are mutually exclusive, never stacked).
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteScope, setDeleteScope] = useState(false)
+  // Edit asks the same question of a series: this occurrence, or all of them.
+  const [editScope, setEditScope] = useState(false)
   const isRecurring = !!event.recurrence
 
-  const cls = checklists(event).filter((c) => c.items.length > 0)
-  const hasChecklist = cls.length > 0
-  const done = isOccurrenceDone(completions, event, date)
-  const occState = completions[occKey(event.id, date)]
-  const checked = occState?.checked ?? {}
-  const status = occState?.status
-  const blockers = blockingPrerequisites(state, completions, event, date)
+  const occState = occurrences.on(event.id, date)
   // A one-off override on this slot. `date` is the occurrence's identity (the day
   // the series would normally place it); if the override's start lands on another
   // day, it's been moved there.
   const hasTimingOverride = occState?.start != null || occState?.duration != null
+  // Who is on it today: this day's own list when it has one, else the series'.
+  const attendees = occState?.attendees ?? event.attendees
+  const hasPeopleOverride = occState?.attendees != null
   const movedFromOrigin = occState?.start != null && occState.start.slice(0, 10) !== date
 
-  function setStatus(next: OccurrenceStatusCode | null) {
-    setOccurrenceStatus.mutate({ event, date, status: next })
-  }
-
   // ---- delete (scoped for a series) --------------------------------------
-  // Deleting forward from the series' anchor leaves nothing behind, so on the
-  // first slot "this and future" collapses into "all".
-  const isFirstOccurrence = eventDate(event) === date
 
   /** Drop the whole series, every occurrence with it. */
   function deleteAllEvents() {
-    dispatch({ type: 'removeEvent', id: event.id })
+    writeEvent({ kind: 'removeEvent', id: event.id })
     onClose()
   }
   /** Remove just this slot: the rule still produces it, `cancelled` hides it. */
   function deleteThisEvent() {
-    cancelOccurrence.mutate({ event, date })
-    onClose()
-  }
-  /**
-   * End the series the day before this occurrence — the inclusive `until` cap
-   * `startsOn` already honours, so everything from here on stops being produced
-   * (relocated occurrences included: pass 1 of occurrencesOnDate re-checks
-   * `startsOn` against the origin slot).
-   */
-  function deleteThisAndFuture() {
-    if (isFirstOccurrence) return deleteAllEvents()
-    dispatch({
-      type: 'updateEvent',
-      event: {
-        ...event,
-        recurrence: { ...event.recurrence!, until: addDays(date, -1) },
-      },
+    occurrencesWrite.mutate({
+      accountId: accountId,
+      change: { kind: 'cancel', series: timingOf(event), date },
     })
     onClose()
   }
-
   const deleteChoices: ScopeChoice[] = [
     { label: 'This event only', detail: isoLabel(date), onSelect: deleteThisEvent },
-    // Omitted on the first occurrence, where it would duplicate "All events".
-    ...(isFirstOccurrence
-      ? []
-      : [
-          {
-            label: 'This and future events',
-            detail: `From ${isoLabel(date)}`,
-            onSelect: deleteThisAndFuture,
-          },
-        ]),
     { label: 'All events', detail: 'The whole series', onSelect: deleteAllEvents },
   ]
 
-  /** Toolbar delete: actions only — the question itself lives in the sheet. */
+  /** Toolbar buttons: actions only — the questions themselves live in sheets. */
+  const editButton = (
+    <button
+      type="button"
+      className={cx(shared.iconBtn, shared.iconAccent)}
+      onClick={() => (isRecurring ? setEditScope(true) : onEdit('series'))}
+      aria-label="Edit event"
+    >
+      <Pencil size={20} aria-hidden />
+    </button>
+  )
+  const editScopeSheet = (
+    <ScopeSheet
+      open={editScope}
+      onOpenChange={setEditScope}
+      title="Edit recurring event"
+      choices={[
+        { label: 'This event only', detail: isoLabel(date), onSelect: () => onEdit('occurrence') },
+        { label: 'All events', detail: 'The whole series', onSelect: () => onEdit('series') },
+      ]}
+    />
+  )
   const deleteButton = (
     <button
       type="button"
@@ -152,7 +122,7 @@ export function OccurrenceSheet({
 
   // Show this occurrence's *effective* timing — a one-off override moves the time
   // and length for this date only, while `event` stays the series for editing.
-  const eff = effectiveOccurrence(event, date, completions)
+  const eff = effectiveOccurrence(event, date, occurrences)
   const startMin = eventStartMinutes(eff)
   const endMin = startMin + eff.duration
   const span = eventSpanDays(eff)
@@ -164,139 +134,103 @@ export function OccurrenceSheet({
 
   // For a checklist event, "done" is derived from ticks — only skipped/blocked
   // are set explicitly. Otherwise all three statuses are selectable.
-  const statusOptions = hasChecklist ? STATUSES.filter((o) => o !== 'done') : STATUSES
 
   // Cold window (e.g. a deep search jump): hold the interactive body until the
   // occurrence's real ticks/status are in, so a tap can't act on bare defaults.
   if (isLoading) {
     return (
-      <div className={shared.editorPage}>
-        <header className={shared.editorHead}>
-          <button type="button" className={shared.editorCancel} onClick={onClose}>
-            Close
-          </button>
-          <div className={shared.editorActions}>
-            <button type="button" className={shared.primary} onClick={onEdit}>
-              Edit
-            </button>
-          </div>
-        </header>
-        <div className={shared.editorBody}>
-          <h1 className={shared.editorTitle}>{event.title}</h1>
-          <PageLoader />
-        </div>
-      </div>
+      <>
+        <EditorPageView cancelLabel="Close" onCancel={onClose}>
+          <EditorPageView.Title>{null}</EditorPageView.Title>
+          <EditorPageView.Actions>{editButton}</EditorPageView.Actions>
+          <EditorPageView.Body>
+            <h1 className={shared.editorTitle}>{event.title}</h1>
+            <PageLoader />
+          </EditorPageView.Body>
+        </EditorPageView>
+        {editScopeSheet}
+      </>
     )
   }
 
   return (
-    <div className={shared.editorPage}>
-      <header className={shared.editorHead}>
-        <button type="button" className={shared.editorCancel} onClick={onClose}>
-          Close
-        </button>
-        <div className={shared.editorActions}>
+    <>
+      <EditorPageView cancelLabel="Close" onCancel={onClose}>
+        <EditorPageView.Title>{null}</EditorPageView.Title>
+        <EditorPageView.Actions>
           {deleteButton}
-          <button type="button" className={shared.primary} onClick={onEdit}>
-            Edit
-          </button>
-        </div>
-      </header>
+          {editButton}
+        </EditorPageView.Actions>
+        <EditorPageView.Body>
+          <h1 className={shared.editorTitle}>{event.title}</h1>
 
-      <div className={shared.editorBody}>
-        <h1 className={cx(shared.editorTitle, done && s.doneTitle)}>{event.title}</h1>
-
-        <p className={s.meta}>
-          {timeLabel} · {attendeeLabel(state, event.attendees)}
-          {event.recurrence && ` · ${recurrenceLabel(event.recurrence).toLowerCase()}`}
-        </p>
-
-        {hasTimingOverride && (
-          <p className={s.moved}>
-            {movedFromOrigin
-              ? `Moved from ${isoLabel(date)} — still part of this series`
-              : 'Rescheduled for this occurrence only'}
-            {' · '}
-            <button
-              type="button"
-              className={s.resetOverride}
-              onClick={() => clearOverride.mutate({ event, date })}
-            >
-              Reset to series time
-            </button>
+          <p className={shared.editorMeta}>
+            {timeLabel} · {attendeeLabelFor(attendees)(people)}
+            {event.recurrence && ` · ${recurrenceLabel(event).toLowerCase()}`}
           </p>
-        )}
 
-        {blockers.length > 0 && (
-          <p className={s.waiting}>
-            ⏳ Waiting on{' '}
-            {blockers
-              .map((b) => `${b.event.title} (${isoLabel(b.date)}) — needs ${b.requiredStatus}`)
-              .join(', ')}
-          </p>
-        )}
+          {hasTimingOverride && (
+            <p className={s.moved}>
+              {movedFromOrigin
+                ? `Moved from ${isoLabel(date)} — still part of this series`
+                : 'Rescheduled for this occurrence only'}
+              {' · '}
+              <button
+                type="button"
+                className={s.resetOverride}
+                onClick={() =>
+                  occurrencesWrite.mutate({
+                    accountId: accountId,
+                    change: { kind: 'clearOverride', series: timingOf(event), date },
+                  })
+                }
+              >
+                Reset to series time
+              </button>
+            </p>
+          )}
 
-        {hasChecklist &&
-          cls.map((c) => (
-            <div key={c.id} className={s.checklist}>
-              {c.title && <h4 className={s.checklistTitle}>{c.title}</h4>}
-              <ul className={s.checklistItems}>
-                {c.items.map((it) => (
-                  <li key={it.id}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={!!checked[it.id]}
-                        onChange={() =>
-                          setChecklistEntry.mutate({
-                            event,
-                            date,
-                            entryId: it.id,
-                            checked: !checked[it.id],
-                          })
-                        }
-                      />
-                      <span className={cx(checked[it.id] && s.doneTitle)}>{it.title}</span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
+          <label className={shared.label}>Who's involved?</label>
+          <AttendeeChips
+            people={peopleWithColors}
+            value={attendees}
+            onChange={(next) =>
+              occurrencesWrite.mutate({
+                accountId: accountId,
+                change: { kind: 'attendees', series: timingOf(event), date, attendees: next },
+              })
+            }
+          />
+          {hasPeopleOverride && (
+            <p className={s.moved}>
+              Just these people on this day
+              {' · '}
+              <button
+                type="button"
+                className={s.resetOverride}
+                onClick={() =>
+                  occurrencesWrite.mutate({
+                    accountId: accountId,
+                    change: { kind: 'clearAttendees', series: timingOf(event), date },
+                  })
+                }
+              >
+                Reset to series people
+              </button>
+            </p>
+          )}
+
+          {reminderOffsets(event).length > 0 && (
+            <div className={s.reminders}>
+              {reminderOffsets(event).map((o) => (
+                <span key={o} className={s.reminderChip}>
+                  🔔 {offsetLabel(o)}
+                </span>
+              ))}
             </div>
-          ))}
-
-        <div className={s.statusRow}>
-          {statusOptions.map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              className={cx(s.statusBtn, status === opt && s.statusOn)}
-              onClick={() => setStatus(status === opt ? null : opt)}
-            >
-              {opt === 'done' ? 'Mark done' : opt[0].toUpperCase() + opt.slice(1)}
-            </button>
-          ))}
-        </div>
-
-        {notes(event).map((n) => (
-          <p key={n.id} className={s.note}>
-            {n.text}
-          </p>
-        ))}
-
-        {reminderOffsets(event).length > 0 && (
-          <div className={s.reminders}>
-            {reminderOffsets(event).map((o) => (
-              <span key={o} className={s.reminderChip}>
-                🔔 {offsetLabel(o)}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <LinkedTodos event={event} date={date} />
-
-        <DependencyEditor event={event} date={date} completions={completions} />
-      </div>
+          )}
+        </EditorPageView.Body>
+      </EditorPageView>
 
       <ConfirmDialog
         open={confirmDelete}
@@ -315,244 +249,7 @@ export function OccurrenceSheet({
         choices={deleteChoices}
         destructive
       />
-    </div>
-  )
-}
-
-/**
- * To-dos surfaced inside this occurrence (`list_item_event_link`). Each linked
- * to-do is a tickable line whose tick is the to-do's own `list_item.done` — so
- * ticking it here is the same write as in the Lists view (no per-occurrence
- * state). A linked to-do never gates the occurrence's completion.
- */
-function LinkedTodos({ event, date }: { event: CalendarEvent; date: string }) {
-  const { state, dispatch } = useApp()
-  const linkedIds = state.listLinks[occKey(event.id, date)] ?? []
-  const linked = linkedIds
-    .map((id) => findListItem(state, id))
-    .filter((r): r is NonNullable<typeof r> => r !== null)
-
-  const [pick, setPick] = useState('')
-
-  // Items not already linked here, kept under their list as <optgroup>s.
-  const groups = state.lists
-    .map((list) => ({
-      list,
-      items: list.items.filter((i) => !linkedIds.includes(i.id)),
-    }))
-    .filter((g) => g.items.length > 0)
-
-  function add() {
-    if (!pick) return
-    dispatch({ type: 'linkListItem', eventId: event.id, date, itemId: pick })
-    setPick('')
-  }
-
-  return (
-    <div className={s.deps}>
-      <h4 className={s.depsTitle}>To-dos</h4>
-
-      {linked.length > 0 && (
-        <ul className={s.todoList}>
-          {linked.map(({ list, item }) => (
-            <li key={item.id} className={s.todoRow}>
-              <label className={s.todoLabel}>
-                <input
-                  type="checkbox"
-                  checked={item.done}
-                  onChange={() =>
-                    dispatch({ type: 'toggleListItem', listId: list.id, itemId: item.id })
-                  }
-                />
-                <span className={cx(item.done && s.doneTitle)}>{item.title}</span>
-              </label>
-              {item.dueOn && (
-                <span className={cx(s.todoDue, isOverdue(item) && s.todoOverdue)}>
-                  {isoLabel(item.dueOn)}
-                </span>
-              )}
-              <button
-                type="button"
-                className={s.depRemove}
-                onClick={() =>
-                  dispatch({ type: 'unlinkListItem', eventId: event.id, date, itemId: item.id })
-                }
-                aria-label="Unlink to-do"
-              >
-                ✕
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {groups.length > 0 ? (
-        <div className={s.depForm}>
-          <select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Link a to-do">
-            <option value="">Link a to-do…</option>
-            {groups.map(({ list, items }) => (
-              <optgroup key={list.id} label={list.title}>
-                {items.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.title}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-          <button type="button" className={shared.primary} onClick={add} disabled={!pick}>
-            Link
-          </button>
-        </div>
-      ) : (
-        linked.length === 0 && <p className={s.meta}>No to-dos to link yet.</p>
-      )}
-    </div>
-  )
-}
-
-/**
- * Manage this occurrence's prerequisite links — concrete occurrence→occurrence
- * edges. Each link names another event, one of its real occurrences, and the
- * status that occurrence must reach.
- */
-function DependencyEditor({
-  event,
-  date,
-  completions,
-}: {
-  event: CalendarEvent
-  date: string
-  completions: CompletionsMap
-}) {
-  const { state, dispatch } = useApp()
-  const edges = state.dependencies[occKey(event.id, date)] ?? []
-  const others = state.events.filter((e) => e.id !== event.id)
-
-  const [prereqId, setPrereqId] = useState('')
-  const [prereqDate, setPrereqDate] = useState('')
-  const [requiredStatus, setRequiredStatus] = useState<OccurrenceStatusCode>('done')
-
-  const prereq = others.find((e) => e.id === prereqId)
-  // Bound the occurrence search to a year either side of this occurrence so a
-  // recurring prerequisite yields a finite, relevant list of real slots.
-  const prereqDates = prereq
-    ? seriesOccurrenceDatesInRange(prereq, addDays(date, -365), addDays(date, 365))
-    : []
-
-  function add() {
-    if (!prereqId || !prereqDate) return
-    dispatch({
-      type: 'addDependency',
-      eventId: event.id,
-      date,
-      prerequisiteSeriesId: prereqId,
-      prerequisiteDate: prereqDate,
-      requiredStatus,
-    })
-    setPrereqId('')
-    setPrereqDate('')
-    setRequiredStatus('done')
-  }
-
-  return (
-    <div className={s.deps}>
-      <h4 className={s.depsTitle}>Waits on</h4>
-
-      {edges.length > 0 && (
-        <ul className={s.depList}>
-          {edges.map((edge) => {
-            const dep = state.events.find((e) => e.id === edge.prerequisiteSeriesId)
-            const actual = dep
-              ? occurrenceEffectiveStatus(completions, dep, edge.prerequisiteDate)
-              : null
-            const met = actual === edge.requiredStatus
-            return (
-              <li
-                key={`${edge.prerequisiteSeriesId}:${edge.prerequisiteDate}`}
-                className={s.depRow}
-              >
-                <span className={cx(s.depDot, met ? s.depMet : s.depUnmet)} />
-                <span className={s.depText}>
-                  {dep?.title ?? 'Unknown'} · {isoLabel(edge.prerequisiteDate)} · needs{' '}
-                  {edge.requiredStatus}
-                </span>
-                <button
-                  type="button"
-                  className={s.depRemove}
-                  onClick={() =>
-                    dispatch({
-                      type: 'removeDependency',
-                      eventId: event.id,
-                      date,
-                      prerequisiteSeriesId: edge.prerequisiteSeriesId,
-                      prerequisiteDate: edge.prerequisiteDate,
-                    })
-                  }
-                  aria-label="Remove link"
-                >
-                  ✕
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      )}
-
-      {others.length > 0 ? (
-        <div className={s.depForm}>
-          <select
-            value={prereqId}
-            onChange={(e) => {
-              setPrereqId(e.target.value)
-              setPrereqDate('')
-            }}
-            aria-label="Prerequisite event"
-          >
-            <option value="">Add a prerequisite…</option>
-            {others.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.title || 'Untitled'}
-              </option>
-            ))}
-          </select>
-
-          {prereq && (
-            <>
-              <select
-                value={prereqDate}
-                onChange={(e) => setPrereqDate(e.target.value)}
-                aria-label="Prerequisite occurrence"
-              >
-                <option value="">Which occurrence…</option>
-                {prereqDates.map((d) => (
-                  <option key={d} value={d}>
-                    {isoLabel(d)}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={requiredStatus}
-                onChange={(e) => setRequiredStatus(e.target.value as OccurrenceStatusCode)}
-                aria-label="Required status"
-              >
-                {STATUSES.map((st) => (
-                  <option key={st} value={st}>
-                    needs {st}
-                  </option>
-                ))}
-              </select>
-
-              <button type="button" className={shared.primary} onClick={add} disabled={!prereqDate}>
-                Add
-              </button>
-            </>
-          )}
-        </div>
-      ) : (
-        <p className={s.meta}>No other events to wait on yet.</p>
-      )}
-    </div>
+      {editScopeSheet}
+    </>
   )
 }

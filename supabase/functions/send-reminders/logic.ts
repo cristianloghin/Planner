@@ -36,6 +36,8 @@ export interface Recurrence {
   interval: number
   /** Inclusive last occurrence date. */
   until?: string
+  /** Stop after this many occurrences (RFC-5545 COUNT). */
+  count?: number
 }
 
 const FREQ_MAP: Record<string, Recurrence['freq'] | undefined> = {
@@ -46,9 +48,9 @@ const FREQ_MAP: Record<string, Recurrence['freq'] | undefined> = {
 
 /**
  * Parse the stored bare RRULE. UNTIL decodes exactly like the client
- * (rruleToRecurrence): the UTC date of the instant rewound 10h, which maps
- * both the current UTC-end-of-day encoding and legacy locally-encoded values
- * onto their intended date. An unmodelled FREQ returns undefined (one-off).
+ * (rruleToRecurrence): the UTC date of the instant, which is the intended date
+ * because the only writer encodes the UTC end of the day. COUNT is read
+ * straight through. An unmodelled FREQ returns undefined (one-off).
  */
 export function parseRRule(rrule: string | null): Recurrence | undefined {
   if (!rrule) return undefined
@@ -64,47 +66,82 @@ export function parseRRule(rrule: string | null): Recurrence | undefined {
   const freq = FREQ_MAP[fields.get('FREQ') ?? '']
   if (!freq) return undefined
   const interval = Math.max(1, Number(fields.get('INTERVAL') ?? 1) || 1)
+  const countRaw = fields.get('COUNT')
+  const count = countRaw ? Number(countRaw) : undefined
   const untilRaw = fields.get('UNTIL')
   let until: string | undefined
   if (untilRaw) {
     const m = untilRaw.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?$/)
     if (m) {
       const instant = Date.parse(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`)
-      until = new Date(instant - 10 * 3_600_000).toISOString().slice(0, 10)
+      until = new Date(instant).toISOString().slice(0, 10)
     }
   }
-  return { freq, interval, ...(until ? { until } : {}) }
+  return {
+    freq,
+    interval,
+    ...(until ? { until } : {}),
+    ...(count != null && Number.isFinite(count) ? { count } : {}),
+  }
 }
 
 // ---- recurrence expansion (mirrors src/lib/recurrence.ts startsOn) ----------
 
 /** Does an occurrence anchored on `anchor` with `recurrence` start on `date`? */
+/**
+ * The zero-based position of `date` on the grid, or null when it is not a slot.
+ * The UTC twin of the client's `occurrenceIndex` (src/services/recurrence/
+ * expand.ts) — the cross-validation test pins the two together.
+ *
+ * The monthly walk counts *produced* months only: an anchor on the 31st yields
+ * nothing in February, and that missing month must not consume one of a counted
+ * series' N.
+ */
+export function occurrenceIndex(
+  anchor: string,
+  recurrence: Recurrence | undefined,
+  date: string,
+): number | null {
+  const delta = diffDays(date, anchor)
+  if (delta < 0) return null
+  if (delta === 0) return 0
+  if (!recurrence) return null
+  const n = recurrence.interval
+  switch (recurrence.freq) {
+    case 'daily':
+      return delta % n === 0 ? delta / n : null
+    case 'weekly':
+      return delta % (7 * n) === 0 ? delta / (7 * n) : null
+    case 'monthly': {
+      const a = new Date(isoToUtcMs(anchor))
+      const b = new Date(isoToUtcMs(date))
+      // Same day-of-month only (months missing that day simply skip).
+      if (a.getUTCDate() !== b.getUTCDate()) return null
+      const months =
+        (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + (b.getUTCMonth() - a.getUTCMonth())
+      if (months % n !== 0) return null
+      let index = 0
+      for (let j = 0; j < months / n; j++) {
+        const d = new Date(a)
+        d.setUTCMonth(d.getUTCMonth() + j * n)
+        // Date overflow (Feb 31 -> Mar 3) marks a month that produces nothing.
+        if (d.getUTCDate() === a.getUTCDate()) index++
+      }
+      return index
+    }
+  }
+}
+
 export function startsOn(
   anchor: string,
   recurrence: Recurrence | undefined,
   date: string,
 ): boolean {
-  const delta = diffDays(date, anchor)
-  if (delta < 0) return false
   if (recurrence?.until && diffDays(date, recurrence.until) > 0) return false
-  if (delta === 0) return true
-  if (!recurrence) return false
-  const n = recurrence.interval
-  switch (recurrence.freq) {
-    case 'daily':
-      return delta % n === 0
-    case 'weekly':
-      return delta % 7 === 0 && (delta / 7) % n === 0
-    case 'monthly': {
-      const a = new Date(isoToUtcMs(anchor))
-      const b = new Date(isoToUtcMs(date))
-      // Same day-of-month only (months missing that day simply skip).
-      if (a.getUTCDate() !== b.getUTCDate()) return false
-      const months =
-        (b.getUTCFullYear() - a.getUTCFullYear()) * 12 + (b.getUTCMonth() - a.getUTCMonth())
-      return months % n === 0
-    }
-  }
+  const index = occurrenceIndex(anchor, recurrence, date)
+  if (index == null) return false
+  // A counted series stops after its Nth slot — slots, not survivors.
+  return recurrence?.count == null || index < recurrence.count
 }
 
 // ---- timezone bridging -------------------------------------------------------
