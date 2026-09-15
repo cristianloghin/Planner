@@ -14,7 +14,7 @@
   color-scheme: light dark;
 
   /* ---- Brand & status (theme-independent) ---- */
-  --accent: light-dark(hsl(240 50% 50%), hsl(240 75% 75%));
+  --accent: light-dark(hsl(240 50% 50%), hsl(240 80% 77%));
   --on-accent: light-dark(hsl(240 50% 93%), hsl(240 50% 15%)); /* text/icons on a coloured block or accent button */
   --danger: light-dark(hsl(350 80% 50%), hsl(350 80% 75%));
   --now: light-dark(hsl(350, 75%, 45%), hsl(350, 75%, 60%)); /* current-time line */
@@ -35,33 +35,21 @@
 
   /* ---- Surfaces: dark theme (default) ---- */
   --bg: light-dark(hsl(240 25% 90%), hsl(240 15% 5%));
-  --surface: light-dark(hsl(240 25% 94%), hsl(240 15% 15%));
-  --surface-2: hsl(240 25% 25%);
-  --border: light-dark(hsl(240 25% 88%), hsl(240 20% 30%));
-  --text: hsl(240 15% 91%);
-  --muted: hsl(240 5% 65%);
-  --grid-line: hsl(240 15% 65% / 0.09);
-  --grid-line-strong: hsl(240 15% 65% / 0.22);
-  --overlay: hsl(240 84% 5% / 0.6);
-  --shadow: hsl(240 15% 3% / 0.45);
-  --danger-border: hsl(350 63% 31%);
+  --surface: light-dark(hsl(240 25% 93%), hsl(240 15% 15%));
+  --surface-2: light-dark(hsl(240 25% 96%), hsl(240 25% 25%));
+  --border: light-dark(hsl(240 25% 85%), hsl(240 20% 37%));
+  --text: light-dark(hsl(240 15% 30%), hsl(240 20% 91%));
+  --reversed: light-dark(hsl(240 15% 95%), hsl(240 15% 7%));
+  --muted: light-dark(hsl(240 15% 45%), hsl(240 10% 70%));
+  --grid-line: hsl(from var(--border) h s l / 0.5);
+  --grid-line-strong: var(--border);
+  --overlay: light-dark(hsl(240 35% 7% / 0.2), hsl(240 15% 3% / 0.6));
+  --shadow: light-dark(hsl(240 35% 7% / 0.12), hsl(240 15% 3% / 0.45));
+  --danger-border: var(--danger);
 
   /* ---- Layout ---- */
   --radius: 12px;
   --gutter-w: 32px;
   --hour-h: 56px; /* must match DEFAULT_HOUR_H in DayView.tsx */
   --quarter-h: 14px; /* hour / 4 */
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    --surface-2: hsl(240 25% 94%);
-    --text: hsl(240 20% 30%);
-    --muted: hsl(240 15% 50%);
-    --grid-line: hsl(240 15% 35% / 0.1);
-    --grid-line-strong: hsl(240 15% 35% / 0.22);
-    --overlay: hsl(240 47% 11% / 0.4);
-    --shadow: hsl(240 47% 11% / 0.18);
-    --danger-border: hsl(350 94% 82%);
-  }
 }

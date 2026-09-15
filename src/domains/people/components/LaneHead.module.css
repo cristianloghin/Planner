@@ -19,13 +19,13 @@
   align-items: center;
   justify-content: center;
   font-size: var(--fs-base);
-  font-weight: 700;
+  font-weight: 600;
   border: 2px solid currentColor;
   border-radius: 9999px;
 }
 
 .LaneHead[data-expanded="true"] .name .toggle {
-  color: white;
+  color: var(--reversed);
 }
 
 /* The name doubles as the expand toggle; keep the heading's look. */

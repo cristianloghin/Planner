@@ -25,7 +25,7 @@
   gap: 10px;
   border-left: var(--event-accent) solid var(--c);
   border-radius: 8px;
-  padding: 12px;
+  padding: 6px 12px;
   background: color-mix(in oklab, var(--c) var(--tint-strength), var(--surface));
 }
 

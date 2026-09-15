@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react'
 import { Dialog } from 'radix-ui'
 import { cx } from '../utils/cx'
 import s from './ScopeSheet.module.css'
@@ -45,8 +46,11 @@ export function ScopeSheet({
               className={cx(s.option, destructive && s.danger)}
               onClick={c.onSelect}
             >
-              {c.label}
-              {c.detail && <span className={s.detail}>{c.detail}</span>}
+              <span className={s.label}>
+                {c.label}
+                {c.detail && <span className={s.detail}>{c.detail}</span>}
+              </span>
+              <ChevronRight />
             </button>
           ))}
           <Dialog.Close asChild>

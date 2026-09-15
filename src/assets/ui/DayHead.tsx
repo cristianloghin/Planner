@@ -23,7 +23,11 @@ export function DayHead({
   isExpanded?: boolean
   onToggle?: () => void
 }) {
-  const containerClass = cx(styles.container, isToday && styles.today)
+  const containerClass = cx(
+    styles.container,
+    isToday && styles.today,
+    isExpanded && styles.expanded,
+  )
   const label = (
     <>
       <span className={styles.name}>{isCollapsed ? name.charAt(0) : name}</span>
