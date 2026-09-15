@@ -21,7 +21,7 @@ import { rosterChange } from '../domains/events/patches'
 import { useEvents, useOccurrencesForRange, useTemplates } from '../domains/events/queries'
 import { timingOf } from '../domains/events/selectors'
 import { usePeopleWithColors } from '../domains/people/queries'
-import { defaultAttendees } from '../domains/people/selectors'
+import { defaultAttendees, eventColorIn } from '../domains/people/selectors'
 import { effectiveOccurrence } from '../services/recurrence/expand'
 import { eventDate, eventStartMinutes } from '../services/recurrence/timing'
 import type { CalendarEvent } from '../types'
@@ -211,16 +211,21 @@ function EditorSession({
     onClose()
   }
 
-  /** The current form as a reusable template; the event, if any, is untouched. */
+  /**
+   * The current form as a reusable template; the event, if any, is untouched.
+   * The template keeps the colour the event is drawn in — its own, or the
+   * first person's lane colour when it has none.
+   */
   function saveAsTemplate() {
     if (!draft.title.trim()) return
+    const lane = people.find((p) => p.person.id === draft.attendees[0])?.color
     events.mutate({
       accountId,
       userId,
       change: {
         kind: 'saveTemplate',
         isNew: true,
-        template: { ...templateFromDraft(draft), id: uid() },
+        template: { ...templateFromDraft(draft, eventColorIn(lane, draft.colorKey)), id: uid() },
       },
     })
   }

@@ -24,6 +24,15 @@ export function hasReminders(e: WithReminders): boolean {
   return e.reminders.length > 0
 }
 
+/** How long it runs, as text: "45 min", "1 h 30 min", "2 h", "1 day", "3 days". */
+export function durationLabel(e: { allDay: boolean; duration: number }): string {
+  if (e.allDay) return `${e.duration} day${e.duration === 1 ? '' : 's'}`
+  const h = Math.floor(e.duration / 60)
+  const m = e.duration % 60
+  if (h === 0) return `${m} min`
+  return m === 0 ? `${h} h` : `${h} h ${m} min`
+}
+
 /**
  * The little of an event a write about one of its days needs: which series, and
  * where its days sit in time.

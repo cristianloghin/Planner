@@ -47,7 +47,11 @@ export interface CalendarEvent {
 }
 
 /**
- * A reusable blueprint: an event with everything except a time.
+ * A reusable blueprint: an event with everything except a time and people.
+ *
+ * Who is on the event is decided when it is made — adding one starts from a
+ * person's lane — so a template carries no people. It does carry a colour,
+ * which the created event takes as its own.
  *
  * "New from template" copies it into a real event with a real start and fresh
  * reminder ids, so the two never share rows.
@@ -59,7 +63,8 @@ export interface EventTemplate {
   allDay: boolean
   /** Minutes, or whole days when `allDay`. */
   duration: number
-  attendees: PersonId[]
+  /** Always set: a template names its colour rather than borrowing a lane's. */
+  colorKey: ColorKey
   reminders: EventReminder[]
 }
 

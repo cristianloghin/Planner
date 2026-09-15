@@ -14,15 +14,13 @@ import {
 } from '../domains/events/draft'
 import { useEventsWrite } from '../domains/events/mutations'
 import { useTemplates } from '../domains/events/queries'
-import { usePeopleWithColors } from '../domains/people/queries'
-import { defaultAttendees } from '../domains/people/selectors'
 import { EditorPageView } from '../views/EditorPage'
 
 /**
  * The template editor as a route: `/library/templates/new` and
- * `/library/templates/:id`. Loads the template and the people, hands the form
- * a draft, and writes the template on save. Closes by going back to the list
- * that opened it, or to the list outright from a deep link.
+ * `/library/templates/:id`. Loads the template, hands the form a draft, and
+ * writes the template on save. Closes by going back to the list that opened
+ * it, or to the list outright from a deep link.
  */
 
 function useClose() {
@@ -35,24 +33,13 @@ function useClose() {
 }
 
 export function NewTemplateRoute() {
-  const { accountId, userId } = useAccount()
-  const { people, withColors, isPending } = usePeopleWithColors(accountId, userId)
   const close = useClose()
-  if (isPending) return <PageLoader />
-  return (
-    <TemplateSession
-      key="new"
-      initial={templateDraftForNew(defaultAttendees(people))}
-      people={withColors}
-      onClose={close}
-    />
-  )
+  return <TemplateSession key="new" initial={templateDraftForNew()} onClose={close} />
 }
 
 export function EditTemplateRoute() {
   const { id } = useParams('/library/templates/:id')
-  const { accountId, userId } = useAccount()
-  const { withColors, isPending: peoplePending } = usePeopleWithColors(accountId, userId)
+  const { accountId } = useAccount()
   const { data: templates, isPending } = useTemplates(accountId)
   const close = useClose()
   const template = templates?.find((t) => t.id === id)
@@ -60,13 +47,11 @@ export function EditTemplateRoute() {
     if (isPending) return <PageLoader />
     notFound()
   }
-  if (peoplePending) return <PageLoader />
   return (
     <TemplateSession
       key={template.id}
       initial={templateDraftFor(template)}
       id={template.id}
-      people={withColors}
       onClose={close}
     />
   )
@@ -76,13 +61,11 @@ export function EditTemplateRoute() {
 function TemplateSession({
   initial,
   id,
-  people,
   onClose,
 }: {
   initial: TemplateDraft
   /** The template being edited; absent for a new one. */
   id?: string
-  people: Parameters<typeof TemplateForm>[0]['people']
   onClose: () => void
 }) {
   const { accountId, userId } = useAccount()
@@ -116,7 +99,7 @@ function TemplateSession({
     >
       <EditorPageView.Title>{id ? 'Edit template' : 'New template'}</EditorPageView.Title>
       <EditorPageView.Body>
-        <TemplateForm draft={draft} onChange={setDraft} people={people} />
+        <TemplateForm draft={draft} onChange={setDraft} />
       </EditorPageView.Body>
     </EditorPageView>
   )

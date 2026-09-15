@@ -1,54 +1,54 @@
 import { Edit, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { colorStyle } from '../../../assets/palette'
+import { ConfirmDialog } from '../../../assets/ui/ConfirmDialog'
 import { cx } from '../../../assets/utils/cx'
+import { durationLabel } from '../selectors'
+import type { EventTemplate } from '../types'
 import styles from './TemplateList.module.css'
 
-/** One row of the list: a template, described. */
-export interface TemplateItem {
-  id: string
-  title: string
-  /** "Kid · 2 reminders" — the caller joins the names in. */
-  meta: string
-}
-
 /**
- * The saved templates, one row each, with a way to open, delete and add.
- * Takes rows already described, because who is on a template is a join with
- * the people list.
+ * The saved templates, one row each, with a way to open and delete each.
+ * A row shows what an event made from the template comes out as: painted the
+ * way an event block is, in the template's colour, with how long it runs and
+ * how many reminders it carries. Deleting asks first; `onDelete` is only
+ * called once the dialog is confirmed.
  */
 export function TemplateList({
-  items,
+  templates,
   loading,
   onOpen,
   onDelete,
-  onNew,
 }: {
-  items: TemplateItem[]
+  templates: EventTemplate[]
   loading?: boolean
   onOpen: (id: string) => void
   onDelete: (id: string) => void
-  onNew: () => void
 }) {
+  // The template whose delete is being confirmed, if any. UI state only.
+  const [pending, setPending] = useState<EventTemplate | null>(null)
+
   return (
     <div className={styles.TemplateList}>
       <p className={styles.hint}>
-        Reusable blueprints. Pick one when creating an event to prefill its people and reminders.
-        Save one from the event editor, or start one here.
+        Reusable blueprints. Pick one when creating an event to prefill its title, length, colour
+        and reminders. Save one from the event editor, or start one with the + above.
       </p>
       {loading ? (
         <p className={styles.empty}>Loading templates…</p>
-      ) : items.length === 0 ? (
+      ) : templates.length === 0 ? (
         <p className={styles.empty}>No templates yet.</p>
       ) : (
-        items.map((t) => (
-          <div className={styles.row} key={t.id}>
+        templates.map((t) => (
+          <div className={styles.row} key={t.id} style={colorStyle(t.colorKey)}>
             <div className={styles.info}>
               <strong>{t.title || 'Untitled template'}</strong>
-              {t.meta && <span className={styles.meta}>{t.meta}</span>}
+              <span className={styles.meta}>{describe(t)}</span>
             </div>
             <button
               type="button"
               className={cx(styles.button, styles.delete)}
-              onClick={() => onDelete(t.id)}
+              onClick={() => setPending(t)}
               aria-label={`Delete template ${t.title || 'Untitled'}`}
             >
               <Trash2 size={20} />
@@ -64,9 +64,28 @@ export function TemplateList({
           </div>
         ))
       )}
-      <button type="button" className={styles.add} onClick={onNew}>
-        + New template
-      </button>
+      <ConfirmDialog
+        open={pending !== null}
+        onOpenChange={(open) => {
+          if (!open) setPending(null)
+        }}
+        title="Delete template?"
+        message={`“${pending?.title || 'Untitled template'}” will be removed. Events made from it are kept.`}
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => {
+          if (pending) onDelete(pending.id)
+          setPending(null)
+        }}
+      />
     </div>
   )
+}
+
+/** "1 h 30 min · 2 reminders" — the length always, the reminders when there are any. */
+function describe(t: EventTemplate): string {
+  const bits = [durationLabel(t)]
+  const n = t.reminders.length
+  if (n) bits.push(`${n} reminder${n > 1 ? 's' : ''}`)
+  return bits.join(' · ')
 }

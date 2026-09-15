@@ -49,9 +49,14 @@ describe('toTemplate', () => {
       title: 'Swimming',
       allDay: false,
       duration: 60,
-      attendees: ['p1'],
+      colorKey: '3',
       reminders: [],
     })
+  })
+
+  it('reads a row with no colour of its own as the default', () => {
+    const t = toTemplate(series({ isTemplate: true, start: null, colorKey: undefined }))
+    expect(t.colorKey).toBe('1')
   })
 })
 
@@ -61,11 +66,13 @@ describe('back to a series', () => {
     expect(fromEvent(toEvent(original))).toEqual(original)
   })
 
-  it('a blueprint is stored with no start and no repeat', () => {
+  it('a blueprint is stored with no start, no repeat and nobody on it', () => {
     const stored = fromTemplate(toTemplate(series({ isTemplate: true })))
     expect(stored.isTemplate).toBe(true)
     expect(stored.start).toBeNull()
     expect(stored.recurrence).toBeUndefined()
+    expect(stored.attendees).toEqual([])
+    expect(stored.colorKey).toBe('3')
   })
 })
 

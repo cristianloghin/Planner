@@ -1,25 +1,23 @@
 import { useEffect, useRef } from 'react'
-import type { ColorKey } from '../../../assets/palette'
+import { COLOR_OPTIONS } from '../../../assets/palette'
 import shared from '../../../assets/styles/shared.module.css'
+import { ColorPicker } from '../../../assets/ui/ColorPicker'
 import { NumberField } from '../../../assets/ui/NumberField'
-import { AttendeeChips } from '../../people/components/AttendeeChips'
-import type { Person } from '../../people/types'
 import { SNAP, type TemplateDraft } from '../draft'
 import { RemindersEditor } from './RemindersEditor'
 
 /**
  * The template form's fields: what a new event made from it inherits. A
- * template has no point in time, so there is no date and no recurrence.
+ * template has no point in time and no people, so there is no date, no
+ * recurrence and nobody to pick; it names a colour instead.
  * Controlled: it shows `draft` and reports every change through `onChange`.
  */
 export function TemplateForm({
   draft,
   onChange,
-  people,
 }: {
   draft: TemplateDraft
   onChange: (next: TemplateDraft) => void
-  people: { person: Person; color: ColorKey }[]
 }) {
   const set = (patch: Partial<TemplateDraft>) => onChange({ ...draft, ...patch })
   const titleRef = useRef<HTMLInputElement>(null)
@@ -69,11 +67,12 @@ export function TemplateForm({
         </div>
       )}
 
-      <label className={shared.label}>Who's involved?</label>
-      <AttendeeChips
-        people={people}
-        value={draft.attendees}
-        onChange={(attendees) => set({ attendees })}
+      <label className={shared.label}>Color</label>
+      <ColorPicker
+        options={COLOR_OPTIONS}
+        value={draft.colorKey}
+        ariaLabel="Template color"
+        onChange={(colorKey) => set({ colorKey })}
       />
 
       <RemindersEditor reminders={draft.reminders} onChange={(reminders) => set({ reminders })} />

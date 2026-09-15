@@ -17,13 +17,16 @@
   margin: 0;
 }
 
+/* Painted like an event block: `--c` is set on the row, the tinted background
+   and solid coloured left border derive from it (see swatches.css). */
 .row {
   display: flex;
   align-items: center;
   gap: 10px;
-  background-color: var(--surface);
+  border-left: var(--event-accent) solid var(--c);
   border-radius: 8px;
   padding: 12px;
+  background: color-mix(in oklab, var(--c) var(--tint-strength), var(--surface));
 }
 
 .info {
@@ -42,10 +45,6 @@
 
 .info strong {
   font-size: var(--fs-base);
-}
-
-.info:hover strong {
-  text-decoration: underline;
 }
 
 .meta {
@@ -70,15 +69,4 @@
 
 .button:active {
   color: var(--text);
-}
-
-.add {
-  align-self: flex-start;
-  margin-top: 8px;
-  background: transparent;
-  border: 1px dashed var(--border);
-  color: var(--muted);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: var(--fs-md);
 }

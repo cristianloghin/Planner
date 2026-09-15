@@ -92,24 +92,31 @@ describe('templates', () => {
     title: 'Dentist',
     allDay: false,
     duration: 45,
-    attendees: ['p2'],
+    colorKey: '11',
     reminders: [{ id: 'r9', offset: 60 }],
   }
 
-  it('applying keeps the chosen start and stretches the end', () => {
+  it('applying keeps the chosen start and people, takes the colour, stretches the end', () => {
     const d = applyTemplate(draftForNew({ date: '2026-04-07', attendees: ['p1'] }), t)
     expect(d).toMatchObject({
       title: 'Dentist',
-      attendees: ['p2'],
+      attendees: ['p1'],
+      colorKey: '11',
       startDT: '2026-04-07T09:00',
       endDT: '2026-04-07T09:45',
     })
     expect(d.reminders[0].id).not.toBe('r9')
   })
 
-  it('saving as a template drops the time and re-ids the reminders', () => {
-    const tpl = templateFromDraft(draftForEvent(event))
-    expect(tpl).toMatchObject({ title: 'Swimming', duration: 60, attendees: ['p1'] })
+  it('saving as a template drops the time and people, keeps the colour, re-ids the reminders', () => {
+    const tpl = templateFromDraft(draftForEvent(event), '3')
+    expect(tpl).toEqual({
+      title: 'Swimming',
+      allDay: false,
+      duration: 60,
+      colorKey: '3',
+      reminders: [{ id: expect.any(String), offset: 30 }],
+    })
     expect(tpl.reminders[0].id).not.toBe('r1')
   })
 })
@@ -120,7 +127,7 @@ describe('template drafts', () => {
     title: 'Dentist',
     allDay: false,
     duration: 90,
-    attendees: ['p2'],
+    colorKey: '11',
     reminders: [{ id: 'r9', offset: 60 }],
   }
 
@@ -131,10 +138,11 @@ describe('template drafts', () => {
   })
 
   it('a draft has changed when it would save something different', () => {
-    const initial = templateDraftForNew(['a'])
+    const initial = templateDraftForNew()
     expect(templateDraftChanged(initial, initial)).toBe(false)
     expect(templateDraftChanged({ ...initial, title: 'Dentist' }, initial)).toBe(true)
     expect(templateDraftChanged({ ...initial, minutes: 30 }, initial)).toBe(true)
+    expect(templateDraftChanged({ ...initial, colorKey: '7' }, initial)).toBe(true)
     // Hours are not part of an all-day template, so editing them changes nothing.
     const allDay = { ...initial, allDay: true }
     expect(templateDraftChanged({ ...allDay, hours: 5 }, allDay)).toBe(false)
@@ -146,8 +154,9 @@ describe('template drafts', () => {
     expect(templateFromTemplateDraft(d)).toMatchObject({ allDay: true, duration: 3 })
   })
 
-  it('a new template is an hour for the given people, and never shorter than the snap', () => {
-    const d = templateDraftForNew(['p1'])
+  it('a new template is an hour in the default colour, and never shorter than the snap', () => {
+    const d = templateDraftForNew()
+    expect(d.colorKey).toBe('1')
     expect(templateDraftDuration(d)).toBe(60)
     expect(templateDraftDuration({ ...d, hours: 0, minutes: 5 })).toBe(15)
   })

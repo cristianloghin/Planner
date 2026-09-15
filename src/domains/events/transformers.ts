@@ -1,4 +1,3 @@
-import { toISODate } from '../../assets/utils/dates'
 /**
  * Turning a stored series into an event or a blueprint, and back.
  *
@@ -6,6 +5,8 @@ import { toISODate } from '../../assets/utils/dates'
  * shape and the app's are the same `{ id, offset }` — so this is now just the
  * event/blueprint split and the missing-date rule.
  */
+import { DEFAULT_COLOR } from '../../assets/palette'
+import { toISODate } from '../../assets/utils/dates'
 import { uid } from '../../assets/utils/id'
 import type { OccurrenceRow } from '../../client/occurrences'
 import type { Series } from '../../client/series'
@@ -48,14 +49,18 @@ export function toEvent(series: Series): CalendarEvent {
   }
 }
 
-/** A stored series read as a blueprint: everything but the timing. */
+/**
+ * A stored series read as a blueprint: everything but the timing and the
+ * people. A row saved before templates had a colour of their own has none
+ * stored; it reads as the default rather than as a missing colour.
+ */
 export function toTemplate(series: Series): EventTemplate {
   return {
     id: series.id,
     title: series.title,
     allDay: series.allDay,
     duration: series.duration,
-    attendees: series.attendees,
+    colorKey: series.colorKey ?? DEFAULT_COLOR,
     reminders: series.reminders,
   }
 }
@@ -77,8 +82,8 @@ export function fromEvent(event: CalendarEvent): Series {
 }
 
 /**
- * A blueprint as the series to store: no start and no repeat, which is exactly
- * what makes it a blueprint rather than an event.
+ * A blueprint as the series to store: no start, no repeat and nobody on it,
+ * which is exactly what makes it a blueprint rather than an event.
  */
 export function fromTemplate(template: EventTemplate): Series {
   return {
@@ -88,8 +93,8 @@ export function fromTemplate(template: EventTemplate): Series {
     start: null,
     duration: template.duration,
     recurrence: undefined,
-    attendees: template.attendees,
-    colorKey: undefined,
+    attendees: [],
+    colorKey: template.colorKey,
     reminders: template.reminders,
     isTemplate: true,
   }

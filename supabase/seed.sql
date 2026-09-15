@@ -130,12 +130,12 @@ values
    '9', false)
 on conflict (id) do nothing;
 
--- Who is on each event, as an array on the series itself (§10).
+-- Who is on each event, as an array on the series itself (§10). The template
+-- is left out: a blueprint is for anyone, and carries a colour instead.
 update event_series set attendees = case id
   when '44444444-0000-4000-8000-000000000001' then array['33333333-0000-4000-8000-000000000001','33333333-0000-4000-8000-000000000003']::uuid[]
   when '44444444-0000-4000-8000-000000000002' then array['33333333-0000-4000-8000-000000000001','33333333-0000-4000-8000-000000000002']::uuid[]
   when '44444444-0000-4000-8000-000000000003' then array['33333333-0000-4000-8000-000000000003']::uuid[]
-  when '44444444-0000-4000-8000-000000000004' then array['33333333-0000-4000-8000-000000000003']::uuid[]
   when '44444444-0000-4000-8000-000000000005' then array['33333333-0000-4000-8000-000000000003']::uuid[]
   when '44444444-0000-4000-8000-000000000006' then array['33333333-0000-4000-8000-000000000002']::uuid[]
   else attendees end;

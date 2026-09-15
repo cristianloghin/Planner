@@ -131,7 +131,9 @@ does a partial update, so app writes leave the bag alone (verified by hand).
 
 **Templates are `event_series` rows with `is_template = true`** and no date. One
 table, one module — `client/series.ts` treats events and templates as the same
-thing.
+thing. A template has nobody on it (`attendees` is empty — who is on an event is
+chosen when it is made) and always has a `color_key`, which the event made from
+it takes as its own.
 
 ---
 

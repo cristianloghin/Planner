@@ -1,4 +1,4 @@
-import type { ColorKey } from '../../assets/palette'
+import { type ColorKey, DEFAULT_COLOR } from '../../assets/palette'
 import { addDays, diffDays, minutesToTime, toDateTimeLocal } from '../../assets/utils/dates'
 import type { PersonId } from '../people/types'
 import { cloneReminders } from './transformers'
@@ -174,27 +174,33 @@ export function eventFromDraft(d: EventDraft): Omit<CalendarEvent, 'id'> {
   }
 }
 
-/** The draft as a reusable template (no id); reminders get fresh ids. */
-export function templateFromDraft(d: EventDraft): Omit<EventTemplate, 'id'> {
+/**
+ * The draft as a reusable template (no id); reminders get fresh ids. The
+ * people are left behind — a template is for anyone. `colorKey` is the colour
+ * the event shows in, resolved by the caller: a draft with no colour of its
+ * own is drawn in its lane's, and that is what the template keeps.
+ */
+export function templateFromDraft(d: EventDraft, colorKey: ColorKey): Omit<EventTemplate, 'id'> {
   return {
     title: d.title.trim(),
     allDay: d.allDay,
     duration: draftDuration(d),
-    attendees: d.attendees,
+    colorKey,
     reminders: cloneReminders(d.reminders),
   }
 }
 
 /**
- * The draft pre-filled from a template: its title, people, reminders (with
- * fresh ids) and shape. A timed template keeps the draft's chosen start and
- * stretches the end to the template's duration.
+ * The draft pre-filled from a template: its title, colour, reminders (with
+ * fresh ids) and shape. The people stay the draft's own. A timed template
+ * keeps the draft's chosen start and stretches the end to the template's
+ * duration.
  */
 export function applyTemplate(d: EventDraft, t: EventTemplate): EventDraft {
   const next: EventDraft = {
     ...d,
     title: t.title,
-    attendees: t.attendees,
+    colorKey: t.colorKey,
     reminders: cloneReminders(t.reminders),
     allDay: t.allDay,
   }
@@ -226,13 +232,21 @@ export interface TemplateDraft {
   days: number
   hours: number
   minutes: number
-  attendees: PersonId[]
+  colorKey: ColorKey
   reminders: EventReminder[]
 }
 
-/** An empty template for `attendees`: an hour, timed. */
-export function templateDraftForNew(attendees: PersonId[]): TemplateDraft {
-  return { title: '', allDay: false, days: 1, hours: 1, minutes: 0, attendees, reminders: [] }
+/** An empty template: an hour, timed, in the default colour. */
+export function templateDraftForNew(): TemplateDraft {
+  return {
+    title: '',
+    allDay: false,
+    days: 1,
+    hours: 1,
+    minutes: 0,
+    colorKey: DEFAULT_COLOR,
+    reminders: [],
+  }
 }
 
 /** A draft describing `template` as it stands. */
@@ -243,7 +257,7 @@ export function templateDraftFor(t: EventTemplate): TemplateDraft {
     days: t.allDay ? Math.max(1, t.duration) : 1,
     hours: t.allDay ? 1 : Math.floor(t.duration / 60),
     minutes: t.allDay ? 0 : t.duration % 60,
-    attendees: t.attendees,
+    colorKey: t.colorKey,
     reminders: t.reminders,
   }
 }
@@ -275,7 +289,7 @@ export function templateFromTemplateDraft(d: TemplateDraft): Omit<EventTemplate,
     title: d.title.trim(),
     allDay: d.allDay,
     duration: templateDraftDuration(d),
-    attendees: d.attendees,
+    colorKey: d.colorKey,
     reminders: d.reminders,
   }
 }

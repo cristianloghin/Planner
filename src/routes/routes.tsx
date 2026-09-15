@@ -2,7 +2,7 @@ import { defineRoutes } from '@mikrostack/router'
 import { isISODate, mondayOf, startOfMonth, toISODate } from '../assets/utils/dates'
 import { DayRoute } from './DayRoute'
 import { EditEventRoute, NewEventRoute } from './EventRoute'
-import { LibraryRoute, NotesRoute, TemplatesRoute } from './LibraryRoute'
+import { NotesRoute, TemplatesRoute } from './LibraryRoute'
 import { MonthRoute } from './MonthRoute'
 import { SettingsRoute } from './SettingsRoute'
 import { EditTemplateRoute, NewTemplateRoute } from './TemplateRoute'
@@ -26,10 +26,11 @@ const today = () => toISODate(new Date())
  * button closes it and a reload keeps it open. The occurrence sheet is a
  * transient panel and stays route-local state.
  *
- * `/library` is a section whose title switches between templates and notes:
- * its route draws the frame and the matched child fills it through the
- * outlet. Templates are its index. The template editors opt out of the nesting (`parent: null`):
- * they are full-page, so there is nothing to draw beneath them.
+ * `/library` is a section whose title switches between templates and notes.
+ * Each of the two draws the frame itself, since the buttons beside the title
+ * are its own; the bare `/library` is the templates. The template editors are
+ * top-level (`parent: null`): they are full-page, so there is nothing to draw
+ * beneath them.
  *
  * `/` exists because the PWA's `start_url` is the bare base, so every cold
  * launch lands there. Guards run on the initial match (router >= 0.9), which
@@ -60,7 +61,7 @@ export const routes = defineRoutes({
   },
   '/event/new': { component: NewEventRoute },
   '/event/:id': { component: EditEventRoute },
-  '/library': { component: LibraryRoute, index: TemplatesRoute },
+  '/library': { component: TemplatesRoute },
   '/library/templates': { component: TemplatesRoute },
   '/library/notes': { component: NotesRoute },
   '/library/templates/new': { component: NewTemplateRoute, parent: null },
