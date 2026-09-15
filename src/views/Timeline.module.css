@@ -9,6 +9,9 @@
 
 .column {
   position: relative;
+  /* Stacked blocks set their own z-index; keep those inside the column so
+     they never rise over the sticky all-day band above. */
+  isolation: isolate;
   min-width: 0;
   border-left: 1px solid var(--border);
   cursor: copy;
@@ -43,7 +46,8 @@
   right: 0;
   height: 0;
   border-top: 2px solid var(--now);
-  z-index: 2;
+  /* Above any stack of blocks, however deep. */
+  z-index: 1000;
   pointer-events: none;
 }
 

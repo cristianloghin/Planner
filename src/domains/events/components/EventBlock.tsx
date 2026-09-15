@@ -10,11 +10,15 @@ import styles from './EventBlock.module.css'
 // A dense bar needs this many pixels before its title renders at all.
 const TITLE_MIN_PX = 18
 
+const OFFSET_PX = 6
+const EXPANDED_OFFSET_PX = 12
+
 /**
  * One timed occurrence as a block on a timeline. It places itself from its
- * time and the column the layout gave it (`col` of `cols` side by side, for
- * overlaps); its colour is resolved by the caller, because an event with no
- * colour of its own shows in its lane's.
+ * time and the column the layout gave it (`col` of `cols`): overlapping
+ * blocks are stepped a little to the right per column and stacked, the later
+ * start on top (`order`). Its colour is resolved by the caller, because an
+ * event with no colour of its own shows in its lane's.
  *
  * `dense` is the week's look: tighter, title only, and only when the bar is
  * tall enough to fit one. Children (attendee avatars) render after the title.
@@ -25,9 +29,11 @@ export function EventBlock({
   pxPerMin,
   col = 0,
   cols = 1,
+  order = 0,
   dense,
   showTitle = true,
   onClick,
+  isExpanded = false,
   children,
 }: {
   occ: DayOccurrence
@@ -35,9 +41,12 @@ export function EventBlock({
   pxPerMin: number
   col?: number
   cols?: number
+  /** Position in its overlap cluster by start time; later sits on top. */
+  order?: number
   dense?: boolean
   showTitle?: boolean
   onClick: () => void
+  isExpanded?: boolean
   children?: ReactNode
 }) {
   const { event } = occ
@@ -47,6 +56,11 @@ export function EventBlock({
   const height = Math.max((end - start) * pxPerMin, dense ? 12 : 16)
   const inset = dense ? 1 : 2
 
+  const offset =
+    Math.floor((cols - 1) / (cols - col)) * (isExpanded ? EXPANDED_OFFSET_PX : OFFSET_PX)
+  const left = `calc(${offset}px + ${inset}px)`
+  const width = `calc(100% - ${(cols - 1) * (isExpanded ? EXPANDED_OFFSET_PX : OFFSET_PX)}px - ${inset * 2}px)`
+
   return (
     <button
       type="button"
@@ -54,8 +68,9 @@ export function EventBlock({
       style={{
         top: start * pxPerMin,
         height,
-        left: `calc(${(100 / cols) * col}% + ${inset}px)`,
-        width: `calc(${100 / cols}% - ${inset * 2}px)`,
+        left,
+        width,
+        zIndex: order,
         ...colorStyle(color),
       }}
       onClick={onClick}

@@ -125,7 +125,7 @@ export function DayRoute() {
           onAddAt={(minute) => addAt(p.iso, person.id, minute)}
         >
           {layoutBlocks(p.timedBlocks.filter((b) => b.occ.attendees.includes(person.id))).map(
-            ({ block, col, cols }) => (
+            ({ block, col, cols, order }) => (
               <EventBlock
                 key={`${block.occ.event.id}:${block.occ.start}`}
                 occ={block.occ}
@@ -133,6 +133,7 @@ export function DayRoute() {
                 pxPerMin={hourH / 60}
                 col={col}
                 cols={cols}
+                order={order}
                 onClick={() => openOccurrence(block.occ)}
               />
             ),

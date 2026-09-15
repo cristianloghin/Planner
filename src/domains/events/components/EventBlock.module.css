@@ -11,9 +11,12 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   box-shadow: 0 1px 3px var(--shadow);
   line-height: 1.15;
+  /* The fade at the bottom is layered inside this block only. Without this
+     it would rise above any block stacked over it, and wash out its text. */
+  isolation: isolate;
 
   font-stretch: 75%;
 }
@@ -46,7 +49,7 @@
 
 .tag {
   font-size: var(--fs-2xs);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   opacity: 0.9;

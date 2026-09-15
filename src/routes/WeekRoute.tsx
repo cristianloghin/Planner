@@ -136,7 +136,7 @@ export function WeekRoute() {
             occs
               .filter((o) => !o.event.allDay)
               .map((o) => ({ occ: o, start: o.segment.start, end: o.segment.end })),
-          ).map(({ block, col, cols }) => (
+          ).map(({ block, col, cols, order }) => (
             <EventBlock
               key={`${block.occ.event.id}:${block.occ.start}`}
               occ={block.occ}
@@ -144,8 +144,10 @@ export function WeekRoute() {
               pxPerMin={hourH / 60}
               col={col}
               cols={cols}
+              order={order}
               dense
               showTitle={focusDay == null || dayIdx === focusDay}
+              isExpanded={dayIdx === focusDay}
               onClick={() => openOccurrence(block.occ)}
             >
               {/* Who is on it THIS day — an override replaces the roster. */}

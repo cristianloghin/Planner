@@ -1,9 +1,11 @@
 /**
- * Arranging a day's blocks so overlapping ones sit side by side.
+ * Arranging a day's blocks so overlapping ones can share the hour.
  *
  * Blocks that overlap are put in a cluster and dealt out into as few columns as
- * the cluster needs, so two events at the same time each get half the width and
- * an hour with nothing else in it gets all of it.
+ * the cluster needs, so two events at the same time each get a column of their
+ * own and an hour with nothing else in it gets the whole width. Each block is
+ * also told where it comes in its cluster by start time, for when the columns
+ * are drawn overlapping and the later one has to sit on top.
  *
  * Pure geometry: minutes in, columns out.
  */
@@ -23,6 +25,12 @@ export interface LaidBlock {
   block: TimeBlock
   col: number
   cols: number
+  /**
+   * Where the block comes in its cluster, by start time: 0 for the earliest.
+   * A column is not that — a block can land in the first column because an
+   * earlier one there has ended — so a view that stacks blocks uses this.
+   */
+  order: number
 }
 
 /** Greedy column layout so overlapping blocks in one column sit side by side. */
@@ -46,7 +54,13 @@ export function layoutBlocks(blocks: TimeBlock[]): LaidBlock[] {
       if (!placed) columns.push([b])
     }
     const n = columns.length
-    columns.forEach((c, ci) => c.forEach((block) => result.push({ block, col: ci, cols: n })))
+    // The cluster is already in start order.
+    const orderOf = new Map(cluster.map((b, i) => [b, i]))
+    columns.forEach((c, ci) =>
+      c.forEach((block) =>
+        result.push({ block, col: ci, cols: n, order: orderOf.get(block) as number }),
+      ),
+    )
   }
 
   for (const b of sorted) {
