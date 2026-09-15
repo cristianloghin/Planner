@@ -1,3 +1,5 @@
+import { Edit, Trash2 } from 'lucide-react'
+import { cx } from '../../../assets/utils/cx'
 import styles from './TemplateList.module.css'
 
 /** One row of the list: a template, described. */
@@ -39,22 +41,25 @@ export function TemplateList({
       ) : (
         items.map((t) => (
           <div className={styles.row} key={t.id}>
-            <button
-              type="button"
-              className={styles.info}
-              onClick={() => onOpen(t.id)}
-              aria-label={`Edit template ${t.title || 'Untitled'}`}
-            >
+            <div className={styles.info}>
               <strong>{t.title || 'Untitled template'}</strong>
               {t.meta && <span className={styles.meta}>{t.meta}</span>}
-            </button>
+            </div>
             <button
               type="button"
-              className={styles.delete}
+              className={cx(styles.button, styles.delete)}
               onClick={() => onDelete(t.id)}
               aria-label={`Delete template ${t.title || 'Untitled'}`}
             >
-              Delete
+              <Trash2 size={20} />
+            </button>
+            <button
+              type="button"
+              className={styles.button}
+              onClick={() => onOpen(t.id)}
+              aria-label={`Edit template ${t.title || 'Untitled'}`}
+            >
+              <Edit size={20} />
             </button>
           </div>
         ))

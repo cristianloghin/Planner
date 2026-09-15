@@ -18,6 +18,7 @@ interface CalendarViewProps {
   zoom?: SwipeZoom
   /** Minute to scroll to on first mount; unset leaves the scroller at the top. */
   initialMinute?: number
+  isMonth?: boolean
 }
 
 /** The column template for lanes with the given relative widths. */
@@ -153,6 +154,7 @@ export const CalendarView = createLayout(
       gutterLabel,
       zoom,
       initialMinute,
+      isMonth = false,
     }: CalendarViewProps,
     { slots },
   ) => {
@@ -270,7 +272,7 @@ export const CalendarView = createLayout(
               </div>
             </div>
           )}
-          <div className={styles.grid}>
+          <div className={cx(styles.grid, isMonth ? styles.noTopPadding : null)}>
             {slots.Gutter.filled && <div className={styles.gutter}>{slots.Gutter}</div>}
             {/* The gutter stays put; only the pages slide during a swipe. */}
             <div className={styles.clip}>

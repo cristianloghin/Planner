@@ -1,11 +1,14 @@
 /* Sits under the month grid, aligned with its cells (past the week-number
    column and the grid's gap). */
 .DayPeek {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-left: calc(var(--gutter-w) + 5px);
-  padding-bottom: 16px;
+  padding: 8px 12px 12px;
+  background-color: var(--surface);
+  border-radius: 12px;
+  border: 1px solid var(--border);
 }
 
 .head {

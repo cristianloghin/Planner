@@ -1,7 +1,8 @@
 .MonthGrid {
+  flex: 0;
   display: grid;
-  grid-template-columns: var(--gutter-w) repeat(7, minmax(0, 1fr));
-  gap: 5px;
+  grid-template-columns: calc(var(--gutter-w) - 2px) repeat(7, minmax(0, 1fr));
+  gap: 2px;
   align-content: start;
   padding-bottom: 16px;
 }
@@ -9,8 +10,9 @@
 .weekNumber {
   align-self: center;
   text-align: center;
-  font-size: var(--fs-2xs);
-  font-weight: 600;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  font-stretch: 75%;
   color: var(--muted);
 }
 
@@ -32,22 +34,21 @@
 }
 
 .cell.today {
+  color: var(--accent);
   border-color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .cell.selected {
-  border-color: var(--accent);
-  background: color-mix(in oklab, var(--accent) 15%, var(--surface));
+  color: var(--text);
+  border-color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--text);
+  background: var(--surface-2);
 }
 
 .date {
   font-size: var(--fs-base);
   font-weight: 600;
-}
-
-.cell.today .date {
-  color: var(--accent);
 }
 
 /* One bar per all-day occurrence, edge to edge across the cell. */

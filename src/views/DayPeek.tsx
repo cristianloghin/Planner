@@ -21,7 +21,7 @@ export const DayPeekView = createLayout(
       <header className={styles.head}>
         <strong className={styles.title}>{slots.Title}</strong>
         <button type="button" className={styles.open} onClick={onOpen} aria-label={openLabel}>
-          <ChevronRight size={20} />
+          <ChevronRight size={24} />
         </button>
       </header>
       <div className={styles.rows}>{slots.Row}</div>

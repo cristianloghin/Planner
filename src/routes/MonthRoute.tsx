@@ -134,6 +134,7 @@ export function MonthRoute() {
         onNavigate={(delta) => goToMonth(addMonths(cursor, delta))}
         onGoToday={() => goToMonth(startOfMonth(today))}
         todayActive={isSameMonth(today, cursor)}
+        isMonth
       >
         <CalendarView.Header.Search>
           <EventSearch onPick={openSearchHit} />

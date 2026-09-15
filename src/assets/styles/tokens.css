@@ -14,12 +14,10 @@
   color-scheme: light dark;
 
   /* ---- Brand & status (theme-independent) ---- */
-  --accent: hsl(240 40% 53%);
-  --on-accent: hsl(240 50% 97%); /* text/icons on a coloured block or accent button */
-  --danger: hsl(0 80% 50%);
-  --danger-glow: hsl(0 84% 60% / 0.25);
-  --warning: hsl(35 100% 50%);
-  --now: hsl(0 50% 50%); /* current-time line */
+  --accent: light-dark(hsl(240 50% 50%), hsl(240 50% 75%));
+  --on-accent: light-dark(hsl(240 50% 93%), hsl(240 50% 15%)); /* text/icons on a coloured block or accent button */
+  --danger: light-dark(hsl(350 80% 50%), hsl(350 80% 75%));
+  --now: light-dark(hsl(350, 75%, 45%), hsl(350, 75%, 60%)); /* current-time line */
 
   /* ---- Typography ---- */
   --font: "Google Sans Flex Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -36,17 +34,17 @@
   --fs-3xl: 2.5rem;
 
   /* ---- Surfaces: dark theme (default) ---- */
-  --bg: hsl(240 15% 11%);
-  --surface: hsl(240 15% 14%);
+  --bg: light-dark(hsl(240 25% 90%), hsl(240 15% 5%));
+  --surface: light-dark(hsl(240 25% 94%), hsl(240 15% 15%));
   --surface-2: hsl(240 25% 25%);
-  --border: hsl(240 20% 20%);
+  --border: light-dark(hsl(240 25% 88%), hsl(240 20% 30%));
   --text: hsl(240 15% 91%);
   --muted: hsl(240 5% 65%);
   --grid-line: hsl(240 15% 65% / 0.09);
   --grid-line-strong: hsl(240 15% 65% / 0.22);
   --overlay: hsl(240 84% 5% / 0.6);
   --shadow: hsl(240 15% 3% / 0.45);
-  --danger-border: hsl(0 63% 31%);
+  --danger-border: hsl(350 63% 31%);
 
   /* ---- Layout ---- */
   --radius: 12px;
@@ -57,16 +55,13 @@
 
 @media (prefers-color-scheme: light) {
   :root {
-    --bg: hsl(240 25% 92%);
-    --surface: hsl(240 20% 97%);
     --surface-2: hsl(240 25% 94%);
-    --border: hsl(240 25% 86%);
     --text: hsl(240 20% 30%);
     --muted: hsl(240 15% 50%);
     --grid-line: hsl(240 15% 35% / 0.1);
     --grid-line-strong: hsl(240 15% 35% / 0.22);
     --overlay: hsl(240 47% 11% / 0.4);
     --shadow: hsl(240 47% 11% / 0.18);
-    --danger-border: hsl(0 94% 82%);
+    --danger-border: hsl(350 94% 82%);
   }
 }
