@@ -268,7 +268,9 @@ export function useSwipeGestures({
     el.addEventListener('touchend', onEnd)
     el.addEventListener('touchcancel', onEnd)
     el.addEventListener('gesturestart', noGesture) // iOS Safari pinch-zoom
+    // const detachDebug = attachGestureDebug(el, grid, () => g.current.mode) // TEMP
     return () => {
+      // detachDebug() // TEMP
       el.removeEventListener('touchstart', onStart)
       el.removeEventListener('touchmove', onMove)
       el.removeEventListener('touchend', onEnd)

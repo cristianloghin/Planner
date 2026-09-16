@@ -49,7 +49,7 @@ function TabBar() {
     <nav className={s.tabbar}>
       {/* The section root, so the tab stays lit for templates and notes alike. */}
       <Link to="/library" aria-label="Library" {...cls(s.iconTab)}>
-        <SquarePen size={20} />
+        <SquarePen />
       </Link>
       <div className={s.calendarTabs}>
         <Link to="/day/:date" params={{ date }} aria-label="Day" {...cls()}>
@@ -64,7 +64,7 @@ function TabBar() {
         </Link>
       </div>
       <Link to="/settings" aria-label="Settings" {...cls(s.iconTab)}>
-        <SettingsIcon size={20} />
+        <SettingsIcon />
       </Link>
     </nav>
   )

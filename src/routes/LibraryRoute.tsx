@@ -36,9 +36,11 @@ export function TemplatesRoute() {
           Notes
         </SectionView.Header.Center.Option>
         <SectionView.Header.Right>
-          <IconButton label="New template" onClick={() => navigate('/library/templates/new')}>
-            <Plus size={22} aria-hidden />
-          </IconButton>
+          <IconButton
+            label="New template"
+            onClick={() => navigate('/library/templates/new')}
+            icon={Plus}
+          />
         </SectionView.Header.Right>
       </SectionView.Header>
       <SectionView.Body>

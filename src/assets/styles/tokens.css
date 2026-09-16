@@ -35,20 +35,25 @@
 
   /* ---- Surfaces: dark theme (default) ---- */
   --bg: light-dark(hsl(240 25% 90%), hsl(240 15% 5%));
-  --surface: light-dark(hsl(240 25% 93%), hsl(240 15% 15%));
-  --surface-2: light-dark(hsl(240 25% 96%), hsl(240 25% 25%));
-  --border: light-dark(hsl(240 25% 85%), hsl(240 20% 37%));
+  --surface: light-dark(hsl(240 25% 93%), hsl(240 15% 8%));
+  --surface-2: light-dark(hsl(240 25% 97%), hsl(240 25% 15%));
+  --border: light-dark(hsl(240 25% 84%), hsl(240 20% 18%));
   --text: light-dark(hsl(240 15% 30%), hsl(240 20% 91%));
   --reversed: light-dark(hsl(240 15% 95%), hsl(240 15% 7%));
   --muted: light-dark(hsl(240 15% 45%), hsl(240 10% 70%));
-  --grid-line: hsl(from var(--border) h s l / 0.5);
-  --grid-line-strong: var(--border);
+  --grid-line: light-dark(
+    hsl(from var(--border) h s l / 0.35),
+    hsl(from var(--border) h s l / 0.15)
+  );
+  --grid-line-strong: light-dark(var(--border), hsl(from var(--border) h s l / 0.3));
   --overlay: light-dark(hsl(240 35% 7% / 0.2), hsl(240 15% 3% / 0.6));
   --shadow: light-dark(hsl(240 35% 7% / 0.12), hsl(240 15% 3% / 0.45));
   --danger-border: var(--danger);
 
   /* ---- Layout ---- */
   --radius: 12px;
+  --radius-sm: 8px;
+  --radius-full: 999px;
   --gutter-w: 32px;
   --hour-h: 56px; /* must match DEFAULT_HOUR_H in DayView.tsx */
   --quarter-h: 14px; /* hour / 4 */

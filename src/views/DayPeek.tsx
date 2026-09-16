@@ -1,7 +1,15 @@
 import { createLayout, slot } from '@mikrostack/rst'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Plus } from 'lucide-react'
 
+import { IconButton } from '../assets/ui/IconButton'
 import styles from './DayPeek.module.css'
+
+interface DayPeekViewProps {
+  onOpen: () => void
+  openLabel: string
+  onCreate: () => void
+  newLabel: string
+}
 
 /**
  * A day's overview under a month grid: its name, an arrow that opens the
@@ -16,13 +24,14 @@ export const DayPeekView = createLayout(
       fallback: <p className={styles.empty}>Nothing planned</p>,
     }),
   },
-  ({ onOpen, openLabel }: { onOpen: () => void; openLabel: string }, { slots }) => (
+  ({ onOpen, onCreate, openLabel, newLabel }: DayPeekViewProps, { slots }) => (
     <section className={styles.DayPeek}>
       <header className={styles.head}>
-        <strong className={styles.title}>{slots.Title}</strong>
-        <button type="button" className={styles.open} onClick={onOpen} aria-label={openLabel}>
-          <ChevronRight size={24} />
-        </button>
+        <span className={styles.day}>
+          <span className={styles.title}>{slots.Title}</span>
+          <IconButton onClick={onOpen} label={openLabel} icon={ChevronRight} />
+        </span>
+        <IconButton onClick={onCreate} label={newLabel} icon={Plus} />
       </header>
       <div className={styles.rows}>{slots.Row}</div>
     </section>

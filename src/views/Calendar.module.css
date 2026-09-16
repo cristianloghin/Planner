@@ -50,27 +50,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  font-size: var(--fs-xl);
-}
-
-/* Bare icon buttons — the calendar also swipes, so the arrows stay quiet. */
-.nav button,
-.todayBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  background: transparent;
-  border: none;
-  border-radius: 8px;
-  color: var(--accent);
-}
-
-.todayBtn.todayActive {
-  color: var(--on-accent);
-  background: var(--accent);
 }
 
 .gutterLabel {
@@ -201,7 +180,7 @@
    report as intersecting either way. It also stands in for the grid's own top
    padding, so the layout is unchanged. */
 .top {
-  height: 1px;
+  flex: 0 0 1px;
   margin-bottom: -1px;
 }
 

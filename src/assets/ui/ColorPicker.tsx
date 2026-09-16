@@ -83,7 +83,7 @@ export function ColorPicker<T extends string>({
                   aria-pressed={on}
                   onClick={() => select(o.value)}
                 >
-                  {on && <Check className={s.check} size={20} aria-hidden strokeWidth={3} />}
+                  {on && <Check className={s.check} size={24} aria-hidden strokeWidth={3} />}
                 </button>
               )
             })}

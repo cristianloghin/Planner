@@ -24,18 +24,3 @@
 .name input[type="text"] {
   flex: 1;
 }
-
-.reset {
-  flex: none;
-  padding: 0 10px;
-  font-size: var(--fs-sm);
-  color: var(--muted);
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.reset:hover {
-  color: var(--text);
-}

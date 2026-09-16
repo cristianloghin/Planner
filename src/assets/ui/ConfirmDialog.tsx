@@ -1,5 +1,5 @@
 import { AlertDialog } from 'radix-ui'
-import { cx } from '../utils/cx'
+import { Button } from './Button'
 import s from './Dialog.module.css'
 
 /**
@@ -41,18 +41,12 @@ export function ConfirmDialog({
           )}
           <div className={s.actions}>
             <AlertDialog.Cancel asChild>
-              <button type="button" className={cx(s.btn, s.cancel)}>
-                {cancelLabel}
-              </button>
+              <Button label={cancelLabel}>{cancelLabel}</Button>
             </AlertDialog.Cancel>
             <AlertDialog.Action asChild>
-              <button
-                type="button"
-                className={cx(s.btn, destructive && s.danger)}
-                onClick={onConfirm}
-              >
+              <Button danger onClick={onConfirm} label={confirmLabel}>
                 {confirmLabel}
-              </button>
+              </Button>
             </AlertDialog.Action>
           </div>
         </AlertDialog.Content>

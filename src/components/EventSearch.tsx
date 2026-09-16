@@ -2,6 +2,7 @@ import { Search as SearchIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useAccount } from '../account'
 import { useDebouncedValue } from '../assets/hooks/useDebouncedValue'
+import { IconButton } from '../assets/ui/IconButton'
 import s from '../assets/ui/Search.module.css'
 import { SearchOverlay } from '../assets/ui/SearchOverlay'
 import { cx } from '../assets/utils/cx'
@@ -30,17 +31,14 @@ export function EventSearch({ onPick }: { onPick: (seriesId: string) => void }) 
 
   return (
     <>
-      <button
-        type="button"
-        className={s.trigger}
+      <IconButton
         onClick={() => {
           setQuery('')
           setOpen(true)
         }}
-        aria-label="Search events"
-      >
-        <SearchIcon size={18} />
-      </button>
+        label="Search events"
+        icon={SearchIcon}
+      />
 
       {open && (
         <SearchOverlay

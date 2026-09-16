@@ -20,7 +20,8 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 8px;
-  box-shadow: 0 18px 48px var(--shadow);
+  box-shadow: 0 18px 48px 8px var(--shadow);
+  width: calc(100dvw - 32px);
 }
 
 .arrow {
@@ -29,18 +30,19 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(4, 40px);
+  grid-template-columns: repeat(6, 1fr);
   border-radius: 4px;
   overflow: hidden;
-  gap: 2px;
+  gap: 8px;
 }
 
 .swatch {
   position: relative;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
   padding: 0;
   cursor: pointer;
   outline: none;
@@ -50,6 +52,6 @@
 /* Check mark on the selected swatch. White with a soft shadow so it stays
  * legible on both light and dark swatch colors. */
 .check {
-  color: #fff;
+  color: var(--reversed);
   pointer-events: none;
 }

@@ -30,7 +30,7 @@ import type { CalendarEvent, OccurrenceIndex, PersonId } from '../types'
 import { CalendarView } from '../views/Calendar'
 import { DayPeekView } from '../views/DayPeek'
 import { MonthGridView } from '../views/MonthGrid'
-import { editEventPath } from './eventPaths'
+import { editEventPath, newEventAtPath } from './eventPaths'
 
 /**
  * The Month screen, wired up.
@@ -84,6 +84,10 @@ export function MonthRoute() {
 
   function openDay(iso: string) {
     navigate('/day/:date', { params: { date: iso } })
+  }
+
+  function addAt(iso: string) {
+    navigate(newEventAtPath(iso, 540, [userId]))
   }
 
   // The selected day's occurrences, all-day first, then timed in start order.
@@ -149,7 +153,12 @@ export function MonthRoute() {
         <CalendarView.Current.Body>{page(months[1])}</CalendarView.Current.Body>
         <CalendarView.Next.Body>{page(months[2])}</CalendarView.Next.Body>
         <CalendarView.Footer>
-          <DayPeekView onOpen={() => openDay(selected)} openLabel={`Open ${isoLabel(selected)}`}>
+          <DayPeekView
+            onOpen={() => openDay(selected)}
+            onCreate={() => addAt(selected)}
+            openLabel={`Open ${isoLabel(selected)}`}
+            newLabel={`Add event on ${isoLabel(selected)}`}
+          >
             <DayPeekView.Title>{isoLabel(selected)}</DayPeekView.Title>
             {dayOccs.map((o) => (
               <DayPeekView.Row key={`${o.event.id}:${o.start}`}>

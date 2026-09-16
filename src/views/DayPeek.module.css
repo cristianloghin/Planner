@@ -17,6 +17,11 @@
   justify-content: space-between;
 }
 
+.day {
+  display: flex;
+  align-items: center;
+}
+
 .title {
   font-size: var(--fs-lg);
 }
