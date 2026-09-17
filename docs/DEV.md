@@ -278,6 +278,14 @@ resolves but Deno does not.
   notes in `archive/PLANNED.md` describe a data layer that no longer exists.
 - **Finer RLS.** Today membership grants everything in an account. Per-row
   visibility would need policies that consult a share/visibility table.
+- **Routines** — [`ROUTINES.md`](./ROUTINES.md). A person's ideal week as a
+  single JSON document per person, drawn as a backdrop under the events in
+  their lane. No per-day state, no reminders, no accountability. Also the
+  first thing to read `person.user_id` ("this lane is me").
+- **The shell and the zoom axis** — [`NAVIGATION.md`](./NAVIGATION.md). Three
+  workspaces with the calendar as the root page, and the calendar as one
+  thing seen at four distances: my lane, family day, week, month. Routes stay;
+  the pinch navigates between them. Needs two small changes to the router.
 
 ## 9. Restructure: what is left
 

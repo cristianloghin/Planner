@@ -29,6 +29,10 @@ nothing follows from who is on an event — it is just who is on it.
   rules, where new code goes.
 - [`docs/NOTE_MODEL.md`](docs/NOTE_MODEL.md) — a richer note/document model
   (design only, next up).
+- [`docs/ROUTINES.md`](docs/ROUTINES.md) — a person's ideal week, drawn under
+  the real one (design only).
+- [`docs/NAVIGATION.md`](docs/NAVIGATION.md) — three workspaces, and the
+  calendar as one zoomable thing (design only).
 - [`docs/archive/`](docs/archive/README.md) — superseded docs, kept for their
   reasoning. Not current.
 - [`supabase/migrations/`](supabase/migrations) — schema, RLS, functions, grants.
