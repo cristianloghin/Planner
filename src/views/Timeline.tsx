@@ -1,8 +1,9 @@
 import { createLayout, slot } from '@mikrostack/rst'
-import type { CSSProperties, MouseEvent, ReactNode } from 'react'
+import { type CSSProperties, type MouseEvent, type ReactNode, useContext } from 'react'
 import { cx } from '../assets/utils/cx'
 
 import styles from './Timeline.module.css'
+import { PageOverlayContext } from './pageOverlay'
 
 interface TimelineViewProps {
   pxPerMin: number
@@ -59,7 +60,9 @@ function Column({
  * them, so three people's columns on today share a line instead of each
  * drawing their own. The columns that are today are assumed contiguous,
  * which they are — all of them on the Day screen, one on the Week screen.
- * The dot at the gutter edge is the gutter's to draw.
+ * The line goes on the page's overlay rather than in the timeline itself:
+ * its dot is centred on the line's left end, which for the first column is
+ * the gutter's edge, where the page is clipped and the overlay is not.
  */
 export const TimelineView = createLayout(
   {
@@ -68,6 +71,7 @@ export const TimelineView = createLayout(
   ({ pxPerMin }: TimelineViewProps, { slots }) => {
     const hourH = pxPerMin * 60
     const now = nowLineFor(slots.Column.props)
+    const Overlay = useContext(PageOverlayContext)
     return (
       <div
         className={styles.Timeline}
@@ -80,14 +84,15 @@ export const TimelineView = createLayout(
         }
       >
         {slots.Column}
-        {now && (
-          <div
-            className={styles.nowLine}
-            style={{
-              gridColumn: `${now.from} / ${now.to}`,
-              top: `${(now.min / DAY_MIN) * 100}%`,
-            }}
-          />
+        {now && Overlay && (
+          <Overlay>
+            <div
+              className={styles.nowLine}
+              style={{ gridColumn: `${now.from} / ${now.to}`, top: now.min * pxPerMin }}
+            >
+              <span className={styles.nowDot} />
+            </div>
+          </Overlay>
         )}
       </div>
     )

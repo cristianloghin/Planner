@@ -125,6 +125,7 @@
 }
 
 .grid {
+  position: relative;
   flex: 0;
   display: flex;
   padding-top: 16px;
@@ -157,6 +158,41 @@
   margin-left: -100%;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* ---- The overlay ---- */
+
+/* The grid's shape again (its top padding included), laid over it, and
+   transparent to the pointer: what is drawn here never takes a tap from the
+   page beneath. No z-index of its own, so it paints over the pages by DOM
+   order and stays under the all-day band. */
+.overlay {
+  position: absolute;
+  inset: 0;
+  padding-top: inherit;
+  display: flex;
+  pointer-events: none;
+}
+
+/* Like `.clip`, but reaching half a "now" dot into the gutter: a page's own
+   dot, centred on the edge, shows whole, while a neighbour's still slides in
+   with its page. The negative margin keeps the strip inside aligned with the
+   pages'. */
+.overlayClip {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  margin-left: calc(var(--now-dot) / -2);
+  padding-left: calc(var(--now-dot) / 2);
+}
+
+/* One per page, on the lane template, so a fill places itself by lane. */
+.overlayPage {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: var(--lane-columns);
+  transition: grid-template-columns 0.25s ease;
 }
 
 /* ---- Pages ---- */

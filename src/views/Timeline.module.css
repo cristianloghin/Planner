@@ -40,17 +40,27 @@
   background-color: color-mix(in oklab, var(--accent) 5%, transparent);
 }
 
-/* One line across the columns that are today. An absolutely positioned
-   child of a grid is placed by its grid lines, so `grid-column` (set inline
-   from the columns) is the whole horizontal placement, and it covers the
-   column borders it crosses. Above the columns, which are stacking contexts
-   of their own, and still under the sticky all-day band. */
+/* The "now" line, on the page's overlay (see `PageOverlayContext`): a grid
+   on the lane template, where an absolutely positioned child is placed by
+   its grid lines, so `grid-column` (set inline from the columns) is the
+   whole horizontal placement. Centred on its minute, with the dot centred
+   on its left end. */
 .nowLine {
   position: absolute;
   left: 0;
   right: 0;
-  height: 0;
-  border-top: 2px solid var(--now);
-  z-index: 1;
-  pointer-events: none;
+  height: 2px;
+  margin-top: -1px;
+  background: var(--now);
+}
+
+.nowDot {
+  position: absolute;
+  left: calc(var(--now-dot) / -2);
+  top: 50%;
+  width: var(--now-dot);
+  height: var(--now-dot);
+  margin-top: calc(var(--now-dot) / -2);
+  border-radius: 50%;
+  background: var(--now);
 }
