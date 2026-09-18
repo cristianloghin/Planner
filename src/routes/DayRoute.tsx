@@ -169,7 +169,7 @@ export function DayRoute() {
           </CalendarView.Header.Lane>
         ))}
         <CalendarView.Gutter>
-          <TimeGutter hourH={hourH} />
+          <TimeGutter hourH={hourH} nowMin={dateISO === todayISO ? nowMin : undefined} />
         </CalendarView.Gutter>
         {/* Each deck page: a cell of all-day chips per person, then the day. */}
         {(

@@ -40,23 +40,17 @@
   background-color: color-mix(in oklab, var(--accent) 5%, transparent);
 }
 
+/* One line across the columns that are today. An absolutely positioned
+   child of a grid is placed by its grid lines, so `grid-column` (set inline
+   from the columns) is the whole horizontal placement, and it covers the
+   column borders it crosses. Above the columns, which are stacking contexts
+   of their own, and still under the sticky all-day band. */
 .nowLine {
   position: absolute;
   left: 0;
   right: 0;
   height: 0;
   border-top: 2px solid var(--now);
-  /* Above any stack of blocks, however deep. */
-  z-index: 1000;
+  z-index: 1;
   pointer-events: none;
-}
-
-.nowDot {
-  position: absolute;
-  left: -4px;
-  top: -4px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--now);
 }

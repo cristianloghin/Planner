@@ -187,7 +187,7 @@ export function WeekRoute() {
           </CalendarView.Header.Lane>
         ))}
         <CalendarView.Gutter>
-          <TimeGutter hourH={hourH} />
+          <TimeGutter hourH={hourH} nowMin={thisWeek ? nowMin : undefined} />
         </CalendarView.Gutter>
         {/* Each deck page: a cell of all-day chips per weekday, then the week. */}
         {(

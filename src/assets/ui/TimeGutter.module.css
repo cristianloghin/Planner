@@ -11,3 +11,17 @@
   color: var(--muted);
   white-space: nowrap;
 }
+
+/* Centred on the gutter's right edge, half over the first column. The
+   column paints later and would cover that half, so lift the dot above it. */
+.nowDot {
+  position: absolute;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: var(--now);
+  z-index: 1;
+  pointer-events: none;
+}
