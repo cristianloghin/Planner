@@ -125,14 +125,15 @@
 }
 
 .grid {
+  --grid-pad: 16px;
   position: relative;
   flex: 0;
   display: flex;
-  padding-top: 16px;
+  padding-top: var(--grid-pad);
 }
 
 .grid.noTopPadding {
-  padding-top: 0;
+  --grid-pad: 0px;
 }
 
 /* The fixed column beside the pages (a time gutter). Its width is a token so
@@ -160,39 +161,33 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-/* ---- The overlay ---- */
+/* ---- The "now" line ---- */
 
-/* The grid's shape again (its top padding included), laid over it, and
-   transparent to the pointer: what is drawn here never takes a tap from the
-   page beneath. No z-index of its own, so it paints over the pages by DOM
-   order and stays under the all-day band. */
-.overlay {
+/* From the gutter's edge to the pages' end, over both: a sibling of the clip,
+   not a child, so nothing cuts it. Centred on its minute (`--now-at`, set
+   inline, is measured from the top of the day, below the grid's padding).
+   Later in the DOM than the pages, so it paints over them, and with no
+   z-index of its own it stays under the all-day band. Transparent to the
+   pointer: a tap on the line is a tap on the column beneath. */
+.now {
   position: absolute;
-  inset: 0;
-  padding-top: inherit;
-  display: flex;
+  left: var(--gutter-w);
+  right: 0;
+  top: calc(var(--grid-pad) + var(--now-at) - 1px);
+  height: 2px;
+  background: var(--now);
   pointer-events: none;
 }
 
-/* Like `.clip`, but reaching half a "now" dot into the gutter: a page's own
-   dot, centred on the edge, shows whole, while a neighbour's still slides in
-   with its page. The negative margin keeps the strip inside aligned with the
-   pages'. */
-.overlayClip {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  margin-left: calc(var(--now-dot) / -2);
-  padding-left: calc(var(--now-dot) / 2);
-}
-
-/* One per page, on the lane template, so a fill places itself by lane. */
-.overlayPage {
-  position: relative;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: var(--lane-columns);
-  transition: grid-template-columns 0.25s ease;
+/* Centred on the line's left end: half over the gutter, half over the page. */
+.nowDot {
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--now);
 }
 
 /* ---- Pages ---- */

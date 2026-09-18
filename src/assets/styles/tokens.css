@@ -18,7 +18,6 @@
   --on-accent: light-dark(hsl(240 50% 93%), hsl(240 50% 15%)); /* text/icons on a coloured block or accent button */
   --danger: light-dark(hsl(350 80% 50%), hsl(350 80% 75%));
   --now: light-dark(hsl(350, 75%, 45%), hsl(350, 75%, 60%)); /* current-time line */
-  --now-dot: 8px; /* the dot on its gutter end; the deck lets a page draw half of it over the gutter */
 
   /* ---- Typography ---- */
   --font: "Google Sans Flex Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

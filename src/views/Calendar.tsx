@@ -6,7 +6,6 @@ import { cx } from '../assets/utils/cx'
 import { type SwipeZoom, pageInert, scrollOrigin, useSwipeGestures } from '../services/gestures'
 
 import styles from './Calendar.module.css'
-import { PageOverlayContext } from './pageOverlay'
 
 interface CalendarViewProps {
   /** Identity of the current page: an ISO date, a week start, a month cursor. */
@@ -19,6 +18,8 @@ interface CalendarViewProps {
   zoom?: SwipeZoom
   /** Minute to scroll to on first mount; unset leaves the scroller at the top. */
   initialMinute?: number
+  /** Minute to draw the "now" line at; unset draws none (the page is not today). */
+  nowMinute?: number
   isMonth?: boolean
 }
 
@@ -38,16 +39,13 @@ function AllDayCell({ children }: { children?: ReactNode }) {
 }
 
 /**
- * What a deck page carries: one `AllDay` cell per lane, in lane order, the
- * `Body` the page scrolls, and an `Overlay` drawn over the body outside its
- * clip, which the body fills from within through `PageOverlayContext`. One
- * object, three keys — the library keys slot identity by path, so the three
- * pages' fills stay distinct.
+ * What a deck page carries: one `AllDay` cell per lane, in lane order, and
+ * the `Body` the page scrolls. One object, three keys — the library keys
+ * slot identity by path, so the three pages' fills stay distinct.
  */
 const page = {
   AllDay: slot({ component: AllDayCell, multiple: true }),
   Body: slot({ required: true }),
-  Overlay: slot({ portal: true }),
 }
 
 /**
@@ -120,16 +118,12 @@ function Header({
  * knows the new page has landed so it can recentre before paint. The arrows
  * fire the same `onNavigate`, so a route names the intent once.
  *
- * Each page has three parts. Its `AllDay` cells, one per lane, go in a band
+ * Each page has two parts. Its `AllDay` cells, one per lane, go in a band
  * that sits at the top of the scroller and stays pinned there as the page
  * scrolls under it; its `Body` goes in the page itself. The band is a second
  * three-page strip that the gesture slides together with the first, so a
  * day's chips arrive with the day. The band is as tall as the current page's
- * chips need, and absent altogether when no page has any. Its `Overlay` is
- * a third strip, laid over the pages and sliding with them, that is not
- * clipped at the gutter's edge and takes no pointer events: the body fills it
- * (a timeline's "now" line, whose dot sits on that edge) through the context
- * the frame provides on each page.
+ * chips need, and absent altogether when no page has any.
  *
  * Zoom is lent by the route, because pinch and swipe share one gesture
  * binding but the zoom key is per screen and the month has none.
@@ -138,6 +132,12 @@ function Header({
  * a `MonthGridView` of cells. The lane template is inherited by anything
  * inside. `Footer` sits under the deck, in the same scroller, and does not
  * slide with it: a swipe changes the pages, the footer stays.
+ *
+ * The "now" line is the frame's too, for the same reason the gutter is: it
+ * marks a time on the axis, not a thing on a page. Drawn once over gutter
+ * and pages alike, outside the clip, its dot sits whole on the gutter's edge
+ * and the line runs on across every lane; the pages slide under it, and it
+ * goes when the page that lands is not today.
  */
 export const CalendarView = createLayout(
   {
@@ -162,6 +162,7 @@ export const CalendarView = createLayout(
       gutterLabel,
       zoom,
       initialMinute,
+      nowMinute,
       isMonth = false,
     }: CalendarViewProps,
     { slots },
@@ -170,20 +171,20 @@ export const CalendarView = createLayout(
     const stripRef = useRef<HTMLDivElement>(null)
     const bandRef = useRef<HTMLDivElement>(null)
     const bandStripRef = useRef<HTMLDivElement>(null)
-    const overlayStripRef = useRef<HTMLDivElement>(null)
     const topRef = useRef<HTMLDivElement>(null)
     // Whether the page has scrolled away from the top: the head shows an edge
     // only once content slides under it. Known from a sentinel at the top of
     // the scroller, so the browser tells us when it changes and nothing
     // reads scroll positions per frame.
     const [scrolled, setScrolled] = useState(false)
+    const pxPerMin = (zoom?.hourH ?? 60) / 60
     // Mirror for scrollToMinute, which mount effects call with a stale closure.
-    const pxPerMinRef = useLatest((zoom?.hourH ?? 60) / 60)
+    const pxPerMinRef = useLatest(pxPerMin)
 
     const { onClickCapture } = useSwipeGestures({
       scrollRef,
       stripRef,
-      followRefs: [bandStripRef, overlayStripRef],
+      followRefs: [bandStripRef],
       pageKey,
       onNavigate,
       zoom,
@@ -287,34 +288,22 @@ export const CalendarView = createLayout(
             <div className={styles.clip}>
               <div className={styles.strip} ref={stripRef}>
                 <div className={styles.page} {...pageInert(false)}>
-                  <PageOverlayContext.Provider value={CalendarView.Previous.Overlay}>
-                    {slots.Previous.Body}
-                  </PageOverlayContext.Provider>
+                  {slots.Previous.Body}
                 </div>
-                <div className={styles.page}>
-                  <PageOverlayContext.Provider value={CalendarView.Current.Overlay}>
-                    {slots.Current.Body}
-                  </PageOverlayContext.Provider>
-                </div>
+                <div className={styles.page}>{slots.Current.Body}</div>
                 <div className={styles.page} {...pageInert(false)}>
-                  <PageOverlayContext.Provider value={CalendarView.Next.Overlay}>
-                    {slots.Next.Body}
-                  </PageOverlayContext.Provider>
+                  {slots.Next.Body}
                 </div>
               </div>
             </div>
-            {/* Over the pages, in the same gutter + strip shape, so a fill
-                lands on its own page's lanes; only the clip is looser. */}
-            <div className={styles.overlay}>
-              {slots.Gutter.filled && <div className={styles.gutter} />}
-              <div className={styles.overlayClip}>
-                <div className={styles.strip} ref={overlayStripRef}>
-                  <div className={styles.overlayPage}>{slots.Previous.Overlay}</div>
-                  <div className={styles.overlayPage}>{slots.Current.Overlay}</div>
-                  <div className={styles.overlayPage}>{slots.Next.Overlay}</div>
-                </div>
+            {nowMinute != null && (
+              <div
+                className={styles.now}
+                style={{ '--now-at': `${nowMinute * pxPerMin}px` } as CSSProperties}
+              >
+                <span className={styles.nowDot} />
               </div>
-            </div>
+            )}
           </div>
           {slots.Footer}
         </div>
