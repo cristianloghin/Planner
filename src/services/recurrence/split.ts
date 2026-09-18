@@ -29,12 +29,25 @@ export function recurrenceEndingBefore(r: Recurrence, date: string): Recurrence 
  * once the days before `date` are taken off — twelve lessons cut at the fifth
  * leave eight.
  *
- * `date` is expected to be a day the rule produces. One it does not cannot be
- * cut at, and the count is kept whole rather than guessed.
+ * `date` must be a day the rule produces (`startsOn`); callers gate on that.
+ * A day it does not produce is not a cut, so the rule comes back unchanged
+ * rather than with a count guessed from a position that does not exist.
  */
 export function recurrenceFrom(e: CalendarEvent, date: string): Recurrence | undefined {
   const r = e.recurrence
   if (!r || r.count == null) return r
-  const index = occurrenceIndex(e, date) ?? 0
+  const index = occurrenceIndex(e, date)
+  if (index == null) return r
   return { ...r, count: Math.max(1, r.count - index) }
+}
+
+/**
+ * The first day of the new half, given the day the series is cut at and the
+ * day the new half was asked to start on. Usually the same day. The editor
+ * lets the start move: moved earlier, the new half starts there and the old
+ * one stops before it, so no day is produced by both halves; moved later,
+ * the days in between are gone, which is what "from here on" means.
+ */
+export function splitDate(cutDay: string, newStart: string): string {
+  return newStart < cutDay ? newStart : cutDay
 }

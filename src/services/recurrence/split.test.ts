@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { addDays } from '../../assets/utils/dates'
 import type { CalendarEvent, Recurrence } from '../../domains/events/types'
 import { startsOn } from './expand'
-import { recurrenceEndingBefore, recurrenceFrom } from './split'
+import { recurrenceEndingBefore, recurrenceFrom, splitDate } from './split'
 
 function ev(start: string, recurrence?: Recurrence): CalendarEvent {
   return {
@@ -78,6 +78,25 @@ describe('recurrenceFrom', () => {
   it('keeps the count whole for a day the rule does not produce', () => {
     const e = ev('2026-06-01', { freq: 'weekly', interval: 1, count: 8 })
     expect(recurrenceFrom(e, '2026-06-03')).toEqual({ freq: 'weekly', interval: 1, count: 8 })
+  })
+})
+
+describe('splitDate', () => {
+  it('is the cut day unless the new half was moved before it', () => {
+    expect(splitDate('2026-06-15', '2026-06-15')).toBe('2026-06-15')
+    expect(splitDate('2026-06-15', '2026-06-22')).toBe('2026-06-15')
+    expect(splitDate('2026-06-15', '2026-06-10')).toBe('2026-06-10')
+  })
+
+  it('keeps the halves apart whichever way the start moved', () => {
+    const whole = ev('2026-06-01', { freq: 'weekly', interval: 1 })
+    for (const newStart of ['2026-06-10', '2026-06-15', '2026-06-24']) {
+      const from = splitDate('2026-06-15', newStart)
+      const before = ev('2026-06-01', recurrenceEndingBefore(whole.recurrence!, from))
+      const after = ev(newStart, recurrenceFrom(whole, from))
+      const both = daysOf(before, '2026-06-01', 120).filter((d) => startsOn(after, d))
+      expect(both).toEqual([])
+    }
   })
 })
 

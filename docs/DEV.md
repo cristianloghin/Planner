@@ -57,8 +57,8 @@ event_occurrence  series_id, occurrence_start,          -- identity: the ORIGINA
 ```
 
 Functions: `create_account`, `handle_new_user`, `is_account_member`,
-`can_access_series`, `search_events`, `schedule_reminder_sender`,
-`unschedule_reminder_sender`.
+`can_access_series`, `search_events`, `split_series`,
+`schedule_reminder_sender`, `unschedule_reminder_sender`.
 
 Realtime publishes `event_series`, `event_occurrence`, `person`, `reminder`.
 
@@ -91,22 +91,27 @@ produces that day again the old row applies. Cancel Tuesday, switch
 weekly→daily, and that Tuesday is still cancelled. This is the accepted price
 of editing in place: an occurrence *is* "the one on this day".
 
-**"This and following" is a cap, or a cap plus a copy — no RPC.** The two
-halves of a series cut at a day are worked out in `services/recurrence/split.ts`:
-the old half is the same rule with `UNTIL` = the day before (a `COUNT` is
-dropped, the cap says the same thing), the new half is the same rule anchored on
-the cut day with whatever is left of the count. *Deleting* from a day on is the
-cap alone (`endEvent` → `setSeriesRecurrence`). *Editing* from a day on is
-three plain writes (`splitEvent`), in this order: insert the new series from the
-form (fresh id, fresh reminder ids), re-file the old series' `event_occurrence`
-rows from the cut day on under it (`moveOccurrenceRows`, matched by day), then
-cap the old series. The order is chosen for what a failure part-way leaves
-behind: the new half exists before anything depends on it, and the old series
-is still whole until the new one is in place, so a day is drawn twice at worst
-and never lost — the fix is a delete from the cut day on of either half. There
-is no transaction; that is the accepted price of not having a stored
-procedure to keep in step with the app. Neither sheet offers the choice on the
-series' first day, where it would be "all events" with a dead row left behind.
+**"This and following" is a cap, or a cap plus a copy.** The two halves of a
+series cut at a day are worked out in the app, in
+`services/recurrence/split.ts`: the old half is the same rule with `UNTIL` =
+the day before (a `COUNT` is dropped, the cap says the same thing), the new
+half is the same rule anchored on the cut day with whatever is left of the
+count. *Deleting* from a day on is the cap alone — `endEvent` →
+`setSeriesRecurrence`, an update of `rrule` and nothing else. *Editing* from a
+day on is `splitEvent` → `splitSeries` → the `split_series` RPC (0024), one
+transaction that inserts the new series from values the app worked out, copies
+**every user's** reminders onto it (the only step the app cannot do itself —
+RLS shows it only its own), hands the old series' `event_occurrence` rows from
+the cut day on to the new one (matched by `>=` local midnight, so a row
+written at an older time of day moves too), and caps the old rule. The app
+then runs its usual reminder sync so the caller's copies match the form. The
+new id is minted by the app and passed in, which is what makes the write
+replayable: a repeat finds its series already there and only re-asserts the
+cap. The function is deliberately small — the 0003 one copied eight tables —
+and the recurrence maths never enters SQL. Neither sheet offers the choice on
+the series' first day, where it would be "all events" with a dead row left
+behind, and the editor route accepts a narrow scope only for a day the rule
+actually produces (`startsOn`), since the URL can be typed.
 
 **The database does no recurrence math.** The rrule string is the whole story,
 including how the series ends: `UNTIL` for a date, `COUNT` for a number of
@@ -328,6 +333,12 @@ is pointed at. There is no staging project and the app has no undo.
 > tables, 10 columns and 4 functions, adds 4 columns, renames 1, and rebuilds 3
 > function bodies. It is irreversible and there is no staging project. It should
 > go deliberately, with `--dry-run` first — not as a side effect of other work.
+>
+> Migration `0024` (the `split_series` function, additive and harmless on its
+> own) has to exist before a build that carries "this and following" is
+> served: the app calls the function by name and gets a 404 until it does.
+> `deploy.yml` runs `supabase db push` before the build for exactly this
+> reason, so a merge to `main` handles it; a manual deploy must keep that order.
 >
 > One statement in it needs care: the copy from `event_person` into
 > `event_series.attendees`. `db reset` does **not** exercise it, because the seed

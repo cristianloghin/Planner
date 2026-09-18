@@ -23,8 +23,8 @@ import { useEvents, useOccurrencesForRange, useTemplates } from '../domains/even
 import { timingOf } from '../domains/events/selectors'
 import { usePeopleWithColors } from '../domains/people/queries'
 import { defaultAttendees, eventColorIn } from '../domains/people/selectors'
-import { effectiveOccurrence } from '../services/recurrence/expand'
-import { recurrenceEndingBefore, recurrenceFrom } from '../services/recurrence/split'
+import { effectiveOccurrence, startsOn } from '../services/recurrence/expand'
+import { recurrenceEndingBefore, recurrenceFrom, splitDate } from '../services/recurrence/split'
 import { eventDate, eventStartMinutes } from '../services/recurrence/timing'
 import type { CalendarEvent } from '../types'
 import { EditorPageView } from '../views/EditorPage'
@@ -94,12 +94,17 @@ export function EditEventRoute() {
   const [q] = useQueryState({ date: { type: 'string' }, scope: { type: 'string' } })
   const { date } = q
   const event = events?.find((e) => e.id === id)
-  // Part of a series is only a thing to edit when there is a day and a series
-  // to pick it out of; anything else is the series. So is "following" on the
-  // series' first day, where nothing would be left before the cut.
+  // Part of a series is only a thing to edit when there is a day the series
+  // actually produces to pick it out of — the URL can be typed, and a day the
+  // rule skips is nobody's occurrence; anything else is the series. So is
+  // "following" on the series' first day, where nothing would be left before
+  // the cut.
   const asked = q.scope === 'occurrence' || q.scope === 'following' ? q.scope : 'series'
   const scope: EditScope =
-    !date || !event?.recurrence || (asked === 'following' && date === eventDate(event))
+    !date ||
+    !event?.recurrence ||
+    !startsOn(event, date) ||
+    (asked === 'following' && date === eventDate(event))
       ? 'series'
       : asked
   // Opened on an occurrence, the form seeds from that occurrence's override —
@@ -216,11 +221,8 @@ function EditorSession({
    */
   function saveFollowing() {
     const event = { ...splitEventFromDraft(draft), id: uid() }
-    // The form may have moved the new half's first day off the cut day. The
-    // old series stops before whichever comes first, so no day is produced
-    // by both halves: moved earlier, the new half starts there; moved later,
-    // the days in between are gone, which is what "from here on" means.
-    const fromDate = eventDate(event) < occurrenceDate! ? eventDate(event) : occurrenceDate!
+    // The form may have moved the new half's first day off the cut day.
+    const fromDate = splitDate(occurrenceDate!, eventDate(event))
     events.mutate({
       accountId,
       userId,

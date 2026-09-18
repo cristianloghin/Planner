@@ -9,7 +9,7 @@
  * business.
  */
 import { type ColorKey, isColorKey } from '../assets/palette'
-import { durationToInterval, intervalToDuration, startToTs, tsToStart } from './mappers'
+import { dayRange, durationToInterval, intervalToDuration, startToTs, tsToStart } from './mappers'
 import { fetchAll } from './pagination'
 import type { PersonId } from './people'
 import { recurrenceToRRule, rruleToRecurrence } from './rrule'
@@ -194,6 +194,50 @@ export async function setSeriesRecurrence(
     .update({ rrule: recurrenceToRRule(recurrence) })
     .eq('id', id)
   if (error) throw error
+}
+
+/**
+ * Cut a repeating series in two: `series` takes over from `fromDate`, and the
+ * one with `sourceId` is left repeating by `sourceRecurrence` — its own rule,
+ * capped the day before. For "change this one and all the ones after it".
+ *
+ * The database does the cut in one transaction (`split_series`, 0024): it
+ * inserts the new series, copies every user's reminders onto it, hands the
+ * old series' per-day rows from `fromDate` on to it, and caps the old rule.
+ * The reminders are copied there because only the database can see a
+ * partner's; the caller's own are then brought in line with `series` here,
+ * the same sync every save runs.
+ *
+ * Replayable: `series.id` is minted by the caller, so a write repeated after
+ * a lost response finds its series already made and only re-asserts the cap.
+ * The recurrence maths is the app's — both rules arrive worked out.
+ */
+export async function splitSeries(
+  sourceId: string,
+  sourceRecurrence: Recurrence,
+  fromDate: string,
+  series: Series,
+  userId: string,
+): Promise<void> {
+  if (!series.start) throw new Error('splitSeries: the new half needs a start')
+  const rrule = recurrenceToRRule(series.recurrence)
+  const { error } = await supabase.rpc('split_series', {
+    p_series: sourceId,
+    p_new_id: series.id,
+    p_from: dayRange(fromDate).from,
+    // Never null: a defined recurrence always serialises.
+    p_old_rrule: recurrenceToRRule(sourceRecurrence) as string,
+    p_title: series.title,
+    p_all_day: series.allDay,
+    p_dtstart: startToTs(series.start, series.allDay),
+    p_duration: durationToInterval(series.duration, series.allDay),
+    p_attendees: series.attendees,
+    ...(rrule ? { p_rrule: rrule } : {}),
+    ...(series.colorKey ? { p_color_key: series.colorKey } : {}),
+  })
+  if (error) throw error
+
+  await syncReminders(series, userId)
 }
 
 /**

@@ -15,11 +15,10 @@ import {
   cancelOccurrence,
   clearOccurrenceAttendees,
   clearOccurrenceOverride,
-  moveOccurrenceRows,
   setOccurrenceAttendees,
   setOccurrenceOverride,
 } from '../../client/occurrences'
-import { deleteSeries, saveSeries, setSeriesRecurrence } from '../../client/series'
+import { deleteSeries, saveSeries, setSeriesRecurrence, splitSeries } from '../../client/series'
 import type { Recurrence, SeriesTiming } from '../../client/series'
 import type { PersonId } from '../people/types'
 import {
@@ -142,15 +141,9 @@ export function registerEventsDefaults(queryClient: QueryClient): void {
         case 'endEvent':
           return setSeriesRecurrence(w.id, w.recurrence)
         case 'splitEvent':
-          // Three plain writes and no transaction, in an order chosen for
-          // what a failure part-way leaves behind. The new half goes first,
-          // so the days handed to it have a series to belong to. The cap
-          // goes last, so the old series stays whole until the new one is in
-          // place: a day is drawn twice at worst, never not at all, and the
-          // fix is a delete of either half from the cut day on.
-          await saveSeries(accountId, userId, fromEvent(w.event), { isNew: true })
-          await moveOccurrenceRows(w.id, w.fromDate, w.event.id)
-          return setSeriesRecurrence(w.id, w.recurrence)
+          // One transaction on the server: the copy, the hand-over of the
+          // days from the cut on, and the cap land together or not at all.
+          return splitSeries(w.id, w.recurrence, w.fromDate, fromEvent(w.event), userId)
         case 'saveTemplate':
           return saveSeries(accountId, userId, fromTemplate(w.template), {
             isNew: w.isNew,

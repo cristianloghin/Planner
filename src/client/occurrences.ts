@@ -201,28 +201,6 @@ export async function clearOccurrenceOverride(series: SeriesTiming, date: string
 }
 
 /**
- * Hand every day recorded from `fromDate` on to another series.
- *
- * For a split: a new series takes over from the cut day, and the days already
- * recorded against the old one from there on — moved, taken out, with their
- * own people — belong to it now. Matched by day like every other lookup here,
- * so a row written at an older time of day moves too. The new series must
- * already exist: the rows reference it.
- */
-export async function moveOccurrenceRows(
-  fromSeriesId: string,
-  fromDate: string,
-  toSeriesId: string,
-): Promise<void> {
-  const { error } = await supabase
-    .from('event_occurrence')
-    .update({ series_id: toSeriesId })
-    .eq('series_id', fromSeriesId)
-    .gte('occurrence_start', dayRange(fromDate).from)
-  if (error) throw error
-}
-
-/**
  * Take a single day out of its series.
  *
  * The repeat rule still produces that day; the row's flag is what makes it stop

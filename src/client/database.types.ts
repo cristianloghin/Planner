@@ -425,6 +425,22 @@ export type Database = {
           title: string
         }[]
       }
+      split_series: {
+        Args: {
+          p_all_day: boolean
+          p_attendees: string[]
+          p_color_key?: string
+          p_dtstart: string
+          p_duration: string
+          p_from: string
+          p_new_id: string
+          p_old_rrule: string
+          p_rrule?: string
+          p_series: string
+          p_title: string
+        }
+        Returns: undefined
+      }
       unschedule_reminder_sender: { Args: never; Returns: undefined }
     }
     Enums: {
