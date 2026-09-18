@@ -37,7 +37,8 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
  *
  * Editing one occurrence shows only what an occurrence can differ in — when
  * it happens and who is on it. The title, repeat rule, colour and reminders
- * are the series' and stay out of sight.
+ * are the series' and stay out of sight. Editing this and the following
+ * occurrences is a new series from that day, so it shows everything.
  */
 export function EventForm({
   draft,
@@ -53,7 +54,10 @@ export function EventForm({
   onChange: (next: EventDraft) => void
   isEdit: boolean
   scope?: EditScope
-  /** The series' own anchor day: a series may end before an opened occurrence. */
+  /**
+   * The first day the saved series can produce, which its last day cannot
+   * precede: the series' own anchor, or the cut day when editing from one on.
+   */
   seriesStart?: string
   people: { person: Person; color: ColorKey }[]
   templates: EventTemplate[]
@@ -82,7 +86,8 @@ export function EventForm({
   const firstColor = people.find((p) => p.person.id === draft.attendees[0])?.color ?? DEFAULT_COLOR
   const unitLabel =
     draft.repeat === 'daily' ? 'days' : draft.repeat === 'weekly' ? 'weeks' : 'months'
-  const seriesOnly = scope === 'series'
+  // The fields a series has and one occurrence of it does not.
+  const seriesOnly = scope !== 'occurrence'
 
   return (
     <>

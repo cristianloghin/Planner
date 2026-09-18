@@ -8,11 +8,14 @@ import type { CalendarEvent, EventReminder, EventTemplate, RecurrenceFreq } from
 export const SNAP = 15
 
 /**
- * How far an edit of a recurring event reaches: the whole series, or one
- * occurrence of it. An occurrence can only differ from its series in when it
- * happens and who is on it; everything else is the series' alone.
+ * How far an edit of a recurring event reaches: the whole series, one
+ * occurrence of it, or that occurrence and every one after it.
+ *
+ * An occurrence can only differ from its series in when it happens and who is
+ * on it; everything else is the series' alone. "Following" is a new series
+ * that takes over from that day, so it can change anything.
  */
-export type EditScope = 'series' | 'occurrence'
+export type EditScope = 'series' | 'occurrence' | 'following'
 const DAY_MIN = 24 * 60
 
 export type RepeatChoice = 'none' | RecurrenceFreq
@@ -172,6 +175,16 @@ export function eventFromDraft(d: EventDraft): Omit<CalendarEvent, 'id'> {
     ...(d.colorKey ? { colorKey: d.colorKey } : {}),
     reminders: d.reminders,
   }
+}
+
+/**
+ * The draft as the series that takes over from a cut (no id): the event it
+ * describes, with reminders of its own. Fresh ids, so the two halves never
+ * share a row — the old series keeps the ones the form was seeded with.
+ */
+export function splitEventFromDraft(d: EventDraft): Omit<CalendarEvent, 'id'> {
+  const event = eventFromDraft(d)
+  return { ...event, reminders: cloneReminders(event.reminders) }
 }
 
 /**

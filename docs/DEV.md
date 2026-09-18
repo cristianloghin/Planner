@@ -57,8 +57,8 @@ event_occurrence  series_id, occurrence_start,          -- identity: the ORIGINA
 ```
 
 Functions: `create_account`, `handle_new_user`, `is_account_member`,
-`can_access_series`, `search_events`, `schedule_reminder_sender`,
-`unschedule_reminder_sender`.
+`can_access_series`, `search_events`, `split_series`,
+`schedule_reminder_sender`, `unschedule_reminder_sender`.
 
 Realtime publishes `event_series`, `event_occurrence`, `person`, `reminder`.
 
@@ -84,18 +84,41 @@ misses every row written before that edit. Match with `dayRange`, insert with
 Two rows can therefore land on the same day. `toCompletions` layers them rather
 than letting the last win.
 
-**A series is edited in place. There is no split.** "All events" rewrites the
-row, cadence and end included. A per-day row for a day the rule no longer
-produces is *inert* — never matched, never rendered — but it is not deleted, so
-if the rule later produces that day again the old row applies. Cancel Tuesday,
-switch weekly→daily, and that Tuesday is still cancelled. This is the accepted
-price of editing in place: an occurrence *is* "the one on this day".
+**"All events" edits a series in place.** It rewrites the row, cadence and end
+included. A per-day row for a day the rule no longer produces is *inert* —
+never matched, never rendered — but it is not deleted, so if the rule later
+produces that day again the old row applies. Cancel Tuesday, switch
+weekly→daily, and that Tuesday is still cancelled. This is the accepted price
+of editing in place: an occurrence *is* "the one on this day".
+
+**"This and following" is a cap, or a cap plus a copy.** The two halves of a
+series cut at a day are worked out in the app, in
+`services/recurrence/split.ts`: the old half is the same rule with `UNTIL` =
+the day before (a `COUNT` is dropped, the cap says the same thing), the new
+half is the same rule anchored on the cut day with whatever is left of the
+count. *Deleting* from a day on is the cap alone — `endEvent` →
+`setSeriesRecurrence`, an update of `rrule` and nothing else. *Editing* from a
+day on is `splitEvent` → `splitSeries` → the `split_series` RPC (0024), one
+transaction that inserts the new series from values the app worked out, copies
+**every user's** reminders onto it (the only step the app cannot do itself —
+RLS shows it only its own), hands the old series' `event_occurrence` rows from
+the cut day on to the new one (matched by `>=` local midnight, so a row
+written at an older time of day moves too), and caps the old rule. The app
+then runs its usual reminder sync so the caller's copies match the form. The
+new id is minted by the app and passed in, which is what makes the write
+replayable: a repeat finds its series already there and only re-asserts the
+cap. The function is deliberately small — the 0003 one copied eight tables —
+and the recurrence maths never enters SQL. Neither sheet offers the choice on
+the series' first day, where it would be "all events" with a dead row left
+behind, and the editor route accepts a narrow scope only for a day the rule
+actually produces (`startsOn`), since the URL can be typed.
 
 **The database does no recurrence math.** The rrule string is the whole story,
 including how the series ends: `UNTIL` for a date, `COUNT` for a number of
 times, neither for infinite. Both are RFC-5545 and the `rrule` package
 round-trips them. (An older rule "never store a `COUNT`" existed because copying
-a rule on a split would restart the count — that reason died with the split.)
+a rule on a split would restart the count. The split now computes the remaining
+count for the new half — `recurrenceFrom` — so a counted series survives a cut.)
 
 **Recurrence is hand-rolled, deliberately.** `src/services/recurrence/expand.ts`
 computes `startsOn` arithmetically rather than asking `rrule` to expand. This was
@@ -310,6 +333,12 @@ is pointed at. There is no staging project and the app has no undo.
 > tables, 10 columns and 4 functions, adds 4 columns, renames 1, and rebuilds 3
 > function bodies. It is irreversible and there is no staging project. It should
 > go deliberately, with `--dry-run` first — not as a side effect of other work.
+>
+> Migration `0024` (the `split_series` function, additive and harmless on its
+> own) has to exist before a build that carries "this and following" is
+> served: the app calls the function by name and gets a 404 until it does.
+> `deploy.yml` runs `supabase db push` before the build for exactly this
+> reason, so a merge to `main` handles it; a manual deploy must keep that order.
 >
 > One statement in it needs care: the copy from `event_person` into
 > `event_series.attendees`. `db reset` does **not** exercise it, because the seed

@@ -7,6 +7,7 @@ import {
   draftValid,
   eventFromDraft,
   moveStart,
+  splitEventFromDraft,
   templateDraftChanged,
   templateDraftDuration,
   templateDraftFor,
@@ -159,5 +160,17 @@ describe('template drafts', () => {
     expect(d.colorKey).toBe('1')
     expect(templateDraftDuration(d)).toBe(60)
     expect(templateDraftDuration({ ...d, hours: 0, minutes: 5 })).toBe(15)
+  })
+})
+
+describe('splitEventFromDraft', () => {
+  it('is the same event, with reminders of its own', () => {
+    const d = draftForEvent(event)
+    const { reminders, ...rest } = splitEventFromDraft(d)
+    const { reminders: seeded, ...expected } = eventFromDraft(d)
+    expect(rest).toEqual(expected)
+    expect(reminders.map((r) => r.offset)).toEqual(seeded.map((r) => r.offset))
+    // Fresh ids: the old series keeps r1, the new one must not share it.
+    expect(reminders.map((r) => r.id)).not.toContain('r1')
   })
 })

@@ -18,16 +18,19 @@ import {
   setOccurrenceAttendees,
   setOccurrenceOverride,
 } from '../../client/occurrences'
-import { deleteSeries, saveSeries } from '../../client/series'
-import type { SeriesTiming } from '../../client/series'
+import { deleteSeries, saveSeries, setSeriesRecurrence, splitSeries } from '../../client/series'
+import type { Recurrence, SeriesTiming } from '../../client/series'
 import type { PersonId } from '../people/types'
 import {
   type OccurrenceChange,
+  patchEventRecurrence,
+  patchMoveOccurrences,
   patchOccurrences,
   patchRemoveEvent,
   patchRemoveTemplate,
   patchSaveEvent,
   patchSaveTemplate,
+  patchSplitEvent,
 } from './patches'
 import { eventsKey, occurrencesPrefix, templatesKey } from './queries'
 import { fromEvent, fromTemplate, occurrenceKey } from './transformers'
@@ -39,10 +42,27 @@ import type { CalendarEvent, EventTemplate, OccurrenceMap } from './types'
  * A new event or blueprint carries its id, minted by the caller before the
  * write, so editing it again before the first write lands still names something
  * real.
+ *
+ * The two writes that act on a series from one of its days on are a cap and a
+ * split. `endEvent` leaves the series repeating by a rule that ends before
+ * that day — "delete this and following". `splitEvent` does the same to the
+ * series and adds a new one that takes over from that day, carrying the days
+ * already recorded from there on with it — "edit this and following".
  */
 export type EventsChange =
   | { kind: 'saveEvent'; event: CalendarEvent; isNew: boolean }
   | { kind: 'removeEvent'; id: string }
+  | { kind: 'endEvent'; id: string; recurrence: Recurrence }
+  | {
+      kind: 'splitEvent'
+      /** The series being cut, and the rule it is left with. */
+      id: string
+      recurrence: Recurrence
+      /** The first day that belongs to the new half. */
+      fromDate: string
+      /** The new half, with an id of its own. */
+      event: CalendarEvent
+    }
   | { kind: 'saveTemplate'; template: EventTemplate; isNew: boolean }
   | { kind: 'removeTemplate'; id: string }
 
@@ -92,6 +112,23 @@ function changeOf(w: OccurrencesChange): OccurrenceChange {
 const isTemplateWrite = (w: EventsChange) =>
   w.kind === 'saveTemplate' || w.kind === 'removeTemplate'
 
+/** The events the moment a change is made, before the server has confirmed it. */
+function patchEvents(events: CalendarEvent[], w: EventsChange): CalendarEvent[] {
+  switch (w.kind) {
+    case 'saveEvent':
+      return patchSaveEvent(events, w.event)
+    case 'removeEvent':
+      return patchRemoveEvent(events, w.id)
+    case 'endEvent':
+      return patchEventRecurrence(events, w.id, w.recurrence)
+    case 'splitEvent':
+      return patchSplitEvent(events, w.id, w.recurrence, w.event)
+    case 'saveTemplate':
+    case 'removeTemplate':
+      return events
+  }
+}
+
 export function registerEventsDefaults(queryClient: QueryClient): void {
   queryClient.setMutationDefaults(EVENTS_WRITE_KEY, {
     scope: { id: APP_SCOPE },
@@ -101,6 +138,12 @@ export function registerEventsDefaults(queryClient: QueryClient): void {
           return saveSeries(accountId, userId, fromEvent(w.event), { isNew: w.isNew })
         case 'removeEvent':
           return deleteSeries(w.id)
+        case 'endEvent':
+          return setSeriesRecurrence(w.id, w.recurrence)
+        case 'splitEvent':
+          // One transaction on the server: the copy, the hand-over of the
+          // days from the cut on, and the cap land together or not at all.
+          return splitSeries(w.id, w.recurrence, w.fromDate, fromEvent(w.event), userId)
         case 'saveTemplate':
           return saveSeries(accountId, userId, fromTemplate(w.template), {
             isNew: w.isNew,
@@ -130,15 +173,21 @@ export function registerEventsDefaults(queryClient: QueryClient): void {
       }
 
       const previous = queryClient.getQueryData<CalendarEvent[]>(events)
-      if (previous) {
-        queryClient.setQueryData<CalendarEvent[]>(
-          events,
-          w.kind === 'saveEvent'
-            ? patchSaveEvent(previous, w.event)
-            : patchRemoveEvent(previous, w.id),
+      if (previous) queryClient.setQueryData<CalendarEvent[]>(events, patchEvents(previous, w))
+      const entries: Rollback['entries'] = previous ? [[events, previous]] : []
+
+      if (w.kind === 'splitEvent') {
+        // The days handed to the new half sit in the occurrence windows, and
+        // one day can sit in several cached months — re-file it in every one,
+        // or the same day would read differently depending on the screen.
+        const months = occurrencesPrefix(accountId)
+        await queryClient.cancelQueries({ queryKey: months })
+        entries.push(...queryClient.getQueriesData<OccurrenceMap>({ queryKey: months }))
+        queryClient.setQueriesData<OccurrenceMap>({ queryKey: months }, (map) =>
+          map ? patchMoveOccurrences(map, w.id, w.fromDate, w.event.id) : map,
         )
       }
-      return { entries: previous ? [[events, previous]] : [] }
+      return { entries }
     },
     onError: (_err, _vars, ctx) => rollback(queryClient, ctx),
     onSettled: (_data, _err, { accountId, change: w }: EventsWrite) => {
@@ -149,6 +198,10 @@ export function registerEventsDefaults(queryClient: QueryClient): void {
       void queryClient.invalidateQueries({
         queryKey: isTemplateWrite(w) ? templates : events,
       })
+      // A split moved days between series too, and those are read per window.
+      if (w.kind === 'splitEvent') {
+        void queryClient.invalidateQueries({ queryKey: occurrencesPrefix(accountId) })
+      }
     },
   })
 

@@ -15,7 +15,13 @@ import { AttendeeChips } from '../domains/people/components/AttendeeChips'
 import { usePeopleWithColors } from '../domains/people/queries'
 import { attendeeLabelFor } from '../domains/people/selectors'
 import { effectiveOccurrence, recurrenceLabel } from '../services/recurrence/expand'
-import { MINS_PER_DAY, eventSpanDays, eventStartMinutes } from '../services/recurrence/timing'
+import { recurrenceEndingBefore } from '../services/recurrence/split'
+import {
+  MINS_PER_DAY,
+  eventDate,
+  eventSpanDays,
+  eventStartMinutes,
+} from '../services/recurrence/timing'
 import type { CalendarEvent } from '../types'
 import { EditorPageView } from '../views/EditorPage'
 import s from './OccurrenceSheet.module.css'
@@ -53,9 +59,13 @@ export function OccurrenceSheet({
   // itself the confirmation (so the two are mutually exclusive, never stacked).
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleteScope, setDeleteScope] = useState(false)
-  // Edit asks the same question of a series: this occurrence, or all of them.
+  // Edit asks the same question of a series: this occurrence, this and the
+  // ones after it, or all of them.
   const [editScope, setEditScope] = useState(false)
   const isRecurring = !!event.recurrence
+  // Cutting a series at its first day would leave nothing before the cut, so
+  // there "this and following" is "all events" and is not offered.
+  const canSplit = isRecurring && eventDate(event) !== date
 
   const occState = occurrences.on(event.id, date)
   // A one-off override on this slot. `date` is the occurrence's identity (the day
@@ -82,8 +92,27 @@ export function OccurrenceSheet({
     })
     onClose()
   }
+  /**
+   * End the series the day before this one. The rule stops producing days
+   * from here on; nothing is copied or removed. A day already recorded from
+   * here on is simply no longer reached.
+   */
+  function deleteFollowing() {
+    writeEvent({
+      kind: 'endEvent',
+      id: event.id,
+      recurrence: recurrenceEndingBefore(event.recurrence!, date),
+    })
+    onClose()
+  }
+  /** The middle choice of either sheet, where there is something before the cut. */
+  const followingChoice = (onSelect: () => void): ScopeChoice[] =>
+    canSplit
+      ? [{ label: 'This and following events', detail: `From ${isoLabel(date)}`, onSelect }]
+      : []
   const deleteChoices: ScopeChoice[] = [
     { label: 'This event only', detail: isoLabel(date), onSelect: deleteThisEvent },
+    ...followingChoice(deleteFollowing),
     { label: 'All events', detail: 'The whole series', onSelect: deleteAllEvents },
   ]
 
@@ -105,6 +134,7 @@ export function OccurrenceSheet({
       title="Edit recurring event"
       choices={[
         { label: 'This event only', detail: isoLabel(date), onSelect: () => onEdit('occurrence') },
+        ...followingChoice(() => onEdit('following')),
         { label: 'All events', detail: 'The whole series', onSelect: () => onEdit('series') },
       ]}
     />

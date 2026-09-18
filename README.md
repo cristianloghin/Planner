@@ -13,6 +13,8 @@ appears live.
 - Repeating events, with a user-set end — *after N times* or *on a date*
 - Per-occurrence overrides: move a single day, cancel it, or change who is on it
   without touching the rest of the series
+- Edit or delete a series from one day on ("this and following"): the earlier
+  days stay exactly as they were
 - Event templates, to start a new event from a saved shape
 - Reminders: in-app while the tab is open, Web Push while it is closed
 - Full-text search over event titles

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { OccurrenceRow } from '../../client/occurrences'
-import { patchEntry, patchOccurrences, rosterChange } from './patches'
+import { patchEntry, patchMoveOccurrences, patchOccurrences, rosterChange } from './patches'
 import { indexOccurrences, occurrenceKey, toOccurrences } from './transformers'
 
 const row = (over: Partial<OccurrenceRow> = {}): OccurrenceRow => ({
@@ -156,5 +156,27 @@ describe('indexOccurrences', () => {
     expect(idx.on('S', '2026-04-08')).toBeUndefined()
     expect(idx.of('S').map(([date]) => date)).toEqual(['2026-04-07', '2026-04-14'])
     expect(idx.of('nobody')).toEqual([])
+  })
+})
+
+describe('patchMoveOccurrences', () => {
+  it('files the days from the cut on under the new half, and leaves the rest', () => {
+    const map = {
+      [occurrenceKey('S', '2026-04-06')]: { cancelled: true },
+      [occurrenceKey('S', '2026-04-07')]: { attendees: ['p1'] },
+      [occurrenceKey('S', '2026-04-14')]: { start: '2026-04-14T18:00' },
+      [occurrenceKey('T', '2026-04-14')]: { cancelled: true },
+    }
+    expect(patchMoveOccurrences(map, 'S', '2026-04-07', 'S2')).toEqual({
+      [occurrenceKey('S', '2026-04-06')]: { cancelled: true },
+      [occurrenceKey('S2', '2026-04-07')]: { attendees: ['p1'] },
+      [occurrenceKey('S2', '2026-04-14')]: { start: '2026-04-14T18:00' },
+      [occurrenceKey('T', '2026-04-14')]: { cancelled: true },
+    })
+  })
+
+  it('does not mistake an event whose id merely starts the same way', () => {
+    const map = { [occurrenceKey('S1', '2026-04-07')]: { cancelled: true } }
+    expect(patchMoveOccurrences(map, 'S', '2026-04-07', 'S2')).toEqual(map)
   })
 })
