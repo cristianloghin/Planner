@@ -1,3 +1,4 @@
+import type { EditScope } from '../domains/events/draft'
 import type { PersonId } from '../types'
 
 /** Times snap to this; a tap on empty space makes an hour-long event. */
@@ -30,15 +31,15 @@ export function newEventAtPath(date: string, minute: number, attendees?: PersonI
 }
 
 /**
- * URL for editing a series. `date` is the day the editor was opened from,
- * so closing can return there; the form itself shows the series.
+ * URL for editing a series, or part of one. `date` is the day the editor was
+ * opened from, so closing can return there; the form itself shows the series.
+ * A narrower `scope` — one occurrence, or one and every one after it — is
+ * about that day, so it needs one.
  */
-export function editEventPath(id: string, date?: string): string {
-  const q = date ? `?${new URLSearchParams({ date })}` : ''
-  return `/event/${encodeURIComponent(id)}${q}`
-}
-
-/** URL for editing one occurrence of a series: just its day, times and people. */
-export function editOccurrencePath(id: string, date: string): string {
-  return `/event/${encodeURIComponent(id)}?${new URLSearchParams({ date, scope: 'occurrence' })}`
+export function editEventPath(id: string, date?: string, scope: EditScope = 'series'): string {
+  const q = new URLSearchParams()
+  if (date) q.set('date', date)
+  if (date && scope !== 'series') q.set('scope', scope)
+  const qs = q.toString()
+  return `/event/${encodeURIComponent(id)}${qs ? `?${qs}` : ''}`
 }

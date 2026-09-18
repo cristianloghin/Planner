@@ -27,7 +27,7 @@ import { layoutBlocks } from '../services/timeline-layout'
 import type { CalendarEvent, PersonId } from '../types'
 import { CalendarView } from '../views/Calendar'
 import { TimelineView } from '../views/Timeline'
-import { editEventPath, editOccurrencePath, newEventAtPath } from './eventPaths'
+import { editEventPath, newEventAtPath } from './eventPaths'
 
 // The Week grid keeps its own zoom level: a comfortable hour height for one
 // day (three lanes) is usually too tall for a seven-day overview.
@@ -226,11 +226,7 @@ export function WeekRoute() {
           date={sheet.date}
           onEdit={(scope) => {
             setSheet(null)
-            navigate(
-              scope === 'occurrence'
-                ? editOccurrencePath(sheet.event.id, sheet.date)
-                : editEventPath(sheet.event.id, sheet.date),
-            )
+            navigate(editEventPath(sheet.event.id, sheet.date, scope))
           }}
           onClose={() => setSheet(null)}
         />

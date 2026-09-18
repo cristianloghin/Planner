@@ -84,18 +84,36 @@ misses every row written before that edit. Match with `dayRange`, insert with
 Two rows can therefore land on the same day. `toCompletions` layers them rather
 than letting the last win.
 
-**A series is edited in place. There is no split.** "All events" rewrites the
-row, cadence and end included. A per-day row for a day the rule no longer
-produces is *inert* — never matched, never rendered — but it is not deleted, so
-if the rule later produces that day again the old row applies. Cancel Tuesday,
-switch weekly→daily, and that Tuesday is still cancelled. This is the accepted
-price of editing in place: an occurrence *is* "the one on this day".
+**"All events" edits a series in place.** It rewrites the row, cadence and end
+included. A per-day row for a day the rule no longer produces is *inert* —
+never matched, never rendered — but it is not deleted, so if the rule later
+produces that day again the old row applies. Cancel Tuesday, switch
+weekly→daily, and that Tuesday is still cancelled. This is the accepted price
+of editing in place: an occurrence *is* "the one on this day".
+
+**"This and following" is a cap, or a cap plus a copy — no RPC.** The two
+halves of a series cut at a day are worked out in `services/recurrence/split.ts`:
+the old half is the same rule with `UNTIL` = the day before (a `COUNT` is
+dropped, the cap says the same thing), the new half is the same rule anchored on
+the cut day with whatever is left of the count. *Deleting* from a day on is the
+cap alone (`endEvent` → `setSeriesRecurrence`). *Editing* from a day on is
+three plain writes (`splitEvent`), in this order: insert the new series from the
+form (fresh id, fresh reminder ids), re-file the old series' `event_occurrence`
+rows from the cut day on under it (`moveOccurrenceRows`, matched by day), then
+cap the old series. The order is chosen for what a failure part-way leaves
+behind: the new half exists before anything depends on it, and the old series
+is still whole until the new one is in place, so a day is drawn twice at worst
+and never lost — the fix is a delete from the cut day on of either half. There
+is no transaction; that is the accepted price of not having a stored
+procedure to keep in step with the app. Neither sheet offers the choice on the
+series' first day, where it would be "all events" with a dead row left behind.
 
 **The database does no recurrence math.** The rrule string is the whole story,
 including how the series ends: `UNTIL` for a date, `COUNT` for a number of
 times, neither for infinite. Both are RFC-5545 and the `rrule` package
 round-trips them. (An older rule "never store a `COUNT`" existed because copying
-a rule on a split would restart the count — that reason died with the split.)
+a rule on a split would restart the count. The split now computes the remaining
+count for the new half — `recurrenceFrom` — so a counted series survives a cut.)
 
 **Recurrence is hand-rolled, deliberately.** `src/services/recurrence/expand.ts`
 computes `startsOn` arithmetically rather than asking `rrule` to expand. This was

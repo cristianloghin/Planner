@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { toISODate } from '../../assets/utils/dates'
 import type { Series } from '../../client/series'
-import { patchRemoveEvent, patchRemoveTemplate, patchSaveEvent, patchSaveTemplate } from './patches'
+import {
+  patchEventRecurrence,
+  patchRemoveEvent,
+  patchRemoveTemplate,
+  patchSaveEvent,
+  patchSaveTemplate,
+  patchSplitEvent,
+} from './patches'
 import { cloneReminders, fromEvent, fromTemplate, toEvent, toTemplate } from './transformers'
 import type { CalendarEvent } from './types'
 
@@ -109,6 +116,24 @@ describe('patches', () => {
   it('removes one, and leaves the list alone for an unknown id', () => {
     expect(patchRemoveEvent([a, b], 'A').map((e) => e.id)).toEqual(['B'])
     expect(patchRemoveEvent([a, b], 'nope').map((e) => e.id)).toEqual(['A', 'B'])
+  })
+
+  it('leaves one event repeating differently, and the others as they were', () => {
+    const capped = { freq: 'weekly', interval: 1, until: '2026-06-21' } as const
+    const next = patchEventRecurrence([a, b], 'A', capped)
+    expect(next[0].recurrence).toEqual(capped)
+    expect(next[1]).toBe(b)
+    expect(patchEventRecurrence([a], 'A', undefined)[0].recurrence).toBeUndefined()
+  })
+
+  it('splits: caps the source and adds the half that takes over', () => {
+    const capped = { freq: 'weekly', interval: 1, until: '2026-06-21' } as const
+    const half = { ...a, id: 'A2', start: '2026-06-22T16:00' }
+    const next = patchSplitEvent([a, b], 'A', capped, half)
+    expect(next.map((e) => e.id)).toEqual(['A', 'B', 'A2'])
+    expect(next[0].recurrence).toEqual(capped)
+    expect(next[1]).toBe(b)
+    expect(next[2]).toBe(half)
   })
 
   it('does the same for blueprints', () => {

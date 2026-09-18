@@ -179,6 +179,24 @@ export async function saveSeries(
 }
 
 /**
+ * Change only how a series repeats — its cadence, and where it ends.
+ *
+ * A narrower write than `saveSeries`: nothing else on the row is touched, so
+ * capping a series while a partner renames it clobbers nothing. Ending a
+ * series from a day on is this with the rule capped the day before.
+ */
+export async function setSeriesRecurrence(
+  id: string,
+  recurrence: Recurrence | undefined,
+): Promise<void> {
+  const { error } = await supabase
+    .from('event_series')
+    .update({ rrule: recurrenceToRRule(recurrence) })
+    .eq('id', id)
+  if (error) throw error
+}
+
+/**
  * Delete a series.
  *
  * The cascade takes its people and attachments with it. Events made from a

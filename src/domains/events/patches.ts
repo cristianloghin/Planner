@@ -5,7 +5,9 @@
  * Pure, so the rules a screen shows instantly can be tested without a database
  * or a cache.
  */
+import type { Recurrence } from '../../client/series'
 import type { PersonId } from '../people/types'
+import { occurrenceKey } from './transformers'
 import type { CalendarEvent, EventTemplate, OccurrenceMap, OccurrenceState } from './types'
 
 /** With an event added or replaced, whichever it turns out to be. */
@@ -17,6 +19,49 @@ export function patchSaveEvent(events: CalendarEvent[], event: CalendarEvent): C
 
 export function patchRemoveEvent(events: CalendarEvent[], id: string): CalendarEvent[] {
   return events.filter((e) => e.id !== id)
+}
+
+/** With one event repeating by `recurrence` instead — how it ends, usually. */
+export function patchEventRecurrence(
+  events: CalendarEvent[],
+  id: string,
+  recurrence: Recurrence | undefined,
+): CalendarEvent[] {
+  return events.map((e) => (e.id === id ? { ...e, recurrence } : e))
+}
+
+/**
+ * With a series cut in two: the one it was, left repeating by `recurrence`
+ * (capped the day before the cut), and `event` — the half that takes over —
+ * added beside it.
+ */
+export function patchSplitEvent(
+  events: CalendarEvent[],
+  id: string,
+  recurrence: Recurrence,
+  event: CalendarEvent,
+): CalendarEvent[] {
+  return patchSaveEvent(patchEventRecurrence(events, id, recurrence), event)
+}
+
+/**
+ * A window of days with every day of one event from `fromDate` on filed
+ * under another — what a split does to the rows on the server, so a day
+ * taken out of the old series stays out of the new one the moment it exists.
+ */
+export function patchMoveOccurrences(
+  occurrences: OccurrenceMap,
+  fromId: string,
+  fromDate: string,
+  toId: string,
+): OccurrenceMap {
+  const prefix = occurrenceKey(fromId, '')
+  const next: OccurrenceMap = {}
+  for (const [key, state] of Object.entries(occurrences)) {
+    const date = key.startsWith(prefix) ? key.slice(prefix.length) : null
+    next[date != null && date >= fromDate ? occurrenceKey(toId, date) : key] = state
+  }
+  return next
 }
 
 /** With a blueprint added or replaced. */

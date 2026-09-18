@@ -19,7 +19,7 @@ import { type TimeBlock, layoutBlocks } from '../services/timeline-layout'
 import type { CalendarEvent, PersonId } from '../types'
 import { CalendarView } from '../views/Calendar'
 import { TimelineView } from '../views/Timeline'
-import { editEventPath, editOccurrencePath, newEventAtPath } from './eventPaths'
+import { editEventPath, newEventAtPath } from './eventPaths'
 
 const ZOOM_KEY = 'planner:hourH'
 
@@ -208,11 +208,7 @@ export function DayRoute() {
           date={sheet.date}
           onEdit={(scope) => {
             setSheet(null)
-            navigate(
-              scope === 'occurrence'
-                ? editOccurrencePath(sheet.event.id, sheet.date)
-                : editEventPath(sheet.event.id, sheet.date),
-            )
+            navigate(editEventPath(sheet.event.id, sheet.date, scope))
           }}
           onClose={() => setSheet(null)}
         />

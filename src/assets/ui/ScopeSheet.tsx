@@ -13,7 +13,7 @@ export interface ScopeChoice {
 
 /**
  * Action sheet for choosing how far an operation on a recurring series reaches:
- * this one occurrence, or the whole series.
+ * this one occurrence, this and everything after it, or the whole series.
  *
  * Both editing and deleting ask the same question, so the chooser lives here
  * rather than inside either surface. `destructive` paints the options with

@@ -14,6 +14,7 @@ import {
   draftValid,
   dtLocal,
   eventFromDraft,
+  splitEventFromDraft,
   templateFromDraft,
 } from '../domains/events/draft'
 import { useEventsWrite, useOccurrencesWrite } from '../domains/events/mutations'
@@ -23,14 +24,17 @@ import { timingOf } from '../domains/events/selectors'
 import { usePeopleWithColors } from '../domains/people/queries'
 import { defaultAttendees, eventColorIn } from '../domains/people/selectors'
 import { effectiveOccurrence } from '../services/recurrence/expand'
+import { recurrenceEndingBefore, recurrenceFrom } from '../services/recurrence/split'
 import { eventDate, eventStartMinutes } from '../services/recurrence/timing'
 import type { CalendarEvent } from '../types'
 import { EditorPageView } from '../views/EditorPage'
 
 /**
  * The editor as a route: `/event/new` seeded from the query, `/event/:id`
- * for an existing series, or with `scope=occurrence` for one occurrence of
- * it — which day, what time, who is on it, and nothing the series owns.
+ * for an existing series, or with a `scope` and a `date` for part of one —
+ * `occurrence` for that one day (which day, what time, who is on it, and
+ * nothing the series owns), `following` for that day and every one after it
+ * (a new series from there on, so everything).
  *
  * The routes load — people, colours, templates, the series, the occurrence
  * window — and hand the form a draft to show. The form only renders; what a
@@ -90,10 +94,14 @@ export function EditEventRoute() {
   const [q] = useQueryState({ date: { type: 'string' }, scope: { type: 'string' } })
   const { date } = q
   const event = events?.find((e) => e.id === id)
-  // One occurrence is only a thing to edit when there is a day and a series
-  // to pick it out of; anything else is the series.
+  // Part of a series is only a thing to edit when there is a day and a series
+  // to pick it out of; anything else is the series. So is "following" on the
+  // series' first day, where nothing would be left before the cut.
+  const asked = q.scope === 'occurrence' || q.scope === 'following' ? q.scope : 'series'
   const scope: EditScope =
-    q.scope === 'occurrence' && date && event?.recurrence ? 'occurrence' : 'series'
+    !date || !event?.recurrence || (asked === 'following' && date === eventDate(event))
+      ? 'series'
+      : asked
   // Opened on an occurrence, the form seeds from that occurrence's override —
   // which lives in the windowed occurrence cache. Normally a warm hit: the
   // view that opened the editor fetched the same window.
@@ -114,16 +122,15 @@ export function EditEventRoute() {
   // The occurrence as it currently stands (override applied), re-anchored on
   // its own date so the form shows the right day and time even for a
   // far-future instance. The series shows as itself, from its own first day.
+  // From a day on, it shows as itself from that day: the series' own time and
+  // people (that day's one-off override stays that day's), with what is left
+  // of its count.
   const seed: CalendarEvent =
     scope === 'occurrence'
-      ? (() => {
-          const eff = effectiveOccurrence(event, date!, occurrences)
-          return {
-            ...eff,
-            start: eff.allDay ? date! : dtLocal(date!, eventStartMinutes(eff)),
-          }
-        })()
-      : event
+      ? anchoredOn(effectiveOccurrence(event, date!, occurrences), date!)
+      : scope === 'following'
+        ? { ...anchoredOn(event, date!), recurrence: recurrenceFrom(event, date!) }
+        : event
 
   return (
     <EditorSession
@@ -136,6 +143,11 @@ export function EditEventRoute() {
       onClose={close}
     />
   )
+}
+
+/** `e` as if its first day were `date`, at its own time of day. */
+function anchoredOn(e: CalendarEvent, date: string): CalendarEvent {
+  return { ...e, start: e.allDay ? date : dtLocal(date, eventStartMinutes(e)) }
 }
 
 /**
@@ -154,7 +166,10 @@ function EditorSession({
   initial: EventDraft
   /** The series being edited; absent for a new event. */
   base?: CalendarEvent
-  /** What a save writes: the series, or one occurrence of it (`occurrenceDate`). */
+  /**
+   * What a save writes: the series, one occurrence of it, or it from one
+   * occurrence on — the last two on `occurrenceDate`.
+   */
   scope?: EditScope
   occurrenceDate?: string
   people: Parameters<typeof EventForm>[0]['people']
@@ -168,6 +183,7 @@ function EditorSession({
 
   const isEdit = !!base
   const isOccurrence = scope === 'occurrence' && !!base && !!occurrenceDate
+  const isFollowing = scope === 'following' && !!base && !!occurrenceDate
 
   function saveSeries(event: Omit<CalendarEvent, 'id'>, isNew: boolean) {
     events.mutate({
@@ -186,10 +202,37 @@ function EditorSession({
   function submit() {
     if (!draftValid(draft)) return
     if (isOccurrence) saveThisOccurrence()
+    else if (isFollowing) saveFollowing()
     else {
       saveSeries(eventFromDraft(draft), !isEdit)
       onClose()
     }
+  }
+
+  /**
+   * This occurrence and every one after it: the series stops the day before,
+   * and the form — a new series with reminders of its own — takes over from
+   * here, along with whatever was already recorded on the days from here on.
+   */
+  function saveFollowing() {
+    const event = { ...splitEventFromDraft(draft), id: uid() }
+    // The form may have moved the new half's first day off the cut day. The
+    // old series stops before whichever comes first, so no day is produced
+    // by both halves: moved earlier, the new half starts there; moved later,
+    // the days in between are gone, which is what "from here on" means.
+    const fromDate = eventDate(event) < occurrenceDate! ? eventDate(event) : occurrenceDate!
+    events.mutate({
+      accountId,
+      userId,
+      change: {
+        kind: 'splitEvent',
+        id: base!.id,
+        recurrence: recurrenceEndingBefore(base!.recurrence!, fromDate),
+        fromDate,
+        event,
+      },
+    })
+    onClose()
   }
 
   /** One occurrence: its day, times and people, as a one-off override of that slot. */
@@ -233,9 +276,16 @@ function EditorSession({
   return (
     <EditorPageView onCancel={onClose} onSubmit={submit} submitLabel="Save">
       {/* One occurrence is headed like the sheet that opened it: the event's
-          name in the body, the bar left plain. */}
+          name in the body, the bar left plain. From a day on, the bar names
+          the day: everything before it stays as it is. */}
       <EditorPageView.Title>
-        {isOccurrence ? null : isEdit ? 'Edit event' : 'New event'}
+        {isOccurrence
+          ? null
+          : isFollowing
+            ? `Edit from ${isoLabel(occurrenceDate!)}`
+            : isEdit
+              ? 'Edit event'
+              : 'New event'}
       </EditorPageView.Title>
       <EditorPageView.Body>
         {isOccurrence && (
@@ -249,7 +299,7 @@ function EditorSession({
           onChange={setDraft}
           isEdit={isEdit}
           scope={scope}
-          seriesStart={base ? eventDate(base) : undefined}
+          seriesStart={isFollowing ? occurrenceDate : base ? eventDate(base) : undefined}
           people={people}
           templates={isEdit ? [] : templates}
           onSaveAsTemplate={saveAsTemplate}

@@ -30,7 +30,7 @@ import type { CalendarEvent, OccurrenceIndex, PersonId } from '../types'
 import { CalendarView } from '../views/Calendar'
 import { DayPeekView } from '../views/DayPeek'
 import { MonthGridView } from '../views/MonthGrid'
-import { editEventPath, editOccurrencePath } from './eventPaths'
+import { editEventPath } from './eventPaths'
 
 /**
  * The Month screen, wired up.
@@ -170,11 +170,7 @@ export function MonthRoute() {
           date={sheet.date}
           onEdit={(scope) => {
             setSheet(null)
-            navigate(
-              scope === 'occurrence'
-                ? editOccurrencePath(sheet.event.id, sheet.date)
-                : editEventPath(sheet.event.id, sheet.date),
-            )
+            navigate(editEventPath(sheet.event.id, sheet.date, scope))
           }}
           onClose={() => setSheet(null)}
         />
