@@ -119,11 +119,7 @@ export function DayRoute() {
   const page = (p: DayPage) => (
     <TimelineView pxPerMin={hourH / 60}>
       {people.map((person) => (
-        <TimelineView.Column
-          key={person.id}
-          nowMin={p.iso === todayISO ? nowMin : undefined}
-          onAddAt={(minute) => addAt(p.iso, person.id, minute)}
-        >
+        <TimelineView.Column key={person.id} onAddAt={(minute) => addAt(p.iso, person.id, minute)}>
           {layoutBlocks(p.timedBlocks.filter((b) => b.occ.attendees.includes(person.id))).map(
             ({ block, col, cols, order }) => (
               <EventBlock
@@ -152,6 +148,7 @@ export function DayRoute() {
         todayActive={dateISO === todayISO}
         zoom={{ hourH, setHourH, key: ZOOM_KEY }}
         initialMinute={dateISO === todayISO ? nowMin : 7 * 60}
+        nowMinute={dateISO === todayISO ? nowMin : undefined}
       >
         <CalendarView.Header.Search>
           <EventSearch onPick={openSearchHit} />

@@ -125,13 +125,15 @@
 }
 
 .grid {
+  --grid-pad: 16px;
+  position: relative;
   flex: 0;
   display: flex;
-  padding-top: 16px;
+  padding-top: var(--grid-pad);
 }
 
 .grid.noTopPadding {
-  padding-top: 0;
+  --grid-pad: 0px;
 }
 
 /* The fixed column beside the pages (a time gutter). Its width is a token so
@@ -157,6 +159,35 @@
   margin-left: -100%;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* ---- The "now" line ---- */
+
+/* From the gutter's edge to the pages' end, over both: a sibling of the clip,
+   not a child, so nothing cuts it. Centred on its minute (`--now-at`, set
+   inline, is measured from the top of the day, below the grid's padding).
+   Later in the DOM than the pages, so it paints over them, and with no
+   z-index of its own it stays under the all-day band. Transparent to the
+   pointer: a tap on the line is a tap on the column beneath. */
+.now {
+  position: absolute;
+  left: var(--gutter-w);
+  right: 0;
+  top: calc(var(--grid-pad) + var(--now-at) - 1px);
+  height: 2px;
+  background: var(--now);
+  pointer-events: none;
+}
+
+/* Centred on the line's left end: half over the gutter, half over the page. */
+.nowDot {
+  position: absolute;
+  left: -4px;
+  top: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--now);
 }
 
 /* ---- Pages ---- */

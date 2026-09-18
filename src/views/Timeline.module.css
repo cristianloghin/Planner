@@ -39,24 +39,3 @@
 .highlight {
   background-color: color-mix(in oklab, var(--accent) 5%, transparent);
 }
-
-.nowLine {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 0;
-  border-top: 2px solid var(--now);
-  /* Above any stack of blocks, however deep. */
-  z-index: 1000;
-  pointer-events: none;
-}
-
-.nowDot {
-  position: absolute;
-  left: -4px;
-  top: -4px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--now);
-}

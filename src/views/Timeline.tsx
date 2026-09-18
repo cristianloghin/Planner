@@ -11,18 +11,16 @@ interface TimelineViewProps {
 const DAY_MIN = 24 * 60
 
 /**
- * One day-long column: hour and quarter-hour lines, an optional "now" line,
- * and a tap on empty space that reports the minute under the finger. What
- * sits on it is the caller's — absolutely positioned children.
+ * One day-long column: hour and quarter-hour lines, and a tap on empty space
+ * that reports the minute under the finger. What sits on it is the caller's —
+ * absolutely positioned children. The "now" line is not a column's: it is the
+ * calendar frame's, drawn over the pages (see `CalendarView`).
  */
 function Column({
-  nowMin,
   highlight,
   onAddAt,
   children,
 }: {
-  /** Minute of the day to draw the "now" line at; unset draws none. */
-  nowMin?: number
   /** Tint the column (today's, in a week). */
   highlight?: boolean
   onAddAt?: (minute: number) => void
@@ -39,11 +37,6 @@ function Column({
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: tap-on-empty-space is a pointer affordance to prefill the editor; the keyboard path is the header's + button
     <div className={cx(styles.column, highlight && styles.highlight)} onClick={handleClick}>
-      {nowMin != null && (
-        <div className={styles.nowLine} style={{ top: `${(nowMin / DAY_MIN) * 100}%` }}>
-          <span className={styles.nowDot} />
-        </div>
-      )}
       {children}
     </div>
   )

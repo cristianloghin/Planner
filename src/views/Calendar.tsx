@@ -18,6 +18,8 @@ interface CalendarViewProps {
   zoom?: SwipeZoom
   /** Minute to scroll to on first mount; unset leaves the scroller at the top. */
   initialMinute?: number
+  /** Minute to draw the "now" line at; unset draws none (the page is not today). */
+  nowMinute?: number
   isMonth?: boolean
 }
 
@@ -130,6 +132,12 @@ function Header({
  * a `MonthGridView` of cells. The lane template is inherited by anything
  * inside. `Footer` sits under the deck, in the same scroller, and does not
  * slide with it: a swipe changes the pages, the footer stays.
+ *
+ * The "now" line is the frame's too, for the same reason the gutter is: it
+ * marks a time on the axis, not a thing on a page. Drawn once over gutter
+ * and pages alike, outside the clip, its dot sits whole on the gutter's edge
+ * and the line runs on across every lane; the pages slide under it, and it
+ * goes when the page that lands is not today.
  */
 export const CalendarView = createLayout(
   {
@@ -154,6 +162,7 @@ export const CalendarView = createLayout(
       gutterLabel,
       zoom,
       initialMinute,
+      nowMinute,
       isMonth = false,
     }: CalendarViewProps,
     { slots },
@@ -168,8 +177,9 @@ export const CalendarView = createLayout(
     // the scroller, so the browser tells us when it changes and nothing
     // reads scroll positions per frame.
     const [scrolled, setScrolled] = useState(false)
+    const pxPerMin = (zoom?.hourH ?? 60) / 60
     // Mirror for scrollToMinute, which mount effects call with a stale closure.
-    const pxPerMinRef = useLatest((zoom?.hourH ?? 60) / 60)
+    const pxPerMinRef = useLatest(pxPerMin)
 
     const { onClickCapture } = useSwipeGestures({
       scrollRef,
@@ -286,6 +296,14 @@ export const CalendarView = createLayout(
                 </div>
               </div>
             </div>
+            {nowMinute != null && (
+              <div
+                className={styles.now}
+                style={{ '--now-at': `${nowMinute * pxPerMin}px` } as CSSProperties}
+              >
+                <span className={styles.nowDot} />
+              </div>
+            )}
           </div>
           {slots.Footer}
         </div>

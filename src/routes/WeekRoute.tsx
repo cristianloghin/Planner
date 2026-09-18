@@ -128,7 +128,6 @@ export function WeekRoute() {
       {days.map(({ dateISO, occs }, dayIdx) => (
         <TimelineView.Column
           key={dateISO}
-          nowMin={dateISO === todayISO ? nowMin : undefined}
           highlight={dateISO === todayISO}
           onAddAt={(minute) => addAt(dateISO, minute)}
         >
@@ -169,6 +168,7 @@ export function WeekRoute() {
         gutterLabel={isoWeekNumber(weekStart).toString()}
         zoom={{ hourH, setHourH, key: ZOOM_KEY }}
         initialMinute={thisWeek ? nowMin : 7 * 60}
+        nowMinute={thisWeek ? nowMin : undefined}
       >
         <CalendarView.Header.Search>
           <EventSearch onPick={openSearchHit} />
