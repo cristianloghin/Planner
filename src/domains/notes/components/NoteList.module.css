@@ -41,11 +41,6 @@
   align-items: flex-start;
   gap: 2px;
   padding: 4px 0;
-  background: none;
-  border: none;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
 }
 
 .info strong {

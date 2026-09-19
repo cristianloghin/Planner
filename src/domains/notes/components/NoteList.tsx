@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react'
+import { Edit, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { ConfirmDialog } from '../../../assets/ui/ConfirmDialog'
 import { IconButton } from '../../../assets/ui/IconButton'
@@ -7,7 +7,9 @@ import styles from './NoteList.module.css'
 
 /**
  * The standalone notes: this user's, then everyone else's, most recently
- * saved first. A row opens its note; the bin asks before `onDelete` is called.
+ * saved first, one row each with a way to open and delete each — the shape
+ * of the template list. Deleting asks first; `onDelete` is only called once
+ * the dialog is confirmed.
  */
 export function NoteList({
   mine,
@@ -28,15 +30,21 @@ export function NoteList({
   const rows = (notes: Note[]) =>
     notes.map((n) => (
       <div className={styles.row} key={n.id}>
-        <button type="button" className={styles.info} onClick={() => onOpen(n.id)}>
+        <div className={styles.info}>
           <strong>{n.title || 'Untitled note'}</strong>
           <span className={styles.meta}>{savedLabel(n.updatedAt)}</span>
-        </button>
+        </div>
         <IconButton
           danger
           onClick={() => setPending(n)}
           label={`Delete note ${n.title || 'Untitled'}`}
           icon={Trash2}
+          small
+        />
+        <IconButton
+          onClick={() => onOpen(n.id)}
+          label={`Edit note ${n.title || 'Untitled'}`}
+          icon={Edit}
           small
         />
       </div>
