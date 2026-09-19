@@ -1,0 +1,10 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.row input {
+  flex: 1;
+  min-width: 0;
+}

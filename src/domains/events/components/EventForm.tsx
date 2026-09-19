@@ -114,6 +114,16 @@ export function EventForm({
     <>
       {seriesOnly && (
         <div className={s.row}>
+          {/* The colour sits with the name, as a person's does in Settings:
+              a swatch that opens the palette. Shown in the lane's colour
+              until one is picked. */}
+          <ColorPicker
+            options={COLOR_OPTIONS}
+            value={draft.colorKey ?? null}
+            defaultValue={firstColor}
+            ariaLabel="Event color"
+            onChange={(colorKey) => set({ colorKey })}
+          />
           <input
             ref={titleRef}
             placeholder="What's the plan?"
@@ -262,15 +272,6 @@ export function EventForm({
 
       {seriesOnly && (
         <>
-          <label className={shared.label}>Color</label>
-          <ColorPicker
-            options={COLOR_OPTIONS}
-            value={draft.colorKey ?? null}
-            defaultValue={firstColor}
-            ariaLabel="Event color"
-            onChange={(colorKey) => set({ colorKey })}
-          />
-
           <RemindersEditor
             reminders={draft.reminders}
             onChange={(reminders) => set({ reminders })}

@@ -5,6 +5,7 @@ import { ColorPicker } from '../../../assets/ui/ColorPicker'
 import { NumberField } from '../../../assets/ui/NumberField'
 import { SNAP, type TemplateDraft } from '../draft'
 import { RemindersEditor } from './RemindersEditor'
+import styles from './TemplateForm.module.css'
 
 /**
  * The template form's fields: what a new event made from it inherits. A
@@ -28,12 +29,21 @@ export function TemplateForm({
 
   return (
     <>
-      <input
-        ref={titleRef}
-        placeholder="Template name"
-        value={draft.title}
-        onChange={(e) => set({ title: e.target.value })}
-      />
+      <div className={styles.row}>
+        {/* The colour sits with the name, as a person's does in Settings. */}
+        <ColorPicker
+          options={COLOR_OPTIONS}
+          value={draft.colorKey}
+          ariaLabel="Template color"
+          onChange={(colorKey) => set({ colorKey })}
+        />
+        <input
+          ref={titleRef}
+          placeholder="Template name"
+          value={draft.title}
+          onChange={(e) => set({ title: e.target.value })}
+        />
+      </div>
 
       <label className={shared.toggle}>
         <input
@@ -69,14 +79,6 @@ export function TemplateForm({
           </label>
         </div>
       )}
-
-      <label className={shared.label}>Color</label>
-      <ColorPicker
-        options={COLOR_OPTIONS}
-        value={draft.colorKey}
-        ariaLabel="Template color"
-        onChange={(colorKey) => set({ colorKey })}
-      />
 
       <RemindersEditor reminders={draft.reminders} onChange={(reminders) => set({ reminders })} />
 
