@@ -329,16 +329,14 @@ identical to the safe ones.
 `grep VITE_SUPABASE_URL .env.local` is the whole check for which backend the app
 is pointed at. There is no staging project and the app has no undo.
 
-> ⚠️ **Migration `0022` has not been applied to production.** It drops 17
-> tables, 10 columns and 4 functions, adds 4 columns, renames 1, and rebuilds 3
-> function bodies. It is irreversible and there is no staging project. It should
-> go deliberately, with `--dry-run` first — not as a side effect of other work.
+> Migrations `0022` through `0025` are applied to production (checked with
+> `supabase migration list --linked`, 2026-09-19). `0022` was the irreversible
+> strip-down; the note below on how it was tested stays for the record.
 >
-> Migration `0024` (the `split_series` function, additive and harmless on its
-> own) has to exist before a build that carries "this and following" is
-> served: the app calls the function by name and gets a 404 until it does.
-> `deploy.yml` runs `supabase db push` before the build for exactly this
-> reason, so a merge to `main` handles it; a manual deploy must keep that order.
+> A migration that adds a function the app calls by name (`0024`, `0026`) has
+> to exist before a build that calls it is served. `deploy.yml` runs
+> `supabase db push` before the build for exactly this reason, so a merge to
+> `main` handles it; a manual deploy must keep that order.
 >
 > One statement in it needs care: the copy from `event_person` into
 > `event_series.attendees`. `db reset` does **not** exercise it, because the seed

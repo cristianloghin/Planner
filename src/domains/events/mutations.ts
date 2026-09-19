@@ -62,6 +62,12 @@ export type EventsChange =
       fromDate: string
       /** The new half, with an id of its own. */
       event: CalendarEvent
+      /**
+       * The id the new half's copy of the series' note gets, so the note
+       * write that follows this one can name it. Minted whether or not the
+       * series has a note; unused when it has none.
+       */
+      noteId: string
     }
   | { kind: 'saveTemplate'; template: EventTemplate; isNew: boolean }
   | { kind: 'removeTemplate'; id: string }
@@ -143,7 +149,7 @@ export function registerEventsDefaults(queryClient: QueryClient): void {
         case 'splitEvent':
           // One transaction on the server: the copy, the hand-over of the
           // days from the cut on, and the cap land together or not at all.
-          return splitSeries(w.id, w.recurrence, w.fromDate, fromEvent(w.event), userId)
+          return splitSeries(w.id, w.recurrence, w.fromDate, fromEvent(w.event), userId, w.noteId)
         case 'saveTemplate':
           return saveSeries(accountId, userId, fromTemplate(w.template), {
             isNew: w.isNew,

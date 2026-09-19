@@ -1,10 +1,12 @@
+import { NoteProvider } from '@mikrostack/notes'
 import { notFound, useLocation, useNavigation, useParams, useQueryState } from '@mikrostack/router'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAccount } from '../account'
 import shared from '../assets/styles/shared.module.css'
 import { PageLoader } from '../assets/ui/Spinner'
 import { isoLabel, toISODate } from '../assets/utils/dates'
 import { uid } from '../assets/utils/id'
+import { emptyBody } from '../client/notes'
 import { EventForm } from '../domains/events/components/EventForm'
 import {
   type EditScope,
@@ -21,13 +23,25 @@ import { useEventsWrite, useOccurrencesWrite } from '../domains/events/mutations
 import { rosterChange } from '../domains/events/patches'
 import { useEvents, useOccurrencesForRange, useTemplates } from '../domains/events/queries'
 import { timingOf } from '../domains/events/selectors'
+import { NoteEditor } from '../domains/notes/components/NoteEditor'
+import { NoteToolbar } from '../domains/notes/components/NoteToolbar'
+import { useNotesWrite } from '../domains/notes/mutations'
+import { useNotes } from '../domains/notes/queries'
+import { noteForSeries } from '../domains/notes/selectors'
+import type { Note } from '../domains/notes/types'
 import { usePeopleWithColors } from '../domains/people/queries'
 import { defaultAttendees, eventColorIn } from '../domains/people/selectors'
+import { isBlankBody } from '../services/notes/session'
+import { useNoteSession } from '../services/notes/useNoteSession'
 import { effectiveOccurrence, startsOn } from '../services/recurrence/expand'
 import { recurrenceEndingBefore, recurrenceFrom, splitDate } from '../services/recurrence/split'
 import { eventDate, eventStartMinutes } from '../services/recurrence/timing'
 import type { CalendarEvent } from '../types'
 import { EditorPageView } from '../views/EditorPage'
+import { KeyboardDockView } from '../views/KeyboardDock'
+
+/** What a note editor opens on when the series has no note: held once, so it never reseeds. */
+const EMPTY_BODY = emptyBody()
 
 /**
  * The editor as a route: `/event/new` seeded from the query, `/event/:id`
@@ -184,24 +198,71 @@ function EditorSession({
   const { data: templates = [] } = useTemplates(accountId)
   const events = useEventsWrite()
   const occurrences = useOccurrencesWrite()
+  const notes = useNotesWrite()
   const [draft, setDraft] = useState(initial)
 
   const isEdit = !!base
   const isOccurrence = scope === 'occurrence' && !!base && !!occurrenceDate
   const isFollowing = scope === 'following' && !!base && !!occurrenceDate
 
-  function saveSeries(event: Omit<CalendarEvent, 'id'>, isNew: boolean) {
-    events.mutate({
+  // The series' note, edited alongside the rest of the event. A new event
+  // starts from the note of the template it was just filled from, if that
+  // template has one, and starts over whenever the pick changes. Ticks are
+  // not offered: what is done is a fact about one day, and the days come
+  // later (NOTE_MODEL Decision 10).
+  const seriesNoteSelect = useMemo(() => noteForSeries(base?.id), [base?.id])
+  const { data: seriesNote } = useNotes(accountId, seriesNoteSelect)
+  const [templateId, setTemplateId] = useState<string | null>(null)
+  const templateNoteSelect = useMemo(() => noteForSeries(templateId), [templateId])
+  const { data: templateNote } = useNotes(accountId, templateNoteSelect)
+  const seedNote = templateId ? templateNote : seriesNote
+  const note = useNoteSession({
+    title: '',
+    body: seedNote?.body ?? EMPTY_BODY,
+    // A series note keeps its removed rows: a day's own state may still
+    // point at them (NOTE_MODEL Decision 6).
+    deletes: 'tombstone',
+    seedKey: templateId ?? 'own',
+  })
+
+  /**
+   * The note as edited, saved as `ownerSeriesId`'s: an update when the series
+   * has a note (`existing`), a new row when it has none. Nothing is written
+   * when there is nothing to say — an untouched existing note, or a new one
+   * left blank. A note on an event is optional.
+   */
+  function saveNoteFor(ownerSeriesId: string, existing: Note | undefined, id = uid()) {
+    const { body } = note.draft()
+    if (existing ? !note.changed : isBlankBody(body)) return
+    notes.mutate({
       accountId,
       userId,
       change: {
-        kind: 'saveEvent',
-        // A new event's id is minted here, so a second edit before the first
-        // write lands still names a real row.
-        event: { ...event, id: isNew ? uid() : base!.id },
-        isNew,
+        kind: 'saveNote',
+        isNew: !existing,
+        note: {
+          id: existing?.id ?? id,
+          title: '',
+          body,
+          ownerSeriesId,
+          authorId: existing?.authorId ?? userId,
+          updatedAt: new Date().toISOString(),
+        },
       },
     })
+  }
+
+  function saveSeries(event: Omit<CalendarEvent, 'id'>, isNew: boolean) {
+    // A new event's id is minted here, so a second edit before the first
+    // write lands still names a real row — and so its note can name it.
+    const id = isNew ? uid() : base!.id
+    events.mutate({
+      accountId,
+      userId,
+      change: { kind: 'saveEvent', event: { ...event, id }, isNew },
+    })
+    // Second in the app's ordered write queue, so the series exists first.
+    saveNoteFor(id, seriesNote)
   }
 
   function submit() {
@@ -223,6 +284,9 @@ function EditorSession({
     const event = { ...splitEventFromDraft(draft), id: uid() }
     // The form may have moved the new half's first day off the cut day.
     const fromDate = splitDate(occurrenceDate!, eventDate(event))
+    // The split copies the series' note to the new half under this id, so
+    // the edits made here can then be written to the copy.
+    const noteId = uid()
     events.mutate({
       accountId,
       userId,
@@ -232,8 +296,10 @@ function EditorSession({
         recurrence: recurrenceEndingBefore(base!.recurrence!, fromDate),
         fromDate,
         event,
+        noteId,
       },
     })
+    saveNoteFor(event.id, seriesNote && { ...seriesNote, id: noteId }, noteId)
     onClose()
   }
 
@@ -264,49 +330,82 @@ function EditorSession({
   function saveAsTemplate() {
     if (!draft.title.trim()) return
     const lane = people.find((p) => p.person.id === draft.attendees[0])?.color
+    const id = uid()
     events.mutate({
       accountId,
       userId,
       change: {
         kind: 'saveTemplate',
         isNew: true,
-        template: { ...templateFromDraft(draft, eventColorIn(lane, draft.colorKey)), id: uid() },
+        template: { ...templateFromDraft(draft, eventColorIn(lane, draft.colorKey)), id },
       },
     })
+    // The note as it stands in the form goes with it, as a note of the
+    // template's own — a template that carries its checklist is the point.
+    const { body } = note.draft()
+    if (!isBlankBody(body)) {
+      notes.mutate({
+        accountId,
+        userId,
+        change: {
+          kind: 'saveNote',
+          isNew: true,
+          note: {
+            id: uid(),
+            title: '',
+            body,
+            ownerSeriesId: id,
+            authorId: userId,
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      })
+    }
   }
 
   return (
-    <EditorPageView onCancel={onClose} onSubmit={submit} submitLabel="Save">
-      {/* One occurrence is headed like the sheet that opened it: the event's
+    <NoteProvider store={note.store}>
+      <EditorPageView onCancel={onClose} onSubmit={submit} submitLabel="Save">
+        {/* One occurrence is headed like the sheet that opened it: the event's
           name in the body, the bar left plain. From a day on, the bar names
           the day: everything before it stays as it is. */}
-      <EditorPageView.Title>
-        {isOccurrence
-          ? null
-          : isFollowing
-            ? `Edit from ${isoLabel(occurrenceDate!)}`
-            : isEdit
-              ? 'Edit event'
-              : 'New event'}
-      </EditorPageView.Title>
-      <EditorPageView.Body>
-        {isOccurrence && (
-          <>
-            <h1 className={shared.editorTitle}>{base!.title}</h1>
-            <p className={shared.editorMeta}>Only on {isoLabel(occurrenceDate!)}</p>
-          </>
-        )}
-        <EventForm
-          draft={draft}
-          onChange={setDraft}
-          isEdit={isEdit}
-          scope={scope}
-          seriesStart={isFollowing ? occurrenceDate : base ? eventDate(base) : undefined}
-          people={people}
-          templates={isEdit ? [] : templates}
-          onSaveAsTemplate={saveAsTemplate}
-        />
-      </EditorPageView.Body>
-    </EditorPageView>
+        <EditorPageView.Title>
+          {isOccurrence
+            ? null
+            : isFollowing
+              ? `Edit from ${isoLabel(occurrenceDate!)}`
+              : isEdit
+                ? 'Edit event'
+                : 'New event'}
+        </EditorPageView.Title>
+        <EditorPageView.Body>
+          {isOccurrence && (
+            <>
+              <h1 className={shared.editorTitle}>{base!.title}</h1>
+              <p className={shared.editorMeta}>Only on {isoLabel(occurrenceDate!)}</p>
+            </>
+          )}
+          <EventForm
+            draft={draft}
+            onChange={setDraft}
+            isEdit={isEdit}
+            scope={scope}
+            seriesStart={isFollowing ? occurrenceDate : base ? eventDate(base) : undefined}
+            people={people}
+            templates={isEdit ? [] : templates}
+            onSaveAsTemplate={saveAsTemplate}
+            onPickTemplate={(t) => setTemplateId(t?.id ?? null)}
+            note={isOccurrence ? undefined : <NoteEditor ticks={false} />}
+          />
+        </EditorPageView.Body>
+      </EditorPageView>
+      {!isOccurrence && (
+        <KeyboardDockView>
+          <KeyboardDockView.Bar>
+            <NoteToolbar />
+          </KeyboardDockView.Bar>
+        </KeyboardDockView>
+      )}
+    </NoteProvider>
   )
 }

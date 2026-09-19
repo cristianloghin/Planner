@@ -1,5 +1,6 @@
+import { parseDoc } from '@mikrostack/notes'
 import { Edit, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAccount } from '../account'
 import shared from '../assets/styles/shared.module.css'
 import { ConfirmDialog } from '../assets/ui/ConfirmDialog'
@@ -11,6 +12,9 @@ import type { EditScope } from '../domains/events/draft'
 import { type EventsChange, useEventsWrite, useOccurrencesWrite } from '../domains/events/mutations'
 import { useOccurrencesForRange } from '../domains/events/queries'
 import { reminderOffsets, timingOf } from '../domains/events/selectors'
+import { NoteView } from '../domains/notes/components/NoteView'
+import { useNotes } from '../domains/notes/queries'
+import { noteForSeries } from '../domains/notes/selectors'
 import { AttendeeChips } from '../domains/people/components/AttendeeChips'
 import { usePeopleWithColors } from '../domains/people/queries'
 import { attendeeLabelFor } from '../domains/people/selectors'
@@ -53,6 +57,9 @@ export function OccurrenceSheet({
     })
   const { occurrences, isLoading } = useOccurrencesForRange(accountId, date, date)
   const occurrencesWrite = useOccurrencesWrite()
+  // The series' note, shown as it is. Ticking comes with per-day notes.
+  const noteSelect = useMemo(() => noteForSeries(event.id), [event.id])
+  const { data: note } = useNotes(accountId, noteSelect)
 
   // Delete asks two different questions. A one-off just needs confirming; a
   // series needs to know how far the delete reaches, and that action sheet is
@@ -253,6 +260,13 @@ export function OccurrenceSheet({
                 </span>
               ))}
             </div>
+          )}
+
+          {note && (
+            <>
+              <label className={shared.label}>Note</label>
+              <NoteView rows={parseDoc(note.body)} />
+            </>
           )}
         </EditorPageView.Body>
       </EditorPageView>

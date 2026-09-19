@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { type ReactNode, useEffect, useRef } from 'react'
 import { COLOR_OPTIONS } from '../../../assets/palette'
 import shared from '../../../assets/styles/shared.module.css'
 import { ColorPicker } from '../../../assets/ui/ColorPicker'
@@ -15,9 +15,12 @@ import { RemindersEditor } from './RemindersEditor'
 export function TemplateForm({
   draft,
   onChange,
+  note,
 }: {
   draft: TemplateDraft
   onChange: (next: TemplateDraft) => void
+  /** The template's note editor, when the route has one to show. */
+  note?: ReactNode
 }) {
   const set = (patch: Partial<TemplateDraft>) => onChange({ ...draft, ...patch })
   const titleRef = useRef<HTMLInputElement>(null)
@@ -76,6 +79,13 @@ export function TemplateForm({
       />
 
       <RemindersEditor reminders={draft.reminders} onChange={(reminders) => set({ reminders })} />
+
+      {note && (
+        <>
+          <label className={shared.label}>Note</label>
+          {note}
+        </>
+      )}
     </>
   )
 }

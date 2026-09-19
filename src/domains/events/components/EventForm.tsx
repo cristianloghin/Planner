@@ -1,4 +1,4 @@
-import { type ChangeEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { type ChangeEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 
 import { COLOR_OPTIONS, type ColorKey, DEFAULT_COLOR } from '../../../assets/palette'
 import shared from '../../../assets/styles/shared.module.css'
@@ -53,6 +53,8 @@ export function EventForm({
   people,
   templates,
   onSaveAsTemplate,
+  onPickTemplate,
+  note,
 }: {
   draft: EventDraft
   onChange: (next: EventDraft) => void
@@ -66,6 +68,10 @@ export function EventForm({
   people: { person: Person; color: ColorKey }[]
   templates: EventTemplate[]
   onSaveAsTemplate: () => void
+  /** Which template the draft was just filled from, or null when cleared. */
+  onPickTemplate?: (template: EventTemplate | null) => void
+  /** The series' note editor, when the route has one to show. */
+  note?: ReactNode
 }) {
   const set = (patch: Partial<EventDraft>) => onChange({ ...draft, ...patch })
 
@@ -98,9 +104,10 @@ export function EventForm({
     (t: EventTemplate) => {
       setTemplateId(t ? t.id : null)
       if (t) onChange(applyTemplate(draft, t))
+      onPickTemplate?.(t ?? null)
       setShowTemplates(false)
     },
-    [draft, onChange],
+    [draft, onChange, onPickTemplate],
   )
 
   return (
@@ -279,6 +286,13 @@ export function EventForm({
               {savedTemplate ? 'Saved to templates ✓' : 'Save as template'}
             </button>
           </div>
+
+          {note && (
+            <>
+              <label className={shared.label}>Note</label>
+              {note}
+            </>
+          )}
         </>
       )}
     </>

@@ -15,6 +15,7 @@ import {
   type SerializeOptions,
   actionToPatch,
   mergeDoc,
+  parseDoc,
 } from '@mikrostack/notes'
 import type { NoteBody } from '../../client/notes'
 
@@ -63,4 +64,13 @@ export function recordEdit(
 /** Record a title edit. */
 export function recordTitle(unsaved: Unsaved, title: string): Unsaved {
   return { ...unsaved, title }
+}
+
+/**
+ * Whether a document says nothing: no rows, or only rows with no text. A
+ * note on an event is optional, so an editor left blank creates no note.
+ * Read through the library's rows, never the document's keys.
+ */
+export function isBlankBody(body: NoteBody): boolean {
+  return parseDoc(body).every((row) => row.text.trim() === '')
 }

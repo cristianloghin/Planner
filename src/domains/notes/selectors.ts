@@ -12,6 +12,15 @@ export function standaloneNotes(notes: Note[]): Note[] {
   return notes.filter((n) => n.ownerSeriesId === null)
 }
 
+/**
+ * The note a series owns, or undefined when it has none. A series has at
+ * most one; an absent id (no series yet) finds nothing.
+ */
+export function noteForSeries(seriesId: string | null | undefined) {
+  return (notes: Note[]): Note | undefined =>
+    seriesId ? notes.find((n) => n.ownerSeriesId === seriesId) : undefined
+}
+
 /** One note, or undefined if the account has no such note. */
 export function noteFor(id: string) {
   return (notes: Note[]): Note | undefined => notes.find((n) => n.id === id)
