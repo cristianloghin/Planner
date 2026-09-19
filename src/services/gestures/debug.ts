@@ -1,16 +1,33 @@
 /**
- * TEMPORARY dev-only instrumentation for the iOS "scroller stops scrolling"
- * bug. Draws an overlay above the tab bar with the scroller's live state and
- * one summary line per touch gesture, as the browser saw it *after* every
+ * A readout for the "scroller stops scrolling on iPhone" bug, switched on from
+ * Settings. Draws an overlay above the tab bar with the scroller's live state
+ * and one summary line per touch gesture, as the browser saw it *after* every
  * handler ran. A vertical gesture that produced no scroll while the scroller
- * had room to move is counted as LOST. Not for commit.
+ * had room to move is counted as LOST. The "kick" button scrolls from code, to
+ * tell a scroller that ignores touches from one that cannot scroll at all.
  */
+
+/** localStorage key the switch persists under. */
+export const GESTURE_DEBUG_KEY = 'planner:debugGestures'
+
+export function isGestureDebugOn(): boolean {
+  return typeof localStorage !== 'undefined' && localStorage.getItem(GESTURE_DEBUG_KEY) === '1'
+}
+
+export function setGestureDebug(on: boolean): void {
+  if (on) localStorage.setItem(GESTURE_DEBUG_KEY, '1')
+  else localStorage.removeItem(GESTURE_DEBUG_KEY)
+}
+
+// The tally outlives the calendar view, which remounts on every route change.
+const persisted = { log: [] as string[], gesture: 0, lost: 0, mounts: 0 }
+
 export function attachGestureDebug(
   el: HTMLElement,
   strip: HTMLElement,
   getMode: () => string,
 ): () => void {
-  if (!import.meta.env.DEV) return () => {}
+  if (!isGestureDebugOn()) return () => {}
 
   const box = document.createElement('pre')
   box.style.cssText =
@@ -24,10 +41,11 @@ export function attachGestureDebug(
     'font:11px monospace;padding:4px 8px'
   document.body.append(box, kick)
 
-  const log: string[] = []
+  const log = persisted.log
   let scrolls = 0
-  let gesture = 0
-  let lost = 0
+  let gesture = persisted.gesture
+  let lost = persisted.lost
+  persisted.mounts++
   const push = (s: string) => {
     log.push(s)
     if (log.length > 12) log.shift()
@@ -37,7 +55,7 @@ export function attachGestureDebug(
     const cs = getComputedStyle(document.body)
     const vv = window.visualViewport
     box.textContent = [
-      `mode=${getMode()} top=${el.scrollTop} sh=${el.scrollHeight} ch=${el.clientHeight} scrolls=${scrolls} LOST=${lost}`,
+      `mode=${getMode()} top=${el.scrollTop} sh=${el.scrollHeight} ch=${el.clientHeight} scrolls=${scrolls} LOST=${lost} mounts=${persisted.mounts}`,
       `winY=${window.scrollY} vv.scale=${vv?.scale} vv.top=${vv?.offsetTop} vv.h=${vv?.height} inner=${innerHeight}`,
       `body.pe=${cs.pointerEvents} body.ov=${cs.overflow} el.ta=${getComputedStyle(el).touchAction}`,
       `strip.tf=${strip.style.transform || '-'}|${strip.style.transition || '-'} el.top=${Math.round(el.getBoundingClientRect().top)}`,
@@ -100,6 +118,8 @@ export function attachGestureDebug(
     const hadRoom = dy > 0 ? g.top0 > 0 : g.top0 < maxTop - 1
     const isLost = vertical && g.maxTouches === 1 && dScroll === 0 && hadRoom
     if (isLost) lost++
+    persisted.gesture = gesture
+    persisted.lost = lost
     push(
       `#${gesture} ${e.type} dx=${dx} dy=${dy} n=${g.maxTouches} mv=${g.moves} prev=${g.prevented} ` +
         `nc=${g.nonCancelable} m=${getMode()} tf0=${g.tf0} top ${g.top0}->${el.scrollTop} ` +

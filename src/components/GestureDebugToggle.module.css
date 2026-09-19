@@ -1,0 +1,16 @@
+.GestureDebugToggle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 420px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.hint {
+  color: var(--muted);
+  font-size: var(--fs-md);
+  margin: 0;
+}

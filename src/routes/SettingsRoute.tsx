@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAccount } from '../account'
+import { GestureDebugToggle } from '../components/GestureDebugToggle'
 import { AccountPanel } from '../domains/auth/components/AccountPanel'
 import { useSignOut, useUpdatePassword } from '../domains/auth/mutations'
 import { PeopleSettings } from '../domains/people/components/PeopleSettings'
@@ -8,6 +9,7 @@ import { withPersonColor, withoutPersonColor } from '../domains/people/patches'
 import { usePeopleWithColors, usePreferences } from '../domains/people/queries'
 import { NotificationToggle, type PushStatus } from '../domains/push/components/NotificationToggle'
 import { useForgetDevice, useRegisterDevice } from '../domains/push/mutations'
+import { isGestureDebugOn, setGestureDebug } from '../services/gestures/debug'
 import {
   currentSubscription,
   notificationPermission,
@@ -32,6 +34,8 @@ export function SettingsRoute() {
   const prefsWrite = usePreferencesWrite()
   const signOut = useSignOut()
   const updatePassword = useUpdatePassword()
+  // A per-device switch, so it lives in this device's storage, not in prefs.
+  const [gestureDebug, setGestureDebugState] = useState(isGestureDebugOn)
 
   // Settings save as one document, so a change is the current document with
   // that one thing changed. Nothing to save against until the first read lands.
@@ -61,6 +65,13 @@ export function SettingsRoute() {
           onResetColor={(id) => prefs && savePrefs(withoutPersonColor(prefs, id))}
         />
         {pushConfigured && <DeviceNotifications userId={userId} />}
+        <GestureDebugToggle
+          on={gestureDebug}
+          onToggle={(on) => {
+            setGestureDebug(on)
+            setGestureDebugState(on)
+          }}
+        />
         <AccountPanel
           email={email}
           onChangePassword={async (password) => {
