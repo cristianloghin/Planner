@@ -44,7 +44,7 @@ export function ConfirmDialog({
               <Button label={cancelLabel}>{cancelLabel}</Button>
             </AlertDialog.Cancel>
             <AlertDialog.Action asChild>
-              <Button danger onClick={onConfirm} label={confirmLabel}>
+              <Button danger={destructive} onClick={onConfirm} label={confirmLabel}>
                 {confirmLabel}
               </Button>
             </AlertDialog.Action>
