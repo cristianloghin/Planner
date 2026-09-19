@@ -20,7 +20,7 @@ export function TemplateForm({
 }: {
   draft: TemplateDraft
   onChange: (next: TemplateDraft) => void
-  /** The template's note editor, when the route has one to show. */
+  /** The template's note section, when the route has one to show. */
   note?: ReactNode
 }) {
   const set = (patch: Partial<TemplateDraft>) => onChange({ ...draft, ...patch })
@@ -82,12 +82,7 @@ export function TemplateForm({
 
       <RemindersEditor reminders={draft.reminders} onChange={(reminders) => set({ reminders })} />
 
-      {note && (
-        <>
-          <label className={shared.label}>Note</label>
-          {note}
-        </>
-      )}
+      {note}
     </>
   )
 }

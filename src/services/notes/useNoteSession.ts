@@ -39,17 +39,22 @@ export function useNoteSession({
 
   // Reseed on demand: the store takes the new rows as an external update,
   // and the session forgets what was edited before.
+  const reseed = useCallback(
+    (next: { title: string; body: NoteBody }) => {
+      setOpened(next)
+      setUnsaved(NOTHING_UNSAVED)
+      store.applyExternal(parseDoc(next.body))
+    },
+    [store],
+  )
   const latest = useRef({ title, body })
   latest.current = { title, body }
   const seededFrom = useRef(seedKey)
   useEffect(() => {
     if (seededFrom.current === seedKey) return
     seededFrom.current = seedKey
-    const next = latest.current
-    setOpened(next)
-    setUnsaved(NOTHING_UNSAVED)
-    store.applyExternal(parseDoc(next.body))
-  }, [seedKey, store])
+    reseed(latest.current)
+  }, [seedKey, reseed])
 
   // Edits out: every change the editor reports becomes a patch.
   useEffect(
@@ -64,6 +69,8 @@ export function useNoteSession({
 
   return {
     store,
+    /** Start over from another note, forgetting the edits made so far. */
+    reseed,
     title: unsaved.title ?? opened.title,
     setTitle,
     changed: hasChanges(unsaved, opened.title),

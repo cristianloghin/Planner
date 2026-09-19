@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react'
 import { useAccount } from '../account'
 import { PageLoader } from '../assets/ui/Spinner'
 import { uid } from '../assets/utils/id'
-import { emptyBody } from '../client/notes'
 import { TemplateForm } from '../domains/events/components/TemplateForm'
 import {
   type TemplateDraft,
@@ -16,18 +15,15 @@ import {
 } from '../domains/events/draft'
 import { useEventsWrite } from '../domains/events/mutations'
 import { useTemplates } from '../domains/events/queries'
-import { NoteEditor } from '../domains/notes/components/NoteEditor'
+import { NoteSection } from '../domains/notes/components/NoteSection'
 import { NoteToolbar } from '../domains/notes/components/NoteToolbar'
 import { useNotesWrite } from '../domains/notes/mutations'
 import { useNotes } from '../domains/notes/queries'
 import { noteForSeries } from '../domains/notes/selectors'
 import { isBlankBody } from '../services/notes/session'
-import { useNoteSession } from '../services/notes/useNoteSession'
+import { useOptionalNote } from '../services/notes/useOptionalNote'
 import { EditorPageView } from '../views/EditorPage'
 import { KeyboardDockView } from '../views/KeyboardDock'
-
-/** What a note editor opens on when the template has no note: held once, so it never reseeds. */
-const EMPTY_BODY = emptyBody()
 
 /**
  * The template editor as a route: `/library/templates/new` and
@@ -86,15 +82,12 @@ function TemplateSession({
   const notes = useNotesWrite()
   const [draft, setDraft] = useState(initial)
 
-  // The template's note, edited under its fields. Ticks are not offered: a
-  // template's note is content, never state (NOTE_MODEL Decision 10).
+  // The template's note, if it has one, edited under its fields. Ticks are
+  // not offered: a template's note is content, never state (NOTE_MODEL
+  // Decision 10).
   const noteSelect = useMemo(() => noteForSeries(id), [id])
   const { data: existingNote } = useNotes(accountId, noteSelect)
-  const note = useNoteSession({
-    title: '',
-    body: existingNote?.body ?? EMPTY_BODY,
-    deletes: 'tombstone',
-  })
+  const note = useOptionalNote({ body: existingNote?.body, deletes: 'tombstone' })
 
   function submit() {
     if (!templateDraftValid(draft) || !changed) return
@@ -113,9 +106,14 @@ function TemplateSession({
       })
     }
     // Second in the app's ordered write queue, so the template exists first.
-    // Nothing is written for a note left blank: a note is optional.
+    // A note the form no longer has is removed; a new one left blank is not
+    // written at all.
     const { body } = note.draft()
-    if (existingNote ? note.changed : !isBlankBody(body)) {
+    if (!note.present) {
+      if (existingNote) {
+        notes.mutate({ accountId, userId, change: { kind: 'removeNote', id: existingNote.id } })
+      }
+    } else if (existingNote ? note.changed : !isBlankBody(body)) {
       notes.mutate({
         accountId,
         userId,
@@ -137,8 +135,10 @@ function TemplateSession({
   }
 
   // Something to save: the template differs from what was opened, or its
-  // note does.
-  const changed = templateDraftChanged(draft, initial) || note.changed
+  // note does — added, removed, or edited.
+  const noteChanged =
+    note.present !== (existingNote !== undefined) || (note.present && note.changed)
+  const changed = templateDraftChanged(draft, initial) || noteChanged
 
   return (
     <NoteProvider store={note.store}>
@@ -152,14 +152,27 @@ function TemplateSession({
       >
         <EditorPageView.Title>{id ? 'Edit template' : 'New template'}</EditorPageView.Title>
         <EditorPageView.Body>
-          <TemplateForm draft={draft} onChange={setDraft} note={<NoteEditor ticks={false} />} />
+          <TemplateForm
+            draft={draft}
+            onChange={setDraft}
+            note={
+              <NoteSection
+                present={note.present}
+                onAdd={note.add}
+                onRemove={note.remove}
+                ticks={false}
+              />
+            }
+          />
         </EditorPageView.Body>
       </EditorPageView>
-      <KeyboardDockView>
-        <KeyboardDockView.Bar>
-          <NoteToolbar />
-        </KeyboardDockView.Bar>
-      </KeyboardDockView>
+      {note.present && (
+        <KeyboardDockView>
+          <KeyboardDockView.Bar>
+            <NoteToolbar />
+          </KeyboardDockView.Bar>
+        </KeyboardDockView>
+      )}
     </NoteProvider>
   )
 }
