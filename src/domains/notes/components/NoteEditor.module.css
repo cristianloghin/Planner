@@ -1,0 +1,76 @@
+.NoteEditor {
+  display: flex;
+  flex-direction: column;
+  /* Room for the toolbar docked over the bottom of the page. */
+  padding-bottom: 72px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  align-items: start;
+}
+
+.header {
+  padding-top: 12px;
+}
+
+.header:first-child {
+  padding-top: 0;
+}
+
+.field {
+  grid-column: 2;
+  width: 100%;
+  margin: 0;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-base);
+  line-height: 1.4;
+  resize: none;
+  overflow: hidden;
+  outline: none;
+  field-sizing: content;
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 0;
+}
+
+.header .field,
+.text .field {
+  grid-column: 1 / -1;
+}
+
+.header .field {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+
+.check {
+  grid-column: 1;
+  width: 22px;
+  height: 22px;
+  margin-top: 7px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--on-accent);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.done .check {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.done .field {
+  color: var(--muted);
+  text-decoration: line-through;
+}

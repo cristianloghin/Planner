@@ -204,6 +204,64 @@ export type Database = {
           },
         ]
       }
+      note: {
+        Row: {
+          account_id: string
+          author_id: string
+          body: Json
+          created_at: string
+          id: string
+          metadata: Json
+          owner_series_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          author_id: string
+          body?: Json
+          created_at?: string
+          id?: string
+          metadata?: Json
+          owner_series_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          author_id?: string
+          body?: Json
+          created_at?: string
+          id?: string
+          metadata?: Json
+          owner_series_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "note_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "app_user"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "note_owner_series_id_fkey"
+            columns: ["owner_series_id"]
+            isOneToOne: false
+            referencedRelation: "event_series"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_log: {
         Row: {
           occurrence_start: string

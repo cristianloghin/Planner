@@ -14,12 +14,15 @@ import type { QueryClient, QueryKey } from '@tanstack/react-query'
 import { accountKey } from './account/queries'
 import { registerEventsDefaults } from './events/mutations'
 import { eventsKey, occurrencesPrefix, templatesKey } from './events/queries'
+import { registerNotesDefaults } from './notes/mutations'
+import { notesKey } from './notes/queries'
 import { registerPeopleDefaults } from './people/mutations'
 import { peopleKey, preferencesKey } from './people/queries'
 
 export function registerDomainDefaults(queryClient: QueryClient): void {
   registerEventsDefaults(queryClient)
   registerPeopleDefaults(queryClient)
+  registerNotesDefaults(queryClient)
 }
 
 /** Who the signed-in person is, as the query keys need it. */
@@ -58,6 +61,9 @@ export function queryKeysForTable(table: string, { accountId, userId }: Realtime
       return [preferencesKey(accountId, userId)]
     case 'account_member':
       return [accountKey(userId)]
+    // Notes are one list per account, bodies included.
+    case 'note':
+      return [notesKey(accountId)]
     default:
       // push_subscription, and anything added later: nothing cached reads it.
       return []
