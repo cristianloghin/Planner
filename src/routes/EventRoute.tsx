@@ -31,6 +31,7 @@ import type { Note } from '../domains/notes/types'
 import { usePeopleWithColors } from '../domains/people/queries'
 import { defaultAttendees, eventColorIn } from '../domains/people/selectors'
 import { isBlankBody } from '../services/notes/session'
+import { useNoteFocus } from '../services/notes/useNoteFocus'
 import { useOptionalNote } from '../services/notes/useOptionalNote'
 import { effectiveOccurrence, startsOn } from '../services/recurrence/expand'
 import { recurrenceEndingBefore, recurrenceFrom, splitDate } from '../services/recurrence/split'
@@ -219,6 +220,8 @@ function EditorSession({
     deletes: 'tombstone',
     seedKey: templateId ?? 'own',
   })
+  // The row toolbar only while a note row has the focus.
+  const editingNote = useNoteFocus()
 
   /**
    * The note as it stands in the form, written as `ownerSeriesId`'s: removed
@@ -410,7 +413,7 @@ function EditorSession({
           />
         </EditorPageView.Body>
       </EditorPageView>
-      {!isOccurrence && note.present && (
+      {!isOccurrence && note.present && editingNote && (
         <KeyboardDockView>
           <KeyboardDockView.Bar>
             <NoteToolbar />

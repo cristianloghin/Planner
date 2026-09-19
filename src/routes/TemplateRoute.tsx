@@ -21,6 +21,7 @@ import { useNotesWrite } from '../domains/notes/mutations'
 import { useNotes } from '../domains/notes/queries'
 import { noteForSeries } from '../domains/notes/selectors'
 import { isBlankBody } from '../services/notes/session'
+import { useNoteFocus } from '../services/notes/useNoteFocus'
 import { useOptionalNote } from '../services/notes/useOptionalNote'
 import { EditorPageView } from '../views/EditorPage'
 import { KeyboardDockView } from '../views/KeyboardDock'
@@ -88,6 +89,8 @@ function TemplateSession({
   const noteSelect = useMemo(() => noteForSeries(id), [id])
   const { data: existingNote } = useNotes(accountId, noteSelect)
   const note = useOptionalNote({ body: existingNote?.body, deletes: 'tombstone' })
+  // The row toolbar only while a note row has the focus.
+  const editingNote = useNoteFocus()
 
   function submit() {
     if (!templateDraftValid(draft) || !changed) return
@@ -166,7 +169,7 @@ function TemplateSession({
           />
         </EditorPageView.Body>
       </EditorPageView>
-      {note.present && (
+      {note.present && editingNote && (
         <KeyboardDockView>
           <KeyboardDockView.Bar>
             <NoteToolbar />
