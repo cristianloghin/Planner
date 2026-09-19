@@ -1,4 +1,5 @@
 import { COLOR_OPTIONS, type ColorKey } from '../../../assets/palette'
+import { Button } from '../../../assets/ui/Button'
 import { ColorPicker } from '../../../assets/ui/ColorPicker'
 import { CommitTextInput } from '../../../assets/ui/CommitTextInput'
 import type { Person, PersonId } from '../types'
@@ -43,14 +44,9 @@ export function PeopleSettings({
               aria-label="Name"
             />
             {overridden && (
-              <button
-                type="button"
-                className={styles.reset}
-                onClick={() => onResetColor(person.id)}
-                title="Reset to the default colour"
-              >
+              <Button onClick={() => onResetColor(person.id)} label="Reset to the default colour">
                 Reset
-              </button>
+              </Button>
             )}
           </div>
         </div>

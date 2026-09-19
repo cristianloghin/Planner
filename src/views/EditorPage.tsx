@@ -1,9 +1,8 @@
 import { createLayout, slot } from '@mikrostack/rst'
 import { ArrowLeft, Save } from 'lucide-react'
 import type { FormEvent, ReactNode } from 'react'
-import shared from '../assets/styles/shared.module.css'
-import { cx } from '../assets/utils/cx'
 
+import { IconButton } from '../assets/ui/IconButton'
 import styles from './EditorPage.module.css'
 import { Header } from './header/Header'
 
@@ -45,28 +44,20 @@ export const EditorPageView = createLayout(
       <>
         <Header className={styles.head}>
           <Header.Left>
-            <button
-              type="button"
-              className={shared.iconBtn}
-              onClick={onCancel}
-              aria-label={cancelLabel}
-            >
-              <ArrowLeft size={22} aria-hidden />
-            </button>
+            <IconButton onClick={onCancel} label={cancelLabel} icon={ArrowLeft} />
           </Header.Left>
           <Header.Center.Title>{slots.Title}</Header.Center.Title>
           <Header.Right>
             {slots.Actions}
             {submitLabel && (
-              <button
+              <IconButton
                 type={onSubmit ? 'submit' : 'button'}
-                className={cx(shared.iconBtn, shared.iconAccent)}
+                accent
                 onClick={onSubmit ? undefined : onCancel}
                 disabled={submitDisabled}
-                aria-label={submitLabel}
-              >
-                <Save size={22} aria-hidden />
-              </button>
+                label={submitLabel}
+                icon={Save}
+              />
             )}
           </Header.Right>
         </Header>

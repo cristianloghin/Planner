@@ -1,0 +1,27 @@
+.button {
+  background: transparent;
+  border: 1px solid var(--muted);
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+}
+
+.wrapper {
+  min-height: 40px;
+  padding-inline: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---- Buttons ---- */
+.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.danger {
+  color: var(--danger);
+  background-color: hsl(from var(--danger) h s l / 0.15);
+  border-color: var(--danger-border);
+}

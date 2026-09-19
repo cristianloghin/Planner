@@ -1,11 +1,11 @@
-import { Pencil, Trash2 } from 'lucide-react'
+import { Edit, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useAccount } from '../account'
 import shared from '../assets/styles/shared.module.css'
 import { ConfirmDialog } from '../assets/ui/ConfirmDialog'
+import { IconButton } from '../assets/ui/IconButton'
 import { type ScopeChoice, ScopeSheet } from '../assets/ui/ScopeSheet'
 import { PageLoader } from '../assets/ui/Spinner'
-import { cx } from '../assets/utils/cx'
 import { isoLabel, minutesToTime, offsetLabel } from '../assets/utils/dates'
 import type { EditScope } from '../domains/events/draft'
 import { type EventsChange, useEventsWrite, useOccurrencesWrite } from '../domains/events/mutations'
@@ -118,14 +118,11 @@ export function OccurrenceSheet({
 
   /** Toolbar buttons: actions only — the questions themselves live in sheets. */
   const editButton = (
-    <button
-      type="button"
-      className={cx(shared.iconBtn, shared.iconAccent)}
+    <IconButton
       onClick={() => (isRecurring ? setEditScope(true) : onEdit('series'))}
-      aria-label="Edit event"
-    >
-      <Pencil size={20} aria-hidden />
-    </button>
+      label="Edit event"
+      icon={Edit}
+    />
   )
   const editScopeSheet = (
     <ScopeSheet
@@ -140,14 +137,12 @@ export function OccurrenceSheet({
     />
   )
   const deleteButton = (
-    <button
-      type="button"
-      className={cx(shared.iconBtn, shared.iconDanger)}
+    <IconButton
+      danger
       onClick={() => (isRecurring ? setDeleteScope(true) : setConfirmDelete(true))}
-      aria-label="Delete event"
-    >
-      <Trash2 size={20} aria-hidden />
-    </button>
+      label="Delete event"
+      icon={Trash2}
+    />
   )
 
   // Show this occurrence's *effective* timing — a one-off override moves the time

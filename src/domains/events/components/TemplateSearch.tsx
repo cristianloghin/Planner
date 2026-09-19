@@ -37,9 +37,8 @@ export function TemplateSearch({
           setQuery('')
           setOpen(true)
         }}
-      >
-        <SearchIcon size={22} aria-hidden />
-      </IconButton>
+        icon={SearchIcon}
+      />
 
       {open && (
         <SearchOverlay

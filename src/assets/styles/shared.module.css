@@ -5,51 +5,6 @@
  * route's own module).
  */
 
-/* ---- Buttons ---- */
-.primary {
-  background: var(--accent);
-  color: var(--on-accent);
-  border: none;
-  border-radius: 8px;
-  padding: 8px 14px;
-}
-
-.danger {
-  background: transparent;
-  color: var(--danger);
-  border: 1px solid var(--danger-border);
-  border-radius: 8px;
-  padding: 10px 12px;
-}
-
-/* Bare icon button at the iOS 44pt minimum touch target. */
-.iconBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: transparent;
-  border: none;
-  border-radius: 8px;
-  color: var(--muted);
-}
-
-.iconBtn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.iconBtn.iconDanger {
-  color: var(--danger);
-}
-
-/* The one filled icon in a bar: the primary action. */
-.iconBtn.iconAccent {
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
 /* Large title at the top of a scrolling editor body (see views/EditorPage).
    The toolbar holds the actions; the name lives here so it can wrap freely and
    scroll away instead of inflating a header that's pinned for the life of the

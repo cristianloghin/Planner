@@ -5,6 +5,7 @@ import { useLatest } from '../assets/hooks/useLatest'
 import { cx } from '../assets/utils/cx'
 import { type SwipeZoom, pageInert, scrollOrigin, useSwipeGestures } from '../services/gestures'
 
+import { IconButton } from '../assets/ui/IconButton'
 import styles from './Calendar.module.css'
 
 interface CalendarViewProps {
@@ -74,23 +75,17 @@ function Header({
       <div className={styles.headRow}>
         <div className={styles.headSide}>{search}</div>
         <div className={styles.nav}>
-          <button type="button" onClick={() => onNavigate(-1)} aria-label="Previous">
-            <ChevronLeft size={20} />
-          </button>
-          <strong>{title}</strong>
-          <button type="button" onClick={() => onNavigate(1)} aria-label="Next">
-            <ChevronRight size={20} />
-          </button>
+          <IconButton onClick={() => onNavigate(-1)} label="Previous" icon={ChevronLeft} />
+          <h1>{title}</h1>
+          <IconButton onClick={() => onNavigate(1)} label="Next" icon={ChevronRight} />
         </div>
         <div className={styles.headSide}>
-          <button
-            type="button"
-            className={cx(styles.todayBtn, todayActive && styles.todayActive)}
+          <IconButton
+            active={todayActive}
             onClick={onGoToday}
-            aria-label="Go to today"
-          >
-            <Calendar size={18} />
-          </button>
+            label="Go to today"
+            icon={Calendar}
+          />
         </div>
       </div>
       {lanes.length > 0 && (

@@ -1,4 +1,4 @@
-import { type ChangeEvent, useEffect, useRef, useState } from 'react'
+import { type ChangeEvent, useCallback, useEffect, useRef, useState } from 'react'
 
 import { COLOR_OPTIONS, type ColorKey, DEFAULT_COLOR } from '../../../assets/palette'
 import shared from '../../../assets/styles/shared.module.css'
@@ -25,7 +25,11 @@ import {
 import type { EventTemplate } from '../types'
 import { RemindersEditor } from './RemindersEditor'
 
-import styles from './EventForm.module.css'
+import { EllipsisVertical } from 'lucide-react'
+import { Dialog } from 'radix-ui'
+import { Button } from '../../../assets/ui/Button'
+import { cx } from '../../../assets/utils/cx'
+import s from './EventForm.module.css'
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -68,6 +72,7 @@ export function EventForm({
   // Which template a *new* event was started from. Nothing is stored about
   // it; it only drives the select.
   const [templateId, setTemplateId] = useState<string | null>(null)
+  const [showTemplates, setShowTemplates] = useState(false)
   // Transient "Saved to templates" confirmation.
   const [savedTemplate, setSavedTemplate] = useState(false)
   const savedTimer = useRef<ReturnType<typeof setTimeout>>()
@@ -89,49 +94,46 @@ export function EventForm({
   // The fields a series has and one occurrence of it does not.
   const seriesOnly = scope !== 'occurrence'
 
+  const handleTemplateSelection = useCallback(
+    (t: EventTemplate) => {
+      setTemplateId(t ? t.id : null)
+      if (t) onChange(applyTemplate(draft, t))
+      setShowTemplates(false)
+    },
+    [draft, onChange],
+  )
+
   return (
     <>
-      {seriesOnly && !isEdit && templates.length > 0 && (
-        <div className={shared.row}>
-          <label className={shared.field}>
-            Start from a template
-            <select
-              value={templateId ?? ''}
-              onChange={(e) => {
-                const t = templates.find((x) => x.id === e.target.value)
-                setTemplateId(t ? t.id : null)
-                if (t) onChange(applyTemplate(draft, t))
-              }}
-            >
-              <option value="">Blank event</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title || 'Untitled template'}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      )}
-
       {seriesOnly && (
-        <>
+        <div className={s.row}>
           <input
             ref={titleRef}
             placeholder="What's the plan?"
             value={draft.title}
             onChange={(e) => set({ title: e.target.value })}
           />
-
-          <label className={shared.toggle}>
-            <input
-              type="checkbox"
-              checked={draft.allDay}
-              onChange={(e) => set({ allDay: e.target.checked })}
+          {!isEdit && templates.length > 0 && (
+            <SelectTemplate
+              open={showTemplates}
+              setOpen={setShowTemplates}
+              selectedId={templateId}
+              templates={templates}
+              onSelect={handleTemplateSelection}
             />
-            All-day
-          </label>
-        </>
+          )}
+        </div>
+      )}
+
+      {seriesOnly && (
+        <label className={shared.toggle}>
+          <input
+            type="checkbox"
+            checked={draft.allDay}
+            onChange={(e) => set({ allDay: e.target.checked })}
+          />
+          All-day
+        </label>
       )}
 
       {draft.allDay ? (
@@ -267,10 +269,10 @@ export function EventForm({
             onChange={(reminders) => set({ reminders })}
           />
 
-          <div className={styles.templateBar}>
+          <div className={s.templateBar}>
             <button
               type="button"
-              className={styles.saveTemplate}
+              className={s.saveTemplate}
               onClick={saveAsTemplate}
               disabled={!draft.title.trim()}
             >
@@ -279,9 +281,6 @@ export function EventForm({
           </div>
         </>
       )}
-
-      {/* Delete lives in the OccurrenceSheet toolbar — one tap from the event
-          itself, rather than behind Edit and a full scroll of this form. */}
     </>
   )
 }
@@ -304,10 +303,53 @@ function DateInput({
   }
 
   return (
-    <div className={styles.dateField}>
+    <div className={s.dateField}>
       <label>{label}</label>
       <input type="date" value={date} onChange={(e) => handleChange(e, 'date')} />
       <input type="time" value={time} onChange={(e) => handleChange(e, 'time')} />
     </div>
+  )
+}
+
+function SelectTemplate({
+  open,
+  setOpen,
+  selectedId,
+  templates,
+  onSelect,
+}: {
+  open: boolean
+  setOpen: (open: boolean) => void
+  selectedId: string | null
+  templates: EventTemplate[]
+  onSelect: (t: EventTemplate) => void
+}) {
+  return (
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger className={s.templateTrigger}>
+        <EllipsisVertical />
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className={s.overlay} />
+        <Dialog.Content className={s.templatesCard}>
+          <Dialog.Title className={s.title}>Select a template</Dialog.Title>
+          {templates.map((t) => (
+            <button
+              key={t.id}
+              className={cx(s.templateBtn, selectedId === t.id && s.active)}
+              type="button"
+              onClick={() => onSelect(t)}
+            >
+              {t.title || 'Untitled template'}
+            </button>
+          ))}
+          <Dialog.Close asChild>
+            <Button className={s.cancel} label="Cancel">
+              Cancel
+            </Button>
+          </Dialog.Close>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   )
 }

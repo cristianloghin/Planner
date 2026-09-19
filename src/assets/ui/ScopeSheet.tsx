@@ -1,6 +1,7 @@
-import { ChevronRight } from 'lucide-react'
+import { Edit2, Trash2 } from 'lucide-react'
 import { Dialog } from 'radix-ui'
 import { cx } from '../utils/cx'
+import { Button } from './Button'
 import s from './ScopeSheet.module.css'
 
 /** One reach an operation can have, with the occurrences it covers spelled out. */
@@ -50,13 +51,13 @@ export function ScopeSheet({
                 {c.label}
                 {c.detail && <span className={s.detail}>{c.detail}</span>}
               </span>
-              <ChevronRight />
+              {destructive ? <Trash2 size={20} /> : <Edit2 size={20} />}
             </button>
           ))}
           <Dialog.Close asChild>
-            <button type="button" className={s.cancel}>
+            <Button className={s.cancel} label="Cancel">
               Cancel
-            </button>
+            </Button>
           </Dialog.Close>
         </Dialog.Content>
       </Dialog.Portal>

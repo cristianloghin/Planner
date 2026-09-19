@@ -52,7 +52,7 @@ export const Header = createLayout(
         <DropdownMenu.Root>
           <DropdownMenu.Trigger className={styles.trigger} aria-label="Show">
             {current?.label}
-            <ChevronDown size={18} className={styles.chevron} />
+            <ChevronDown className={styles.chevron} />
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content className={styles.menu} align="center" sideOffset={6}>

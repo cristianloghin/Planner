@@ -2,7 +2,7 @@ import { Edit, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { colorStyle } from '../../../assets/palette'
 import { ConfirmDialog } from '../../../assets/ui/ConfirmDialog'
-import { cx } from '../../../assets/utils/cx'
+import { IconButton } from '../../../assets/ui/IconButton'
 import { durationLabel } from '../selectors'
 import type { EventTemplate } from '../types'
 import styles from './TemplateList.module.css'
@@ -45,22 +45,19 @@ export function TemplateList({
               <strong>{t.title || 'Untitled template'}</strong>
               <span className={styles.meta}>{describe(t)}</span>
             </div>
-            <button
-              type="button"
-              className={cx(styles.button, styles.delete)}
+            <IconButton
+              danger
               onClick={() => setPending(t)}
-              aria-label={`Delete template ${t.title || 'Untitled'}`}
-            >
-              <Trash2 size={20} />
-            </button>
-            <button
-              type="button"
-              className={styles.button}
+              label={`Delete template ${t.title || 'Untitled'}`}
+              icon={Trash2}
+              small
+            />
+            <IconButton
               onClick={() => onOpen(t.id)}
-              aria-label={`Edit template ${t.title || 'Untitled'}`}
-            >
-              <Edit size={20} />
-            </button>
+              label={`Edit template ${t.title || 'Untitled'}`}
+              icon={Edit}
+              small
+            />
           </div>
         ))
       )}

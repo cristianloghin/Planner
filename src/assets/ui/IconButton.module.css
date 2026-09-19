@@ -1,0 +1,51 @@
+/* Bare icon button at the iOS 44pt minimum touch target. */
+.iconBtn,
+.iconWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconBtn {
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.iconBtn:active .iconWrapper {
+  background-color: var(--surface-2);
+}
+
+.iconWrapper {
+  flex: 0 0 40px;
+  aspect-ratio: 1 / 1;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+}
+
+.iconBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.iconBtn.iconDanger .iconWrapper {
+  color: var(--danger);
+}
+
+/* The one filled icon in a bar: the primary action. */
+.iconBtn.iconAccent .iconWrapper {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.iconBtn.active .iconWrapper {
+  border-color: var(--accent);
+}
+
+.iconBtn.small,
+.iconBtn.small .iconWrapper {
+  flex: 0 0 36px;
+}

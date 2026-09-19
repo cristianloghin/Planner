@@ -1,5 +1,6 @@
 import { Search as SearchIcon, X } from 'lucide-react'
 import { type ReactNode, useEffect } from 'react'
+import { IconButton } from './IconButton'
 import s from './Search.module.css'
 
 /**
@@ -36,7 +37,7 @@ export function SearchOverlay({
     <div className={s.overlay} role="dialog" aria-modal="true" aria-label="Search">
       <div className={s.bar}>
         <span className={s.barIcon}>
-          <SearchIcon size={18} />
+          <SearchIcon size={24} />
         </span>
         <input
           // biome-ignore lint/a11y/noAutofocus: the overlay exists to type a query; focusing the input is the expected behaviour
@@ -46,9 +47,7 @@ export function SearchOverlay({
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
         />
-        <button type="button" className={s.close} onClick={onClose} aria-label="Close search">
-          <X size={20} />
-        </button>
+        <IconButton onClick={onClose} label="Close search" icon={X} />
       </div>
       <div className={s.results}>
         {loading && <p className={s.hint}>Searching…</p>}

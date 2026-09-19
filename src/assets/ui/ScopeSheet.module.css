@@ -41,17 +41,16 @@
   min-height: 44px;
   text-align: left;
   background: var(--surface-2);
-  border: 1px solid var(--accent);
+  border: 1px solid hsl(from var(--accent) h s l / 0.25);
   color: var(--accent);
   border-radius: var(--radius);
   padding: 8px 12px;
   display: flex;
   align-items: center;
   justify-content: stretch;
-}
 
-.option:hover {
-  border-color: var(--accent);
+  color: var(--accent);
+  background-color: hsl(from var(--accent) h s l / 0.15);
 }
 
 /* Destructive sheets ARE the confirmation (iOS convention: an action sheet with
@@ -59,15 +58,13 @@
    carry the danger token themselves. */
 .option.danger {
   color: var(--danger);
-}
-
-.option.danger:hover {
-  border-color: var(--danger);
+  background-color: hsl(from var(--danger) h s l / 0.15);
+  border-color: hsl(from var(--danger) h s l / 0.25);
 }
 
 .label {
   flex: 1;
-  color: var(--accent);
+
   font-size: var(--fs-lg);
   font-weight: 600;
   display: flex;
@@ -84,10 +81,4 @@
 
 .cancel {
   align-self: center;
-  background: var(--surface);
-  border: none;
-  border-radius: var(--radius);
-  color: var(--muted);
-  padding: 12px 16px;
-  font-size: var(--fs-body);
 }
