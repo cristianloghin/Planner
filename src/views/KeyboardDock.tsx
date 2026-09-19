@@ -3,6 +3,24 @@ import { useEffect, useRef } from 'react'
 import styles from './KeyboardDock.module.css'
 
 /**
+ * Set on the document while a dock is shown: the height of the screen's
+ * bottom that the keyboard and the bar together cover. A page's scroller
+ * pads its bottom by it so the content above can scroll clear.
+ */
+const INSET_PROPERTY = '--keyboard-inset'
+
+/** The nearest ancestor that scrolls vertically, if any. */
+function scrollParent(el: HTMLElement): HTMLElement | null {
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    const { overflowY } = getComputedStyle(node)
+    if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+      return node
+    }
+  }
+  return null
+}
+
+/**
  * A bar pinned to the bottom of the screen that rides up with the soft
  * keyboard. A fixed element sits under the keyboard on phones; the visual
  * viewport says how much of the screen the keyboard has taken, and the bar
@@ -18,6 +36,7 @@ export const KeyboardDockView = createLayout(
       const vv = window.visualViewport
       const el = ref.current
       if (!vv || !el) return
+      const root = document.documentElement
       const update = () => {
         const keyboardUp = window.innerHeight - vv.height > 100
         // With the keyboard up the bar's bottom edge is the keyboard's top,
@@ -40,11 +59,26 @@ export const KeyboardDockView = createLayout(
         el.style.transform = ''
         const shift = el.getBoundingClientRect().bottom - target
         el.style.transform = shift > 0 ? `translateY(-${shift}px)` : ''
+
+        // How much of the screen's bottom the keyboard and the bar cover,
+        // published for scrollers to pad by — a page whose content fits its
+        // box has nothing to scroll otherwise, and a field under the bar
+        // stays there (views/EditorPage reads it).
+        root.style.setProperty(INSET_PROPERTY, `${Math.max(0, shift) + el.offsetHeight}px`)
+
+        // Then whatever has the focus is brought clear of the bar, within
+        // its own scroller, by however much the bar covers it.
+        const active = document.activeElement
+        if (active instanceof HTMLElement && active !== document.body) {
+          const covered = active.getBoundingClientRect().bottom - el.getBoundingClientRect().top
+          if (covered > 0) scrollParent(active)?.scrollBy({ top: covered + 8 })
+        }
       }
       vv.addEventListener('resize', update)
       vv.addEventListener('scroll', update)
       update()
       return () => {
+        root.style.removeProperty(INSET_PROPERTY)
         vv.removeEventListener('resize', update)
         vv.removeEventListener('scroll', update)
       }

@@ -1,8 +1,6 @@
 .NoteEditor {
   display: flex;
   flex-direction: column;
-  /* Room for the toolbar docked over the bottom of the page. */
-  padding-bottom: 72px;
 }
 
 .row {
