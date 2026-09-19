@@ -27,6 +27,9 @@ export function useOptionalNote({
 }) {
   const session = useNoteSession({ title: '', body: body ?? EMPTY_BODY, deletes, seedKey })
   const [present, setPresent] = useState(body !== undefined)
+  // Present because the user asked for it just now, as opposed to opened
+  // with — the one case the editor should take the caret on appearing.
+  const [added, setAdded] = useState(false)
 
   // A new seed decides presence afresh: a template with a note brings it,
   // one without takes it away.
@@ -37,13 +40,18 @@ export function useOptionalNote({
     if (seededFrom.current === seedKey) return
     seededFrom.current = seedKey
     setPresent(hasBody.current)
+    setAdded(false)
   }, [seedKey])
 
   const add = useCallback(() => {
     session.reseed({ title: '', body: EMPTY_BODY })
     setPresent(true)
+    setAdded(true)
   }, [session.reseed])
-  const remove = useCallback(() => setPresent(false), [])
+  const remove = useCallback(() => {
+    setPresent(false)
+    setAdded(false)
+  }, [])
 
-  return { ...session, present, add, remove }
+  return { ...session, present, added, add, remove }
 }
