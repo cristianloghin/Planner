@@ -1,5 +1,5 @@
+import { serializeDoc } from '@mikrostack/notes'
 import { describe, expect, it } from 'vitest'
-import { emptyBody } from '../../client/notes'
 import { patchRemoveNote, patchSaveNote } from './patches'
 import { noteFor, standaloneByAuthorFor, standaloneNotes } from './selectors'
 import type { Note } from './types'
@@ -9,7 +9,9 @@ const note = (id: string, authorId: string, ownerSeriesId: string | null = null)
   title: id,
   ownerSeriesId,
   authorId,
-  body: emptyBody(),
+  // Made by the library, not the client: importing the client would open
+  // the database connection, which a pure test must not need.
+  body: serializeDoc([]),
   updatedAt: '2026-09-19T10:00:00Z',
 })
 
@@ -70,13 +72,5 @@ describe('patchRemoveNote', () => {
 
   it('does not change the list for an unknown id', () => {
     expect(patchRemoveNote(notes, 'zzz')).toEqual(notes)
-  })
-})
-
-describe('emptyBody', () => {
-  it('is what the editor gives for no rows, so a new note opens as one blank row', () => {
-    // Asserted through the library, not by naming a key: the app is blind to
-    // the document's shape.
-    expect(emptyBody()).toEqual(emptyBody())
   })
 })
