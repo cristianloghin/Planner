@@ -4,6 +4,7 @@ import { DayRoute } from './DayRoute'
 import { EditEventRoute, NewEventRoute } from './EventRoute'
 import { NotesRoute, TemplatesRoute } from './LibraryRoute'
 import { MonthRoute } from './MonthRoute'
+import { EditNoteRoute, NewNoteRoute } from './NoteRoute'
 import { SettingsRoute } from './SettingsRoute'
 import { EditTemplateRoute, NewTemplateRoute } from './TemplateRoute'
 import { WeekRoute } from './WeekRoute'
@@ -30,7 +31,7 @@ const today = () => toISODate(new Date())
  * Each of the two draws the frame itself, since the buttons beside the title
  * are its own, and the bare `/library` is the templates. Everything under it
  * is top-level (`parent: null`): the two screens because nothing draws them an
- * outlet, the template editors because they are full-page.
+ * outlet, the template and note editors because they are full-page.
  *
  * `/` exists because the PWA's `start_url` is the bare base, so every cold
  * launch lands there. Guards run on the initial match (router >= 0.9), which
@@ -66,6 +67,8 @@ export const routes = defineRoutes({
   '/library/notes': { component: NotesRoute, parent: null },
   '/library/templates/new': { component: NewTemplateRoute, parent: null },
   '/library/templates/:id': { component: EditTemplateRoute, parent: null },
+  '/library/notes/new': { component: NewNoteRoute, parent: null },
+  '/library/notes/:id': { component: EditNoteRoute, parent: null },
   '/settings': { component: SettingsRoute },
 })
 

@@ -7,15 +7,16 @@ event series. Its content is a sequence of **rows** — a heading, a checklist
 item, or a paragraph — so one note can be a shopping list, a set of
 instructions, a scribble, or all three at once.
 
-> These notes are a new structure and have nothing to do with the older
-> per-event text blocks described elsewhere. Same word, different thing.
+**Status: design, ready to build.** The per-event notes, checklists and lists
+that once existed were removed in the strip-down (`0022`), so this is the only
+notes structure and takes over nothing. This document specifies storage, the
+rules that govern it, and the one contract the app has with the editor whose
+format it stores: [the library contract](#the-library-contract). How any of it
+is rendered is out of scope.
 
-**Status: design only.** These tables are a *parallel* structure. They stand
-alongside whatever else exists and take nothing over. This document specifies
-storage and the rules that govern it; how any of it is rendered is out of scope.
-The one exception is [the editor contract](#the-editor-contract), which is a
-storage concern: the Notes library's document model constrains what these
-columns are allowed to hold.
+The editor is the **Notes** library (`@mikrostack/notes`, source in
+`~/Documents/_Projects/notes`). The stored document is the library's own
+format. The app stores it and never reads inside it (Decision 13).
 
 ---
 
@@ -30,7 +31,7 @@ create table note (
   owner_series_id uuid references event_series(id) on delete cascade,
   title           text not null default '',
   author_id       uuid not null references app_user(id),  -- set at creation, never reassigned
-  body            jsonb not null default '{"rows":{}}',
+  body            jsonb not null default '{"rows":{}}',   -- the library's document; opaque here
   metadata        jsonb not null default '{}',
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now()
@@ -40,44 +41,51 @@ create table note (
 create unique index note_one_per_series
   on note (owner_series_id) where owner_series_id is not null;
 
--- Sparse per-occurrence divergence: one JSON merge patch per occurrence.
+-- Sparse per-occurrence divergence: one patch per occurrence.
 -- No series_id — the note already knows its series.
 create table note_occurrence_override (
   note_id          uuid not null references note(id) on delete cascade,
   occurrence_start timestamptz not null,
-  patch            jsonb not null default '{}',
+  patch            jsonb not null default '{}',            -- the library's patch; opaque here
   updated_at       timestamptz not null default now(),
   primary key (note_id, occurrence_start)
 );
 ```
 
+Both tables get the usual wiring: row-level security through account
+membership (`is_account_member` on `note.account_id`; a `can_access_note`
+helper for the override table, in the shape of `can_access_series`), full
+replica identity, and membership of the realtime publication.
+
 ---
 
 ## The document
 
-`body` holds the whole note. Rows are an object keyed by row id — never an
-array — so every write is addressable by path and no row's position depends on
-another's.
+`body` is the library's **document** and `patch` is the library's **patch**.
+Both are JSON whose shape the library defines. They are shown here so the
+decisions below can be read, not because the app depends on them — nothing in
+the app names a key inside either.
 
 ```json
 {
   "rows": {
-    "5c1f…": { "type": "heading", "text": "Hardware", "sort": "a1" },
-    "9a02…": { "type": "check",   "text": "screws",   "sort": "a2" },
-    "b73d…": { "type": "para",    "text": "from the blue bin", "sort": "a3" }
+    "5c1f…": { "type": "header", "text": "Hardware", "sort": "a1" },
+    "9a02…": { "type": "item",   "text": "screws",   "sort": "a2" },
+    "b73d…": { "type": "text",   "text": "from the blue bin", "sort": "a3" }
   },
   "attrs": {
     "done":    { "9a02…": true },
-    "flag":    { "b73d…": "blocked" },
     "deleted": { "1e88…": true }
   }
 }
 ```
 
-A row is never removed from `rows`. Deleting marks it in `attrs.deleted` and
+Rows are an object keyed by row id — never an array — so every write is
+addressable by path and no row's position depends on another's. A row is never
+removed from `rows` in a series note. Deleting marks it in `attrs.deleted` and
 the read skips it (Decision 6).
 
-`patch` holds a **JSON merge patch** (RFC 7386 semantics) over that document.
+`patch` is a **JSON merge patch** (RFC 7386 semantics) over that document.
 Present keys merge, `null` deletes, and anything unmentioned inherits:
 
 ```json
@@ -86,11 +94,6 @@ Present keys merge, `null` deletes, and anything unmentioned inherits:
   "attrs": { "done": { "9a02…": true }, "deleted": { "b73d…": true } }
 }
 ```
-
-`null` clears one attr entry (`attrs.done.<id>: null`) or a whole namespace
-(`attrs.done: null`). Deleting a row is normally a tombstone rather than
-`rows.<id>: null` — see Decision 6, including the one case where the physical
-removal is the right call.
 
 ### Reads
 
@@ -126,11 +129,12 @@ the other's notes.
 Every table keyed to an occurrence uses the instant the recurrence rule
 *originally* produced, even if that occurrence is later moved. Most occurrences
 are virtual — never materialised as a row — so there is nothing to point a
-foreign key at. Its integrity is the application's job.
+foreign key at. Its integrity is the application's job. This is the same key
+`event_occurrence` uses, computed the same way.
 
 ### 3. The note is one JSON document, not a table of rows
 Rows, their order and their tick state all live in `body`. A note is read whole,
-written whole-ish, and never joined.
+written whole, and never joined.
 
 The structure a row-per-table model buys — per-row foreign keys, SQL-side
 aggregation, row-grain history — buys nothing here, because a note is always
@@ -142,14 +146,14 @@ format spread across nullable columns.
 tables turned out to be a JSON merge patch wearing a schema: nullable
 field-means-inherit is patch absence, a `removed` boolean is a `null` tombstone,
 and presence-carries-tick is a sparse map. Expressing them as JSON is the same
-model with three fewer tables and a merge that is already implemented.
+model with three fewer tables and a merge the library already implements.
 
 **Accepted consequences:** no foreign key can reach inside a row, so note rows
 stay pure content — a per-row assignee would have to be a bare id with no
 cascade. Aggregate queries ("how many items are unticked across the account")
 move from SQL to the application or to a GIN index. And Postgres rewrites the
-whole `body` on every commit, which makes edit debouncing mandatory rather than
-polite.
+whole `body` on every save, which is why a save is an explicit act rather than
+a keystroke (Decision 15).
 
 ### 4. A series has exactly one note
 Enforced by a partial unique index, not by convention. One note per series keeps
@@ -176,7 +180,7 @@ collection, where it is an invisible gap.
 **Accepted consequence:** inheritance runs both ways. Delete a base row and an
 occurrence that had customised it loses the line along with it.
 
-### 6. Deletion is a tombstone, never a removal
+### 6. In a series note, deletion is a tombstone, never a removal
 A deleted row keeps its entry in `rows` and is marked in `attrs.deleted`. The
 read filters it out; the document does not forget it.
 
@@ -192,9 +196,8 @@ target, live or dead, and an id absent from the base is genuinely new.
 It also makes hiding reversible, within a limit worth stating. `rows.<id>: null`
 discards the row's text and sort key along with it, so un-hiding has nothing to
 restore; a tombstone keeps whatever the row last held, and un-hiding is
-`attrs.deleted.<id>: null`. This is the successor to the old model's `removed`
-boolean, and it works at both grains — the base hides a row for every
-occurrence, an occurrence's patch hides it for that day alone.
+`attrs.deleted.<id>: null`. It works at both grains — the base hides a row for
+every occurrence, an occurrence's patch hides it for that day alone.
 
 **The limit:** a tombstone preserves the row's *last stored content*, not its
 content before the edits that led to the delete. Clearing a row's text and then
@@ -209,14 +212,11 @@ Reversibility is dependable in the case the model actually needs it:
 tombstone into that occurrence's patch and never touches the base, so the row's
 content survives intact and un-hiding restores it in full.
 
-None of this touches the reason tombstones exist. The anti-resurrection
-guarantee depends only on the id being present, never on the text.
-
-**When a tombstone is not needed.** A tombstone protects a row against patches
-that might reference it. Where no patch can — a standalone note, which has no
-overrides by construction, or a series note before its first override row
-exists — the row is removed outright with `rows.<id>: null`, and any tombstones
-the document already carried are swept in the same write.
+**A standalone note removes rows outright.** A tombstone protects a row against
+patches that might reference it, and a standalone note has no overrides by
+construction — ownership never changes (Decision 7), so it never will. Its
+deletes are `rows.<id>: null`, and the library's codec sweeps any tombstones on
+the same write.
 
 This is not a size optimisation. It is what stops ordinary drafting from leaving
 debris: creating a row with Enter and backspacing it away is a normal editing
@@ -224,18 +224,16 @@ rhythm, and under tombstoning every one of those transient rows is kept forever.
 Measured on a fresh note in the editor's demo, five such cycles leave five
 ghosts and a stored document a third larger than what it renders.
 
-The choice belongs to the **writer**, and properly to the **server** — the only
-party that knows whether the note has overrides at the moment the write is
-applied. A client must not cache it: an override created on another device
-mid-session would make a hard delete unsafe in exactly the window where the
-damage is hardest to spot. Sending `attrs.deleted` from the client and letting
-the write endpoint downgrade it to a removal keeps the claim where the knowledge
-is, and collects tombstones retroactively when a note's last override goes.
+The rule is decided by **ownership alone**, which is a column that never
+changes. An earlier draft let a series note drop rows until its first override
+existed; that made the safe choice depend on a fact only the server could know
+at write time, for a saving nobody would notice. A series note tombstones from
+its first keystroke.
 
-**Accepted consequence:** notes only grow. A heavily edited note carries every
-row it ever had, and an occurrence's tick for a row the base later tombstoned
-lingers where nothing reads it — correctly, as it happens: revive the row and
-that occurrence shows it ticked, because it was.
+**Accepted consequence:** series notes only grow. A heavily edited one carries
+every row it ever had, and an occurrence's tick for a row the base later
+tombstoned lingers where nothing reads it — correctly, as it happens: revive the
+row and that occurrence shows it ticked, because it was.
 
 There is deliberately **no compaction rule**. At household scale a note is
 kilobytes, and reclaiming lines of JSON is not worth the risk of dropping a row
@@ -297,18 +295,15 @@ id. The moment a row's identity is a function of its text, renaming the row
 orphans everything keyed to it, and two rows that happen to share text collapse
 into one.
 
-Both failures were reproduced, not theorised. The Notes editor's reference
-adapter read a shape where headings were not rows but a group-label string, so
-it had to *synthesise* heading identity and derived it from the label. Two
-groups called "Pants" in one list — legal, and not rare — produced two rows with
-the same id; because the document is keyed by row id, one was dropped on save. A
-six-row note stored as five, a heading gone, no error. Renaming a heading moved
-its id and orphaned everything attached to it.
+Both failures were reproduced, not theorised, in an earlier adapter that
+synthesised heading rows from a group label: two groups called "Pants" produced
+two rows with one id, and one was dropped on save. The library mints every id
+itself now, and the app never synthesises a row.
 
 ### 10. Tick state is occurrence-grained, and never in a series note's base
-`attrs.done` is a sparse map: present and `true` means ticked, absent means not.
-For a standalone note it lives in `body`, which has exactly one context. For a
-**series** note it lives only in the occurrence's `patch` — never in `body`.
+`attrs.done` is a sparse map. For a standalone note it lives in `body`, which
+has exactly one context. For a **series** note it lives only in the occurrence's
+`patch` — never in `body`.
 
 That last rule is not fussiness. A series can stop being single-occurrence: edit
 a one-off dinner into a weekly one and every tick that had gone to the base
@@ -330,29 +325,25 @@ as a document   base gains  {"done":{"id1":true},"deleted":{"id2":true}}
                             └─ week two's tick, now inherited by every week
 ```
 
-This is Decision 12 arriving from a different direction: writes are patches,
-never documents. There, the reason is concurrency; here it is that a patch
-cannot carry state the user did not touch.
+So **an edit is a patch**, always: the library hands the app one patch per edit,
+naming only what the user touched, and the app routes it — a tick on a series
+note to the occurrence, everything else to wherever the user chose. What is then
+*saved* is a different question (Decision 12); the invariant depends only on the
+edit being a patch when it is routed.
 
 Content edits are free to default to the base for a single-occurrence series —
 the interface need not ask "this occurrence or the series?" when there is only
 one occurrence. It is only tick state that must never land there.
 
-**Statuses beyond done** live in their own namespace, `attrs.flag`
-(`'skipped' | 'blocked'`), which the editor does not read. They are orthogonal
-to the tick: a row is done, or it is not done and possibly flagged. The hazard
-is the write path — a flagged row reads as unticked in the editor, so an untick
-originating there must clear `attrs.done` **only**, never the flag. A user
-tapping twice must not erase a status they were never shown.
-
-*Rejected:* projecting the flags into the editor as row types or text
-decoration. It pushes Planner vocabulary into a general-purpose editor's model,
-which would then be round-tripping a value it cannot represent.
+**Statuses beyond done** (skipped, blocked) are not in this model. If they are
+ever wanted they are the app's own, kept outside the document and keyed by the
+row id the library exposes, because the app does not write into the document
+(Decision 13).
 
 ### 11. Importing a note is an append-merge, never a replace
 Importing standalone note **B** into series note **A** appends B's rows to A's:
 generate sort keys after A's last row, then merge B's rows and attrs into A's
-document. Row ids are uuids from different notes, so they are disjoint by
+document. Row ids come from different notes, so they are disjoint by
 construction — there are no collisions to resolve and no content to reconcile.
 
 Merge is chosen over replace because **replace destroys every override**.
@@ -368,31 +359,45 @@ insert a new one* — the cascade clears the overrides for free, and the new id 
 honest, because it is a different document. Overwriting `body` in place keeps
 the id and leaves the poison behind.
 
+The append itself is a library operation (it needs sort keys and the document's
+shape), asked for through the library contract, not written in the app.
+
 *Rejected:* reconciling by content — noticing that both notes say "milk" and
 collapsing the two rows. That is a genuinely hard merge with no obviously right
 answer, and "import this list into the event's note" does not mean it.
 
-### 12. Concurrent edits are last-write-wins per field, applied server-side
-There is no merge algorithm for conflicts and no lock. Two people editing one
-note resolve field by field: the last write to a given path wins.
+### 12. A save is the whole document, and the last save wins
+Every edit is a patch (Decision 10), but what the app **saves** is the merged
+result: the base body after the patch, or the occurrence's patch after the
+patch. `body` and `patch` are written as whole columns, by the client, through
+an ordinary upsert. No merging happens on the server.
 
-That is weaker than it sounds, because the shape makes the common cases disjoint
-rather than conflicting. Two people ticking different rows write different paths
-under `attrs.done`. Two people editing different rows write different paths
-under `rows`. Two people inserting at the same position may generate the same
-sort key — which is exactly why the read order is `(sort, id)`. The only true
-conflict is two people typing into one row's text at once.
+Concurrent edits therefore resolve **per document**: two people editing one
+note's base at the same moment overwrite each other, and so do two people on the
+same occurrence. Different occurrences never collide, because each is its own
+row, and a tick on a series note never collides with a text edit on the base,
+because they are different rows too.
 
-**Writes are patches, never documents.** The client sends a merge patch and the
-server applies it to the column. A client that reads `body`, edits it and writes
-it back loses every concurrent change between the read and the write — and since
-ticks and text now share one column, that includes a tick someone else made
-while you were typing. This is the rule that replaces the old model's
-separate-tables seam, and it is the one that matters most.
+This is a weaker guarantee than merging on the server, and it is chosen with
+that cost understood. A note is saved when its editor is closed with Save
+(Decision 15), and every device re-reads a note the moment another device's
+save lands, so two people overwrite each other only when both had the same note
+open for editing at once — at household scale, a thing that will rarely happen
+and will be visible when it does. Against that, server-side merging needs
+a recursive merge-patch function in Postgres and an RPC per table, none of which
+exists, all of which would have to be maintained against a format the server
+does not otherwise know.
 
-Ordering comes from the server. Client clocks cannot order writes from two
-devices, so a write carries a server-assigned sequence, never a client
-timestamp.
+**The upgrade path is one function wide.** The app holds patches either way;
+only the client function that performs the save decides whether it writes
+`merge(previous, patch)` as a column or sends `patch` to the server. If
+same-document collisions ever prove real, add the merge function and change that
+one call. Nothing above the client layer notices.
+
+Ordering comes from the app's write queue: every write shares one scope, so
+saves go out in the order they were made, even after a spell offline. There is
+no server-assigned sequence — the app never applies change payloads, it
+re-reads on change, so a sequence would have no reader.
 
 *Not adopted:* a note-level lock. It serialises every conflict-free case above
 to protect the one case that conflicts, and a lock held by a phone that walked
@@ -401,43 +406,102 @@ If same-row collisions prove real, row-level presence — "someone has a caret i
 this row" — is the proportionate answer, since the editor already tracks a
 focused row id.
 
+### 13. The app is blind to the document's format
+`body` and `patch` are opaque values to the app. No code in the app names a row
+type, an attribute namespace, a sort key, or any key inside either column. The
+app knows exactly three things about them:
+
+1. a document can be **parsed into rows** the editor shows;
+2. a document and a patch can be **merged** into a document;
+3. an **edit produces a patch**, and patches compose by merging.
+
+All three are the library's functions (see [the library contract](#the-library-contract)).
+The app's own vocabulary stops at *note*, *body*, *patch* and *row id*.
+
+This is what keeps the two projects independent. The library can change its
+document shape, add a row type or an attribute namespace, and the app carries
+it through storage untouched; the app can change how it stores, routes or
+displays a note without the library knowing. An earlier draft gave the app its
+own row-type names and a translation table; the library reads `type` straight
+from storage, so that adapter would have had to run over every row on every
+read and every patch on every write, for no gain.
+
+**Accepted consequence:** the app cannot answer questions about a note's
+content — how many items are unticked, which rows are headings — without
+parsing it through the library first. That is fine: parsing is pure and cheap,
+and the app never needed to know the shape, only the rows.
+
+### 14. A note follows its series through a split and a template
+Two operations produce a new series from an old one, and both carry the note.
+
+**"Edit this and following"** cuts a series in two (`split_series`, `0024`).
+The new half gets a note of its own: a new `note` row with the old note's
+`body` copied verbatim, and every override row with `occurrence_start` at or
+after the cut moves to the new note. Row ids stay the same because the two are
+now two documents (Decision 11's reasoning, in reverse), so the moved overrides
+keep addressing rows that exist. This runs inside the split transaction,
+alongside the reminders and the per-day rows it already carries.
+
+**New from template.** A template is a series row with no date, so the schema
+lets it own a note, and it should: a template that carries its checklist is the
+point of a template. Making an event from it copies the template's `body` into
+the new event's note, the way its reminders are copied. Ticks are never in a
+template's base (Decision 10), so nothing arrives pre-ticked.
+
+*Rejected:* sharing one note between a template and the events made from it.
+That is a link (Decision 7), and editing the template would rewrite every
+event's note under its owner.
+
+### 15. A note is saved on Save, not as it is typed
+The note page is a form, in the shape of the event and template editors: the
+note is read once when the page opens, edits accumulate as patches on the
+device, and the Save button writes the whole note and closes the page. Leaving
+without saving discards the edits, as it does in every other editor in the app.
+
+This is chosen over saving a beat after each keystroke, which an earlier draft
+specified. Autosave needs a debounce, a flush when the page is left or hidden,
+and a rule for holding back re-reads while a save is in flight so that an older
+document cannot land under the user's fingers — three pieces of timing logic
+whose failures are silent. An explicit save has none of them: nothing is
+written until the user says so, and by then the editor is closed. What the
+user saw is what is saved.
+
+**Accepted consequences.** A change made on another device while a note is
+open for editing is not shown, and is overwritten on Save (Decision 12). A
+phone that drops the page loses unsaved edits, as it would in the event
+editor. Both are the price of a write path with no timing in it; revisit if
+either is ever felt.
+
 ---
 
-## The editor contract
+## The library contract
 
-Notes are edited by the **Notes** library (`~/Documents/_Projects/notes`), whose
-model is a flat row array and whose storage codec is an id-keyed JSON document.
-`body` is that document, so the correspondence is direct:
+The app uses the library through its public surface only. What it needs, and
+what the library provides today:
 
-| This model | Notes library |
+| the app needs | the library provides |
 |---|---|
-| `body.rows.<id>` | a row; `<id>` is `Row.id`, stable and never derived from content |
-| `type` — `heading` / `check` / `para` | `Row.type` — `header` / `item` / `text` |
-| `text` | `Row.text` |
-| `sort` | the row's fractional sort key |
-| `attrs.done` | `attrs.done` — read natively |
-| `attrs.deleted` | `attrs.deleted` — tombstones, filtered out of the read |
-| `attrs.flag` | not read; Planner's own gutter state |
-| `note_occurrence_override.patch` | a `NotePatch` composed with `mergeDoc` |
+| parse a document into rows | `parseDoc(body)` |
+| merge a document with one or more patches | `mergeDoc(body, ...patches)` |
+| turn one edit into one patch | **not yet exported** — the derivation exists in the library's demo and moves into the package as its next release |
+| append one document's rows to another (Decision 11) | not yet; needed at the import stage, not before |
+| feed rows in, receive edits out | `NoteStore.connect(source)` and `onAction` |
+| ids for new rows | the library mints them; the app injects nothing |
 
-The row-type vocabularies differ deliberately: Planner's words stay Planner's,
-the library stays host-agnostic, and the adapter translates. Neither side
-renames to match the other.
+The `Editor` and `Toolbar` components render through render props and ship no
+CSS, so the app's skin is its own and lives with the app's other styles.
 
-Three invariants the schema does not enforce but the editor requires:
+Three invariants the schema does not enforce and the library owns end to end,
+recorded so nobody adds a check for them in the app:
 
-- **A row's text never contains a newline.** The editor's model is one line per
-  row, and it routes every multi-line path — paste, dictation, IME commit —
-  through its parser. A newline arriving from the database is collapsed to a
-  space on read, silently.
+- **A row's text never contains a newline.** The editor routes every multi-line
+  path — paste, dictation, IME commit — through its parser, and collapses a
+  newline arriving from storage to a space on read.
 - **A note with no rows is not empty on screen.** The editor always holds at
-  least one row, so a note with an empty `rows` object yields one blank check
-  row that has no stored identity until the user types into it.
-- **A deleted row is tombstoned, not removed** (Decision 6). The codec
-  enforces this end to end: `parseDoc` skips tombstoned rows, and
-  `serializeDoc` tombstones any row its previous document knew and the new
-  rows no longer carry — so a delete made in the editor becomes a tombstone
-  without the host arranging it.
+  least one row, so an empty document yields one blank item row that has no
+  stored identity until the user types into it.
+- **Deleting tombstones or removes according to what the app asks** (Decision
+  6): the app says which, by ownership, and the library's patch does the rest.
 
 ---
 
@@ -459,11 +523,11 @@ this model needs it yet.
 
 ## Build order
 
-1. `note` — standalone notes and series notes, edited in place. Complete and
-   usable on its own.
+0. The library exports its edit-to-patch function. Everything below reads
+   patches from it; nothing starts before it ships.
+1. `note` — standalone notes and series notes, edited in place, and carried
+   through a split and a template (Decision 14). Complete and usable on its own.
 2. `note_occurrence_override` — per-occurrence divergence and tick state.
 
-Import (Decision 10) is application code over stage 1 and needs no schema.
-
-The editor can be wired at stage 1: it needs rows, ids and sort keys, and reads
-a note with no overrides as an ordinary document.
+Import (Decision 11) is application code over stage 1, needs no schema, and
+waits on the library's append operation.

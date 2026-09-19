@@ -1,0 +1,11 @@
+.KeyboardDock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2100; /* above the editor page it sits in */
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+  will-change: transform;
+}
