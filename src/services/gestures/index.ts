@@ -14,6 +14,7 @@ import {
   useRef,
 } from 'react'
 import { useLatest } from '../../assets/hooks/useLatest'
+import { attachGestureDebug } from './debug'
 
 // Timeline zoom scale. The hour height is user-zoomable (pinch); the default
 // must match --hour-h in tokens.css for the very first paint.
@@ -268,9 +269,10 @@ export function useSwipeGestures({
     el.addEventListener('touchend', onEnd)
     el.addEventListener('touchcancel', onEnd)
     el.addEventListener('gesturestart', noGesture) // iOS Safari pinch-zoom
-    // const detachDebug = attachGestureDebug(el, grid, () => g.current.mode) // TEMP
+    // The Settings readout, a no-op unless switched on.
+    const detachDebug = attachGestureDebug(el, grid, () => g.current.mode)
     return () => {
-      // detachDebug() // TEMP
+      detachDebug()
       el.removeEventListener('touchstart', onStart)
       el.removeEventListener('touchmove', onMove)
       el.removeEventListener('touchend', onEnd)
