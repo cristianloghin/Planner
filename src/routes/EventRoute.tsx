@@ -6,7 +6,6 @@ import shared from '../assets/styles/shared.module.css'
 import { PageLoader } from '../assets/ui/Spinner'
 import { isoLabel, toISODate } from '../assets/utils/dates'
 import { uid } from '../assets/utils/id'
-import { emptyBody } from '../client/notes'
 import { EventForm } from '../domains/events/components/EventForm'
 import {
   type EditScope,
@@ -23,7 +22,7 @@ import { useEventsWrite, useOccurrencesWrite } from '../domains/events/mutations
 import { rosterChange } from '../domains/events/patches'
 import { useEvents, useOccurrencesForRange, useTemplates } from '../domains/events/queries'
 import { timingOf } from '../domains/events/selectors'
-import { NoteEditor } from '../domains/notes/components/NoteEditor'
+import { NoteSection } from '../domains/notes/components/NoteSection'
 import { NoteToolbar } from '../domains/notes/components/NoteToolbar'
 import { useNotesWrite } from '../domains/notes/mutations'
 import { useNotes } from '../domains/notes/queries'
@@ -32,16 +31,14 @@ import type { Note } from '../domains/notes/types'
 import { usePeopleWithColors } from '../domains/people/queries'
 import { defaultAttendees, eventColorIn } from '../domains/people/selectors'
 import { isBlankBody } from '../services/notes/session'
-import { useNoteSession } from '../services/notes/useNoteSession'
+import { useNoteFocus } from '../services/notes/useNoteFocus'
+import { useOptionalNote } from '../services/notes/useOptionalNote'
 import { effectiveOccurrence, startsOn } from '../services/recurrence/expand'
 import { recurrenceEndingBefore, recurrenceFrom, splitDate } from '../services/recurrence/split'
 import { eventDate, eventStartMinutes } from '../services/recurrence/timing'
 import type { CalendarEvent } from '../types'
 import { EditorPageView } from '../views/EditorPage'
 import { KeyboardDockView } from '../views/KeyboardDock'
-
-/** What a note editor opens on when the series has no note: held once, so it never reseeds. */
-const EMPTY_BODY = emptyBody()
 
 /**
  * The editor as a route: `/event/new` seeded from the query, `/event/:id`
@@ -205,33 +202,41 @@ function EditorSession({
   const isOccurrence = scope === 'occurrence' && !!base && !!occurrenceDate
   const isFollowing = scope === 'following' && !!base && !!occurrenceDate
 
-  // The series' note, edited alongside the rest of the event. A new event
-  // starts from the note of the template it was just filled from, if that
-  // template has one, and starts over whenever the pick changes. Ticks are
-  // not offered: what is done is a fact about one day, and the days come
-  // later (NOTE_MODEL Decision 10).
+  // The series' note, if it has one, edited alongside the rest of the event.
+  // A new event starts from the note of the template it was just filled
+  // from, if that template has one, and starts over whenever the pick
+  // changes. Ticks are not offered: what is done is a fact about one day,
+  // and the days come later (NOTE_MODEL Decision 10).
   const seriesNoteSelect = useMemo(() => noteForSeries(base?.id), [base?.id])
   const { data: seriesNote } = useNotes(accountId, seriesNoteSelect)
   const [templateId, setTemplateId] = useState<string | null>(null)
   const templateNoteSelect = useMemo(() => noteForSeries(templateId), [templateId])
   const { data: templateNote } = useNotes(accountId, templateNoteSelect)
   const seedNote = templateId ? templateNote : seriesNote
-  const note = useNoteSession({
-    title: '',
-    body: seedNote?.body ?? EMPTY_BODY,
+  const note = useOptionalNote({
+    body: seedNote?.body,
     // A series note keeps its removed rows: a day's own state may still
     // point at them (NOTE_MODEL Decision 6).
     deletes: 'tombstone',
     seedKey: templateId ?? 'own',
   })
+  // The row toolbar only while a note row has the focus.
+  const editingNote = useNoteFocus()
 
   /**
-   * The note as edited, saved as `ownerSeriesId`'s: an update when the series
-   * has a note (`existing`), a new row when it has none. Nothing is written
-   * when there is nothing to say — an untouched existing note, or a new one
-   * left blank. A note on an event is optional.
+   * The note as it stands in the form, written as `ownerSeriesId`'s: removed
+   * when the series had one (`existing`) and the form no longer does, updated
+   * when it had one and still does, inserted when it is new. Nothing is
+   * written when there is nothing to say — an untouched existing note, or a
+   * new one left blank.
    */
   function saveNoteFor(ownerSeriesId: string, existing: Note | undefined, id = uid()) {
+    if (!note.present) {
+      if (existing) {
+        notes.mutate({ accountId, userId, change: { kind: 'removeNote', id: existing.id } })
+      }
+      return
+    }
     const { body } = note.draft()
     if (existing ? !note.changed : isBlankBody(body)) return
     notes.mutate({
@@ -343,7 +348,7 @@ function EditorSession({
     // The note as it stands in the form goes with it, as a note of the
     // template's own — a template that carries its checklist is the point.
     const { body } = note.draft()
-    if (!isBlankBody(body)) {
+    if (note.present && !isBlankBody(body)) {
       notes.mutate({
         accountId,
         userId,
@@ -395,11 +400,20 @@ function EditorSession({
             templates={isEdit ? [] : templates}
             onSaveAsTemplate={saveAsTemplate}
             onPickTemplate={(t) => setTemplateId(t?.id ?? null)}
-            note={isOccurrence ? undefined : <NoteEditor ticks={false} />}
+            note={
+              isOccurrence ? undefined : (
+                <NoteSection
+                  present={note.present}
+                  onAdd={note.add}
+                  onRemove={note.remove}
+                  ticks={false}
+                />
+              )
+            }
           />
         </EditorPageView.Body>
       </EditorPageView>
-      {!isOccurrence && (
+      {!isOccurrence && note.present && editingNote && (
         <KeyboardDockView>
           <KeyboardDockView.Bar>
             <NoteToolbar />

@@ -466,8 +466,11 @@ the same form can be written to the copy afterwards — an update by id that
 follows the split in the queue. Without it the copy would have an id nobody
 outside the function knows.
 
-A note on a series is optional. An editor left blank writes no note row, and
-a series without one shows nothing.
+A note on a series is optional, and the editors say so: a series without a
+note shows an "Add a note" button and no editor, adding one is that tap, and
+removing one is a single tap on the section's bin — never erasing the text.
+Save writes the outcome: an insert, an update, or a delete. A note added and
+left blank writes nothing.
 
 *Rejected:* sharing one note between a template and the events made from it.
 That is a link (Decision 7), and editing the template would rewrite every

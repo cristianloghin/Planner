@@ -70,7 +70,7 @@ export function EventForm({
   onSaveAsTemplate: () => void
   /** Which template the draft was just filled from, or null when cleared. */
   onPickTemplate?: (template: EventTemplate | null) => void
-  /** The series' note editor, when the route has one to show. */
+  /** The series' note section, when the route has one to show. */
   note?: ReactNode
 }) {
   const set = (patch: Partial<EventDraft>) => onChange({ ...draft, ...patch })
@@ -288,12 +288,7 @@ export function EventForm({
             </button>
           </div>
 
-          {note && (
-            <>
-              <label className={shared.label}>Note</label>
-              {note}
-            </>
-          )}
+          {note}
         </>
       )}
     </>
