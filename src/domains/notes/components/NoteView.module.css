@@ -1,0 +1,51 @@
+.NoteView {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--fs-base);
+}
+
+.header {
+  margin: 8px 0 0;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+
+.header:first-child {
+  margin-top: 0;
+}
+
+.text {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.item {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.check {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+  color: var(--on-accent);
+}
+
+.done .check {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.done {
+  color: var(--muted);
+  text-decoration: line-through;
+}

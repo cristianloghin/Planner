@@ -5,7 +5,7 @@
  * the template editor hands over its draft.
  */
 import { type SerializeOptions, parseDoc, useNoteStore } from '@mikrostack/notes'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { NoteBody } from '../../client/notes'
 import { NOTHING_UNSAVED, hasChanges, pendingBody, recordEdit, recordTitle } from './session'
 
@@ -13,18 +13,43 @@ export function useNoteSession({
   title,
   body,
   deletes,
+  seedKey = 'opened',
 }: {
-  /** The note as opened. Read once; later values are ignored. */
+  /**
+   * The note as opened. Read once, and again whenever `seedKey` changes —
+   * never when only the values do, so a note re-read mid-edit cannot take
+   * the edits away.
+   */
   title: string
   body: NoteBody
   /** How a removed row is recorded: dropped for a standalone note, tombstoned for a series note. */
   deletes: SerializeOptions['deletes']
+  /**
+   * Names what the editor was seeded from. Change it to start over from the
+   * current `title` and `body` — an event editor does so when a template is
+   * picked, so the template's note appears ready to edit.
+   */
+  seedKey?: string
 }) {
   // The note as opened, held for the session: what the editor was seeded
   // from and what every patch is applied to.
-  const [opened] = useState({ title, body })
+  const [opened, setOpened] = useState({ title, body })
   const store = useNoteStore({ initial: parseDoc(opened.body) })
   const [unsaved, setUnsaved] = useState(NOTHING_UNSAVED)
+
+  // Reseed on demand: the store takes the new rows as an external update,
+  // and the session forgets what was edited before.
+  const latest = useRef({ title, body })
+  latest.current = { title, body }
+  const seededFrom = useRef(seedKey)
+  useEffect(() => {
+    if (seededFrom.current === seedKey) return
+    seededFrom.current = seedKey
+    const next = latest.current
+    setOpened(next)
+    setUnsaved(NOTHING_UNSAVED)
+    store.applyExternal(parseDoc(next.body))
+  }, [seedKey, store])
 
   // Edits out: every change the editor reports becomes a patch.
   useEffect(

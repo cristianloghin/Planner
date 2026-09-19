@@ -492,6 +492,7 @@ export type Database = {
           p_duration: string
           p_from: string
           p_new_id: string
+          p_note_id?: string
           p_old_rrule: string
           p_rrule?: string
           p_series: string

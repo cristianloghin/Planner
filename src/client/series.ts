@@ -218,6 +218,8 @@ export async function splitSeries(
   fromDate: string,
   series: Series,
   userId: string,
+  /** The id the new half's copy of the source's note gets, if the source has one. */
+  noteId?: string,
 ): Promise<void> {
   if (!series.start) throw new Error('splitSeries: the new half needs a start')
   const rrule = recurrenceToRRule(series.recurrence)
@@ -234,6 +236,7 @@ export async function splitSeries(
     p_attendees: series.attendees,
     ...(rrule ? { p_rrule: rrule } : {}),
     ...(series.colorKey ? { p_color_key: series.colorKey } : {}),
+    ...(noteId ? { p_note_id: noteId } : {}),
   })
   if (error) throw error
 

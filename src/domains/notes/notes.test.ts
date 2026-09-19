@@ -1,7 +1,7 @@
 import { serializeDoc } from '@mikrostack/notes'
 import { describe, expect, it } from 'vitest'
 import { patchRemoveNote, patchSaveNote } from './patches'
-import { noteFor, standaloneByAuthorFor, standaloneNotes } from './selectors'
+import { noteFor, noteForSeries, standaloneByAuthorFor, standaloneNotes } from './selectors'
 import type { Note } from './types'
 
 const note = (id: string, authorId: string, ownerSeriesId: string | null = null): Note => ({
@@ -31,6 +31,18 @@ describe('noteFor', () => {
   it('finds one note by id, or nothing', () => {
     expect(noteFor('b')(notes)).toBe(b)
     expect(noteFor('zzz')(notes)).toBeUndefined()
+  })
+})
+
+describe('noteForSeries', () => {
+  it('finds the note a series owns, and nothing for a series without one', () => {
+    expect(noteForSeries('series-1')(notes)).toBe(owned)
+    expect(noteForSeries('series-2')(notes)).toBeUndefined()
+  })
+
+  it('finds nothing when there is no series yet', () => {
+    expect(noteForSeries(undefined)(notes)).toBeUndefined()
+    expect(noteForSeries(null)(notes)).toBeUndefined()
   })
 })
 

@@ -335,6 +335,11 @@ Content edits are free to default to the base for a single-occurrence series —
 the interface need not ask "this occurrence or the series?" when there is only
 one occurrence. It is only tick state that must never land there.
 
+Until the override table exists there is nowhere for a tick on a series note
+to go, so the editor offers none on one: the circles are drawn but inert, and
+the occurrence sheet shows the note as it is. Ticking arrives with stage 2,
+not before, and never as a stopgap into the base.
+
 **Statuses beyond done** (skipped, blocked) are not in this model. If they are
 ever wanted they are the app's own, kept outside the document and keyed by the
 row id the library exposes, because the app does not write into the document
@@ -431,6 +436,11 @@ content — how many items are unticked, which rows are headings — without
 parsing it through the library first. That is fine: parsing is pure and cheap,
 and the app never needed to know the shape, only the rows.
 
+The rows are a different matter from the document. They are the library's
+public model — a heading, an item with its tick, a paragraph — and the app is
+free to render them, as the occurrence sheet does read-only, or to ask of them
+whether a note says anything at all. What stays sealed is the stored shape.
+
 ### 14. A note follows its series through a split and a template
 Two operations produce a new series from an old one, and both carry the note.
 
@@ -444,9 +454,20 @@ alongside the reminders and the per-day rows it already carries.
 
 **New from template.** A template is a series row with no date, so the schema
 lets it own a note, and it should: a template that carries its checklist is the
-point of a template. Making an event from it copies the template's `body` into
-the new event's note, the way its reminders are copied. Ticks are never in a
-template's base (Decision 10), so nothing arrives pre-ticked.
+point of a template. Picking a template in the event editor seeds the note
+editor with the template's note, so it is there to read and change before the
+event exists; Save then writes the event and, second in the app's ordered
+write queue, a note of the event's own with the same row ids. Ticks are never
+in a template's base (Decision 10), so nothing arrives pre-ticked. "Save as
+template" from an event copies the other way, for the same reason.
+
+The split's copy gets an id the app minted and passed in, so the edits made in
+the same form can be written to the copy afterwards — an update by id that
+follows the split in the queue. Without it the copy would have an id nobody
+outside the function knows.
+
+A note on a series is optional. An editor left blank writes no note row, and
+a series without one shows nothing.
 
 *Rejected:* sharing one note between a template and the events made from it.
 That is a link (Decision 7), and editing the template would rewrite every
@@ -525,8 +546,9 @@ this model needs it yet.
 
 0. The library exports its edit-to-patch function. Everything below reads
    patches from it; nothing starts before it ships.
-1. `note` — standalone notes and series notes, edited in place, and carried
-   through a split and a template (Decision 14). Complete and usable on its own.
+1. `note` — standalone notes (`0025`), then series notes edited in the event
+   and template editors, carried through a split (`0026`) and a template
+   (Decision 14). Complete and usable on its own, without ticks on series notes.
 2. `note_occurrence_override` — per-occurrence divergence and tick state.
 
 Import (Decision 11) is application code over stage 1, needs no schema, and

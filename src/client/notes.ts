@@ -7,9 +7,9 @@
  * is the app's one name for that sealed value, and this file is the one place
  * it is tied to the library's type (docs/NOTE_MODEL.md, Decision 13).
  *
- * A note either stands on its own or belongs to an event series. Only the
- * standalone kind is written today; `ownerSeriesId` is read so the list can
- * tell them apart once series notes exist.
+ * A note either stands on its own or belongs to an event series — an event
+ * or a template, which are one table. The owner is set when the note is
+ * made and never changes.
  */
 import { type NoteDoc, serializeDoc } from '@mikrostack/notes'
 import type { Json } from './database.types'
@@ -66,16 +66,15 @@ export async function fetchNotes(accountId: string): Promise<Note[]> {
 /**
  * Save a note, whole: its title and its complete document.
  *
- * A new note is upserted with its author, so a save replayed after a lost
- * response finds its row already there and rewrites it. An existing note is
- * updated without touching the author: saving someone else's note must not
- * make it yours. Ownership is not written at all — a standalone note stays
- * standalone.
+ * A new note is upserted with its author and its owner, so a save replayed
+ * after a lost response finds its row already there and rewrites it. An
+ * existing note is updated without touching either: saving someone else's
+ * note must not make it yours, and a note never changes hands (Decision 7).
  */
 export async function saveNote(
   accountId: string,
   userId: string,
-  note: Pick<Note, 'id' | 'title' | 'body'>,
+  note: Pick<Note, 'id' | 'title' | 'body' | 'ownerSeriesId'>,
   { isNew }: { isNew: boolean },
 ): Promise<void> {
   const fields = {
@@ -85,12 +84,16 @@ export async function saveNote(
     updated_at: new Date().toISOString(),
   }
   const { error } = isNew
-    ? await supabase
-        .from('note')
-        .upsert(
-          { id: note.id, account_id: accountId, author_id: userId, ...fields },
-          { onConflict: 'id' },
-        )
+    ? await supabase.from('note').upsert(
+        {
+          id: note.id,
+          account_id: accountId,
+          author_id: userId,
+          owner_series_id: note.ownerSeriesId,
+          ...fields,
+        },
+        { onConflict: 'id' },
+      )
     : await supabase.from('note').update(fields).eq('id', note.id)
   if (error) throw error
 }

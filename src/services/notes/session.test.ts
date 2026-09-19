@@ -5,6 +5,7 @@ import {
   NOTHING_UNSAVED,
   type Unsaved,
   hasChanges,
+  isBlankBody,
   pendingBody,
   recordEdit,
   recordTitle,
@@ -105,5 +106,19 @@ describe('the title and hasChanges', () => {
     const next = recordTitle(e.unsaved, 'Shopping')
     expect(next.title).toBe('Shopping')
     expect(next.patches).toHaveLength(1)
+  })
+})
+
+describe('isBlankBody', () => {
+  it('is blank with no rows, or rows that say nothing', () => {
+    expect(isBlankBody(serializeDoc([]))).toBe(true)
+    expect(isBlankBody(serializeDoc([{ id: 'a', type: 'item', text: '   ', done: false }]))).toBe(
+      true,
+    )
+  })
+
+  it('is not blank once any row has text', () => {
+    expect(isBlankBody(saved)).toBe(false)
+    expect(isBlankBody(serializeDoc([{ id: 'h', type: 'header', text: 'Tools' }]))).toBe(false)
   })
 })
