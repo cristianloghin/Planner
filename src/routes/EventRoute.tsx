@@ -143,7 +143,7 @@ export function EditEventRoute() {
       initial={draftForEvent(seed)}
       base={event}
       scope={scope}
-      occurrenceDate={scope === 'occurrence' ? date : undefined}
+      occurrenceDate={scope === 'series' ? undefined : date}
       people={withColors}
       onClose={close}
     />
