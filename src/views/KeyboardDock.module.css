@@ -9,9 +9,3 @@
   padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
   will-change: transform;
 }
-
-/* With the keyboard up the bar's bottom edge is the keyboard's top, so the
-   home-indicator inset is behind the keyboard and not needed. */
-.KeyboardDock.keyboardOpen {
-  padding-bottom: 6px;
-}
