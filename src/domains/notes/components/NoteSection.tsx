@@ -17,11 +17,14 @@ export function NoteSection({
   onAdd,
   onRemove,
   ticks,
+  autoFocus,
 }: {
   present: boolean
   onAdd: () => void
   onRemove: () => void
   ticks?: boolean
+  /** The note was just added: open with the caret in it. */
+  autoFocus?: boolean
 }) {
   if (!present) {
     return (
@@ -38,7 +41,7 @@ export function NoteSection({
         <span className={shared.label}>Note</span>
         <IconButton danger small label="Remove note" icon={Trash2} onClick={onRemove} />
       </div>
-      <NoteEditor ticks={ticks} />
+      <NoteEditor ticks={ticks} autoFocus={autoFocus} />
     </div>
   )
 }

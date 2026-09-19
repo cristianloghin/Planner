@@ -12,10 +12,13 @@ import styles from './NoteEditor.module.css'
  * `ticks` is off for a note that belongs to a series: what is done is a
  * fact about one day, not about the series, and lives with the day
  * (docs/NOTE_MODEL.md, Decision 10). The circles are drawn but inert.
+ *
+ * `autoFocus` puts the caret in the first row as the editor appears — for a
+ * note the user just asked for, so the next thing they do is type.
  */
-export function NoteEditor({ ticks = true }: { ticks?: boolean }) {
+export function NoteEditor({ ticks = true, autoFocus }: { ticks?: boolean; autoFocus?: boolean }) {
   return (
-    <Editor className={styles.NoteEditor}>
+    <Editor className={styles.NoteEditor} autoFocus={autoFocus}>
       {({ row, fieldProps, checkboxProps }) =>
         row.type === 'header' ? (
           <div className={cx(styles.row, styles.header)} role="listitem">

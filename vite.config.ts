@@ -8,6 +8,20 @@ const base = '/Planner/'
 
 export default defineConfig({
   base,
+  optimizeDeps: {
+    // The @mikrostack packages are developed alongside this app and change
+    // often. Vite's pre-bundle of dependencies is keyed on the lockfile and
+    // can go on serving an old copy after an upgrade, which looks exactly
+    // like the new version not working. Kept out of it, they are served
+    // straight from node_modules and a new version shows on the next reload.
+    exclude: ['@mikrostack/notes', '@mikrostack/router', '@mikrostack/rst'],
+    // A package kept out of the pre-bundle has its own dependencies served
+    // raw too, and the router's `@mikrostack/chbus` cannot be: its package
+    // points `import` at a CommonJS file (the ESM build sits beside it as
+    // index.mjs), which only the pre-bundle's interop makes loadable. So it
+    // is pre-bundled on the router's behalf until its packaging is fixed.
+    include: ['@mikrostack/router > @mikrostack/chbus'],
+  },
   plugins: [
     react(),
     VitePWA({

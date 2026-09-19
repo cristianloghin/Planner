@@ -164,6 +164,7 @@ function TemplateSession({
                 onAdd={note.add}
                 onRemove={note.remove}
                 ticks={false}
+                autoFocus={note.added}
               />
             }
           />

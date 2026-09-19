@@ -21,5 +21,8 @@
   flex-direction: column;
   gap: 14px;
   padding: 16px;
-  padding-bottom: calc(28px + env(safe-area-inset-bottom));
+  /* Room below the content for what covers the screen's bottom while a
+     keyboard dock is up (views/KeyboardDock publishes it), so a field that
+     would sit under it can scroll clear. */
+  padding-bottom: calc(28px + env(safe-area-inset-bottom) + var(--keyboard-inset, 0px));
 }
