@@ -90,8 +90,8 @@ gives no visual clue. `grep VITE_SUPABASE_URL .env.local` is the whole check.
 per-origin, so the same origin pointed at a different database shows the previous
 account's data until the first fetch lands. It looks like data loss and is not.
 
-The commands that act on the **linked** project — and migration `0022`, which has
-not been applied there yet — are in
+The commands that act on the **linked** project, and which migrations are applied
+there, are in
 [`docs/DEV.md` §10](docs/DEV.md#10-local-vs-production--read-before-running-anything).
 Read it before running any `supabase db` command.
 
