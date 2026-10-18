@@ -11,3 +11,19 @@
   align-items: center;
   justify-content: space-between;
 }
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* The note, read only; a tap opens its editor. */
+.preview {
+  align-self: stretch;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+}

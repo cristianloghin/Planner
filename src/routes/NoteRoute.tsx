@@ -11,10 +11,8 @@ import { useNotesWrite } from '../domains/notes/mutations'
 import { useNotes } from '../domains/notes/queries'
 import { noteFor } from '../domains/notes/selectors'
 import type { NoteBody } from '../domains/notes/types'
-import { useNoteFocus } from '../services/notes/useNoteFocus'
 import { useNoteSession } from '../services/notes/useNoteSession'
 import { EditorPageView } from '../views/EditorPage'
-import { KeyboardDockView } from '../views/KeyboardDock'
 
 /**
  * A standalone note as a route: `/library/notes/new` and `/library/notes/:id`.
@@ -76,9 +74,6 @@ function NoteSession({
     // A standalone note has no overrides, so a removed row is gone for good.
     deletes: 'drop',
   })
-  // The row toolbar only while a note row has the focus — not over the title.
-  const editingNote = useNoteFocus()
-
   function submit() {
     if (!changed) return
     const { title, body } = draft()
@@ -121,14 +116,11 @@ function NoteSession({
           />
           <NoteEditor />
         </EditorPageView.Body>
+        {/* The row toolbar, under the rows and above the keyboard. */}
+        <EditorPageView.Dock>
+          <NoteToolbar />
+        </EditorPageView.Dock>
       </EditorPageView>
-      {editingNote && (
-        <KeyboardDockView>
-          <KeyboardDockView.Bar>
-            <NoteToolbar />
-          </KeyboardDockView.Bar>
-        </KeyboardDockView>
-      )}
     </NoteProvider>
   )
 }

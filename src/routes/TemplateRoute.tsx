@@ -15,16 +15,15 @@ import {
 } from '../domains/events/draft'
 import { useEventsWrite } from '../domains/events/mutations'
 import { useTemplates } from '../domains/events/queries'
+import { NoteEditor } from '../domains/notes/components/NoteEditor'
 import { NoteSection } from '../domains/notes/components/NoteSection'
 import { NoteToolbar } from '../domains/notes/components/NoteToolbar'
 import { useNotesWrite } from '../domains/notes/mutations'
 import { useNotes } from '../domains/notes/queries'
 import { noteForSeries } from '../domains/notes/selectors'
 import { isBlankBody } from '../services/notes/session'
-import { useNoteFocus } from '../services/notes/useNoteFocus'
 import { useOptionalNote } from '../services/notes/useOptionalNote'
 import { EditorPageView } from '../views/EditorPage'
-import { KeyboardDockView } from '../views/KeyboardDock'
 
 /**
  * The template editor as a route: `/library/templates/new` and
@@ -89,8 +88,9 @@ function TemplateSession({
   const noteSelect = useMemo(() => noteForSeries(id), [id])
   const { data: existingNote } = useNotes(accountId, noteSelect)
   const note = useOptionalNote({ body: existingNote?.body, deletes: 'tombstone' })
-  // The row toolbar only while a note row has the focus.
-  const editingNote = useNoteFocus()
+  // The note is edited on a page of its own over the form: open it on
+  // "add" (with the caret in it) and on a tap on the note; Back closes it.
+  const [noteOpen, setNoteOpen] = useState(false)
 
   function submit() {
     if (!templateDraftValid(draft) || !changed) return
@@ -161,21 +161,31 @@ function TemplateSession({
             note={
               <NoteSection
                 present={note.present}
-                onAdd={note.add}
+                onAdd={() => {
+                  note.add()
+                  setNoteOpen(true)
+                }}
+                onEdit={() => setNoteOpen(true)}
                 onRemove={note.remove}
-                ticks={false}
-                autoFocus={note.added}
               />
             }
           />
         </EditorPageView.Body>
       </EditorPageView>
-      {note.present && editingNote && (
-        <KeyboardDockView>
-          <KeyboardDockView.Bar>
+      {/* The note's own page, stacked over the form: the rows get the whole
+          screen and the row toolbar sits under them, above the keyboard.
+          Ticks are not offered (NOTE_MODEL Decision 10). Save is the form's;
+          the edits made here wait in the note's store until then. */}
+      {note.present && noteOpen && (
+        <EditorPageView onCancel={() => setNoteOpen(false)} cancelLabel="Back to template">
+          <EditorPageView.Title>Note</EditorPageView.Title>
+          <EditorPageView.Body>
+            <NoteEditor ticks={false} autoFocus={note.added} />
+          </EditorPageView.Body>
+          <EditorPageView.Dock>
             <NoteToolbar />
-          </KeyboardDockView.Bar>
-        </KeyboardDockView>
+          </EditorPageView.Dock>
+        </EditorPageView>
       )}
     </NoteProvider>
   )
