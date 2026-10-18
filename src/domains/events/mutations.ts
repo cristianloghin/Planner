@@ -15,6 +15,7 @@ import {
   cancelOccurrence,
   clearOccurrenceAttendees,
   clearOccurrenceOverride,
+  resetSeriesOccurrences,
   setOccurrenceAttendees,
   setOccurrenceOverride,
 } from '../../client/occurrences'
@@ -28,6 +29,7 @@ import {
   patchOccurrences,
   patchRemoveEvent,
   patchRemoveTemplate,
+  patchResetSeries,
   patchSaveEvent,
   patchSaveTemplate,
   patchSplitEvent,
@@ -82,12 +84,16 @@ export type EventsWrite = {
 const EVENTS_WRITE_KEY = ['events-write'] as const
 
 /**
- * Every change to one day of an event, as one set of values that can be
- * written down. Each carries the event's timing rather than the whole event,
- * because that is all a write needs to find the right day — and because a set
- * of values that has to survive a restart should be as small as it can be.
+ * Every change to the days of an event, as one set of values that can be
+ * written down. A change to one day carries the event's timing rather than
+ * the whole event, because that is all a write needs to find the right day —
+ * and because a set of values that has to survive a restart should be as
+ * small as it can be. `resetSeries` names no day: it puts every day of the
+ * series back, and needs only the series.
  */
-export type OccurrencesChange =
+export type OccurrencesChange = DayChange | { kind: 'resetSeries'; seriesId: string }
+
+type DayChange =
   | { kind: 'override'; series: SeriesTiming; date: string; start: string; duration: number }
   | { kind: 'clearOverride'; series: SeriesTiming; date: string }
   | { kind: 'attendees'; series: SeriesTiming; date: string; attendees: PersonId[] }
@@ -100,7 +106,7 @@ export type OccurrencesWrite = { accountId: string; change: OccurrencesChange }
 const OCCURRENCES_WRITE_KEY = ['occurrences-write'] as const
 
 /** The change a day write makes, without the values naming which day. */
-function changeOf(w: OccurrencesChange): OccurrenceChange {
+function changeOf(w: DayChange): OccurrenceChange {
   switch (w.kind) {
     case 'override':
       return { kind: 'override', start: w.start, duration: w.duration }
@@ -113,6 +119,14 @@ function changeOf(w: OccurrencesChange): OccurrenceChange {
     case 'cancel':
       return { kind: 'cancel' }
   }
+}
+
+/** What one cached window of days looks like the moment `w` is made. */
+function patchWindow(w: OccurrencesChange): (map: OccurrenceMap) => OccurrenceMap {
+  if (w.kind === 'resetSeries') return (map) => patchResetSeries(map, w.seriesId)
+  const key = occurrenceKey(w.series.id, w.date)
+  const change = changeOf(w)
+  return (map) => patchOccurrences(map, key, change)
 }
 
 const isTemplateWrite = (w: EventsChange) =>
@@ -225,21 +239,23 @@ export function registerEventsDefaults(queryClient: QueryClient): void {
           return clearOccurrenceAttendees(w.series, w.date)
         case 'cancel':
           return cancelOccurrence(w.series, w.date)
+        case 'resetSeries':
+          return resetSeriesOccurrences(w.seriesId)
       }
     },
 
     onMutate: async ({ accountId, change: w }: OccurrencesWrite): Promise<Rollback> => {
-      const months = occurrencesPrefix(accountId)
-      const change = changeOf(w)
+      const windows = occurrencesPrefix(accountId)
+      const patch = patchWindow(w)
 
       // Months are fetched with overlapping margins, so one day can sit in more
-      // than one cached month. Patch every one of them, or the same day would
-      // read differently depending on which month a screen happens to be using.
-      await queryClient.cancelQueries({ queryKey: months })
-      const previous = queryClient.getQueriesData<OccurrenceMap>({ queryKey: months })
-      const key = occurrenceKey(w.series.id, w.date)
-      queryClient.setQueriesData<OccurrenceMap>({ queryKey: months }, (map) =>
-        map ? patchOccurrences(map, key, change) : map,
+      // than one cached month — and a series' own window holds its days too.
+      // Patch every one of them, or the same day would read differently
+      // depending on which window a screen happens to be using.
+      await queryClient.cancelQueries({ queryKey: windows })
+      const previous = queryClient.getQueriesData<OccurrenceMap>({ queryKey: windows })
+      queryClient.setQueriesData<OccurrenceMap>({ queryKey: windows }, (map) =>
+        map ? patch(map) : map,
       )
       return { entries: previous }
     },
@@ -262,7 +278,8 @@ export function useEventsWrite() {
 }
 
 /**
- * Record something against a day.
+ * Record something against a day — or, with `resetSeries`, un-record
+ * everything against every day of a series.
  *
  * `mutate({ accountId, change: { kind: 'cancel', series, date } })`
  */

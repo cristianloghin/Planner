@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { OccurrenceRow } from '../../client/occurrences'
-import { patchEntry, patchMoveOccurrences, patchOccurrences, rosterChange } from './patches'
+import {
+  patchEntry,
+  patchMoveOccurrences,
+  patchOccurrences,
+  patchResetSeries,
+  rosterChange,
+} from './patches'
 import { indexOccurrences, occurrenceKey, toOccurrences } from './transformers'
 
 const row = (over: Partial<OccurrenceRow> = {}): OccurrenceRow => ({
@@ -178,5 +184,30 @@ describe('patchMoveOccurrences', () => {
   it('does not mistake an event whose id merely starts the same way', () => {
     const map = { [occurrenceKey('S1', '2026-04-07')]: { cancelled: true } }
     expect(patchMoveOccurrences(map, 'S', '2026-04-07', 'S2')).toEqual(map)
+  })
+})
+
+describe('patchResetSeries', () => {
+  it("drops every one of the event's days, whatever was on them, and leaves the rest", () => {
+    const map = {
+      [occurrenceKey('S', '2026-04-06')]: { cancelled: true },
+      [occurrenceKey('S', '2026-04-07')]: { attendees: ['p1'] },
+      [occurrenceKey('S', '2026-05-14')]: { start: '2026-05-14T18:00', duration: 90 },
+      [occurrenceKey('T', '2026-04-07')]: { cancelled: true },
+    }
+    expect(patchResetSeries(map, 'S')).toEqual({
+      [occurrenceKey('T', '2026-04-07')]: { cancelled: true },
+    })
+  })
+
+  it('does not mistake an event whose id merely starts the same way', () => {
+    const map = { [occurrenceKey('S1', '2026-04-07')]: { cancelled: true } }
+    expect(patchResetSeries(map, 'S')).toEqual(map)
+  })
+
+  it('does not modify what it was given', () => {
+    const before = { [occurrenceKey('S', '2026-04-07')]: { cancelled: true } }
+    patchResetSeries(before, 'S')
+    expect(Object.keys(before)).toEqual([occurrenceKey('S', '2026-04-07')])
   })
 })

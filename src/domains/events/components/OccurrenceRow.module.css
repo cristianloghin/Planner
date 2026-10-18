@@ -1,5 +1,7 @@
 /* A list row: colour on the left edge, when, title, then the caller's extras. */
 .OccurrenceRow {
+  /* The changed-day mark sits in this corner. */
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;

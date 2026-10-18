@@ -58,11 +58,21 @@
   text-overflow: ellipsis;
 }
 
+/* A changed day carries a corner mark (see ChangedMark); keep the title's end
+   from running under it. */
+.changed {
+  padding-right: 11px;
+}
+
 /* The week's bar: tighter, title only. */
 .dense {
   border-radius: 4px;
   padding: 1px 3px;
   box-shadow: 0 1px 2px var(--shadow);
+}
+
+.dense.changed {
+  padding-right: 9px;
 }
 
 .dense .title {

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { indexOccurrences } from '../../domains/events/transformers'
 import type { CalendarEvent, Recurrence } from '../../domains/events/types'
 import {
+  changedDays,
+  divergence,
   effectiveOccurrence,
   nextStartOnOrAfter,
   occurrenceIndex,
@@ -311,5 +313,80 @@ describe('occurrencesOnDate', () => {
     const e = ev('2026-06-15', { freq: 'weekly', interval: 1 })
     const completions = { 'e1:2026-06-16': { start: '2026-06-18' } }
     expect(occurrencesOnDate([e], '2026-06-18', idx(completions))).toHaveLength(0)
+  })
+})
+
+describe('divergence', () => {
+  it('names what a day overrides: its timing, its people, or both', () => {
+    expect(divergence({ start: '2026-06-15T18:00' })).toBe('timing')
+    expect(divergence({ duration: 3 })).toBe('timing')
+    expect(divergence({ attendees: ['kid'] })).toBe('people')
+    expect(divergence({ duration: 3, attendees: ['kid'] })).toBe('both')
+  })
+
+  it('is nothing for a plain day, and for one that is only taken out', () => {
+    // A cancelled day is not drawn, so there is no box to put a mark on.
+    expect(divergence(undefined)).toBeUndefined()
+    expect(divergence({ cancelled: true })).toBeUndefined()
+  })
+})
+
+describe('occurrencesOnDate — marking a changed day', () => {
+  const e = ev('2026-06-15', { freq: 'weekly', interval: 1 })
+
+  it('leaves a day that is as the series unmarked', () => {
+    const [occ] = occurrencesOnDate([e], '2026-06-15', idx({}))
+    expect(occ.differs).toBeUndefined()
+  })
+
+  it('marks a resized day, a day with its own people, and one with both', () => {
+    const completions = {
+      'e1:2026-06-15': { duration: 2 },
+      'e1:2026-06-22': { attendees: ['kid'] },
+      'e1:2026-06-29': { duration: 2, attendees: ['kid'] },
+    }
+    expect(occurrencesOnDate([e], '2026-06-15', idx(completions))[0].differs).toBe('timing')
+    expect(occurrencesOnDate([e], '2026-06-22', idx(completions))[0].differs).toBe('people')
+    expect(occurrencesOnDate([e], '2026-06-29', idx(completions))[0].differs).toBe('both')
+  })
+
+  it('marks a relocated occurrence on the day it now sits on', () => {
+    const completions = { 'e1:2026-06-15': { start: '2026-06-17' } }
+    const [moved] = occurrencesOnDate([e], '2026-06-17', idx(completions))
+    expect(moved.moved).toBe(true)
+    expect(moved.differs).toBe('timing')
+  })
+
+  it('marks every day a stretched occurrence covers, not just its first', () => {
+    const completions = { 'e1:2026-06-15': { duration: 3 } }
+    const tail = occurrencesOnDate([e], '2026-06-17', idx(completions))
+    expect(tail).toHaveLength(1)
+    expect(tail[0].offset).toBe(2)
+    expect(tail[0].differs).toBe('timing')
+  })
+})
+
+describe('changedDays', () => {
+  const e = ev('2026-06-15', { freq: 'weekly', interval: 1 })
+
+  it('lists the days that are not as the series, taken-out ones included, in order', () => {
+    const completions = {
+      'e1:2026-06-29': { attendees: ['kid'] },
+      'e1:2026-06-15': { duration: 2 },
+      'e1:2026-06-22': { cancelled: true },
+    }
+    expect(changedDays(e, idx(completions))).toEqual(['2026-06-15', '2026-06-22', '2026-06-29'])
+  })
+
+  it('leaves out a recorded day the rule no longer produces', () => {
+    // Written while 06-16 was a slot; the series has since moved to Mondays.
+    // Such a row is never drawn, so it is nothing a person can be pointed at.
+    const completions = { 'e1:2026-06-16': { cancelled: true }, 'e1:2026-06-22': { duration: 2 } }
+    expect(changedDays(e, idx(completions))).toEqual(['2026-06-22'])
+  })
+
+  it("is empty with nothing recorded, and ignores other events' days", () => {
+    expect(changedDays(e, idx({}))).toEqual([])
+    expect(changedDays(e, idx({ 'e2:2026-06-15': { cancelled: true } }))).toEqual([])
   })
 })

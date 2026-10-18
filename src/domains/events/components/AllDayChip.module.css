@@ -1,4 +1,9 @@
 .AllDayChip {
+  /* The changed-day mark sits in this corner — a little further in than on
+     a block, since the pill's full-height radius would otherwise clip it. */
+  position: relative;
+  --mark-inset-y: 3px;
+  --mark-inset-x: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -15,6 +20,11 @@
   overflow: hidden;
 
   font-stretch: 75%;
+}
+
+/* Keep the text clear of the mark. */
+.changed {
+  padding-right: 12px;
 }
 
 .title {

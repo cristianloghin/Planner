@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { type ColorKey, colorStyle } from '../../../assets/palette'
 import { minutesToTime } from '../../../assets/utils/dates'
 import type { DayOccurrence } from '../../../services/recurrence'
+import { ChangedMark } from './ChangedMark'
 
 import styles from './OccurrenceRow.module.css'
 
@@ -22,7 +23,7 @@ export function OccurrenceRow({
   onClick: () => void
   children?: ReactNode
 }) {
-  const { event, segment } = occ
+  const { event, segment, differs } = occ
   let when: string
   if (!event.allDay) {
     when = `${minutesToTime(segment.start)}–${minutesToTime(segment.end)}`
@@ -38,6 +39,7 @@ export function OccurrenceRow({
       style={colorStyle(color)}
       onClick={onClick}
     >
+      {differs && <ChangedMark differs={differs} />}
       <span className={styles.when}>{when}</span>
       <span className={styles.title}>{event.title}</span>
       {children}

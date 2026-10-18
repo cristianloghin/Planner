@@ -64,6 +64,20 @@ export function patchMoveOccurrences(
   return next
 }
 
+/**
+ * A window of days with nothing recorded against any day of one event — what
+ * putting a whole series back does to the rows on the server. Every day goes,
+ * moved and taken-out alike, so the series' pattern shows through everywhere.
+ */
+export function patchResetSeries(occurrences: OccurrenceMap, seriesId: string): OccurrenceMap {
+  const prefix = occurrenceKey(seriesId, '')
+  const next: OccurrenceMap = {}
+  for (const [key, state] of Object.entries(occurrences)) {
+    if (!key.startsWith(prefix)) next[key] = state
+  }
+  return next
+}
+
 /** With a blueprint added or replaced. */
 export function patchSaveTemplate(
   templates: EventTemplate[],

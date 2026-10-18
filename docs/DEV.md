@@ -91,6 +91,21 @@ produces that day again the old row applies. Cancel Tuesday, switch
 weekly→daily, and that Tuesday is still cancelled. This is the accepted price
 of editing in place: an occurrence *is* "the one on this day".
 
+**Per-day rows survive a series edit on purpose.** That is what every
+mainstream calendar does (RFC 5545 exceptions are keyed by `RECURRENCE-ID`
+and untouched by an edit to the master), and silently discarding a cancel
+made weeks ago would be worse than the odd stale Tuesday. Two things make
+the rows visible instead. A day that differs from its series is **marked**:
+`occurrencesOnDate` sets `DayOccurrence.differs` (`timing` / `people` /
+`both`, from `divergence`) and every box that draws an occurrence
+(`EventBlock`, `AllDayChip`, `OccurrenceRow`) puts a `ChangedMark` in its
+corner. And the occurrence sheet offers **"Reset all"** on a series with
+changed days: `changedDays` counts the recorded days the rule still produces
+(read by `useSeriesOccurrences`, a window cut by series rather than by month,
+filed under `occurrencesPrefix` so the usual patches and invalidations keep it
+right), and the `resetSeries` write *deletes* every `event_occurrence` row of
+the series — inert ones included, which is how a zombie Tuesday finally goes.
+
 **"This and following" is a cap, or a cap plus a copy.** The two halves of a
 series cut at a day are worked out in the app, in
 `services/recurrence/split.ts`: the old half is the same rule with `UNTIL` =
@@ -206,7 +221,8 @@ them.
   out of `toCompletions` entirely, so an empty row reads as "nothing happened
   here". Note that nothing garbage-collects empty rows any more — the code that
   did went with occurrence status, and `clearOccurrenceOverride` already left
-  them behind, so the app never relied on it.
+  them behind, so the app never relied on it. The one write that removes rows
+  is `resetSeriesOccurrences`, and it removes all of a series' at once.
 - **`effectiveOccurrence`'s early return must test every override field.** It
   short-circuits when a day carries nothing. A day overriding only its *people*
   has no timing, so a guard that checks timing alone hands back the series and
@@ -222,7 +238,7 @@ them.
 
 ## 6. Tests
 
-`npm test` — 170 tests, no backend needed. It covers the pure logic that is
+`npm test` — 237 tests, no backend needed. It covers the pure logic that is
 easiest to get quietly wrong:
 
 - recurrence expansion (`services/recurrence/`)
