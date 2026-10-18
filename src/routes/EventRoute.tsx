@@ -22,6 +22,7 @@ import { useEventsWrite, useOccurrencesWrite } from '../domains/events/mutations
 import { rosterChange } from '../domains/events/patches'
 import { useEvents, useOccurrencesForRange, useTemplates } from '../domains/events/queries'
 import { timingOf } from '../domains/events/selectors'
+import { NoteEditor } from '../domains/notes/components/NoteEditor'
 import { NoteSection } from '../domains/notes/components/NoteSection'
 import { NoteToolbar } from '../domains/notes/components/NoteToolbar'
 import { useNotesWrite } from '../domains/notes/mutations'
@@ -31,14 +32,12 @@ import type { Note } from '../domains/notes/types'
 import { usePeopleWithColors } from '../domains/people/queries'
 import { defaultAttendees, eventColorIn } from '../domains/people/selectors'
 import { isBlankBody } from '../services/notes/session'
-import { useNoteFocus } from '../services/notes/useNoteFocus'
 import { useOptionalNote } from '../services/notes/useOptionalNote'
 import { effectiveOccurrence, startsOn } from '../services/recurrence/expand'
 import { recurrenceEndingBefore, recurrenceFrom, splitDate } from '../services/recurrence/split'
 import { eventDate, eventStartMinutes } from '../services/recurrence/timing'
 import type { CalendarEvent } from '../types'
 import { EditorPageView } from '../views/EditorPage'
-import { KeyboardDockView } from '../views/KeyboardDock'
 
 /**
  * The editor as a route: `/event/new` seeded from the query, `/event/:id`
@@ -220,8 +219,9 @@ function EditorSession({
     deletes: 'tombstone',
     seedKey: templateId ?? 'own',
   })
-  // The row toolbar only while a note row has the focus.
-  const editingNote = useNoteFocus()
+  // The note is edited on a page of its own over the form: open it on
+  // "add" (with the caret in it) and on a tap on the note; Back closes it.
+  const [noteOpen, setNoteOpen] = useState(false)
 
   /**
    * The note as it stands in the form, written as `ownerSeriesId`'s: removed
@@ -404,22 +404,32 @@ function EditorSession({
               isOccurrence ? undefined : (
                 <NoteSection
                   present={note.present}
-                  onAdd={note.add}
+                  onAdd={() => {
+                    note.add()
+                    setNoteOpen(true)
+                  }}
+                  onEdit={() => setNoteOpen(true)}
                   onRemove={note.remove}
-                  ticks={false}
-                  autoFocus={note.added}
                 />
               )
             }
           />
         </EditorPageView.Body>
       </EditorPageView>
-      {!isOccurrence && note.present && editingNote && (
-        <KeyboardDockView>
-          <KeyboardDockView.Bar>
+      {/* The note's own page, stacked over the form: the rows get the whole
+          screen and the row toolbar sits under them, above the keyboard.
+          Ticks are not offered (NOTE_MODEL Decision 10). Save is the form's;
+          the edits made here wait in the note's store until then. */}
+      {!isOccurrence && note.present && noteOpen && (
+        <EditorPageView onCancel={() => setNoteOpen(false)} cancelLabel="Back to event">
+          <EditorPageView.Title>Note</EditorPageView.Title>
+          <EditorPageView.Body>
+            <NoteEditor ticks={false} autoFocus={note.added} />
+          </EditorPageView.Body>
+          <EditorPageView.Dock>
             <NoteToolbar />
-          </KeyboardDockView.Bar>
-        </KeyboardDockView>
+          </EditorPageView.Dock>
+        </EditorPageView>
       )}
     </NoteProvider>
   )
