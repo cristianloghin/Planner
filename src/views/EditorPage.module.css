@@ -12,6 +12,10 @@
   padding-block: max(env(safe-area-inset-top), 16px) 12px;
 }
 
+/* The body keeps the page's full height under the keyboard (iOS does not
+   shrink the page for it); it pads its bottom by what the keyboard can cover
+   (the view publishes it) so the last fields can scroll clear, and reveals
+   within what is left. */
 .body {
   flex: 1;
   min-height: 0;
@@ -21,26 +25,44 @@
   flex-direction: column;
   gap: 14px;
   padding: 16px;
-  padding-bottom: calc(28px + env(safe-area-inset-bottom));
+  padding-bottom: calc(28px + env(safe-area-inset-bottom) + var(--keyboard-inset, 0px));
+  scroll-padding-bottom: var(--keyboard-inset, 0px);
 }
 
-/* With a dock under it, the body ends above the dock, and the home-indicator
-   inset is the dock's to pad. */
+/* With a dock under it, the home-indicator inset is the dock's to pad. */
 .hasDock .body {
-  padding-bottom: 28px;
+  padding-bottom: calc(28px + var(--keyboard-inset, 0px));
 }
 
-/* A bar under the body, in flow: the body is always exactly the space above
-   it, so nothing has to be scrolled clear of it. */
+/* A bar under the body. At rest it sits at the page's bottom edge; with the
+   keyboard up the view translates it to the keyboard's top edge, over the
+   body's padded end. */
 .dock {
   flex: none;
   background: var(--surface);
   border-top: 1px solid var(--border);
   padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+  will-change: transform;
 }
 
-/* With the keyboard up the page ends at the keyboard's top edge (the view
-   sizes it), and the home indicator is behind the keyboard. */
+/* With the keyboard up the bar's bottom edge is the keyboard's top, and the
+   home indicator is behind the keyboard. */
 .keyboardUp .dock {
   padding-bottom: 6px;
+}
+
+/* Viewport numbers, shown with the gesture readout switched on. */
+.readout {
+  position: fixed;
+  top: calc(4px + env(safe-area-inset-top));
+  left: 4px;
+  z-index: 2200;
+  margin: 0;
+  padding: 4px 7px;
+  font: 10px / 1.4 ui-monospace, Menlo, monospace;
+  color: #7f7;
+  background: rgba(0, 0, 0, 0.75);
+  border-radius: 6px;
+  pointer-events: none;
+  white-space: pre;
 }
