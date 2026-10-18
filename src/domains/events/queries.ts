@@ -11,7 +11,7 @@
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef } from 'react'
 import { addDays } from '../../assets/utils/dates'
-import { fetchOccurrenceRows } from '../../client/occurrences'
+import { fetchOccurrenceRows, fetchSeriesOccurrenceRows } from '../../client/occurrences'
 import { fetchSeries } from '../../client/series'
 import { indexOccurrences, toEvent, toOccurrences, toTemplate } from './transformers'
 import type { CalendarEvent, EventTemplate, OccurrenceIndex, OccurrenceMap } from './types'
@@ -69,6 +69,13 @@ export function useTemplates<T = EventTemplate[]>(
 export const occurrencesPrefix = (accountId: string | null) => ['occurrences', accountId] as const
 const occurrencesKey = (accountId: string | null, month: string) =>
   ['occurrences', accountId, month] as const
+// One series' days, wherever they fall — a window cut by series rather than by
+// month. Deliberately under the same prefix: every write to a day patches and
+// then invalidates everything under it (see ./mutations), so this window
+// stays right for free, the same way the overlapping months do. A patch for
+// another series' day lands in it too; `OccurrenceIndex.of` reads past that.
+const seriesOccurrencesKey = (accountId: string | null, seriesId: string | null) =>
+  ['occurrences', accountId, 'series', seriesId] as const
 
 // A month is fetched with margins. Back, so an event that STARTS before the
 // month but runs into it still has its row (which sits on its start date).
@@ -172,4 +179,24 @@ export function useOccurrencesForRange(
     // here would sit there forever.
     isLoading: results.some((r) => r.isPending && r.fetchStatus === 'fetching'),
   }
+}
+
+/**
+ * Everything recorded on any day of one series, as lookups — for telling how
+ * many of its days are not as the series, however far off they are. Pass
+ * `seriesId` as null to fetch nothing. Until the read lands the index is
+ * empty, which reads as "no changed days": callers show nothing rather than
+ * a spinner, as a count is not worth holding a screen for.
+ */
+export function useSeriesOccurrences(
+  accountId: string | null,
+  seriesId: string | null,
+): OccurrenceIndex {
+  const { data } = useQuery({
+    queryKey: seriesOccurrencesKey(accountId, seriesId),
+    queryFn: async () => toOccurrences(await fetchSeriesOccurrenceRows(seriesId as string)),
+    enabled: accountId != null && seriesId != null,
+    staleTime: STALE_MS,
+  })
+  return useMemo(() => indexOccurrences(data ?? {}), [data])
 }

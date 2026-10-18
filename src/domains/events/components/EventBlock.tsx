@@ -4,6 +4,7 @@ import { cx } from '../../../assets/utils/cx'
 import { minutesToTime } from '../../../assets/utils/dates'
 import type { DayOccurrence } from '../../../services/recurrence'
 import { Badges } from './Badges'
+import { ChangedMark, changedLabel } from './ChangedMark'
 
 import styles from './EventBlock.module.css'
 
@@ -49,9 +50,12 @@ export function EventBlock({
   isExpanded?: boolean
   children?: ReactNode
 }) {
-  const { event } = occ
+  const { event, differs } = occ
   const { start, end } = occ.segment
   const range = `${minutesToTime(start)}–${minutesToTime(end)}`
+  // A dense bar's name is set outright, so the mark's own label would be
+  // lost; say it there as well.
+  const denseLabel = `${event.title}, ${range}${differs ? `, ${changedLabel(differs)}` : ''}`
   // Never thinner than a legible line; dense bars hug their neighbours closer.
   const height = Math.max((end - start) * pxPerMin, dense ? 12 : 16)
   const inset = dense ? 1 : 2
@@ -64,7 +68,7 @@ export function EventBlock({
   return (
     <button
       type="button"
-      className={cx(styles.EventBlock, dense && styles.dense)}
+      className={cx(styles.EventBlock, dense && styles.dense, differs && styles.changed)}
       style={{
         top: start * pxPerMin,
         height,
@@ -75,9 +79,10 @@ export function EventBlock({
       }}
       onClick={onClick}
       title={dense ? event.title : undefined}
-      aria-label={dense ? `${event.title}, ${range}` : undefined}
+      aria-label={dense ? denseLabel : undefined}
     >
       <span className={styles.overlay} style={{ top: height - 12, ...colorStyle(color) }} />
+      {differs && <ChangedMark differs={differs} />}
       {showTitle && (!dense || height >= TITLE_MIN_PX) && (
         <span className={styles.title}>{event.title}</span>
       )}

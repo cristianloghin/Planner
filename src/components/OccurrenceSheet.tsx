@@ -10,7 +10,7 @@ import { PageLoader } from '../assets/ui/Spinner'
 import { isoLabel, minutesToTime, offsetLabel } from '../assets/utils/dates'
 import type { EditScope } from '../domains/events/draft'
 import { type EventsChange, useEventsWrite, useOccurrencesWrite } from '../domains/events/mutations'
-import { useOccurrencesForRange } from '../domains/events/queries'
+import { useOccurrencesForRange, useSeriesOccurrences } from '../domains/events/queries'
 import { reminderOffsets, timingOf } from '../domains/events/selectors'
 import { NoteView } from '../domains/notes/components/NoteView'
 import { useNotes } from '../domains/notes/queries'
@@ -18,7 +18,7 @@ import { noteForSeries } from '../domains/notes/selectors'
 import { AttendeeChips } from '../domains/people/components/AttendeeChips'
 import { usePeopleWithColors } from '../domains/people/queries'
 import { attendeeLabelFor } from '../domains/people/selectors'
-import { effectiveOccurrence, recurrenceLabel } from '../services/recurrence/expand'
+import { changedDays, effectiveOccurrence, recurrenceLabel } from '../services/recurrence/expand'
 import { recurrenceEndingBefore } from '../services/recurrence/split'
 import {
   MINS_PER_DAY,
@@ -73,6 +73,20 @@ export function OccurrenceSheet({
   // Cutting a series at its first day would leave nothing before the cut, so
   // there "this and following" is "all events" and is not offered.
   const canSplit = isRecurring && eventDate(event) !== date
+
+  // Every day of the series that is not as the series — wherever it falls,
+  // not just in this sheet's window — so the reset can say what it reaches.
+  // Only a series has such days; a one-off's edits are the event's own.
+  const seriesOccurrences = useSeriesOccurrences(accountId, isRecurring ? event.id : null)
+  const changed = useMemo(() => changedDays(event, seriesOccurrences), [event, seriesOccurrences])
+  const [confirmReset, setConfirmReset] = useState(false)
+  /** Put every day back: moved, taken out, with its own people — all of them. */
+  function resetAllDays() {
+    occurrencesWrite.mutate({
+      accountId: accountId,
+      change: { kind: 'resetSeries', seriesId: event.id },
+    })
+  }
 
   const occState = occurrences.on(event.id, date)
   // A one-off override on this slot. `date` is the occurrence's identity (the day
@@ -252,6 +266,24 @@ export function OccurrenceSheet({
             </p>
           )}
 
+          {/* The series as a whole: the days above are this one's; these are
+              all of them, this one included when it is among them. */}
+          {changed.length > 0 && (
+            <p className={s.moved}>
+              {changed.length === 1
+                ? '1 day differs from the series'
+                : `${changed.length} days differ from the series`}
+              {' · '}
+              <button
+                type="button"
+                className={s.resetOverride}
+                onClick={() => setConfirmReset(true)}
+              >
+                Reset all
+              </button>
+            </p>
+          )}
+
           {reminderOffsets(event).length > 0 && (
             <div className={s.reminders}>
               {reminderOffsets(event).map((o) => (
@@ -289,6 +321,21 @@ export function OccurrenceSheet({
         destructive
       />
       {editScopeSheet}
+
+      {/* Undoable only by hand, one day at a time, so it asks first. */}
+      <ConfirmDialog
+        open={confirmReset}
+        onOpenChange={setConfirmReset}
+        title="Reset every changed day?"
+        message={
+          changed.length === 1
+            ? `One day of “${event.title || 'Untitled'}” differs from the series: moved, taken out or with different people. It goes back to how the series has it.`
+            : `${changed.length} days of “${event.title || 'Untitled'}” differ from the series: moved, taken out or with different people. They all go back to how the series has them.`
+        }
+        confirmLabel="Reset all"
+        destructive
+        onConfirm={resetAllDays}
+      />
     </>
   )
 }

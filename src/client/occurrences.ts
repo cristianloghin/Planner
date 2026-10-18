@@ -45,6 +45,33 @@ export interface OccurrenceRow {
   attendees: PersonId[] | null
 }
 
+// The columns a read brings back. The parent's all-day flag comes along so the
+// moved-to time and length can be read back in the same units the series uses.
+const ROW_COLUMNS =
+  'series_id, occurrence_start, rescheduled_to, rescheduled_duration, cancelled, attendees, event_series!inner(all_day, account_id)'
+
+interface StoredRow {
+  series_id: string
+  occurrence_start: string
+  rescheduled_to: string | null
+  rescheduled_duration: string | null
+  cancelled: boolean
+  attendees: PersonId[] | null
+  event_series: { all_day: boolean } | null
+}
+
+function toRow(o: StoredRow): OccurrenceRow {
+  const allDay = o.event_series?.all_day ?? false
+  return {
+    seriesId: o.series_id,
+    date: tsToDateKey(o.occurrence_start),
+    cancelled: o.cancelled,
+    start: o.rescheduled_to ? tsToStart(o.rescheduled_to, allDay) : null,
+    duration: o.rescheduled_duration ? intervalToDuration(o.rescheduled_duration, allDay) : null,
+    attendees: o.attendees,
+  }
+}
+
 /**
  * Days with something recorded against them, between `fromDate` and `toDate`.
  *
@@ -61,15 +88,11 @@ export async function fetchOccurrenceRows(
 ): Promise<OccurrenceRow[]> {
   const fromTs = dayRange(fromDate).from
   const toTs = dayRange(toDate).from
-  // The parent's all-day flag comes along so the moved-to time and length can
-  // be read back in the same units the series uses. The join also limits the
-  // scan to this account.
+  // The join also limits the scan to this account.
   const rows = await fetchAll((from, to) =>
     supabase
       .from('event_occurrence')
-      .select(
-        'series_id, occurrence_start, rescheduled_to, rescheduled_duration, cancelled, attendees, event_series!inner(all_day, account_id)',
-      )
+      .select(ROW_COLUMNS)
       .eq('event_series.account_id', accountId)
       .or(
         `and(occurrence_start.gte."${fromTs}",occurrence_start.lt."${toTs}"),and(rescheduled_to.gte."${fromTs}",rescheduled_to.lt."${toTs}")`,
@@ -78,17 +101,25 @@ export async function fetchOccurrenceRows(
       .order('occurrence_start')
       .range(from, to),
   )
-  return rows.map((o) => {
-    const allDay = (o.event_series as { all_day: boolean } | null)?.all_day ?? false
-    return {
-      seriesId: o.series_id,
-      date: tsToDateKey(o.occurrence_start),
-      cancelled: o.cancelled,
-      start: o.rescheduled_to ? tsToStart(o.rescheduled_to, allDay) : null,
-      duration: o.rescheduled_duration ? intervalToDuration(o.rescheduled_duration, allDay) : null,
-      attendees: o.attendees,
-    }
-  })
+  return rows.map(toRow)
+}
+
+/**
+ * Every day of one series with something recorded against it, wherever it
+ * falls — the whole of what `resetSeriesOccurrences` would remove, for saying
+ * so before it does. The series' own rows and nothing else, so no account
+ * filter: the row-level policy already limits this to series the user can see.
+ */
+export async function fetchSeriesOccurrenceRows(seriesId: string): Promise<OccurrenceRow[]> {
+  const rows = await fetchAll((from, to) =>
+    supabase
+      .from('event_occurrence')
+      .select(ROW_COLUMNS)
+      .eq('series_id', seriesId)
+      .order('occurrence_start')
+      .range(from, to),
+  )
+  return rows.map(toRow)
 }
 
 // ---- writes --------------------------------------------------------------
@@ -209,4 +240,18 @@ export async function clearOccurrenceOverride(series: SeriesTiming, date: string
  */
 export async function cancelOccurrence(series: SeriesTiming, date: string): Promise<void> {
   return writeOccurrenceRow(series, date, { cancelled: true })
+}
+
+/**
+ * Put every day of a series back to the series: moved, resized, taken out or
+ * with people of its own, all of them.
+ *
+ * A delete, not a blanking: the per-day clears above null one field and leave
+ * the row, which is fine for one field at a time, but a reset's whole point is
+ * that nothing about any day survives — including rows for days the rule no
+ * longer produces, which the app never shows and could not otherwise clear.
+ */
+export async function resetSeriesOccurrences(seriesId: string): Promise<void> {
+  const { error } = await supabase.from('event_occurrence').delete().eq('series_id', seriesId)
+  if (error) throw error
 }

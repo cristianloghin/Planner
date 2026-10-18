@@ -151,6 +151,41 @@ export function nextRelevantDate(e: CalendarEvent): string {
   return nextStartOnOrAfter(e, toISODate(new Date())) ?? eventDate(e)
 }
 
+/**
+ * How a day differs from its series: it was given a time or length of its own
+ * (`timing`), its own people (`people`), or both.
+ */
+export type Divergence = 'timing' | 'people' | 'both'
+
+/**
+ * How what is recorded on a day makes it differ from its series, if it does.
+ * A day that is only taken out differs too, but it is not drawn, so there is
+ * nothing to mark; callers that count such days test `cancelled` themselves.
+ */
+export function divergence(ov: OccurrenceState | undefined): Divergence | undefined {
+  if (!ov) return undefined
+  const timing = ov.start != null || ov.duration != null
+  const people = ov.attendees != null
+  if (timing && people) return 'both'
+  if (timing) return 'timing'
+  if (people) return 'people'
+  return undefined
+}
+
+/**
+ * The days of `event` that are not as the series — moved, resized, with their
+ * own people, or taken out — among the days the rule still produces, in date
+ * order. A recorded day the rule no longer reaches is inert (never drawn), so
+ * it is left out: this is the list a person can be shown and can act on.
+ */
+export function changedDays(event: CalendarEvent, occurrences: OccurrenceIndex): string[] {
+  return occurrences
+    .of(event.id)
+    .filter(([date, st]) => (st.cancelled || divergence(st) != null) && startsOn(event, date))
+    .map(([date]) => date)
+    .sort()
+}
+
 /** One materialised event instance covering a specific date. */
 export interface DayOccurrence {
   /**
@@ -175,6 +210,12 @@ export interface DayOccurrence {
   segment: { start: number; end: number }
   /** This occurrence was moved to a different day by a one-off override. */
   moved?: boolean
+  /**
+   * How this day differs from its series, when it does — what a screen marks
+   * so a changed day can be told from a plain one. Absent when the day is as
+   * the series. A moved occurrence always differs by at least its timing.
+   */
+  differs?: Divergence
 }
 
 /** Nothing recorded on any day. */
@@ -227,6 +268,7 @@ export function occurrencesOnDate(
         isEnd: offset === span - 1,
         segment: eff.allDay ? { start: 0, end: 24 * 60 } : timedSegment(eff, offset, span),
         moved: true,
+        differs: divergence(st),
       })
     }
 
@@ -244,6 +286,7 @@ export function occurrencesOnDate(
       const eff = effectiveOccurrence(event, start, occurrences)
       const span = eventSpanDays(eff)
       if (back >= span) continue // an override shortened it so it no longer reaches `date`
+      const differs = divergence(ov)
       out.push({
         event,
         attendees: eff.attendees,
@@ -253,6 +296,7 @@ export function occurrencesOnDate(
         isStart: back === 0,
         isEnd: back === span - 1,
         segment: eff.allDay ? { start: 0, end: 24 * 60 } : timedSegment(eff, back, span),
+        ...(differs && { differs }),
       })
       break
     }

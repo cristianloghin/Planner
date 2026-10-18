@@ -1,0 +1,20 @@
+/* A right triangle in the box's top-right corner, inset far enough that the
+   box's rounded corner does not clip it: a 7px radius leaves this whole at
+   2px in, and a rounder box sets the two inset variables to suit. Above the
+   block's fade overlay (z-index 1), under nothing. */
+.ChangedMark {
+  position: absolute;
+  top: var(--mark-inset-y, 2px);
+  right: var(--mark-inset-x, 2px);
+  z-index: 2;
+  width: 7px;
+  height: 7px;
+  background: var(--c);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+  pointer-events: none;
+}
+
+/* On a solid box the colour is the background; white is what its text uses. */
+.inverse {
+  background: white;
+}
