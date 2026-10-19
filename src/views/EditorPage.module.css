@@ -1,6 +1,13 @@
+/* Pinned to the visual viewport the editor library publishes while a note
+   editor is mounted (--note-vv-*): with the keyboard up, the page's bottom
+   edge is the keyboard's top edge. Without an editor the properties are
+   absent and the fallbacks make the page the screen, as before. */
 .EditorPage {
   position: fixed;
-  inset: 0;
+  top: var(--note-vv-top, 0px);
+  left: var(--note-vv-left, 0px);
+  width: var(--note-vv-width, 100%);
+  height: var(--note-vv-height, 100%);
   z-index: 2000;
   display: flex;
   flex-direction: column;
@@ -12,42 +19,40 @@
   padding-block: max(env(safe-area-inset-top), 16px) 12px;
 }
 
-/* The body keeps the page's full height under the keyboard (iOS does not
-   shrink the page for it); it pads its bottom by what the keyboard can cover
-   (the view publishes it) so the last fields can scroll clear, and reveals
-   within what is left. */
+/* The body is exactly the space between the bar and the dock, and the only
+   thing that scrolls. Its overscroll stays inside it: chained to the
+   document, a drag past the end pans the visual viewport, and the page
+   pinned to that viewport moves under the finger. */
 .body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 14px;
   padding: 16px;
-  padding-bottom: calc(28px + env(safe-area-inset-bottom) + var(--keyboard-inset, 0px));
-  scroll-padding-bottom: var(--keyboard-inset, 0px);
+  padding-bottom: calc(28px + env(safe-area-inset-bottom));
 }
 
 /* With a dock under it, the home-indicator inset is the dock's to pad. */
 .hasDock .body {
-  padding-bottom: calc(28px + var(--keyboard-inset, 0px));
+  padding-bottom: 28px;
 }
 
-/* A bar under the body. At rest it sits at the page's bottom edge; with the
-   keyboard up the view translates it to the keyboard's top edge, over the
-   body's padded end. */
+/* A bar in flow under the body: the page's bottom edge is the keyboard's
+   top edge, so the bar sits on the keyboard without being moved. */
 .dock {
   flex: none;
   background: var(--surface);
   border-top: 1px solid var(--border);
   padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
-  will-change: transform;
 }
 
-/* With the keyboard up the bar's bottom edge is the keyboard's top, and the
-   home indicator is behind the keyboard. */
-.keyboardUp .dock {
+/* With the keyboard up the home indicator is behind the keyboard. The
+   library sets the attribute while it judges the keyboard open. */
+:root[data-note-keyboard] .dock {
   padding-bottom: 6px;
 }
 
