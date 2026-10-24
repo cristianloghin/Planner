@@ -15,6 +15,7 @@ Anything still true was carried into [`../DEV.md`](../DEV.md).
 | `PLANNED.md` | Designed but not built | Private lists died with Lists. Shares & pins and the RLS-granularity note moved to `DEV.md`. Its architecture note describes `AppState` / the reducer / `SupabaseStore`, all three of which were deleted. |
 | `RESTRUCTURE_PLAN.md` | Applying the DRSp pattern to this codebase | Largely done: `client/`, `domains/`, `services/`, `assets/` and real routes all landed. What is left is a short section in `DEV.md`. The pattern itself lives in [`../ARCHITECTURE.md`](../ARCHITECTURE.md). |
 
-`NOTE_MODEL.md` is **not** here. It is a design for work that has not started,
-and it is deliberately unaffected by the note *attachments* that were removed —
-removing those cleared the ground for it.
+`NOTE_MODEL.md` is **not** here. It is the design the notes work is built
+from — stage 1 is live, stage 2 is not — and it is deliberately unaffected by
+the note *attachments* that were removed; removing those cleared the ground for
+it.
