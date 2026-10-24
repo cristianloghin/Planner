@@ -7,9 +7,13 @@ event series. Its content is a sequence of **rows** — a heading, a checklist
 item, or a paragraph — so one note can be a shopping list, a set of
 instructions, a scribble, or all three at once.
 
-**Status: design, ready to build.** The per-event notes, checklists and lists
-that once existed were removed in the strip-down (`0022`), so this is the only
-notes structure and takes over nothing. This document specifies storage, the
+**Status: stage 1 built, stage 2 designed.** The `note` table (`0025`),
+standalone notes in the Library, a note per event or template edited with it,
+and the copies a split (`0026`) and a template make are live — see
+[Build order](#build-order). The per-occurrence override table and tick state
+are not built. The per-event notes, checklists and lists that once existed
+were removed in the strip-down (`0022`), so this is the only notes structure
+and takes over nothing. This document specifies storage, the
 rules that govern it, and the one contract the app has with the editor whose
 format it stores: [the library contract](#the-library-contract). How any of it
 is rendered is out of scope.

@@ -12,10 +12,14 @@ appears live.
 - Day / Week / Month views, one calendar lane per person
 - Repeating events, with a user-set end — *after N times* or *on a date*
 - Per-occurrence overrides: move a single day, cancel it, or change who is on it
-  without touching the rest of the series
+  without touching the rest of the series. A day that differs from its series
+  is marked, and "Reset all" puts the whole series back
 - Edit or delete a series from one day on ("this and following"): the earlier
   days stay exactly as they were
-- Event templates, to start a new event from a saved shape
+- Notes: small documents of headings, checklist items and paragraphs, written
+  in the `@mikrostack/notes` editor. A note stands on its own in the Library,
+  or belongs to an event or template and shows on each of its days
+- Event templates, to start a new event from a saved shape, its note included
 - Reminders: in-app while the tab is open, Web Push while it is closed
 - Full-text search over event titles
 - A twelve-colour palette shared by people and events, with per-user overrides
@@ -29,8 +33,11 @@ nothing follows from who is on an event — it is just who is on it.
   testing, push setup, and what is safe to run. **Start here.**
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the DRSp pattern: layers,
   rules, where new code goes.
-- [`docs/NOTE_MODEL.md`](docs/NOTE_MODEL.md) — a richer note/document model
-  (design only, next up).
+- [`docs/NOTE_MODEL.md`](docs/NOTE_MODEL.md) — the note model: storage, its
+  rules, and the contract with the editor library. Stage 1 (the note itself)
+  is built; stage 2 (per-day divergence and ticks) is designed.
+- [`docs/PATTERN_NOTES.md`](docs/PATTERN_NOTES.md) — evidence from applying
+  DRSp here, and the questions still open.
 - [`docs/archive/`](docs/archive/README.md) — superseded docs, kept for their
   reasoning. Not current.
 - [`supabase/migrations/`](supabase/migrations) — schema, RLS, functions, grants.
@@ -41,6 +48,8 @@ nothing follows from who is on an event — it is just who is on it.
 - TanStack Query for reads, writes and the offline queue
 - Supabase for auth, data, realtime and the reminder sender (a Deno edge function)
 - `vite-plugin-pwa` for the manifest and offline service worker
+- `@mikrostack/router` for routes and `@mikrostack/notes` for the note editor,
+  both developed alongside this app, so Vite serves them raw (DEV.md §5)
 - Deployed to GitHub Pages via GitHub Actions
 
 ## Develop
@@ -90,8 +99,7 @@ gives no visual clue. `grep VITE_SUPABASE_URL .env.local` is the whole check.
 per-origin, so the same origin pointed at a different database shows the previous
 account's data until the first fetch lands. It looks like data loss and is not.
 
-The commands that act on the **linked** project — and migration `0022`, which has
-not been applied there yet — are in
+The commands that act on the **linked** project are in
 [`docs/DEV.md` §10](docs/DEV.md#10-local-vs-production--read-before-running-anything).
 Read it before running any `supabase db` command.
 
@@ -122,7 +130,7 @@ npm run lint
 npm run gen:types   # regenerate client/database.types.ts from the LOCAL database
 ```
 
-`npm test` is 170 tests and needs no backend. What it does **not** cover is any
+`npm test` is 237 tests and needs no backend. What it does **not** cover is any
 round trip to the database — that still needs a click-test against the local
 stack. See [`docs/DEV.md` §6](docs/DEV.md#6-tests).
 

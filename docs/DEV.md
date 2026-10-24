@@ -22,14 +22,24 @@ days it produces are computed, never stored. The only rows about a specific day
 are sparse *overrides* in `event_occurrence`, written when a day differs from its
 series.
 
-Five screens, four of them routes: Day, Week, Month, Settings (`/` redirects to
-`/day`).
+A **note is one document, sealed.** `note.body` is the editor library's own
+format (`@mikrostack/notes`), stored whole and read whole; the app sees rows
+only by parsing it through the library. A note stands on its own in the
+Library, or belongs to one series — an event or a template. That is stage 1 of
+[`NOTE_MODEL.md`](./NOTE_MODEL.md); per-day divergence and ticks are stage 2
+and not built.
+
+Five tabs, every one a route: Day, Week, Month, the Library (templates and
+notes) and Settings; `/` redirects to today's `/day`. The event, template and
+note editors are full-page routes of their own, so the back button closes them
+and a reload keeps them open. The occurrence sheet is the one panel that is
+not a route.
 
 ---
 
 ## 2. The schema
 
-Ten tables. No enum-as-table lookups; the only check constraint in `public` is
+Eleven tables. No enum-as-table lookups; the only check constraint in `public` is
 `template_or_scheduled`, which is a structural invariant.
 
 | Table | Holds |
@@ -40,6 +50,7 @@ Ten tables. No enum-as-table lookups; the only check constraint in `public` is
 | `person` | a calendar lane: `name`, `color_key`, `sort_order`. **No kind of person.** |
 | `event_series` | the pattern — and templates, told apart by `is_template` |
 | `event_occurrence` | sparse per-day overrides |
+| `note` | a document: standalone when `owner_series_id` is null, else a series' one |
 | `reminder` | per user, per series, an offset in seconds |
 | `notification_log` | what the sender already sent (dedup) |
 | `push_subscription` | one row per browser |
@@ -54,13 +65,18 @@ event_occurrence  series_id, occurrence_start,          -- identity: the ORIGINA
                   cancelled,                            -- removed
                   attendees uuid[],                     -- null = as the series
                   metadata
+
+note           id, account_id, owner_series_id, title, author_id,
+               body jsonb,                            -- the editor's document, opaque
+               metadata, …
 ```
 
 Functions: `create_account`, `handle_new_user`, `is_account_member`,
 `can_access_series`, `search_events`, `split_series`,
 `schedule_reminder_sender`, `unschedule_reminder_sender`.
 
-Realtime publishes `event_series`, `event_occurrence`, `person`, `reminder`.
+Realtime publishes `event_series`, `event_occurrence`, `person`, `reminder`,
+`note`.
 
 ---
 
@@ -162,16 +178,56 @@ series.attendees`. No SQL joins them; the app filters in memory.
 > you own cleaning both columns. The read side degrades to a visible `?` rather
 > than throwing.
 
-**`metadata jsonb` on `event_series` and `event_occurrence`** is a pressure
-valve for structured extras. Nothing reads or writes it. That is safe by
-construction: `saveSeries` upserts a named column list and `writeOccurrenceRow`
-does a partial update, so app writes leave the bag alone (verified by hand).
+**`metadata jsonb` on `event_series`, `event_occurrence` and `note`** is a
+pressure valve for structured extras. Nothing reads or writes it. That is safe
+by construction: `saveSeries` upserts a named column list, `writeOccurrenceRow`
+does a partial update and `saveNote` names its fields, so app writes leave the
+bag alone (verified by hand). The split copies it along with the row.
 
 **Templates are `event_series` rows with `is_template = true`** and no date. One
 table, one module — `client/series.ts` treats events and templates as the same
 thing. A template has nobody on it (`attendees` is empty — who is on an event is
 chosen when it is made) and always has a `color_key`, which the event made from
 it takes as its own.
+
+**A note is one JSON column, and the app is blind to it.** `note.body` is the
+`@mikrostack/notes` document. Nothing in the app names a key inside it: the
+client reads and writes the column whole, `services/notes/session.ts` turns
+each edit into a patch through the library and merges the patches back, and
+the only view of the content is the library's parsed rows (`NoteView`,
+`isBlankBody`). The library can change its format and the app carries it
+through untouched (NOTE_MODEL Decision 13). `client/notes.ts` is the one place
+`NoteBody` is tied to the library's type.
+
+**A note is standalone or a series' — never both, never moved.**
+`owner_series_id` is null for a Library note and set for an event's or
+template's, and a partial unique index allows one note per series. The owner
+and `author_id` are stamped at creation and never updated: `saveNote` upserts
+the whole row only for a new note and otherwise updates `title`, `body` and
+`updated_at`, so saving a partner's note does not make it yours (Decision 7).
+
+**Deletes differ by ownership.** A standalone note drops a removed row
+(`deletes: 'drop'`); a series note keeps it as a tombstone (`'tombstone'`),
+because stage 2's per-day patches may still address it (Decision 6). Each
+editor passes the mode for what it edits.
+
+**A note is saved on Save, whole.** Edits accumulate as patches on the device;
+Save writes the complete document and closes the page, and leaving discards
+them, like every other editor here (Decision 15). The last save wins. A new
+note's id is minted by the app before the first write, so the write replays
+cleanly and an editor opened offline can keep naming it.
+
+**A series' note follows the series.** `split_series` (0026) copies the note
+onto the new half under an id the app minted and passed in, so the edits made
+in the same form are written to the copy afterwards, second in the ordered
+queue. Picking a template in the event editor seeds the note editor from the
+template's note and Save writes a note of the event's own; "Save as template"
+copies the other way (Decision 14). Nothing shares a note between two series.
+On an event or template a note is optional: "Add a note" adds one, the bin
+removes it, and a note added and left blank writes nothing.
+
+**The occurrence sheet shows a series' note read-only.** Ticks are drawn as
+stored and cannot be changed there. Ticking on one day is stage 2.
 
 ---
 
@@ -233,6 +289,19 @@ them.
   origin pointed at a different database renders the previous account's data
   until the first fetch lands. It looks like data loss and is not. Clear site
   data when you switch.
+- **The `@mikrostack/*` packages are kept out of Vite's pre-bundle**
+  (`optimizeDeps.exclude` in `vite.config.ts`). They change often, and the
+  pre-bundle can go on serving an old copy after an upgrade, which looks
+  exactly like the new version not working. The one exception is the router's
+  `@mikrostack/chbus`, pre-bundled on the router's behalf because its `import`
+  entry is CommonJS and only the pre-bundle's interop makes that loadable. If
+  a package upgrade "does nothing" in dev, check this list first.
+- **Never read inside `note.body`.** Parse it with the library (`parseDoc`)
+  or leave it alone. A key named in app code is a coupling the library's next
+  release can break silently.
+- **`deletes` is `'drop'` for a standalone note and `'tombstone'` for a
+  series note.** Swapped, a standalone note accumulates debris and a series
+  note loses rows that per-day state may still address.
 
 ---
 
@@ -247,6 +316,9 @@ easiest to get quietly wrong:
 - DB↔app conversions (`client/mappers.ts`)
 - each domain's transformers, selectors and optimistic patches
 - the session and realtime stores
+- the notes domain's selectors and patches, and the editing session
+  (`services/notes/session.test.ts`: unsaved patches replayed over a newer
+  copy, drop vs tombstone, what counts as blank)
 - **the sender-vs-client cross-validation** — the one to watch
 
 **What it does not cover: any round trip to the database.** That needs a
@@ -307,9 +379,13 @@ resolves but Deno does not.
 
 ## 8. Designed, not built
 
-- **The note model** — [`NOTE_MODEL.md`](./NOTE_MODEL.md). A richer note /
-  document model. The old free-text note *attachments* were removed; that
-  cleared the ground for this rather than contradicting it. **Next up.**
+- **Notes, stage 2** — [`NOTE_MODEL.md`](./NOTE_MODEL.md), "Build order".
+  Stage 1 is built: the `note` table, standalone and series notes, and the
+  copies a split and a template make. Stage 2 is `note_occurrence_override`,
+  a sparse per-day patch over a series note, which is where ticking an item
+  on one day and hiding a row for one day live. Until then the occurrence
+  sheet shows a series' note read-only. Import (Decision 11) is application
+  code over stage 1 and waits on the library's append operation.
 - **Shares & pins** — one `occurrence_share` table at occurrence grain: share a
   concrete occurrence to another user (inbox + toast), or pin it for yourself (a
   pin is a self-share). Design in
@@ -345,9 +421,12 @@ identical to the safe ones.
 `grep VITE_SUPABASE_URL .env.local` is the whole check for which backend the app
 is pointed at. There is no staging project and the app has no undo.
 
-> Migrations `0022` through `0025` are applied to production (checked with
-> `supabase migration list --linked`, 2026-09-19). `0022` was the irreversible
-> strip-down; the note below on how it was tested stays for the record.
+> Migrations `0022` through `0025` were confirmed applied to production with
+> `supabase migration list --linked` on 2026-09-19. `0026` went out with the
+> deploy that carried it — `deploy.yml` runs `supabase db push` before every
+> build — and has not been checked by hand since; run the list command before
+> assuming. `0022` was the irreversible strip-down; the note below on how it
+> was tested stays for the record.
 >
 > A migration that adds a function the app calls by name (`0024`, `0026`) has
 > to exist before a build that calls it is served. `deploy.yml` runs
