@@ -389,7 +389,8 @@ resolves but Deno does not.
 - **Routines** — [`ROUTINES.md`](./ROUTINES.md). A private, opt-in weekly
   planner for the things that are not appointments: a measure, a weekly
   target with a dated history, eligible days and a log. Its own tab; the
-  calendar screens come later. Design complete, with a build order.
+  calendar screens come later. Design complete; the step-by-step plan is
+  [`ROUTINES_PLAN.md`](./ROUTINES_PLAN.md).
 - **Shares & pins** — one `occurrence_share` table at occurrence grain: share a
   concrete occurrence to another user (inbox + toast), or pin it for yourself (a
   pin is a self-share). Design in

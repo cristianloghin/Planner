@@ -286,6 +286,9 @@ need not move; it moves if a key is renamed later.
 
 ## Build order
 
+Step by step, with files and done-criteria, in
+[`ROUTINES_PLAN.md`](./ROUTINES_PLAN.md). In outline:
+
 1. `0027_routines.sql` — the three tables, `owns_routine`, policies, realtime.
 2. Client, domain and `services/routines/week.ts`, with the maths tests.
 3. The two preference keys and the Settings switches; the tab; the `/routines`
