@@ -1,55 +1,45 @@
 # Routines
 
-A personal, weekly day planner beside the calendar: the things you want to fit
-into your week that are not appointments. Running. Writing. Drinks with
-friends. Your daughter's bedtime.
+A personal weekly planner beside the calendar, for recurring activities that
+are not appointments: running, writing, a weekly night out, a daily bedtime.
 
 **Status: design, ready to build.** Nothing here exists in the schema or the
 app. Routines are **opt-in** (a switch in Settings), live in **a view of their
 own** (an icon tab), and are **private** to the signed-in user. Integration with
-the calendar screens comes later, once the shape has survived a few weeks of
-real use; what that integration will need is noted at the end and otherwise out
-of scope.
+the calendar screens comes later, after the first version has been used; what
+that integration will need is noted at the end and otherwise out of scope.
 
-The design came out of a conversation about what makes such a tool work for
-one person, and the principles from it matter more than the tables. They come
-first.
+The principles constrain every later decision, so they come first.
 
 ---
 
 ## Principles
 
-1. **The app is neutral.** It knows nothing about running or writing. It holds a
-   measure, a goal, the days that count and a log. Progression, ceilings,
-   "that is enough for this week" are the user's decisions. Where the app has
-   something to say, it is a *hint* the user can switch off, never a change the
-   app makes on its own.
+1. **The app has no activity types.** It holds a measure, a weekly target,
+   eligible days and a log. Targets are set and changed only by the user. The
+   one derived value the app shows is the hint (rule 4), and a preference turns
+   it off.
 
-2. **It records what happened, never what did not.** There is no row for a
-   miss, no "missed" label, no red day, no streak and no broken chain. A quiet
-   week is a smaller total. The user's own reaction to a miss is signal enough;
-   the app adding to it only makes the next day easier to skip.
+2. **It records logs, not their absence.** There is no row, label, colour or
+   count for a day without a log, and no streak. A week with few logs has a
+   small total and nothing else.
 
-3. **The week is the forgiveness boundary.** Monday opens clean. Nothing
-   carries over in either direction: a short week leaves no debt, a big week
-   banks nothing. There is no pause state; a sick week is a low week and the
-   record shows it as it was.
+3. **Weeks are independent.** A week's total is the sum of its logs and its
+   target is its goal. Nothing is carried from one week to the next in either
+   direction. There is no pause state.
 
-4. **Goals are the user's, and their history is kept.** Changing a goal applies
-   to the current week unless the user says "from next week". Past weeks keep
-   the goal they had, for information only.
+4. **Targets have a history.** A change applies to the current week unless the
+   user chooses "from next week". Past weeks keep the target they had.
 
-5. **Private.** Routines belong to the login, not to the account's people, and
-   a partner in the same account never sees them. The database enforces this,
-   not the screen.
+5. **Private.** Routines belong to the user, not to a person row, and other
+   members of the account cannot read them. Row-level security enforces this.
 
-6. **Logging is the whole interaction.** One tap for a tick, one number for an
-   amount. No timer, no planning step. A log never needs a plan to count, and
-   an opportunistic twenty minutes counts the same as a scheduled one.
+6. **Logging is the only write in daily use.** One tap for a tick, one number
+   for an amount. There is no timer and no planning step.
 
-7. **The hint is arithmetic on the user's own numbers.** "22 km left, three
-   eligible days, about 7 today." It is quiet text, it is the only thing in the
-   view that looks forward, and a preference turns it off.
+7. **The hint is derived from the user's own numbers:** the remaining target
+   divided over the remaining eligible days. It is text, the only
+   forward-looking value in the view, and a preference turns it off.
 
 ---
 
@@ -61,18 +51,17 @@ occurrences. Two kinds:
 | Kind | Stored as | Shown as | Example |
 |---|---|---|---|
 | `time` | minutes | hours and minutes | writing, 3 h 30 a week |
-| `amount` | a number, decimals allowed, with an optional label | the number and its label; a blank label is a tick, and a tick logs 1 | running, 50 km a week; drinks, 1 a week; bedtime, 7 a week |
+| `amount` | a number, decimals allowed, with an optional label | the number and its label; a blank label is a tick, and a tick logs 1 | running, 50 km a week; night out, 1 a week; bedtime, 7 a week |
 
-The weekly target is a **floor, not a score**. For some routines the user wants
-to go over, for others going over means nothing, and the app does not need to
-know which.
+The weekly target is a **threshold**. The app does not distinguish between
+meeting it and exceeding it.
 
-**Eligible days** are the weekdays a routine can realistically happen on; a
-commute day is not a running day. They exist for the hint only — they never
-gate a log, and a log on an ineligible day counts like any other.
+**Eligible days** are the weekdays the hint distributes the remaining target
+over. They exist for the hint only — they never gate a log, and a log on an
+ineligible day counts like any other.
 
 **Period is always a week**, Monday to Sunday, matching the calendar. A daily
-ritual is "7 a week".
+routine is "7 a week".
 
 ---
 
@@ -150,10 +139,9 @@ Table privileges come from `0004`'s default grants; `owns_routine` is granted
 to `authenticated` and revoked from `public`, like `can_access_series`.
 
 **Realtime.** All three tables join the publication with `replica identity
-full`. Nobody else sees the rows, but the same user on a second device does,
-and a log typed on the phone should appear on the laptop without a reload. The
-gating column is not in `routine_log`'s primary key, so without the full old
-row a DELETE would be filtered out (the `0011` lesson).
+full`. Only the owning user receives changes, and the same user on a second
+device needs them. The gating column is not in `routine_log`'s primary key, so
+without the full old row a DELETE would be filtered out (see `0011`).
 
 **Why `account_id` on a private table.** For the same reason `user_preference`
 has it: the account is where the view appears, a user in two accounts keeps
@@ -176,10 +164,10 @@ past week, whose Monday is earlier than both. This one rule gives history,
 immediate changes and planning ahead, so the first version has all three.
 
 ### 2. A week's total is the sum of its logs, and nothing else
-No column holds debt or surplus, no row says "missed", nothing is computed
-across weeks. The strip for a week is its logs; the number beside the target
-is their sum. Deleting a log lowers the total; that is the only way a total
-goes down.
+No column holds a carried balance, no row records an absent log, nothing is
+computed across weeks. The strip for a week is its logs; the number beside the
+target is their sum. Deleting a log lowers the total; that is the only way a
+total goes down.
 
 ### 3. Two kinds, one log shape
 Every log is one `numeric`. For `time` it is minutes; the editors take and show
@@ -196,21 +184,20 @@ eligible day remains from today through Sunday:
 ask = (target − total) / eligible days from today to Sunday, today included
 ```
 
-Rounded to something sayable: five minutes for time, a whole number or one
-decimal for amounts. It is a line of quiet text under the routine. On an
-ineligible day, or once the target is met, it says nothing. It never becomes a
-bar, a colour or a warning, and `prefs.routinesHint = false` removes it. It is
-the one piece of forward-looking arithmetic in the feature, and the only
-recommendation the app makes.
+Rounded: five minutes for time, a whole number or one decimal for amounts. It
+is a line of secondary text under the routine. On an ineligible day, or once
+the target is met, it is not shown. It is not rendered as a bar, a colour or a
+warning, and `prefs.routinesHint = false` removes it. It is the only derived
+forward-looking value in the feature.
 
 ### 5. Logging
 - A **tick** routine logs 1 for today on one tap. The row shows today's count;
-  a second tap logs another, and the day's logs are listed so a slip can be
-  removed.
+  a second tap logs another, and the day's logs are listed so an extra log
+  can be removed.
 - A **time** or **amount** routine opens a small sheet: the amount, and the
-  day, which defaults to today and may be any day of the **current** week — a
-  forgotten run gets logged the morning after. Logging into a past week is not
-  offered in the first version; the view does not show past weeks.
+  day, which defaults to today and may be any day of the **current** week, so
+  a log can be entered the day after. Logging into a past week is not offered
+  in the first version; the view does not show past weeks.
 - A log's id is minted by the app before the write, and the write is an upsert
   by id, so a save replayed after a lost response rewrites rather than
   duplicates. Writes are change objects through the shared queue, like every
@@ -218,10 +205,9 @@ recommendation the app makes.
 - A log can be edited and deleted from the day's list.
 
 ### 6. Archive by default
-Retiring a routine sets `archived_at`. It leaves Today and the strip and keeps
-every log and goal, for the day past weeks become visible. Delete exists too,
-behind a confirmation, and cascades. There is no un-archive in the first
-version.
+Archiving a routine sets `archived_at`. It leaves Today and the strip and
+keeps every log and goal. Delete exists too, behind a confirmation, and
+cascades. There is no un-archive in the first version.
 
 ### 7. Opt-in, and where the switch is
 Two keys on `user_preference.prefs`, flat like the existing ones:
@@ -233,13 +219,13 @@ routinesHint?: boolean      // the hint shows; default true
 
 Both sit in Settings, the hint switch under the enable switch. With routines
 off, the `/routines` routes redirect to today's `/day`, so a stale deep link
-does nothing surprising.
+lands on the calendar.
 
 ### 8. What is deliberately absent
 Streaks. "Missed" in any form. Carry-over. Pause. Ceilings and progression.
 Activity types. A timer. Time anchors. Partner visibility. Past weeks. Stats
-beyond this week's totals. Each was considered and left out on purpose; the
-principles above say why. Adding one back is a design change, not an omission.
+beyond this week's totals. Each is excluded by the principles above. Adding one
+is a design change.
 
 ---
 
@@ -253,14 +239,14 @@ detail is out of scope, as in `NOTE_MODEL.md`; this is what the screen holds.
 - the name;
 - what is logged today — `25 min`, `8 km`, a count for a tick, or nothing;
 - the week so far against the target — `140 / 210 min`, `21 / 50 km`, `4 / 7`;
-- the hint, in quieter type, when it has something to say.
+- the hint, as secondary text, when rule 4 produces one.
 
 The tap target is the log action: a tick logs now, the others open the sheet.
 A second control opens the day's logs for editing.
 
 **The week**, as a strip under Today. Monday to Sunday, today marked, one thin
-line per routine, a mark on each day with a log. It shows the shape of the
-week, not its arithmetic; the numbers are in the rows above.
+line per routine, a mark on each day with a log. It shows which days have
+logs; the totals are in the rows above.
 
 **Managing routines** is a full-page editor route, like the template editor:
 `/routines/new` and `/routines/:id`. Name, kind (fixed once made), unit,
@@ -301,9 +287,9 @@ need not move; it moves if a key is renamed later.
 2. Client, domain and `services/routines/week.ts`, with the maths tests.
 3. The two preference keys and the Settings switches; the tab; the `/routines`
    view with Today and the strip; the editor route.
-4. Later, each its own design pass: time anchors and the Day view (a soft,
-   personal, movable block that looks nothing like an event); past weeks in the
-   strip; importing runs from a watch.
+4. Later, each its own design pass: time anchors and the Day view (a
+   personal, movable block drawn distinctly from an event); past weeks in the
+   strip; importing logs from a device.
 
 ---
 
