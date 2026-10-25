@@ -386,6 +386,10 @@ resolves but Deno does not.
   on one day and hiding a row for one day live. Until then the occurrence
   sheet shows a series' note read-only. Import (Decision 11) is application
   code over stage 1 and waits on the library's append operation.
+- **Routines** — [`ROUTINES.md`](./ROUTINES.md). A private, opt-in weekly
+  planner for the things that are not appointments: a measure, a weekly
+  target with a dated history, eligible days and a log. Its own tab; the
+  calendar screens come later. Design complete, with a build order.
 - **Shares & pins** — one `occurrence_share` table at occurrence grain: share a
   concrete occurrence to another user (inbox + toast), or pin it for yourself (a
   pin is a self-share). Design in

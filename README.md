@@ -36,6 +36,8 @@ nothing follows from who is on an event — it is just who is on it.
 - [`docs/NOTE_MODEL.md`](docs/NOTE_MODEL.md) — the note model: storage, its
   rules, and the contract with the editor library. Stage 1 (the note itself)
   is built; stage 2 (per-day divergence and ticks) is designed.
+- [`docs/ROUTINES.md`](docs/ROUTINES.md) — routines: a private weekly planner
+  beside the calendar. Design only, not built.
 - [`docs/PATTERN_NOTES.md`](docs/PATTERN_NOTES.md) — evidence from applying
   DRSp here, and the questions still open.
 - [`docs/archive/`](docs/archive/README.md) — superseded docs, kept for their
