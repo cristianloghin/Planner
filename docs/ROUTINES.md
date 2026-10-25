@@ -110,6 +110,9 @@ create table routine_log (
   on_date     date not null,
   -- Minutes for time, the amount's own unit otherwise. A tick is 1.
   amount      numeric not null check (amount > 0),
+  -- The house pressure valve, as on the event tables and `note`. Nothing
+  -- reads or writes it in the first version.
+  metadata    jsonb not null default '{}'::jsonb,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
